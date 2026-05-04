@@ -24,13 +24,13 @@ export default function StudentTests() {
 
       // Filter by user department and group
       const filtered = allTests.filter(t => {
-        // 1. Global content (Admin created, no assignments)
-        const isGlobal = t.creatorRole === 'admin' && 
-                         (!t.organizationIds || t.organizationIds.length === 0) &&
-                         (!t.departmentIds || t.departmentIds.length === 0) &&
-                         (!t.groupIds || t.groupIds.length === 0);
-        
-        if (isGlobal) return true;
+        // 1. Global content (Admin created)
+        const isAdminTest = t.creatorRole === 'admin' || !t.creatorRole;
+        const isGlobalAdminTest = isAdminTest && 
+                                 (!t.organizationIds || t.organizationIds.length === 0) &&
+                                 (!t.departmentIds || t.departmentIds.length === 0) &&
+                                 (!t.groupIds || t.groupIds.length === 0);
+        if (isGlobalAdminTest) return true;
 
         // 2. Teacher/Organization assignment
         if (t.creatorId === user.teacherId) return true;

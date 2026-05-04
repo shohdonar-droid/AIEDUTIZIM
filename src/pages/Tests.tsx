@@ -27,19 +27,24 @@ export default function Tests() {
     if (searchTerm && !t.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     
     // RULE: On the general list, only show content created by ADMIN
+    const isAdminTest = t.creatorRole === 'admin' || !t.creatorRole;
+    const isGlobalAdminTest = isAdminTest && 
+                             (!t.organizationIds || t.organizationIds.length === 0) &&
+                             (!t.departmentIds || t.departmentIds.length === 0) &&
+                             (!t.groupIds || t.groupIds.length === 0);
+
     if (!user) {
-      return t.creatorRole === 'admin' && t.isPublished !== false;
+      return isGlobalAdminTest && t.isPublished !== false;
     }
 
-    // 1. Admin sees only their own (as requested)
     if (user.role === 'admin') {
-      return t.creatorRole === 'admin';
+      return isAdminTest;
     }
 
     // 2. Students see Admin content + their own organization's content
     if (user.role === 'student') {
        // Admin content
-       if (t.creatorRole === 'admin') return true;
+       if (isGlobalAdminTest) return true;
 
        // Organization content
        const isFromMyOrg = t.organizationIds?.includes(user.teacherId || '') || t.creatorId === user.teacherId;

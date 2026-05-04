@@ -65,6 +65,8 @@ export default function AdminCourses() {
       } else {
         await addDoc(collection(db, 'courses'), {
           ...editingCourse,
+          creatorRole: user?.role || 'admin',
+          creatorId: user?.uid || 'admin',
           modules: editingCourse.modules || Array(5).fill(null).map((_, i) => ({
             id: `m${i+1}`,
             title: i === 4 ? `Yakuniy Imtihon` : `Modul ${i+1}`,

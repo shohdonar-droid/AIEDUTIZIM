@@ -27,26 +27,24 @@ export default function Courses() {
 
     // RULE: On the general list, only show content created by ADMIN
     // If user is not logged in, they ONLY see Admin's global content
+    const isAdminCourse = c.creatorRole === 'admin' || !c.creatorRole;
+    const isGlobalAdminCourse = isAdminCourse && 
+                               (!c.organizationIds || c.organizationIds.length === 0) &&
+                               (!c.departmentIds || c.departmentIds.length === 0) &&
+                               (!c.groupIds || c.groupIds.length === 0);
+
     if (!user) {
-      return c.creatorRole === 'admin' && c.isPublic !== false;
+      return isGlobalAdminCourse && c.isPublic !== false;
     }
 
-    // 1. Admin sees everything for management, BUT user wants "Admin profilda faqat o'zi tayyorlagan..." 
-    // This usually refers to the Dashboard, but for the general list, Admin might want to see all or just their own.
-    // The request says "Admin profilda faqat o'zi tayyorlagan kurslar, testlar imtihonlar saqlanadigan bo'lsin"
-    // So if it's the Admin role viewing the GENERAL list, we show everything or just Admin? 
-    // Usually general lists show what is available. 
-    // Let's stick to the isolation requested:
-    
     if (user.role === 'admin') {
-      return c.creatorRole === 'admin';
+      return isAdminCourse;
     }
 
     // 2. Assignment logic for logged-in students
     if (user.role === 'student') {
        // Students see Admin content (if global/public)
-       const isGlobalAdmin = c.creatorRole === 'admin';
-       if (isGlobalAdmin) return true;
+       if (isGlobalAdminCourse) return true;
 
        // Students see their organization's content
        const isFromMyOrg = c.organizationIds?.includes(user.teacherId || '') || c.creatorId === user.teacherId;

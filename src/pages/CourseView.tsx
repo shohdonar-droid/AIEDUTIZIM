@@ -26,26 +26,36 @@ export default function CourseView() {
 
   useEffect(() => {
     async function load() {
-      if (!id || !user) return;
+      if (!id) return;
+      let currentUser = user;
+      if (!currentUser) {
+         let guestId = localStorage.getItem('guest_id');
+         if (!guestId) {
+             guestId = 'GUEST_' + Math.random().toString(36).substring(2, 9);
+             localStorage.setItem('guest_id', guestId);
+         }
+         currentUser = { uid: guestId, displayName: 'Mexmon', role: 'student', teacherId: 'admin' } as any;
+      }
+
       const cSnap = await getDoc(doc(db, 'courses', id));
       if (!cSnap.exists()) return navigate('/courses');
       const cData = { id: cSnap.id, ...cSnap.data() } as Course;
       setCourse(cData);
 
-      const eSnap = await getDocs(query(collection(db, 'enrollments'), where('userId', '==', user.uid), where('courseId', '==', id)));
+      const eSnap = await getDocs(query(collection(db, 'enrollments'), where('userId', '==', currentUser.uid), where('courseId', '==', id)));
       if (eSnap.empty) {
         // Create enrollment if not exists
         const newEnrollment: any = {
-          userId: user.uid,
+          userId: currentUser.uid,
           courseId: id,
-          teacherId: user.teacherId || 'admin', // Added for Journal filtering
+          teacherId: currentUser.teacherId || 'admin', // Added for Journal filtering
           currentModuleIndex: 0,
           grades: {},
           completed: false,
           lastAccessed: serverTimestamp()
         };
         const docRef = await addDoc(collection(db, 'enrollments'), newEnrollment);
-        const finalSnap = await getDocs(query(collection(db, 'enrollments'), where('userId', '==', user.uid), where('courseId', '==', id)));
+        const finalSnap = await getDocs(query(collection(db, 'enrollments'), where('userId', '==', currentUser.uid), where('courseId', '==', id)));
         setEnrollment({ id: finalSnap.docs[0].id, ...finalSnap.docs[0].data() } as Enrollment);
       } else {
         const en = { id: eSnap.docs[0].id, ...eSnap.docs[0].data() } as Enrollment;
@@ -88,7 +98,7 @@ export default function CourseView() {
   };
 
   const submitTest = async () => {
-    if (!currentTest || !enrollment || !user || !course) return;
+    if (!currentTest || !enrollment || !course) return;
     
     let correct = 0;
     currentTest.questions.forEach((q, i) => {

@@ -90,18 +90,20 @@ export default function TestExecute() {
   };
 
   const handleFinish = async () => {
-    if (!test || !user) return;
+    if (!test) return;
     setSaving(true);
     const finalScore = calculateScore();
     try {
-       const resultId = `${user.uid}_${test.id}`;
+       const uId = user ? user.uid : "GUEST_" + Math.random().toString(36).substring(2, 9);
+       const uName = user ? (user.displayName || 'Talaba') : 'Mexmon (Guest)';
+       const resultId = `${uId}_${test.id}`;
         await setDoc(doc(db, 'testResults', resultId), {
           testId: test.id,
           testTitle: test.title,
           testType: test.type,
-          userId: user.uid,
-          userName: user.displayName || 'Talaba',
-          teacherId: user.teacherId || 'admin', // Store student's teacherId for Journal
+          userId: uId,
+          userName: uName,
+          teacherId: user?.teacherId || 'admin', // Store student's teacherId for Journal
           creatorId: test.creatorId || 'admin', // Keep track of who created the test
           score: finalScore,
           totalQuestions: test.questions.length,

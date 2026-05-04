@@ -20,12 +20,13 @@ export default function StudentCourses() {
       if (user) {
         cData = cData.filter(course => {
           // 1. Global content (Admin created, no assignments)
-          const isGlobal = course.creatorRole === 'admin' && 
-                           (!course.organizationIds || course.organizationIds.length === 0) &&
-                           (!course.departmentIds || course.departmentIds.length === 0) &&
-                           (!course.groupIds || course.groupIds.length === 0);
+          const isAdminCourse = course.creatorRole === 'admin' || !course.creatorRole;
+          const isGlobalAdminCourse = isAdminCourse && 
+                                     (!course.organizationIds || course.organizationIds.length === 0) &&
+                                     (!course.departmentIds || course.departmentIds.length === 0) &&
+                                     (!course.groupIds || course.groupIds.length === 0);
           
-          if (isGlobal || course.isPublic === true) return true;
+          if (isGlobalAdminCourse || course.isPublic === true) return true;
 
           // 2. Teacher/Organization assignment
           if (course.creatorId === user.teacherId) return true;
