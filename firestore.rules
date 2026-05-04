@@ -60,12 +60,12 @@ service cloud.firestore {
 
     // --- Dynamic Data Collections ---
     match /enrollments/{id} {
-      allow read, list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isTeacher());
+      allow read, list: if isSignedIn() && (resource == null || resource.data.get('userId', '') == request.auth.uid || isTeacher());
       allow write: if isSignedIn();
     }
 
     match /testResults/{id} {
-      allow read, list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isTeacher());
+      allow read, list: if isSignedIn() && (resource == null || resource.data.get('userId', '') == request.auth.uid || isTeacher());
       allow write: if isSignedIn();
     }
 
