@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "middleName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "login": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "teacher", "student"] },
+        "teacherId": { "type": "string", "description": "Reference to parent teacher/org" },
+        "teacherName": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "departmentName": { "type": "string" },
+        "groupId": { "type": "string" },
+        "groupName": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "address": { "type": "string" },
+        "idx": { "type": "number" },
+        "ball": { "type": "number" },
+        "spentBalls": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "role", "login"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Educational course content",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "creatorRole": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "organizationIds": { "type": "array", "items": { "type": "string" } },
+        "departmentIds": { "type": "array", "items": { "type": "string" } },
+        "groupIds": { "type": "array", "items": { "type": "string" } },
+        "modules": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Student track in a course",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "currentModuleIndex": { "type": "integer" },
+        "grades": { "type": "object" },
+        "completed": { "type": "boolean" },
+        "lastAccessed": { "type": "string", "format": "date-time" },
+        "certificateId": { "type": "string" }
+      }
+    },
+    "Test": {
+      "title": "Test",
+      "description": "Quiz or Exam",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["module", "topic", "exam"] },
+        "creatorId": { "type": "string" },
+        "creatorRole": { "type": "string" },
+        "questions": { "type": "array" },
+        "organizationIds": { "type": "array", "items": { "type": "string" } },
+        "departmentIds": { "type": "array", "items": { "type": "string" } },
+        "groupIds": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "TestResult": {
+      "title": "TestResult",
+      "description": "Score and details of a test attempt",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "testId": { "type": "string" },
+        "testTitle": { "type": "string" },
+        "testType": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "attempts": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "Profiles" },
+    "/courses/{courseId}": { "schema": "Course", "description": "Courses" },
+    "/enrollments/{enrollmentId}": { "schema": "Enrollment", "description": "Enrollments" },
+    "/tests/{testId}": { "schema": "Test", "description": "Tests" },
+    "/testResults/{resultId}": { "schema": "TestResult", "description": "Results" },
+    "/departments/{deptId}": { "schema": "object", "description": "Departments" },
+    "/groups/{groupId}": { "schema": "object", "description": "Groups" },
+    "/messages/{messageId}": { "schema": "object", "description": "Messages" },
+    "/activityLogs/{logId}": { "schema": "object", "description": "Logs" },
+    "/siteContent/{contentId}": { "schema": "object", "description": "Content" },
+    "/counters/{counterId}": { "schema": "object", "description": "Counters" }
+  }
+}

@@ -1,0 +1,118 @@
+import { useState, useEffect } from 'react';
+import { db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { Course } from '../types';
+import { BookOpen, Search, ArrowRight, Loader2, Globe, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+
+export default function Courses() {
+  const { user } = useAuth();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    async function load() {
+      const snap = await getDocs(collection(db, 'courses'));
+      setCourses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course)));
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const filtered = courses.filter(c => {
+    // Title search
+    if (search && !c.title.toLowerCase().includes(search.toLowerCase())) return false;
+
+    // RULE: On the general list, only show content created by ADMIN
+    // If user is not logged in, they ONLY see Admin's global content
+    if (!user) {
+      return c.creatorRole === 'admin' && c.isPublic !== false;
+    }
+
+    // 1. Admin sees everything for management, BUT user wants "Admin profilda faqat o'zi tayyorlagan..." 
+    // This usually refers to the Dashboard, but for the general list, Admin might want to see all or just their own.
+    // The request says "Admin profilda faqat o'zi tayyorlagan kurslar, testlar imtihonlar saqlanadigan bo'lsin"
+    // So if it's the Admin role viewing the GENERAL list, we show everything or just Admin? 
+    // Usually general lists show what is available. 
+    // Let's stick to the isolation requested:
+    
+    if (user.role === 'admin') {
+      return c.creatorRole === 'admin';
+    }
+
+    // 2. Assignment logic for logged-in students
+    if (user.role === 'student') {
+       // Students see Admin content (if global/public)
+       const isGlobalAdmin = c.creatorRole === 'admin';
+       if (isGlobalAdmin) return true;
+
+       // Students see their organization's content
+       const isFromMyOrg = c.organizationIds?.includes(user.teacherId || '') || c.creatorId === user.teacherId;
+       const isFromMyDept = c.departmentIds?.includes(user.departmentId || '');
+       const isFromMyGroup = c.groupIds?.includes(user.groupId || '');
+
+       if (isFromMyOrg || isFromMyDept || isFromMyGroup) return true;
+    }
+
+    // 3. Teachers/Organizations see their own courses
+    if (user.role === 'teacher' && (c.creatorId === user.uid)) return true;
+
+    return false;
+  });
+
+  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-[#00f2ff]" /></div>;
+
+  return (
+    <div className="py-24 min-h-screen">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <header className="mb-20 text-center max-w-3xl mx-auto">
+          <h1 className="text-5xl md:text-6xl font-black text-gray-900 tracking-tight mb-6 uppercase">Kurslarimiz</h1>
+          <p className="text-gray-500 text-xl font-medium">Eng zamonaviy sun'iy intellekt va dasturlash yo'nalishlarida ta'lim oling.</p>
+          
+          <div className="mt-12 relative max-w-xl mx-auto group">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+            <input 
+              type="text" 
+              className="w-full pl-16 pr-8 py-5 rounded-[2rem] bg-white border border-gray-100 shadow-xl shadow-gray-200/20 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-gray-900 placeholder-gray-400"
+              placeholder="Kurs qidirish..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+          {filtered.map((course) => (
+            <div key={course.id} className="bg-white rounded-[2.5rem] overflow-hidden flex flex-col hover:-translate-y-2 transition-all duration-500 group border border-gray-50 shadow-2xl shadow-gray-200/40">
+              <div className="h-64 overflow-hidden relative">
+                <img src={course.thumbnail || null} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={course.title} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+              </div>
+              <div className="p-10 flex-1 flex flex-col">
+                <h3 className="text-2xl font-black text-gray-900 mb-4 uppercase tracking-tight">{course.title}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed mb-10 flex-1 font-medium">
+                  {course.description}
+                </p>
+                <div className="flex items-center justify-between pt-8 border-t border-gray-50">
+                  <div className="flex items-center gap-2 text-xs font-black text-blue-600 uppercase tracking-widest">
+                    <BookOpen className="h-4 w-4" />
+                    {course.modules?.length || 0} Modul
+                  </div>
+                  <Link 
+                    to={`/courses/${course.id}`}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold text-sm tracking-wide hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
+                  >
+                    Boshlash
+                    <ArrowRight className="h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

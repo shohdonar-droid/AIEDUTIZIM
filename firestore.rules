@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email in ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'] ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin') ||
+         getUserRole() == 'admin'
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Role-based helpers
+    function getUserRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') 
+        : '';
+    }
+
+    function isTeacher() {
+      return isAdmin() || (isSignedIn() && getUserRole() in ['teacher', 'staff']);
+    }
+
+    // --- Global Admin Access ---
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isTeacher() || (isSignedIn() && (resource.data.get('role', '') in ['admin', 'teacher', 'staff']));
+      allow list: if isSignedIn() && (
+        isTeacher() || 
+        resource.data.get('role', '') == 'admin' || 
+        resource.data.get('role', '') == 'teacher' ||
+        (getUserRole() == 'student' && resource.data.get('teacherId', '') == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('teacherId', ''))
+      );
+      allow create: if isSignedIn() && (userId == request.auth.uid || isTeacher());
+      allow update: if isOwner(userId) || isTeacher();
+      allow delete: if isTeacher();
+    }
+
+    // --- Core Content Collections ---
+    match /courses/{id} { allow read, list: if true; allow write: if isTeacher(); }
+    match /departments/{id} { allow read, list: if true; allow write: if isTeacher(); }
+    match /groups/{id} { allow read, list: if true; allow write: if isTeacher(); }
+    match /tests/{id} { allow read, list: if true; allow write: if isTeacher(); }
+    match /siteContent/{id} { allow read, list: if true; allow write: if isAdmin(); }
+    match /counters/{id} { allow read, list: if true; allow write: if isSignedIn(); }
+    match /test-connection/{id} { allow read, list: if true; }
+
+    // --- Dynamic Data Collections ---
+    match /enrollments/{id} {
+      allow read, list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isTeacher());
+      allow write: if isSignedIn();
+    }
+
+    match /testResults/{id} {
+      allow read, list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isTeacher());
+      allow write: if isSignedIn();
+    }
+
+    // --- Monitoring & Communication ---
+    match /messages/{id} {
+      allow read, list: if isSignedIn() && (resource.data.get('senderId', '') == request.auth.uid || resource.data.get('receiverId', '') == request.auth.uid || isTeacher());
+      allow create: if isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid || 
+        request.resource.data.get('senderId', '') == 'SYSTEM_ADMIN' ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (resource.data.get('receiverId', '') == request.auth.uid || isTeacher());
+    }
+
+    match /activityLogs/{id} {
+      allow read, list: if isTeacher() || (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
+      allow create: if isSignedIn() && (request.resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow update: if isAdmin() || (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
+    }
+  }
+}
