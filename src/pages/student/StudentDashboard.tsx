@@ -10,7 +10,10 @@ import StudentCourses from './StudentCourses';
 import StudentTests from './StudentTests';
 import StudentCertificates from './StudentCertificates';
 import StudentServices from './StudentServices';
+import SubjectsManager from '../../components/SubjectsManager';
+import SubjectRead from '../SubjectRead';
 import ChatSection from '../ChatSection';
+import { BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function StudentDashboard() {
@@ -64,6 +67,7 @@ export default function StudentDashboard() {
     { name: 'Baholar', path: '/student/grades', icon: GraduationCap },
     { name: 'Kurslar', path: '/student/courses', icon: LayoutDashboard },
     { name: 'Testlar', path: '/student/tests', icon: FileText },
+    { name: 'Mavzular', path: '/student/subjects', icon: BookOpen },
     { name: 'Sertifikatlar', path: '/student/certificates', icon: Award },
     { name: 'Xizmatlar', path: '/student/services', icon: BrainCircuit },
     { name: 'Chat', path: '/student/chat', icon: MessageSquare, badge: unreadCount },
@@ -185,6 +189,8 @@ export default function StudentDashboard() {
             <Route path="/grades" element={<StudentGrades />} />
             <Route path="/courses" element={<StudentCourses />} />
             <Route path="/tests" element={<StudentTests />} />
+            <Route path="/subjects" element={<SubjectsManager />} />
+            <Route path="/subjects/read/:id" element={<SubjectRead />} />
             <Route path="/certificates" element={<StudentCertificates />} />
             <Route path="/services" element={<StudentServices />} />
             <Route path="/chat" element={<ChatSection />} />

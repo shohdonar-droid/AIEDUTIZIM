@@ -137,13 +137,13 @@ export default function CourseView() {
                     }
                     const nextCount = currentCount + 1;
                     transaction.set(certCounterRef, { count: nextCount }, { merge: true });
-                    return `YAU${String(nextCount).padStart(5, '0')}`;
+                    return `YAU-${String(nextCount).padStart(5, '0')}`;
                 });
                 updateData.certificateId = newCertId;
              } catch (err) {
                 console.error("Sertifikat raqamini yaratishda xato, yuz berdi", err);
-                const randomNum = Math.floor(Math.random() * 90000) + 10000;
-                updateData.certificateId = `YAU${randomNum}`;
+                const fallbackStr = enrollment.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase();
+                updateData.certificateId = `YAU-${fallbackStr}`;
              }
          }
       }

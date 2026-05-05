@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, query, where, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import { Enrollment, UserProfile } from '../../types';
 import { Award, FileText, Plus, Loader2, Eye, Download, Settings, Save, X } from 'lucide-react';
@@ -36,13 +36,27 @@ export default function AdminCertificates() {
   const [selectedStudent, setSelectedStudent] = useState('');
   const [type, setType] = useState<'certificate' | 'contract'>('certificate');
 
+  const [showSubjectTemplateModal, setShowSubjectTemplateModal] = useState(false);
+  const [subjectTemplate, setSubjectTemplate] = useState<CertTemplate>({
+    title: 'SERTIFIKAT',
+    completionText: "Mavzuni a'lo darajada o'zlashtirgani uchun",
+    coursePrefix: 'Ushbu sertifikat',
+    courseSuffix: 'mavzusidan muvaffaqiyatli o\'tganligini tasdiqlaydi.'
+  });
+
   useEffect(() => {
     async function load() {
       try {
-        // Load template
-        const tDoc = await getDoc(doc(db, 'settings', 'certificate_template'));
+        // Load templates
+        const [tDoc, stDoc] = await Promise.all([
+           getDoc(doc(db, 'settings', 'certificate_template')),
+           getDoc(doc(db, 'settings', 'certificate_subject_template'))
+        ]);
         if (tDoc.exists()) {
           setTemplate(tDoc.data() as CertTemplate);
+        }
+        if (stDoc.exists()) {
+          setSubjectTemplate(stDoc.data() as CertTemplate);
         }
 
         // Load courses map
@@ -52,9 +66,27 @@ export default function AdminCertificates() {
         setCourses(cMap);
 
         const eSnap = await getDocs(query(collection(db, 'enrollments'), where('completed', '==', true)));
-        setCerts(eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const allCerts = eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
-        const uSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+        const sSnap = await getDocs(query(collection(db, 'testResults'), where('testType', '==', 'subject')));
+        const allSubs = sSnap.docs.map(doc => ({ id: doc.id, isSubjectItem: true, ...doc.data() } as any));
+
+        const combined = [
+          ...allCerts,
+          ...allSubs.filter((c: any) => c.score >= 90)
+        ];
+        
+        combined.sort((a, b) => {
+           const idA = a.certificateId || '';
+           const idB = b.certificateId || '';
+           const numA = parseInt(idA.replace(/\D/g, '')) || 0;
+           const numB = parseInt(idB.replace(/\D/g, '')) || 0;
+           return numA - numB;
+        });
+
+        setCerts(combined);
+
+        const uSnap = await getDocs(collection(db, 'users'));
         setStudents(uSnap.docs.map(doc => doc.data() as UserProfile));
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'admin-certificates-loader');
@@ -79,14 +111,116 @@ export default function AdminCertificates() {
     }
   };
 
+  const saveSubjectTemplate = async () => {
+    setSavingTemplate(true);
+    try {
+      await setDoc(doc(db, 'settings', 'certificate_subject_template'), subjectTemplate);
+      setShowSubjectTemplateModal(false);
+      alert("Mavzu sertifikat matnlari saqlandi!");
+    } catch (err) {
+      console.error(err);
+      alert("Xatolik yuz berdi");
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   const createDoc = async () => {
     if (!selectedStudent) return;
     setLoading(true);
-    setTimeout(() => {
+    try {
+      if (type === 'certificate') {
+        const student = students.find(s => s.uid === selectedStudent);
+        if (!student) return;
+
+        // Give +10 points to student
+        const userRef = doc(db, 'users', student.uid);
+        const newRecord = {
+          type: 'kirim',
+          amount: 10,
+          description: "Rag'batlantirish +10 ball",
+          date: new Date().toISOString()
+        };
+        const currentBall = student.ball || 0;
+        const currentTotalIncome = student.totalIncome || 0;
+        const currentHistory = student.billingHistory || [];
+
+        await updateDoc(userRef, {
+           ball: currentBall + 10,
+           totalIncome: currentTotalIncome + 10,
+           billingHistory: [...currentHistory, newRecord]
+        });
+
+        // Generate Certificate ID
+        const certCounterRef = doc(db, 'counters', 'certificates');
+        let certId = `YAU-${Math.floor(Math.random() * 90000) + 10000}`;
+        try {
+           certId = await runTransaction(db, async (transaction) => {
+               const certDoc = await transaction.get(certCounterRef);
+               let currentCount = 0;
+               if (certDoc.exists()) {
+                   currentCount = certDoc.data().count || 0;
+               }
+               const nextCount = currentCount + 1;
+               transaction.set(certCounterRef, { count: nextCount }, { merge: true });
+               return `YAU-${String(nextCount).padStart(5, '0')}`;
+           });
+        } catch (err) {
+           console.error(err);
+        }
+
+        const newCertRef = await addDoc(collection(db, 'enrollments'), {
+           userId: student.uid,
+           courseId: 'reward',
+           completed: true,
+           score: 100,
+           certificateId: certId,
+           assignedAt: serverTimestamp(),
+           completedAt: serverTimestamp()
+        });
+
+        const newCert = {
+           id: newCertRef.id,
+           userId: student.uid,
+           courseId: 'reward',
+           completed: true,
+           score: 100,
+           certificateId: certId
+        };
+        
+        setCerts(prev => {
+          const list = [...prev, newCert];
+          list.sort((a, b) => {
+             const idA = a.certificateId || '';
+             const idB = b.certificateId || '';
+             const numA = parseInt(idA.replace(/\D/g, '')) || 0;
+             const numB = parseInt(idB.replace(/\D/g, '')) || 0;
+             return numA - numB;
+          });
+          return list;
+        });
+
+        setStudents(prev => prev.map(s => {
+           if (s.uid === student.uid) {
+              return {
+                 ...s,
+                 ball: currentBall + 10,
+                 totalIncome: currentTotalIncome + 10,
+                 billingHistory: [...currentHistory, newRecord]
+              };
+           }
+           return s;
+        }));
+      }
+
       alert(`${type === 'certificate' ? 'Sertifikat' : 'Shartnoma'} muvaffaqiyatli shakllantirildi!`);
       setShowModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Xatolik yuz berdi");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const openCert = (c: any) => {
@@ -107,6 +241,13 @@ export default function AdminCertificates() {
           <p className="text-gray-500 mt-2 text-lg">Sertifikatlar va talabalar bilan shartnomalar boshqaruvi.</p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => setShowSubjectTemplateModal(true)}
+            className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-100 text-gray-900 rounded-2xl font-black shadow-lg hover:bg-gray-50 transition-all border-2 border-gray-100"
+          >
+            <Settings className="h-5 w-5 text-gray-400" />
+            M-TAHRIRLASH
+          </button>
           <button
             onClick={() => setShowTemplateModal(true)}
             className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-100 text-gray-900 rounded-2xl font-black shadow-lg hover:bg-gray-50 transition-all border-2 border-gray-100"
@@ -197,6 +338,79 @@ export default function AdminCertificates() {
         </div>
       )}
 
+      {/* Subject Template Editor Modal */}
+      {showSubjectTemplateModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-white rounded-[40px] p-10 max-w-2xl w-full shadow-2xl space-y-8"
+           >
+              <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                <div className="flex items-center gap-3">
+                   <Settings className="h-6 w-6 text-blue-600" />
+                   <h3 className="text-2xl font-black text-gray-900 uppercase">Mavzular uchun Sertifikat Matni</h3>
+                </div>
+                <button onClick={() => setShowSubjectTemplateModal(false)} className="p-2 text-gray-400 hover:text-red-500">
+                   <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-2 col-span-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Sertifikat Sarlavhasi</label>
+                    <input 
+                      type="text" 
+                      value={subjectTemplate.title}
+                      onChange={e => setSubjectTemplate({...subjectTemplate, title: e.target.value})}
+                      className="w-full px-5 py-4 bg-gray-50 rounded-2xl font-bold border-none focus:ring-2 focus:ring-blue-100"
+                    />
+                 </div>
+                 <div className="space-y-2 col-span-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Kurs yakunlash matni</label>
+                    <input 
+                      type="text" 
+                      value={subjectTemplate.completionText}
+                      onChange={e => setSubjectTemplate({...subjectTemplate, completionText: e.target.value})}
+                      className="w-full px-5 py-4 bg-gray-50 rounded-2xl font-bold border-none focus:ring-2 focus:ring-blue-100"
+                    />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Kurs oldidan matn</label>
+                    <input 
+                      type="text" 
+                      value={subjectTemplate.coursePrefix}
+                      onChange={e => setSubjectTemplate({...subjectTemplate, coursePrefix: e.target.value})}
+                      className="w-full px-5 py-4 bg-gray-50 rounded-2xl font-bold border-none focus:ring-2 focus:ring-blue-100"
+                    />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Kursdan keyingi matn</label>
+                    <input 
+                      type="text" 
+                      value={subjectTemplate.courseSuffix}
+                      onChange={e => setSubjectTemplate({...subjectTemplate, courseSuffix: e.target.value})}
+                      className="w-full px-5 py-4 bg-gray-50 rounded-2xl font-bold border-none focus:ring-2 focus:ring-blue-100"
+                    />
+                 </div>
+              </div>
+
+              <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 italic text-sm text-blue-600">
+                <p><strong>Eslatma:</strong> Fan/Mavzu nomi avtomat ravishda "Kurs oldidan matn" va "Kursdan keyingi matn" o'rtasida joylashadi.</p>
+              </div>
+
+              <button
+                onClick={saveSubjectTemplate}
+                disabled={savingTemplate}
+                className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 transition-all font-serif"
+              >
+                {savingTemplate ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                SAQLASH VA QO'LLASH
+              </button>
+           </motion.div>
+        </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
            <div className="bg-white rounded-[40px] p-12 max-w-xl w-full shadow-2xl space-y-8">
@@ -226,7 +440,7 @@ export default function AdminCertificates() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Talabani tanlang</label>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Foydalanuvchini tanlang</label>
                   <select 
                     className="w-full px-5 py-4 rounded-xl bg-gray-50 border-none font-bold text-gray-700"
                     value={selectedStudent}
@@ -277,9 +491,18 @@ export default function AdminCertificates() {
                <tbody>
                   {certs.map((c, i) => {
                      const student = students.find(s => s.uid === c.userId);
-                     const scores = c.grades ? Object.values(c.grades) as number[] : [];
-                     const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 100;
+                     let avg = 100;
+                     if (!c.isSubjectItem) {
+                         const scores = c.grades ? Object.values(c.grades) as number[] : [];
+                         avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 100;
+                     } else {
+                         avg = c.score;
+                     }
                      const scoreText = `${Math.round(avg)}%`;
+                     let title = c.isSubjectItem ? c.testTitle : (c.courseId === 'reward' ? 'Rag\'batlantirish Sertifikati' : (courses[c.courseId] || 'Kurs'));
+                     if (typeof title === 'string') {
+                       title = title.replace(' (Fanlar/Mavzu)', '');
+                     }
 
                      return (
                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
@@ -287,13 +510,16 @@ export default function AdminCertificates() {
                             <span className="font-bold text-gray-500">{i + 1}</span>
                           </td>
                           <td className="py-4 px-6">
-                            <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md text-xs border border-blue-100">{c.certificateId || ('CERT-' + c.id.slice(-8).toUpperCase())}</span>
+                            <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md text-xs border border-blue-100">{c.certificateId || ('YAU-' + c.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase())}</span>
                           </td>
                           <td className="py-4 px-6">
                             <span className="font-black text-gray-900">{student?.displayName || "Noma'lum Talaba"}</span>
                           </td>
                           <td className="py-4 px-6">
-                            <span className="font-bold text-gray-600">{courses[c.courseId] || 'Kurs'}</span>
+                            <span className="font-bold text-gray-600">
+                                {c.isSubjectItem ? <span className="mr-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md text-xs">Fanlar</span> : null}
+                                {title}
+                            </span>
                           </td>
                           <td className="py-4 px-6 text-center">
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black ${
@@ -305,7 +531,7 @@ export default function AdminCertificates() {
                           </td>
                           <td className="py-4 px-6 text-right font-bold text-gray-500 whitespace-nowrap">
                             {(() => {
-                               const ts = c.lastAccessed;
+                               const ts = c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed;
                                if (!ts) return '';
                                const dateObj = ts?.toMillis ? new Date(ts.toMillis()) : (ts instanceof Date ? ts : new Date());
                                return dateObj.toLocaleDateString('uz-UZ');
@@ -314,7 +540,12 @@ export default function AdminCertificates() {
                           <td className="py-4 px-6 text-center">
                              <div className="flex items-center justify-center gap-2">
                                <button
-                                  onClick={() => openCert(c)}
+                                  onClick={() => setSelectedCert({
+                                     ...c, 
+                                     courseTitle: title, 
+                                     studentName: student?.displayName || "Talaba",
+                                     lastAccessed: c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed
+                                  } as any)}
                                   className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
                                   title="Sertifikatni ko'rish"
                                >
@@ -322,11 +553,11 @@ export default function AdminCertificates() {
                                </button>
                                <button
                                   onClick={() => {
-                                    const student = students.find(s => s.uid === c.userId);
                                     setSelectedCert({
                                        ...c, 
-                                       courseTitle: courses[c.courseId] || 'Kurs', 
+                                       courseTitle: title, 
                                        studentName: student?.displayName || "Talaba",
+                                       lastAccessed: c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed,
                                        autoDownload: true
                                     } as any);
                                   }}

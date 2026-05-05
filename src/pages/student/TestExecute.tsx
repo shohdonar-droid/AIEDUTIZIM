@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { Test, Question } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { Loader2, BrainCircuit, CheckCircle2, ChevronRight, RefreshCcw, Sparkles } from 'lucide-react';
@@ -28,13 +28,37 @@ export default function TestExecute() {
     async function loadTest() {
       if (!testId) return;
       try {
-        const docRef = doc(db, 'tests', testId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const t = { id: docSnap.id, ...docSnap.data() } as Test;
-          
+        let t: any = null;
+        if (testId.startsWith('subject_')) {
+          const subjectId = testId.replace('subject_', '');
+          const docSnap = await getDoc(doc(db, 'subjects', subjectId));
+          if (docSnap.exists()) {
+             const sub = docSnap.data();
+             let allQuestions = sub.questions || [];
+             // Shuffle and pick 10
+             allQuestions = [...allQuestions].sort(() => 0.5 - Math.random());
+             if (allQuestions.length > 10) {
+               allQuestions = allQuestions.slice(0, 10);
+             }
+             t = {
+                id: testId,
+                title: sub.title,
+                type: 'subject',
+                questions: allQuestions,
+                maxAttempts: 100 // Subjects might have infinite attempts or something, we'll set to 100
+             };
+          }
+        } else {
+          const docRef = doc(db, 'tests', testId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            t = { id: docSnap.id, ...docSnap.data() } as Test;
+          }
+        }
+
+        if (t) {
           // Check attempts
-          if (user) {
+          if (user && !testId.startsWith('subject_')) {
              const resultId = `${user.uid}_${t.id}`;
              const resSnap = await getDoc(doc(db, 'testResults', resultId));
              const existingResult = resSnap.exists() ? resSnap.data() : null;
@@ -97,21 +121,57 @@ export default function TestExecute() {
        const uId = user ? user.uid : "GUEST_" + Math.random().toString(36).substring(2, 9);
        const uName = user ? (user.displayName || 'Talaba') : 'Mexmon (Guest)';
        const resultId = `${uId}_${test.id}`;
-        await setDoc(doc(db, 'testResults', resultId), {
-          testId: test.id,
-          testTitle: test.title,
-          testType: test.type,
-          userId: uId,
-          userName: uName,
-          teacherId: user?.teacherId || 'admin', // Store student's teacherId for Journal
-          creatorId: test.creatorId || 'admin', // Keep track of who created the test
-          score: finalScore,
-          totalQuestions: test.questions.length,
-          attempts: attemptsInfo.count + 1,
-          answers: answers,
-          questions: test.questions,
-          createdAt: serverTimestamp()
-        });
+
+       let certId = undefined;
+
+       // Unconditionally fetch existing result to preserve certificate ID if it exists
+       const oldRes = await getDoc(doc(db, 'testResults', resultId));
+       if (oldRes.exists() && oldRes.data().certificateId) {
+          certId = oldRes.data().certificateId;
+       }
+
+       // If it's a subject and score >= 90, and no certificate ID yet, generate one
+       if (!certId && test.type === 'subject' && finalScore >= 90) {
+          const certCounterRef = doc(db, 'counters', 'certificates');
+          try {
+             certId = await runTransaction(db, async (transaction) => {
+                 const certDoc = await transaction.get(certCounterRef);
+                 let currentCount = 0;
+                 if (certDoc.exists()) {
+                     currentCount = certDoc.data().count || 0;
+                 }
+                 const nextCount = currentCount + 1;
+                 transaction.set(certCounterRef, { count: nextCount }, { merge: true });
+                 return `YAU-${String(nextCount).padStart(5, '0')}`;
+             });
+          } catch (err) {
+             console.error("Sertifikat raqamini yaratishda xato", err);
+             const fallbackStr = resultId.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase();
+             certId = `YAU-${fallbackStr}`;
+          }
+       }
+
+       const payload: any = {
+         testId: test.id,
+         testTitle: test.title,
+         testType: test.type,
+         userId: uId,
+         userName: uName,
+         teacherId: user?.teacherId || 'admin',
+         creatorId: test.creatorId || 'admin',
+         score: finalScore,
+         totalQuestions: test.questions.length,
+         attempts: attemptsInfo.count + 1,
+         answers: answers,
+         questions: test.questions,
+         createdAt: serverTimestamp()
+       };
+
+       if (certId) {
+         payload.certificateId = certId;
+       }
+
+       await setDoc(doc(db, 'testResults', resultId), payload);
        setScore(finalScore);
        setIsFinished(true);
     } catch (err) {

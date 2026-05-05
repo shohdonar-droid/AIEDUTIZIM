@@ -49,7 +49,10 @@ service cloud.firestore {
     match /departments/{id} { allow read: if true; allow write: if isTeacher(); }
     match /groups/{id} { allow read: if true; allow write: if isTeacher(); }
     match /tests/{id} { allow read: if true; allow write: if isTeacher(); }
+    match /subjects/{id} { allow read: if true; allow write: if isTeacher(); }
     match /siteContent/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /billing/{id} { allow read: if isTeacher(); allow write: if isAdmin(); }
     match /counters/{id} { allow read: if true; allow write: if isSignedIn(); }
     match /test-connection/{id} { allow read: if true; }
 

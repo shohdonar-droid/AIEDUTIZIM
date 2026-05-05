@@ -505,7 +505,7 @@ export default function AdminBilling() {
                            </span>
                          </td>
                          <td className={`py-4 font-black text-right ${record.type === 'kirim' ? 'text-green-600' : 'text-red-600'}`}>
-                           {record.amount > 0 ? '+' : ''}{record.amount.toLocaleString()} so'm
+                           {record.description || <>{record.amount > 0 ? '+' : ''}{record.amount.toLocaleString()} so'm</>}
                          </td>
                        </tr>
                      ))}

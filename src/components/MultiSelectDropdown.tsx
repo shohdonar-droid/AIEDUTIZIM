@@ -60,7 +60,7 @@ export function MultiSelectDropdown({
                    onChange={(e) => onChange(opt.id, e.target.checked)}
                    className={`w-5 h-5 rounded border-gray-300 ${colorClass}`}
                  />
-                 <span className="ml-3 font-medium text-gray-700">{opt.name || opt.title || `${opt.lastName || ''} ${opt.firstName || ''}` || opt.id}</span>
+                 <span className="ml-3 font-medium text-gray-700">{opt.name || opt.title || opt.displayName || `${opt.lastName || ''} ${opt.firstName || ''}` || opt.id}</span>
                </label>
              ))
            )}

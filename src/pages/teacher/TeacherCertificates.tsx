@@ -10,6 +10,8 @@ import { useAuth } from '../../hooks/useAuth';
 export default function TeacherCertificates() {
   const { user } = useAuth();
   const [certs, setCerts] = useState<any[]>([]);
+  const [subjectCerts, setSubjectCerts] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'courses' | 'subjects'>('courses');
   const [students, setStudents] = useState<UserProfile[]>([]);
   const [courses, setCourses] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -37,7 +39,24 @@ export default function TeacherCertificates() {
       if (studentIds.length > 0) {
           const eSnap = await getDocs(query(collection(db, 'enrollments'), where('completed', '==', true)));
           const allCerts = eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-          setCerts(allCerts.filter(c => studentIds.includes(c.userId)));
+          
+          const sSnap = await getDocs(query(collection(db, 'testResults'), where('testType', '==', 'subject')));
+          const allSubs = sSnap.docs.map(doc => ({ id: doc.id, isSubjectItem: true, ...doc.data() } as any));
+          
+          const combined = [
+             ...allCerts.filter(c => studentIds.includes(c.userId)),
+             ...allSubs.filter(c => studentIds.includes(c.userId) && c.score >= 90)
+          ];
+          
+          combined.sort((a, b) => {
+             const idA = a.certificateId || '';
+             const idB = b.certificateId || '';
+             const numA = parseInt(idA.replace(/\D/g, '')) || 0;
+             const numB = parseInt(idB.replace(/\D/g, '')) || 0;
+             return numA - numB;
+          });
+
+          setCerts(combined);
       } else {
           setCerts([]);
       }
@@ -164,9 +183,18 @@ export default function TeacherCertificates() {
                <tbody>
                   {certs.map((c, i) => {
                      const student = students.find(s => s.uid === c.userId);
-                     const scores = c.grades ? Object.values(c.grades) as number[] : [];
-                     const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 100;
+                     let avg = 100;
+                     if (!c.isSubjectItem) {
+                         const scores = c.grades ? Object.values(c.grades) as number[] : [];
+                         avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 100;
+                     } else {
+                         avg = c.score;
+                     }
                      const scoreText = `${Math.round(avg)}%`;
+                     let title = c.isSubjectItem ? c.testTitle : (courses[c.courseId] || 'O\'chirilgan Kurs');
+                     if (typeof title === 'string') {
+                       title = title.replace(' (Fanlar/Mavzu)', '');
+                     }
 
                      return (
                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
@@ -174,13 +202,16 @@ export default function TeacherCertificates() {
                             <span className="font-bold text-gray-500">{i + 1}</span>
                           </td>
                           <td className="py-4 px-6">
-                            <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md text-xs border border-blue-100">{c.certificateId || ('YAU' + c.id.slice(0, 5).toUpperCase())}</span>
+                            <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md text-xs border border-blue-100">{c.certificateId || ('YAU-' + c.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase())}</span>
                           </td>
                           <td className="py-4 px-6">
                             <span className="font-black text-gray-900">{student?.displayName || "Noma'lum Talaba"}</span>
                           </td>
                           <td className="py-4 px-6">
-                            <span className="font-bold text-gray-600">{courses[c.courseId] || 'O\'chirilgan Kurs'}</span>
+                            <span className="font-bold text-gray-600">
+                                {c.isSubjectItem ? <span className="mr-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md text-xs">Fanlar</span> : null}
+                                {title}
+                            </span>
                           </td>
                           <td className="py-4 px-6 text-center">
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black ${
@@ -192,7 +223,7 @@ export default function TeacherCertificates() {
                           </td>
                           <td className="py-4 px-6 text-right font-bold text-gray-500 whitespace-nowrap">
                             {(() => {
-                              const ts = c.lastAccessed;
+                              const ts = c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed;
                               if (!ts) return '';
                               const dateObj = ts?.toMillis ? new Date(ts.toMillis()) : (ts instanceof Date ? ts : new Date());
                               return dateObj.toLocaleDateString('uz-UZ');
@@ -201,7 +232,12 @@ export default function TeacherCertificates() {
                           <td className="py-4 px-6 text-center">
                              <div className="flex items-center justify-center gap-2">
                                <button
-                                  onClick={() => openCert(c)}
+                                  onClick={() => setSelectedCert({
+                                     ...c, 
+                                     courseTitle: title, 
+                                     studentName: student?.displayName || "Talaba",
+                                     lastAccessed: c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed
+                                  } as any)}
                                   className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
                                   title="Sertifikatni ko'rish"
                                >
@@ -209,11 +245,11 @@ export default function TeacherCertificates() {
                                </button>
                                <button
                                   onClick={() => {
-                                    const student = students.find(s => s.uid === c.userId);
                                     setSelectedCert({
                                        ...c, 
-                                       courseTitle: courses[c.courseId] || 'Kurs', 
+                                       courseTitle: title, 
                                        studentName: student?.displayName || "Talaba",
+                                       lastAccessed: c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed,
                                        autoDownload: true
                                     } as any);
                                   }}

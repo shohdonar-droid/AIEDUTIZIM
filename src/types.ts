@@ -72,8 +72,20 @@ export interface Course {
   createdAt: any;
 }
 
-export interface Question {
+export interface Subject {
   id: string;
+  title: string;
+  content: string; // Maruza matni
+  questions: Question[]; // Generated questions
+  creatorId?: string;
+  creatorRole?: string;
+  organizationIds?: string[];
+  departmentIds?: string[];
+  groupIds?: string[];
+  createdAt?: any;
+}
+
+export interface Question {
   text: string;
   options: string[];
   correctIdx: number;
@@ -105,6 +117,15 @@ export interface Test {
   groupIds?: string[];
   maxAttempts?: number;
   createdAt?: any;
+}
+
+export interface SubjectResult {
+  id: string;
+  userId: string;
+  subjectId: string;
+  score: number;
+  passed: boolean; // >= 90%
+  completedAt: any;
 }
 
 export interface Enrollment {

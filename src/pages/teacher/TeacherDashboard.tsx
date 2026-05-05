@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, User, FileText, Library, CheckCircle2, MessageSquare, LogOut, ChevronRight, GraduationCap, Home, BrainCircuit } from 'lucide-react';
+import { LayoutDashboard, Users, User, FileText, Library, CheckCircle2, MessageSquare, LogOut, ChevronRight, GraduationCap, Home, BrainCircuit, BookOpen } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../../hooks/useAuth';
 import TeacherProfile from './TeacherProfile';
@@ -13,6 +13,8 @@ import TeacherCertificates from './TeacherCertificates';
 import TeacherServices from './TeacherServices';
 import TeacherChat from './TeacherChat';
 import TeacherOverview from './TeacherOverview';
+import TeacherSubjects from '../../components/SubjectsManager';
+import SubjectRead from '../SubjectRead';
 
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, getDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -84,6 +86,7 @@ export default function TeacherDashboard() {
     { name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
     { name: 'Yo\'nalishlar', path: '/teacher/departments', icon: Users, hidden: user?.role === 'staff' },
     { name: 'Testlar', path: '/teacher/tests', icon: CheckCircle2 },
+    { name: 'Mavzular', path: '/teacher/subjects', icon: BookOpen },
     { name: 'Kurslar', path: '/teacher/courses', icon: Library, hidden: user?.role === 'staff' },
     { name: 'Talabalar', path: '/teacher/students', icon: Users, hidden: user?.role === 'staff' },
     { name: 'Jurnal', path: '/teacher/jurnal', icon: FileText },
@@ -216,6 +219,8 @@ export default function TeacherDashboard() {
             <Route path="/departments" element={<TeacherDepartments />} />
             <Route path="/courses" element={<TeacherCourses />} />
             <Route path="/tests" element={<TeacherTests />} />
+            <Route path="/subjects" element={<TeacherSubjects />} />
+            <Route path="/subjects/read/:id" element={<SubjectRead />} />
             <Route path="/students" element={<TeacherStudents />} />
             <Route path="/jurnal" element={<TeacherJurnal />} />
             <Route path="/certificates" element={<TeacherCertificates />} />

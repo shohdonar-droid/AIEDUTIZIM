@@ -34,6 +34,8 @@ import AdminCertificates from './AdminCertificates';
 import AdminNotifications from './AdminNotifications';
 import AdminBilling from './AdminBilling';
 import AdminServices from './AdminServices';
+import AdminSubjects from '../../components/SubjectsManager';
+import SubjectRead from '../SubjectRead';
 import ChatSection from '../ChatSection';
 import { motion } from 'motion/react';
 import { AlertCircle } from 'lucide-react';
@@ -63,6 +65,7 @@ export default function AdminDashboard() {
     { name: 'Info', path: '/admin/info', icon: Info },
     { name: 'Kurslar', path: '/admin/courses', icon: BookOpen },
     { name: 'Testlar', path: '/admin/tests', icon: Brain },
+    { name: 'Mavzular', path: '/admin/subjects', icon: BookOpen },
     { name: 'Yo\'nalishlar', path: '/admin/departments', icon: UsersIcon },
     { name: 'Foydalanuvchilar', path: '/admin/users', icon: UsersIcon },
     { name: 'Jurnal', path: '/admin/jurnal', icon: TrendingUp },
@@ -167,6 +170,8 @@ export default function AdminDashboard() {
             <Route path="/info" element={<AdminInfo />} />
             <Route path="/courses" element={<AdminCourses />} />
             <Route path="/tests" element={<AdminTests />} />
+            <Route path="/subjects" element={<AdminSubjects />} />
+            <Route path="/subjects/read/:id" element={<SubjectRead />} />
             <Route path="/departments" element={<AdminDepartments />} />
             <Route path="/users" element={<AdminUsers />} />
             <Route path="/jurnal" element={<AdminJurnal />} />

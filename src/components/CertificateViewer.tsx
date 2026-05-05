@@ -36,13 +36,22 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
   useEffect(() => {
     async function loadData() {
       try {
+        const isSubject = (selectedCert as any).isSubjectItem || (selectedCert as any).testType === 'subject';
+        const templateDocRef = doc(db, 'settings', isSubject ? 'certificate_subject_template' : 'certificate_template');
         const [templateSnap, siteSnap] = await Promise.all([
-          getDoc(doc(db, 'settings', 'certificate_template')),
+          getDoc(templateDocRef),
           getDoc(doc(db, 'siteContent', 'main'))
         ]);
 
         if (templateSnap.exists()) {
           setTemplate(templateSnap.data() as CertTemplate);
+        } else if (isSubject) {
+          setTemplate({
+            title: 'SERTIFIKAT',
+            completionText: "Mavzuni a'lo darajada o'zlashtirgani uchun",
+            coursePrefix: 'Ushbu sertifikat',
+            courseSuffix: 'mavzusidan muvaffaqiyatli o\'tganligini tasdiqlaydi.'
+          });
         }
 
         if (siteSnap.exists()) {
@@ -98,8 +107,10 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
     }
   };
 
-  const getScore = (cert: Enrollment | null) => {
-    if (!cert || !cert.grades) return 100;
+  const getScore = (cert: any) => {
+    if (!cert) return 100;
+    if (typeof cert.score === 'number') return cert.score;
+    if (!cert.grades) return 100;
     const scores = Object.values(cert.grades) as number[];
     if (scores.length === 0) return 100;
     return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
@@ -204,10 +215,10 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                             <p className="text-[10px] font-bold text-[#c5a059] tracking-[0.4em] uppercase mt-2 font-serif">Raqamli Akademiya</p>
                          </div>
                       </div>
-                      <div className="text-right">
-                         <p className="text-[11px] font-black text-[#1e3a8a]/60 uppercase tracking-widest mb-1 px-3 inline-block">Sertifikat ID</p>
-                         <p className="font-mono font-bold text-2xl text-[#1e3a8a] bg-white border-2 border-[#1e3a8a]/10 px-5 py-2 rounded-xl shadow-sm">
-                            {selectedCert.certificateId || ('CERT-' + selectedCert.id.slice(-8).toUpperCase())}
+                      <div className="text-right mt-1.5">
+                         <p className="text-[11px] font-black text-[#1e3a8a]/60 uppercase tracking-widest mb-1 px-3">Sertifikat ID</p>
+                         <p className="font-mono font-bold text-2xl text-[#1e3a8a] px-3">
+                            {selectedCert.certificateId || ('YAU-' + selectedCert.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase())}
                          </p>
                       </div>
                    </div>
@@ -220,14 +231,17 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                       </p>
 
                       <div className="mb-2 relative w-full flex flex-col items-center">
-                         <span className="text-6xl font-black text-gray-900 px-16 py-1 uppercase tracking-tight italic font-serif leading-tight">
+                         <span 
+                           className="font-black text-gray-900 px-16 py-1 uppercase tracking-tight italic font-serif leading-tight whitespace-nowrap"
+                           style={{ fontSize: (selectedCert.studentName || "TALABA ISMI FAMILIYASI").length > 35 ? '2rem' : (selectedCert.studentName || "TALABA ISMI FAMILIYASI").length > 25 ? '2.5rem' : (selectedCert.studentName || "TALABA ISMI FAMILIYASI").length > 18 ? '3rem' : '3.75rem' }}
+                         >
                             {selectedCert.studentName || "TALABA ISMI FAMILIYASI"}
                          </span>
                          <div className="w-[80%] h-[3px] bg-gradient-to-r from-transparent via-[#c5a059] to-transparent mt-1" />
                       </div>
 
                       <p className="text-2xl text-gray-700 font-medium max-w-4xl leading-loose italic -mt-2">
-                        {template.coursePrefix} <span className="font-black text-gray-900 not-italic font-serif border-b-[2px] border-[#c5a059]/40">"{selectedCert.courseTitle || 'MAXSUS KURSI'}"</span> {template.courseSuffix}
+                        {template.coursePrefix} <span className="font-black text-gray-900 not-italic font-serif border-b-[2px] border-[#c5a059]/40">"{selectedCert.courseId === 'reward' ? 'FAOL FOYDALANUVCHI' : (selectedCert.courseTitle || 'MAXSUS KURSI')}"</span> {template.courseSuffix}
                       </p>
                    </div>
 
@@ -236,7 +250,7 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                       {/* Score Result Bottom Left */}
                       <div className="text-left flex flex-col gap-2 translate-y-5">
                          <p className="text-[12px] font-black text-[#1e3a8a]/60 uppercase tracking-widest leading-none">Umumiy natija</p>
-                         <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm self-start w-[190px] h-[80px] -translate-x-10">
+                         <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm self-start w-[190px] h-[60px] -translate-x-10">
                             <span className="text-4xl font-black text-[#1e3a8a]">{score}%</span>
                          </div>
                       </div>
@@ -259,7 +273,7 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                       {/* Date Right Bottom */}
                       <div className="text-right flex flex-col items-end gap-2 translate-y-5">
                          <p className="text-[12px] font-black text-[#1e3a8a]/60 uppercase tracking-widest leading-none">Berilgan sana</p>
-                         <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm w-[190px] h-[80px] translate-x-10">
+                         <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm w-[190px] h-[60px] translate-x-10">
                             <p className="text-3xl font-black text-[#1e3a8a] tracking-tighter">
                                {(() => {
                                   const ts = selectedCert.lastAccessed;
