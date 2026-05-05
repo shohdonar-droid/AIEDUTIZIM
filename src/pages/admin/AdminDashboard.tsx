@@ -42,6 +42,7 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -79,59 +80,80 @@ export default function AdminDashboard() {
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px)] relative overflow-hidden bg-gray-50 text-gray-900 border-t border-gray-100">
       
       {/* Sidebar */}
-      <aside className="w-full md:w-72 bg-white border-r md:border-b-0 border-gray-200 flex flex-col p-6 shadow-sm z-20">
-        <div className="flex items-center gap-4 mb-10 pb-6 border-b border-gray-100">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
-            <LayoutDashboard className="h-6 w-6" />
+      <aside className={`bg-white border-r border-gray-200 flex flex-col p-4 shadow-sm z-20 transition-all duration-300 relative group/sidebar ${isCollapsed ? 'md:w-24' : 'md:w-72'} w-full`}>
+        {/* Toggle Button */}
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="hidden md:flex absolute -right-3 top-10 w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center shadow-lg hover:bg-gray-50 transition-all z-20"
+        >
+          <ChevronRight className={`h-3 w-3 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
+        </button>
+
+        <div className={`flex items-center gap-4 mb-8 pb-4 border-b border-gray-100 transition-all ${isCollapsed ? 'justify-center' : ''}`}>
+          <div className={`rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0 transition-all ${isCollapsed ? 'h-10 w-10' : 'h-12 w-12'}`}>
+            <LayoutDashboard className={`${isCollapsed ? 'h-5 w-5' : 'h-6 w-6'}`} />
           </div>
-          <div>
-            <p className="font-black text-gray-900 tracking-tight uppercase text-sm">{user?.displayName || "Admin"}</p>
-            <div className="flex items-center gap-2">
-              <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">Administrator</p>
-            </div>
-          </div>
+          {!isCollapsed && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden">
+              <p className="font-black text-gray-900 tracking-tight uppercase text-xs truncate">{user?.displayName || "Admin"}</p>
+              <p className="text-[9px] text-blue-600 font-black uppercase tracking-widest leading-none mt-1">Administrator</p>
+            </motion.div>
+          )}
         </div>
 
-        <nav className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-2">
+        <nav className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar pr-0">
           {menuItems.map((item) => {
             const active = location.pathname === item.path;
+            const Icon = item.icon;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all group border-2 ${
+                className={`flex items-center gap-4 px-3.5 py-2.5 rounded-xl transition-all group relative border-2 ${
                   active 
                     ? 'bg-blue-50 text-blue-700 border-blue-100 shadow-sm' 
-                    : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900'
-                }`}
+                    : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-900 text-xs'
+                } ${isCollapsed ? 'justify-center border-none p-4' : ''}`}
+                title={isCollapsed ? item.name : ''}
               >
-                <item.icon className={`h-5 w-5 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'}`} />
-                <span className="font-black text-[10px] uppercase tracking-widest flex-1">{item.name}</span>
+                <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-500'} transition-transform group-hover:scale-110`} />
+                {!isCollapsed && (
+                  <motion.span 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="font-black text-[9px] uppercase tracking-widest flex-1 truncate"
+                  >
+                    {item.name}
+                  </motion.span>
+                )}
+                
                 {item.badge && item.badge > 0 && (
-                   <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-bold shadow-md shadow-red-200">
-                     {item.badge}
+                   <span className={`bg-red-500 text-white flex items-center justify-center text-[10px] font-bold shadow-md shadow-red-200 rounded-full ${isCollapsed ? 'absolute -top-1 -right-1 w-4 h-4' : 'w-5 h-5'}`}>
+                      {item.badge}
                    </span>
                 )}
-                {active && !item.badge && <ChevronRight className="h-4 w-4" />}
+                {!isCollapsed && active && !item.badge && <ChevronRight className="h-3 w-3 opacity-50" />}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto pt-6 space-y-2 border-t border-gray-100">
+        <div className="mt-auto pt-4 space-y-1 border-t border-gray-100">
           <Link
             to="/"
-            className="flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest"
+            className={`flex items-center gap-4 px-3.5 py-2.5 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-all font-black text-[9px] uppercase tracking-widest ${isCollapsed ? 'justify-center' : ''}`}
+            title={isCollapsed ? 'Saytga qaytish' : ''}
           >
-            <Home className="h-5 w-5" />
-            Saytga qaytish
+            <Home className="h-4 w-4" />
+            {!isCollapsed && <span>Saytga qaytish</span>}
           </Link>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-4 px-5 py-3.5 rounded-2xl text-red-500 hover:bg-red-50 transition-all font-black text-[10px] uppercase tracking-widest w-full text-left"
+            className={`flex items-center gap-4 px-3.5 py-2.5 rounded-xl text-red-500 hover:bg-red-50 transition-all font-black text-[9px] uppercase tracking-widest w-full text-left ${isCollapsed ? 'justify-center px-0' : ''}`}
+            title={isCollapsed ? 'Chiqish' : ''}
           >
-            <LogOut className="h-5 w-5 text-red-400" />
-            Chiqish
+            <LogOut className="h-4 w-4 text-red-400" />
+            {!isCollapsed && <span>Chiqish</span>}
           </button>
         </div>
       </aside>

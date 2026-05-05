@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { UserProfile } from '../../types';
-import { Award, FileText, Plus, Loader2 } from 'lucide-react';
+import { Award, FileText, Plus, Loader2, Eye, Download } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import CertificateViewer from '../../components/CertificateViewer';
 import { useAuth } from '../../hooks/useAuth';
@@ -90,7 +90,7 @@ export default function TeacherCertificates() {
              <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-black text-gray-900">Hujjat shakllantirish</h3>
                 <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-red-500">
-                  <Award className="h-6 w-6" />
+                   <Award className="h-6 w-6" />
                 </button>
              </div>
              
@@ -199,13 +199,30 @@ export default function TeacherCertificates() {
                             })()}
                           </td>
                           <td className="py-4 px-6 text-center">
-                            <button
-                               onClick={() => openCert(c)}
-                               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition-colors"
-                            >
-                               <Award className="h-4 w-4" />
-                               <span>Ko'rish</span>
-                            </button>
+                             <div className="flex items-center justify-center gap-2">
+                               <button
+                                  onClick={() => openCert(c)}
+                                  className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
+                                  title="Sertifikatni ko'rish"
+                               >
+                                  <Eye className="h-5 w-5" />
+                               </button>
+                               <button
+                                  onClick={() => {
+                                    const student = students.find(s => s.uid === c.userId);
+                                    setSelectedCert({
+                                       ...c, 
+                                       courseTitle: courses[c.courseId] || 'Kurs', 
+                                       studentName: student?.displayName || "Talaba",
+                                       autoDownload: true
+                                    } as any);
+                                  }}
+                                  className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors shadow-sm"
+                                  title="PDF Yuklab olish"
+                                >
+                                  <Download className="h-5 w-5" />
+                               </button>
+                             </div>
                           </td>
                        </tr>
                      );

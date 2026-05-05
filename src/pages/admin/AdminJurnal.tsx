@@ -3,7 +3,9 @@ import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, orderBy, query, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import { Enrollment, Department, Group } from '../../types';
-import { Loader2, Download, Search, FileText, Trash2, Filter } from 'lucide-react';
+import { Loader2, Download, Search, FileText, Trash2, Filter, Award } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
+import CertificateViewer from '../../components/CertificateViewer';
 import * as XLSX from 'xlsx';
 
 export default function AdminJurnal() {
@@ -26,6 +28,8 @@ export default function AdminJurnal() {
   const [filterOrg, setFilterOrg] = useState('');
   const [filterDept, setFilterDept] = useState('');
   const [filterGrp, setFilterGrp] = useState('');
+
+  const [selectedCert, setSelectedCert] = useState<any>(null);
 
   useEffect(() => {
     async function load() {
@@ -98,6 +102,8 @@ export default function AdminJurnal() {
               courseName: courseInfo.title || 'Kurs',
               grades: en.grades,
               progress: en.currentModuleIndex,
+              completed: en.completed,
+              certificateId: en.certificateId,
               dept: users[en.userId].dept,
               grp: users[en.userId].grp,
               org: users[en.userId].teacherId
@@ -167,6 +173,7 @@ export default function AdminJurnal() {
         return {
           id: su.uid,
           studentName: su.name,
+          courseName: en?.courseName || '',
           dept: su.dept,
           grp: su.grp,
           org: su.org,
@@ -338,6 +345,7 @@ export default function AdminJurnal() {
                        <th className="px-4 py-5 text-center text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">3-modul</th>
                        <th className="px-4 py-5 text-center text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">4-modul</th>
                        <th className="px-4 py-5 text-center text-xs font-black text-blue-600 uppercase tracking-widest whitespace-nowrap bg-blue-50/50 border-l border-white">5-modul</th>
+                       <th className="px-4 py-5 text-right text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Amal</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -365,6 +373,19 @@ export default function AdminJurnal() {
                                ) : '--'}
                              </td>
                            ))}
+                           <td className="px-4 py-6 text-right">
+                              {row.isEnrolled && data.find(en => en.userId === row.id && en.courseId === selectedCourse)?.completed && (
+                                 <button 
+                                   onClick={() => {
+                                      const en = data.find(x => x.userId === row.id && x.courseId === selectedCourse);
+                                      setSelectedCert({ ...en, studentName: row.studentName, courseTitle: row.courseName });
+                                   }}
+                                   className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1 font-bold text-[10px]"
+                                 >
+                                    <Award className="h-4 w-4" /> REYTING
+                                 </button>
+                              )}
+                           </td>
                          </tr>
                        );
                     })}
@@ -493,6 +514,11 @@ export default function AdminJurnal() {
             )}
           </div>
         )}
+        <AnimatePresence>
+           {selectedCert && (
+              <CertificateViewer selectedCert={selectedCert} onClose={() => setSelectedCert(null)} />
+           )}
+        </AnimatePresence>
     </div>
   );
 }

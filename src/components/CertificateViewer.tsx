@@ -1,58 +1,109 @@
-import React, { useRef, useState } from 'react';
-import { Download, X, Sparkles, BrainCircuit, Loader2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Download, X, Award, ShieldCheck, Loader2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import domtoimage from 'dom-to-image-more';
 import jsPDF from 'jspdf';
 import { QRCodeSVG } from 'qrcode.react';
-import { Enrollment } from '../types';
+import { db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { Enrollment, SiteContent } from '../types';
 
 interface CertificateViewerProps {
-  selectedCert: Enrollment & { courseTitle?: string, studentName?: string, lastAccessed?: number };
+  selectedCert: Enrollment & { courseTitle?: string, studentName?: string, lastAccessed?: any, autoDownload?: boolean };
   onClose: () => void;
 }
 
+interface CertTemplate {
+  title: string;
+  completionText: string;
+  coursePrefix: string;
+  courseSuffix: string;
+}
+
+const DEFAULT_TEMPLATE: CertTemplate = {
+  title: 'SERTIFIKAT',
+  completionText: "Maxsus ta'lim dasturini yakunlagani uchun",
+  coursePrefix: 'Ushbu sertifikat',
+  courseSuffix: 'kursini muvaffaqiyatli tugatganligini tasdiqlaydi.'
+};
+
 export default function CertificateViewer({ selectedCert, onClose }: CertificateViewerProps) {
   const [downloading, setDownloading] = useState(false);
+  const [template, setTemplate] = useState<CertTemplate>(DEFAULT_TEMPLATE);
+  const [siteSettings, setSiteSettings] = useState<SiteContent['header']>({});
   const certRef = useRef<HTMLDivElement>(null);
 
-  const handleDownloadPdf = async () => {
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [templateSnap, siteSnap] = await Promise.all([
+          getDoc(doc(db, 'settings', 'certificate_template')),
+          getDoc(doc(db, 'siteContent', 'main'))
+        ]);
+
+        if (templateSnap.exists()) {
+          setTemplate(templateSnap.data() as CertTemplate);
+        }
+
+        if (siteSnap.exists()) {
+          const siteData = siteSnap.data() as SiteContent;
+          if (siteData.header) {
+            setSiteSettings(siteData.header);
+          }
+        }
+      } catch (err) {
+        console.error("Data load error:", err);
+      }
+    }
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCert.autoDownload && certRef.current) {
+      const timer = setTimeout(() => {
+        handleDownload();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedCert.autoDownload]);
+
+  const handleDownload = async () => {
     if (!certRef.current) return;
     setDownloading(true);
     try {
+      const scale = 2; 
       const dataUrl = await domtoimage.toPng(certRef.current, {
-        width: 1000,
-        height: 707,
+        width: 1123 * scale,
+        height: 794 * scale,
         style: {
-          transform: 'scale(1)',
+          transform: `scale(${scale})`,
           transformOrigin: 'top left'
         }
       });
-      // A4 Landscape is 297 x 210 mm
+
       const pdf = new jsPDF({
-          orientation: 'landscape',
-          unit: 'mm',
-          format: 'a4'
+        orientation: 'landscape',
+        unit: 'px',
+        format: [1123, 794]
       });
-      pdf.addImage(dataUrl, 'PNG', 0, 0, 297, 210);
-      pdf.save(`Sertifikat_${selectedCert?.courseTitle?.replace(/ /g, '_') || 'Kurs'}.pdf`);
+      pdf.addImage(dataUrl, 'PNG', 0, 0, 1123, 794);
+      pdf.save(`Sertifikat_${selectedCert.studentName?.replace(/ /g, '_')}.pdf`);
     } catch (err) {
-      console.error(err);
+      console.error("Export error:", err);
+      alert("Xatolik yuz berdi.");
     } finally {
       setDownloading(false);
     }
   };
 
-  const getDegreeText = (cert: Enrollment | null) => {
-    if (!cert || !cert.grades) return { text: "A'lo darajada", score: 100 };
-    const scores = Object.values(cert.grades);
-    if (scores.length === 0) return { text: "Muvaffaqiyatli", score: 100 };
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-    if (avg >= 90) return { text: "A'lo darajada", score: Math.round(avg) };
-    if (avg >= 70) return { text: "Yaxshi darajada", score: Math.round(avg) };
-    return { text: "Qoniqarli darajada", score: Math.round(avg) };
+  const getScore = (cert: Enrollment | null) => {
+    if (!cert || !cert.grades) return 100;
+    const scores = Object.values(cert.grades) as number[];
+    if (scores.length === 0) return 100;
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   };
 
-  const degree = getDegreeText(selectedCert);
+  const score = getScore(selectedCert);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -62,130 +113,164 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
         onClick={onClose}
       />
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        initial={{ opacity: 0, scale: 0.9, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-5xl bg-white rounded-[40px] shadow-2xl p-6 overflow-hidden flex flex-col"
+        exit={{ opacity: 0, scale: 0.9, y: 30 }}
+        className="relative w-full max-w-5xl aspect-[1123/794] bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col"
       >
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-black text-gray-900">Sertifikatni yuklash (PDF)</h3>
-          <div className="flex gap-4">
-            <button
-              onClick={handleDownloadPdf}
-              disabled={downloading}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 disabled:opacity-50 transition-all"
-            >
-              {downloading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
-              PDF qilib saqlash
-            </button>
-            <button onClick={onClose} className="p-3 text-gray-400 hover:text-red-500 bg-gray-100 rounded-xl">
-              <X className="h-6 w-6" />
-            </button>
-          </div>
+        <div className="absolute top-6 right-6 z-20 flex gap-3">
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all disabled:opacity-50"
+          >
+            {downloading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+            PDF
+          </button>
+          <button
+            onClick={onClose}
+            className="p-3 bg-white/90 backdrop-blur-md text-gray-400 hover:text-red-500 rounded-2xl shadow-lg border border-gray-100 transition-all hover:scale-105"
+          >
+            <X className="h-6 w-6" />
+          </button>
         </div>
 
-        {/* Certificate Render Area (A4 proportionate 1.414) */}
-        <div className="relative w-full aspect-[1.414/1] md:aspect-[1.5/1] bg-gray-100 rounded-3xl overflow-hidden flex items-center justify-center shadow-inner">
-          <div className="absolute top-0 left-0" style={{ width: '1000px', height: '707px', transformOrigin: 'top left', transform: 'scale(min(1, 100cqw / 1000))' }} style-container="true">
-            <div ref={certRef} className="w-[1000px] h-[707px] bg-white overflow-hidden relative shadow-lg text-gray-900 font-sans">
-
-              {/* Elegant Modern Background Pattern */}
-              <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-[0.4]" />
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/50" />
-              
-              {/* Subtle Decorative elements */}
-              <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/40 rounded-full blur-[100px] -mr-40 -mt-20 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-100/40 rounded-full blur-[120px] -ml-40 -mb-20 pointer-events-none" />
-
-              {/* Elegant Double Border */}
-              <div className="absolute inset-8 border border-gray-100 rounded-[32px] pointer-events-none z-10 box-border" />
-              <div className="absolute inset-10 border-2 border-blue-600/10 rounded-[28px] pointer-events-none z-10 box-border" />
-
-              {/* Top Section with Logo and ID */}
-              <div className="absolute top-[70px] left-[90px] right-[90px] flex justify-between items-start z-20">
-                <div className="flex items-center gap-5">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-blue-100">
-                    <BrainCircuit className="h-8 w-8" />
-                  </div>
-                  <div>
-                    <h2 className="text-3xl font-black tracking-tight text-gray-900">EDU<span className="text-blue-600">AI</span></h2>
-                    <p className="text-xs font-bold text-gray-400 tracking-[0.2em] uppercase mt-1">Raqamli Ta'lim</p>
-                  </div>
-                </div>
-                <div className="text-right flex flex-col items-end">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Sertifikat ID</p>
-                  <p className="font-mono font-bold text-blue-700 bg-blue-50 border border-blue-100 px-4 py-1.5 rounded-xl shadow-sm text-sm">
-                    {selectedCert.certificateId || ('YAU' + selectedCert.id.slice(0, 5).toUpperCase())}
-                  </p>
-                </div>
-              </div>
-
-              {/* Main Content */}
-              <div className="absolute inset-x-20 top-[140px] bottom-[250px] flex flex-col items-center justify-center text-center z-20">
-
-                <h1 className="text-[72px] font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 tracking-tighter leading-none mb-4">
-                  SERTIFIKAT
-                </h1>
-
-                <p className="text-sm font-bold text-blue-600/60 uppercase tracking-[0.4em] mb-8 flex items-center justify-center gap-4 w-full">
-                  <span className="w-16 h-[1px] bg-gradient-to-r from-transparent to-blue-200" />
-                  Maxsus ta'lim dasturini yakunlagani uchun
-                  <span className="w-16 h-[1px] bg-gradient-to-l from-transparent to-blue-200" />
-                </p>
-
-                <div className="text-xl text-gray-600 font-medium max-w-4xl flex flex-col items-center justify-center gap-5">
-                  <span className="text-5xl font-black text-gray-900 border-b-[4px] border-gray-900 px-8 py-2 relative inline-block leading-tight">
-                    {selectedCert.studentName || "Talaba ismi familiyasi"}
-                  </span> 
-                  
-                  <span className="text-2xl text-gray-500 leading-relaxed max-w-3xl px-8 font-medium">
-                     Ushbu sertifikat <span className="font-bold text-blue-600 uppercase tracking-wider bg-blue-50 border border-blue-100 px-3 py-1 rounded-lg mx-2">{selectedCert.courseTitle || 'O\'quv kursi'}</span>  
-                     kursini muvaffaqiyatli tugatganligini tasdiqlaydi.
-                  </span>
-                </div>
-
-              </div>
-
-              {/* Bottom Section */}
-              <div className="absolute bottom-[70px] left-[90px] right-[90px] flex justify-between items-end z-20">
+        <div className="flex-1 overflow-hidden bg-gray-100/50 flex items-center justify-center relative" style={{ containerType: 'size' } as any}>
+            <div 
+              ref={certRef} 
+              className="bg-white relative overflow-hidden select-none border-[16px] border-white shadow-[0_40px_80px_-15px_rgba(30,58,138,0.25)] ring-1 ring-gray-200"
+              style={{ 
+                width: '1123px',
+                height: '794px',
+                transform: 'scale(calc(min(100cqw / 1123, 100cqh / 794) * 0.75))',
+                transformOrigin: 'center center',
+                flexShrink: 0
+              }}
+            >
+                <div className="w-full h-full bg-[#fcfdff] relative overflow-hidden">
+                {/* Formal Background Pattern - CSS Only to avoid CORS/Fetch errors */}
+                <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(#1e3a8a 1px, transparent 0px)', backgroundSize: '20px 20px' }} />
+                <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(45deg, #1e3a8a 25%, transparent 25%, transparent 50%, #1e3a8a 50%, #1e3a8a 75%, transparent 75%, transparent)' , backgroundSize: '4px 4px'}} />
                 
-                {/* Result */}
-                <div className="flex flex-col items-start gap-2">
-                  <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">Umumiy Natija</span>
-                  <span className="text-4xl font-black text-gray-900 border-l-4 border-blue-600 pl-4 py-1 flex items-center gap-3">
-                     {degree.score}%
-                  </span>
-                  <span className="text-sm font-bold text-blue-600 tracking-wide uppercase">{degree.text}</span>
+                {/* Professional Multi-Layered Frame */}
+                <div className="absolute inset-2 border-[12px] border-[#c5a059]/30 rounded-sm" />
+                <div className="absolute inset-5 border-[1px] border-[#c5a059]/40 rounded-sm" />
+                <div className="absolute inset-10 border-[1px] border-[#c5a059]/15 rounded-sm" />
+                
+                {/* Corner Ornaments */}
+                <div className="absolute top-4 left-4 w-24 h-24 text-[#c5a059] opacity-80">
+                  <svg viewBox="0 0 100 100" fill="currentColor">
+                    <path d="M0 0 v30 q0 -30 30 -30 h-30 Z" />
+                    <path d="M15 15 v15 q0 -15 15 -15 h-15 Z" />
+                  </svg>
+                </div>
+                <div className="absolute top-4 right-4 w-24 h-24 text-[#c5a059] opacity-80 rotate-90">
+                  <svg viewBox="0 0 100 100" fill="currentColor">
+                    <path d="M0 0 v30 q0 -30 30 -30 h-30 Z" />
+                  </svg>
+                </div>
+                <div className="absolute bottom-4 left-4 w-24 h-24 text-[#c5a059] opacity-80 -rotate-90">
+                  <svg viewBox="0 0 100 100" fill="currentColor">
+                    <path d="M0 0 v30 q0 -30 30 -30 h-30 Z" />
+                  </svg>
+                </div>
+                <div className="absolute bottom-4 right-4 w-24 h-24 text-[#c5a059] opacity-80 rotate-180">
+                  <svg viewBox="0 0 100 100" fill="currentColor">
+                    <path d="M0 0 v30 q0 -30 30 -30 h-30 Z" />
+                  </svg>
                 </div>
 
-                {/* QR Code */}
-                <div className="flex flex-col items-center gap-4">
-                  <div className="p-3 bg-white rounded-2xl shadow-xl shadow-blue-50 border border-gray-100">
-                    <QRCodeSVG
-                      value={`https://aistudio-edu.com/verify/${selectedCert.id}`}
-                      size={90}
-                      level="H"
-                      fgColor="#1e293b"
-                      bgColor="transparent"
-                    />
-                  </div>
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400">Haqiqiylikni tekshirish</p>
-                </div>
+                <div className="absolute inset-0 p-24 flex flex-col items-center">
+                   {/* Top Header Row: Logo left, ID right */}
+                   <div className="w-full flex justify-between items-start mb-6">
+                      <div className="flex items-center gap-5">
+                         <div className="w-20 h-20 bg-white p-3 border-2 border-[#c5a059]/30 rounded-2xl flex items-center justify-center shadow-sm overflow-hidden">
+                            {siteSettings?.logoUrl ? (
+                               <img src={siteSettings.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" crossOrigin="anonymous" />
+                            ) : (
+                               <Award className="h-12 w-12 text-blue-700" />
+                            )}
+                         </div>
+                         <div className="text-left">
+                            <h2 className="text-4xl font-black text-gray-900 tracking-tighter leading-none">
+                               {siteSettings?.siteName ? (
+                                  siteSettings.siteName
+                               ) : (
+                                  <>EDU<span className="text-blue-700">AI</span></>
+                               )}
+                            </h2>
+                            <p className="text-[10px] font-bold text-blue-800/60 tracking-[0.4em] uppercase mt-2 font-serif">Raqamli Akademiya</p>
+                         </div>
+                      </div>
+                      <div className="text-right">
+                         <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1 px-3 inline-block">Sertifikat ID</p>
+                         <p className="font-mono font-bold text-2xl text-blue-900 bg-white border-2 border-blue-50 px-5 py-2 rounded-xl shadow-sm">
+                            {selectedCert.certificateId || ('CERT-' + selectedCert.id.slice(-8).toUpperCase())}
+                         </p>
+                      </div>
+                   </div>
 
-                {/* Date and Signature */}
-                <div className="flex flex-col items-end gap-1">
-                  <p className="text-[10px] uppercase font-bold tracking-widest text-gray-400 border-b border-gray-100 pb-2 mb-2 w-32 text-right">Berilgan sana:</p>
-                  <p className="font-black text-gray-900 text-2xl">
-                    {(() => {
-                      const ts = selectedCert.lastAccessed;
-                      const dateObj = ts?.toMillis ? new Date(ts.toMillis()) : (ts instanceof Date ? ts : new Date());
-                      return dateObj.toLocaleDateString('uz-UZ');
-                    })()}
-                  </p>
+                   {/* Main Content */}
+                   <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-4xl mt-[-10px]">
+                      <h1 className="text-8xl font-black text-gray-900 tracking-[0.15em] mb-6 drop-shadow-sm uppercase">{template.title}</h1>
+                      <p className="text-2xl font-bold text-[#c5a059] uppercase tracking-[0.3em] mb-12 font-serif italic">
+                        {template.completionText}
+                      </p>
+
+                      <div className="mb-12 relative w-full flex flex-col items-center">
+                         <span className="text-6xl font-black text-gray-900 px-16 py-3 uppercase tracking-tight italic font-serif leading-tight">
+                            {selectedCert.studentName || "TALABA ISMI FAMILIYASI"}
+                         </span>
+                         <div className="w-[80%] h-[3px] bg-gradient-to-r from-transparent via-[#c5a059] to-transparent mt-3" />
+                      </div>
+
+                      <p className="text-2xl text-gray-700 font-medium max-w-4xl leading-loose italic">
+                        {template.coursePrefix} <span className="font-black text-gray-900 not-italic font-serif border-b-[2px] border-blue-200">"{selectedCert.courseTitle || 'MAXSUS KURSI'}"</span> {template.courseSuffix}
+                      </p>
+                   </div>
+
+                   {/* Bottom Area: Three parts - Score (Left), QR (Center), Date (Right) */}
+                   <div className="w-full grid grid-cols-3 items-end mt-8">
+                      {/* Score Result Bottom Left */}
+                      <div className="text-left flex flex-col gap-2">
+                         <p className="text-[12px] font-black text-gray-400 uppercase tracking-widest leading-none">Umumiy natija</p>
+                         <div className="flex items-center gap-4 bg-white/60 p-4 rounded-2xl border border-blue-50 shadow-sm self-start">
+                            <span className="text-5xl font-black text-blue-700">{score}%</span>
+                         </div>
+                      </div>
+
+                      {/* QR Code Center with Text */}
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="p-3 bg-white border-2 border-blue-50 rounded-2xl shadow-xl shadow-blue-900/5">
+                           <QRCodeSVG
+                              value={`${window.location.origin}/verify/${selectedCert.id}`}
+                              size={110}
+                              level="H"
+                              fgColor="#1e3a8a"
+                           />
+                        </div>
+                        <div className="flex flex-col items-center leading-none">
+                           <p className="text-[10px] font-black text-blue-800 uppercase tracking-[0.25em]">Haqiqiyligini tekshirish</p>
+                        </div>
+                      </div>
+
+                      {/* Date Right Bottom */}
+                      <div className="text-right flex flex-col items-end gap-2">
+                         <p className="text-[12px] font-black text-gray-400 uppercase tracking-widest leading-none">Berilgan sana</p>
+                         <div className="bg-white/80 px-6 py-4 rounded-2xl border-2 border-blue-50 shadow-sm inline-block">
+                            <p className="text-2xl font-black text-gray-900 tracking-tighter">
+                               {(() => {
+                                  const ts = selectedCert.lastAccessed;
+                                  const dateObj = ts?.toMillis ? new Date(ts.toMillis()) : (ts instanceof Date ? ts : new Date());
+                                  return dateObj.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
+                               })()}
+                            </p>
+                         </div>
+                      </div>
+                   </div>
                 </div>
               </div>
             </div>
-          </div>
         </div>
       </motion.div>
     </div>

@@ -3,7 +3,7 @@ import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { Enrollment } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { Award, ShieldCheck, Star, Loader2 } from 'lucide-react';
+import { Award, ShieldCheck, Star, Loader2, Eye, Download } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import CertificateViewer from '../../components/CertificateViewer';
 
@@ -69,13 +69,22 @@ export default function StudentCertificates() {
                 </div>
              </div>
 
-             <button 
-               onClick={() => setSelectedCert({...c, courseTitle: courses[c.courseId], studentName: getFullName()})}
-               className="mt-10 flex items-center justify-center gap-2 w-full py-4 bg-gray-900 text-white rounded-2xl font-black hover:bg-black transition-all shadow-xl active:scale-95 group/btn relative z-10"
-             >
-                <Award className="h-4 w-4" />
-                SERTIFIKATNI KO'RISH
-             </button>
+             <div className="flex gap-4 mt-10 relative z-10">
+                <button 
+                  onClick={() => setSelectedCert({...c, courseTitle: courses[c.courseId], studentName: getFullName()})}
+                  className="flex-1 flex items-center justify-center gap-2 py-4 bg-gray-900 text-white rounded-2xl font-black hover:bg-black transition-all shadow-xl active:scale-95 group/btn"
+                >
+                   <Eye className="h-5 w-5" />
+                   KO'RISH
+                </button>
+                <button 
+                  onClick={() => setSelectedCert({...c, courseTitle: courses[c.courseId], studentName: getFullName(), autoDownload: true} as any)}
+                  className="w-16 flex items-center justify-center bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl active:scale-95 group/download"
+                  title="PDF Yuklab olish"
+                >
+                   <Download className="h-6 w-6" />
+                </button>
+             </div>
           </div>
         ))}
         

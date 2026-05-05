@@ -17,6 +17,7 @@ export default function StudentDashboard() {
   const { user } = useAuth();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -75,72 +76,98 @@ export default function StudentDashboard() {
       <AnimatePresence />
 
       {/* Sidebar */}
-      <aside className="w-full md:w-72 bg-white border-r border-gray-100 flex flex-col p-6 shadow-sm">
-        <div className="flex items-center gap-5 mb-10 pb-6 border-b border-gray-100 bg-gray-50/30 p-4 rounded-3xl">
-          <div className="w-14 h-14 rounded-2xl bg-white p-1 shadow-md border border-indigo-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
+      <aside className={`bg-white border-r border-gray-100 flex flex-col p-4 shadow-sm transition-all duration-300 relative group/sidebar ${isCollapsed ? 'md:w-24' : 'md:w-72'} w-full`}>
+        {/* Toggle Button */}
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="hidden md:flex absolute -right-4 top-10 w-8 h-8 bg-white border border-gray-100 rounded-full items-center justify-center shadow-lg hover:bg-gray-50 transition-all z-20"
+        >
+          <ChevronRight className={`h-4 w-4 text-gray-500 transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
+        </button>
+
+        <div className={`flex items-center gap-4 mb-8 pb-6 border-b border-gray-100 bg-gray-50/30 p-3 rounded-2xl overflow-hidden transition-all ${isCollapsed ? 'justify-center p-2' : ''}`}>
+          <div className={`rounded-xl bg-white p-1 shadow-md border border-indigo-100 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all ${isCollapsed ? 'w-10 h-10' : 'w-12 h-12'}`}>
             {user?.photoURL ? (
-              <img src={user.photoURL || null} alt="Avatar" className="w-full h-full rounded-2xl object-cover" />
+              <img src={user.photoURL || null} alt="Avatar" className="w-full h-full rounded-xl object-cover" />
             ) : (
-              <User className="h-6 w-6 text-indigo-500" />
+              <User className="h-5 w-5 text-indigo-500" />
             )}
           </div>
-          <div className="overflow-hidden">
-            <p className="font-black text-gray-900 truncate uppercase text-xs tracking-tight">{user?.displayName}</p>
-            <p className="text-[9px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-0.5">Talaba</p>
-            <div className={`mt-2 inline-flex items-center px-2 py-0.5 rounded-lg text-[9px] font-black uppercase transition-all ${
-              (user?.ball || 0) <= 3 
-                ? 'bg-red-50 text-red-600 animate-pulse ring-1 ring-red-100' 
-                : 'bg-blue-50 text-blue-600'
-            }`}>
-              Ball: {user?.ball || 0}
-            </div>
-          </div>
+          {!isCollapsed && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="overflow-hidden"
+            >
+              <p className="font-black text-gray-900 truncate uppercase text-[10px] tracking-tight">{user?.displayName}</p>
+              <p className="text-[8px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-0.5">Talaba</p>
+              <div className={`mt-1 inline-flex items-center px-1.5 py-0.5 rounded-lg text-[8px] font-black uppercase transition-all ${
+                (user?.ball || 0) <= 3 
+                  ? 'bg-red-50 text-red-600 animate-pulse' 
+                  : 'bg-blue-50 text-blue-600'
+              }`}>
+                Ball: {user?.ball || 0}
+              </div>
+            </motion.div>
+          )}
         </div>
 
-        <nav className="flex-1 space-y-2">
+        <nav className="flex-1 space-y-1.5">
           {menuItems.map((item) => {
             const active = location.pathname === item.path;
+            const Icon = item.icon;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all group ${
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all group relative ${
                   active 
-                    ? 'bg-blue-600 text-white shadow-xl shadow-blue-100' 
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' 
                     : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                }`}
+                } ${isCollapsed ? 'justify-center' : ''}`}
+                title={isCollapsed ? item.name : ''}
               >
-                <item.icon className="h-5 w-5" />
-                <span className="font-semibold flex-1">{item.name}</span>
-                {item.badge && item.badge > 0 ? (
-                   <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs font-bold shadow-md">
+                <Icon className={`h-5 w-5 flex-shrink-0 transition-transform ${!active && 'group-hover:scale-110'}`} />
+                {!isCollapsed && (
+                  <motion.span 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="font-bold text-sm flex-1 truncate"
+                  >
+                    {item.name}
+                  </motion.span>
+                )}
+                
+                {item.badge && item.badge > 0 && (
+                   <span className={`rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-bold shadow-md ${isCollapsed ? 'absolute -top-1 -right-1 w-4 h-4' : 'w-5 h-5'}`}>
                      {item.badge}
                    </span>
-                ) : (
-                  <>
-                    {active && <ChevronRight className="h-4 w-4" />}
-                    {!active && <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                  </>
+                )}
+                
+                {!isCollapsed && !item.badge && (
+                  <ChevronRight className={`h-4 w-4 transition-all ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
                 )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto pt-6 space-y-2">
+        <div className="mt-auto pt-6 space-y-1">
           <Link
             to="/"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-gray-500 hover:bg-gray-50 transition-all font-bold text-xs ${isCollapsed ? 'justify-center' : ''}`}
+            title={isCollapsed ? 'Saytga qaytish' : ''}
           >
-            <Home className="h-5 w-5" />
-            Saytga qaytish
+            <Home className="h-5 w-5 flex-shrink-0" />
+            {!isCollapsed && <span>Saytga qaytish</span>}
           </Link>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-colors font-medium w-full text-left"
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-bold text-xs w-full text-left ${isCollapsed ? 'justify-center' : ''}`}
+            title={isCollapsed ? 'Tizimdan chiqish' : ''}
           >
-            <LogOut className="h-5 w-5" />
-            Tizimdan chiqish
+            <LogOut className="h-5 w-5 flex-shrink-0" />
+            {!isCollapsed && <span>Tizimdan chiqish</span>}
           </button>
         </div>
       </aside>

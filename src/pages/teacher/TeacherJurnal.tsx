@@ -3,8 +3,10 @@ import { db } from '../../lib/firebase';
 import { collection, getDocs, orderBy, query, deleteDoc, updateDoc, doc, where } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import { Enrollment, Department, Group, UserProfile, Course, Test } from '../../types';
-import { Loader2, Download, Search, FileText, Trash2, Filter, FileSpreadsheet } from 'lucide-react';
+import { Loader2, Download, Search, FileText, Trash2, Filter, FileSpreadsheet, Award } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { AnimatePresence } from 'motion/react';
+import CertificateViewer from '../../components/CertificateViewer';
 import * as XLSX from 'xlsx';
 
 export default function TeacherJurnal() {
@@ -27,6 +29,8 @@ export default function TeacherJurnal() {
   const [filterDept, setFilterDept] = useState('');
   const [filterGrp, setFilterGrp] = useState('');
   const [filterCourse, setFilterCourse] = useState('');
+
+  const [selectedCert, setSelectedCert] = useState<any>(null);
 
   useEffect(() => {
     async function load() {
@@ -86,7 +90,9 @@ export default function TeacherJurnal() {
               courseId: en.courseId,
               courseName: coursesMap[en.courseId],
               grades: en.grades,
-              progress: en.currentModuleIndex
+              progress: en.currentModuleIndex,
+              completed: en.completed,
+              certificateId: en.certificateId
             });
           }
         });
@@ -338,6 +344,7 @@ export default function TeacherJurnal() {
                         <th className="px-6 py-5 text-center text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Modul 3</th>
                         <th className="px-6 py-5 text-center text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Modul 4</th>
                         <th className="px-6 py-5 text-center text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Yakuniy</th>
+                        <th className="px-6 py-5 text-right text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Hujjat</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -360,6 +367,16 @@ export default function TeacherJurnal() {
                                  <span className={`px-3 py-1 rounded-lg ${d?.grades?.["m5"] && Number(d.grades["m5"]) >= 60 ? 'bg-green-100 text-green-700' : d?.grades?.["m5"] ? 'bg-red-100 text-red-700' : ''}`}>
                                     {d?.grades?.["m5"] ? d.grades?.["m5"] + '%' : '-'}
                                  </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                 {d?.completed && (
+                                    <button 
+                                      onClick={() => setSelectedCert({ ...d, studentName: student.displayName, courseTitle: d.courseName })}
+                                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1 font-bold text-xs"
+                                    >
+                                       <Award className="w-4 h-4"/> KO'RISH
+                                    </button>
+                                 )}
                               </td>
                            </tr>
                         );
@@ -490,6 +507,11 @@ export default function TeacherJurnal() {
             </div>
          </div>
       )}
+      <AnimatePresence>
+        {selectedCert && (
+           <CertificateViewer selectedCert={selectedCert} onClose={() => setSelectedCert(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
