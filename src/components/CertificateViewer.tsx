@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Download, X, Award, ShieldCheck, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
-import domtoimage from 'dom-to-image-more';
+import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import { QRCodeSVG } from 'qrcode.react';
 import { db } from '../lib/firebase';
@@ -71,22 +71,24 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
     if (!certRef.current) return;
     setDownloading(true);
     try {
-      const scale = 2; 
-      const dataUrl = await domtoimage.toPng(certRef.current, {
-        width: 1123 * scale,
-        height: 794 * scale,
+      const dataUrl = await htmlToImage.toPng(certRef.current, {
+        quality: 1.0,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
         style: {
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left'
+          transform: 'none',
+          boxShadow: 'none'
         }
       });
 
       const pdf = new jsPDF({
         orientation: 'landscape',
-        unit: 'px',
-        format: [1123, 794]
+        unit: 'mm',
+        format: 'a4'
       });
-      pdf.addImage(dataUrl, 'PNG', 0, 0, 1123, 794);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (794 * pdfWidth) / 1123;
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Sertifikat_${selectedCert.studentName?.replace(/ /g, '_')}.pdf`);
     } catch (err) {
       console.error("Export error:", err);
@@ -109,23 +111,23 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
         onClick={onClose}
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 30 }}
-        className="relative w-full max-w-5xl aspect-[1123/794] bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-full h-[90vh] max-w-6xl flex flex-col group justify-center items-center"
       >
-        <div className="absolute top-6 right-6 z-20 flex gap-3">
+        <div className="absolute top-0 right-0 z-20 flex gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-[-10px] group-hover:translate-y-0">
           <button
             onClick={handleDownload}
             disabled={downloading}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all disabled:opacity-50"
           >
             {downloading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
-            PDF
+            PDF yuklash
           </button>
           <button
             onClick={onClose}
@@ -135,19 +137,19 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
           </button>
         </div>
 
-        <div className="flex-1 overflow-hidden bg-gray-100/50 flex items-center justify-center relative" style={{ containerType: 'size' } as any}>
+        <div className="flex-1 w-full flex items-center justify-center relative" style={{ containerType: 'size' } as any}>
             <div 
-              ref={certRef} 
-              className="bg-white relative overflow-hidden select-none border-[16px] border-white shadow-[0_40px_80px_-15px_rgba(30,58,138,0.25)] ring-1 ring-gray-200"
+              ref={certRef}
+              className="bg-white relative select-none shadow-[0_40px_80px_-15px_rgba(0,0,0,0.5)] ring-1 ring-white/20 border-[16px] border-white"
               style={{ 
                 width: '1123px',
                 height: '794px',
-                transform: 'scale(calc(min(100cqw / 1123, 100cqh / 794) * 0.75))',
+                transform: 'scale(calc(min(100cqw / 1123, 100cqh / 794) * 0.95))',
                 transformOrigin: 'center center',
                 flexShrink: 0
               }}
             >
-                <div className="w-full h-full bg-[#fcfdff] relative overflow-hidden">
+              <div className="w-full h-full bg-[#fcfdff] relative overflow-hidden">
                 {/* Formal Background Pattern - CSS Only to avoid CORS/Fetch errors */}
                 <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(#1e3a8a 1px, transparent 0px)', backgroundSize: '20px 20px' }} />
                 <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(45deg, #1e3a8a 25%, transparent 25%, transparent 50%, #1e3a8a 50%, #1e3a8a 75%, transparent 75%, transparent)' , backgroundSize: '4px 4px'}} />
@@ -180,68 +182,68 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                   </svg>
                 </div>
 
-                <div className="absolute inset-0 p-24 flex flex-col items-center">
+                <div className="absolute inset-0 pt-16 pb-36 px-24 flex flex-col items-center">
                    {/* Top Header Row: Logo left, ID right */}
                    <div className="w-full flex justify-between items-start mb-6">
                       <div className="flex items-center gap-5">
-                         <div className="w-20 h-20 bg-white p-3 border-2 border-[#c5a059]/30 rounded-2xl flex items-center justify-center shadow-sm overflow-hidden">
+                         <div className="w-20 h-20 bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] p-3 border-2 border-[#c5a059]/50 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
                             {siteSettings?.logoUrl ? (
-                               <img src={siteSettings.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" crossOrigin="anonymous" />
+                               <img src={siteSettings.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain drop-shadow-md" crossOrigin="anonymous" />
                             ) : (
-                               <Award className="h-12 w-12 text-blue-700" />
+                               <Award className="h-12 w-12 text-[#c5a059]" />
                             )}
                          </div>
                          <div className="text-left">
-                            <h2 className="text-4xl font-black text-gray-900 tracking-tighter leading-none">
+                            <h2 className="text-4xl font-black text-[#1e3a8a] tracking-tighter leading-none drop-shadow-sm">
                                {siteSettings?.siteName ? (
                                   siteSettings.siteName
                                ) : (
-                                  <>EDU<span className="text-blue-700">AI</span></>
+                                  <>EDU<span className="text-[#c5a059]">AI</span></>
                                )}
                             </h2>
-                            <p className="text-[10px] font-bold text-blue-800/60 tracking-[0.4em] uppercase mt-2 font-serif">Raqamli Akademiya</p>
+                            <p className="text-[10px] font-bold text-[#c5a059] tracking-[0.4em] uppercase mt-2 font-serif">Raqamli Akademiya</p>
                          </div>
                       </div>
                       <div className="text-right">
-                         <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1 px-3 inline-block">Sertifikat ID</p>
-                         <p className="font-mono font-bold text-2xl text-blue-900 bg-white border-2 border-blue-50 px-5 py-2 rounded-xl shadow-sm">
+                         <p className="text-[11px] font-black text-[#1e3a8a]/60 uppercase tracking-widest mb-1 px-3 inline-block">Sertifikat ID</p>
+                         <p className="font-mono font-bold text-2xl text-[#1e3a8a] bg-white border-2 border-[#1e3a8a]/10 px-5 py-2 rounded-xl shadow-sm">
                             {selectedCert.certificateId || ('CERT-' + selectedCert.id.slice(-8).toUpperCase())}
                          </p>
                       </div>
                    </div>
 
                    {/* Main Content */}
-                   <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-4xl mt-[-10px]">
-                      <h1 className="text-8xl font-black text-gray-900 tracking-[0.15em] mb-6 drop-shadow-sm uppercase">{template.title}</h1>
-                      <p className="text-2xl font-bold text-[#c5a059] uppercase tracking-[0.3em] mb-12 font-serif italic">
+                   <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-4xl mt-[-30px]">
+                      <h1 className="text-8xl font-black text-[#1e3a8a] tracking-[0.15em] mb-4 drop-shadow-sm uppercase">{template.title}</h1>
+                      <p className="text-2xl font-bold text-[#c5a059] uppercase tracking-[0.3em] mb-10 font-serif italic">
                         {template.completionText}
                       </p>
 
-                      <div className="mb-12 relative w-full flex flex-col items-center">
-                         <span className="text-6xl font-black text-gray-900 px-16 py-3 uppercase tracking-tight italic font-serif leading-tight">
+                      <div className="mb-2 relative w-full flex flex-col items-center">
+                         <span className="text-6xl font-black text-gray-900 px-16 py-1 uppercase tracking-tight italic font-serif leading-tight">
                             {selectedCert.studentName || "TALABA ISMI FAMILIYASI"}
                          </span>
-                         <div className="w-[80%] h-[3px] bg-gradient-to-r from-transparent via-[#c5a059] to-transparent mt-3" />
+                         <div className="w-[80%] h-[3px] bg-gradient-to-r from-transparent via-[#c5a059] to-transparent mt-1" />
                       </div>
 
-                      <p className="text-2xl text-gray-700 font-medium max-w-4xl leading-loose italic">
-                        {template.coursePrefix} <span className="font-black text-gray-900 not-italic font-serif border-b-[2px] border-blue-200">"{selectedCert.courseTitle || 'MAXSUS KURSI'}"</span> {template.courseSuffix}
+                      <p className="text-2xl text-gray-700 font-medium max-w-4xl leading-loose italic -mt-2">
+                        {template.coursePrefix} <span className="font-black text-gray-900 not-italic font-serif border-b-[2px] border-[#c5a059]/40">"{selectedCert.courseTitle || 'MAXSUS KURSI'}"</span> {template.courseSuffix}
                       </p>
                    </div>
 
                    {/* Bottom Area: Three parts - Score (Left), QR (Center), Date (Right) */}
-                   <div className="w-full grid grid-cols-3 items-end mt-8">
+                   <div className="w-full grid grid-cols-3 items-end mt-[10px]">
                       {/* Score Result Bottom Left */}
-                      <div className="text-left flex flex-col gap-2">
-                         <p className="text-[12px] font-black text-gray-400 uppercase tracking-widest leading-none">Umumiy natija</p>
-                         <div className="flex items-center gap-4 bg-white/60 p-4 rounded-2xl border border-blue-50 shadow-sm self-start">
-                            <span className="text-5xl font-black text-blue-700">{score}%</span>
+                      <div className="text-left flex flex-col gap-2 translate-y-5">
+                         <p className="text-[12px] font-black text-[#1e3a8a]/60 uppercase tracking-widest leading-none">Umumiy natija</p>
+                         <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm self-start w-[190px] h-[80px] -translate-x-10">
+                            <span className="text-4xl font-black text-[#1e3a8a]">{score}%</span>
                          </div>
                       </div>
 
                       {/* QR Code Center with Text */}
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="p-3 bg-white border-2 border-blue-50 rounded-2xl shadow-xl shadow-blue-900/5">
+                      <div className="flex flex-col items-center gap-3 translate-y-[24px]">
+                        <div className="p-3 bg-white border-2 border-[#c5a059]/30 rounded-2xl shadow-xl shadow-[#1e3a8a]/5">
                            <QRCodeSVG
                               value={`${window.location.origin}/verify/${selectedCert.id}`}
                               size={110}
@@ -250,20 +252,23 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                            />
                         </div>
                         <div className="flex flex-col items-center leading-none">
-                           <p className="text-[10px] font-black text-blue-800 uppercase tracking-[0.25em]">Haqiqiyligini tekshirish</p>
+                           <p className="text-[10px] font-black text-[#c5a059] uppercase tracking-[0.25em]">Haqiqiyligini tekshirish</p>
                         </div>
                       </div>
 
                       {/* Date Right Bottom */}
-                      <div className="text-right flex flex-col items-end gap-2">
-                         <p className="text-[12px] font-black text-gray-400 uppercase tracking-widest leading-none">Berilgan sana</p>
-                         <div className="bg-white/80 px-6 py-4 rounded-2xl border-2 border-blue-50 shadow-sm inline-block">
-                            <p className="text-2xl font-black text-gray-900 tracking-tighter">
+                      <div className="text-right flex flex-col items-end gap-2 translate-y-5">
+                         <p className="text-[12px] font-black text-[#1e3a8a]/60 uppercase tracking-widest leading-none">Berilgan sana</p>
+                         <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm w-[190px] h-[80px] translate-x-10">
+                            <p className="text-3xl font-black text-[#1e3a8a] tracking-tighter">
                                {(() => {
                                   const ts = selectedCert.lastAccessed;
                                   const dateObj = ts?.toMillis ? new Date(ts.toMillis()) : (ts instanceof Date ? ts : new Date());
-                                  return dateObj.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
-                               })()}
+                                  const day = dateObj.getDate();
+                                  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                  const year = dateObj.getFullYear();
+                                  return `${day}.${month}.${year}`;
+                                })()}
                             </p>
                          </div>
                       </div>
