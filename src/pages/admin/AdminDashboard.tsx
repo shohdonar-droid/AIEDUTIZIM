@@ -70,7 +70,6 @@ export default function AdminDashboard() {
     { name: 'Foydalanuvchilar', path: '/admin/users', icon: UsersIcon },
     { name: 'Jurnal', path: '/admin/jurnal', icon: TrendingUp },
     { name: 'Sertifikatlar', path: '/admin/certificates', icon: Award },
-    { name: 'Xizmatlar', path: '/admin/services', icon: LayoutDashboard },
     { name: 'Billing', path: '/admin/billing', icon: Wallet },
     { name: 'Tepa va Footer', path: '/admin/footer', icon: Dock },
     { name: 'Bildirishnomalar', path: '/admin/notifications', icon: AlertCircle },

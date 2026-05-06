@@ -35,33 +35,6 @@ export default function StudentDashboard() {
     return unsub;
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
-    
-    const checkBallAndNotify = async () => {
-      if (user.ball === 3) {
-        const lastNotif = localStorage.getItem(`notif_ball3_${user.uid}`);
-        const today = new Date().toDateString();
-        if (lastNotif === today) return;
-
-        try {
-          await addDoc(collection(db, 'messages'), {
-            senderId: 'system',
-            senderName: 'Tizim',
-            receiverId: user.uid,
-            text: "Diqqat! Hisobingizda 3 ta ball qoldi. Iltimos, hisobingizni to'ldiring.",
-            isRead: false,
-            createdAt: serverTimestamp()
-          });
-          localStorage.setItem(`notif_ball3_${user.uid}`, today);
-        } catch (e) {
-          console.error("Notif error:", e);
-        }
-      }
-    };
-    checkBallAndNotify();
-  }, [user?.ball, user?.uid]);
-
   const menuItems = [
     { name: 'Profil', path: '/student', icon: User },
     { name: 'Baholar', path: '/student/grades', icon: GraduationCap },
@@ -69,7 +42,6 @@ export default function StudentDashboard() {
     { name: 'Testlar', path: '/student/tests', icon: FileText },
     { name: 'Mavzular', path: '/student/subjects', icon: BookOpen },
     { name: 'Sertifikatlar', path: '/student/certificates', icon: Award },
-    { name: 'Xizmatlar', path: '/student/services', icon: BrainCircuit },
     { name: 'Chat', path: '/student/chat', icon: MessageSquare, badge: unreadCount },
   ];
 
@@ -105,13 +77,6 @@ export default function StudentDashboard() {
             >
               <p className="font-black text-gray-900 truncate uppercase text-[10px] tracking-tight">{user?.displayName}</p>
               <p className="text-[8px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-0.5">Talaba</p>
-              <div className={`mt-1 inline-flex items-center px-1.5 py-0.5 rounded-lg text-[8px] font-black uppercase transition-all ${
-                (user?.ball || 0) <= 3 
-                  ? 'bg-red-50 text-red-600 animate-pulse' 
-                  : 'bg-blue-50 text-blue-600'
-              }`}>
-                Ball: {user?.ball || 0}
-              </div>
             </motion.div>
           )}
         </div>
@@ -192,7 +157,6 @@ export default function StudentDashboard() {
             <Route path="/subjects" element={<SubjectsManager />} />
             <Route path="/subjects/read/:id" element={<SubjectRead />} />
             <Route path="/certificates" element={<StudentCertificates />} />
-            <Route path="/services" element={<StudentServices />} />
             <Route path="/chat" element={<ChatSection />} />
           </Routes>
         </motion.div>

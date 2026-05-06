@@ -1,152 +1,70 @@
-import React, { useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import React, { useState } from 'react';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router-dom';
-import { UserPlus, Loader2, BrainCircuit } from 'lucide-react';
-import { doc, setDoc, serverTimestamp, getDocs, collection, query, where } from 'firebase/firestore';
+import { BrainCircuit, Loader2 } from 'lucide-react';
+import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
-import { UserProfile, Department, Group } from '../types';
 
 export default function Register() {
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    middleName: '',
-    phone: '',
-    login: '',
-    password: '',
-    teacherId: '',
-    departmentId: '',
-    groupId: '',
-  });
-  const [teachers, setTeachers] = useState<UserProfile[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
 
-  useEffect(() => {
-    async function loadTeachers() {
-      try {
-        const tSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'teacher')));
-        const ts = tSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as any)) as UserProfile[];
-        ts.sort((a,b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
-        setTeachers(ts);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    loadTeachers();
-  }, []);
-
-  useEffect(() => {
-    if (!formData.teacherId) {
-      setDepartments([]);
-      setFormData(prev => ({ ...prev, departmentId: '', groupId: '' }));
-      return;
-    }
-    async function loadDepts() {
-      const q = query(collection(db, 'departments'), where('creatorId', '==', formData.teacherId));
-      const snap = await getDocs(q);
-      const ds = snap.docs.map(d => ({ id: d.id, ...d.data() } as Department));
-      ds.sort((a, b) => a.name.localeCompare(b.name, 'uz-UZ'));
-      setDepartments(ds);
-    }
-    loadDepts();
-  }, [formData.teacherId]);
-
-  useEffect(() => {
-    if (!formData.departmentId) {
-      setGroups([]);
-      setFormData(prev => ({ ...prev, groupId: '' }));
-      return;
-    }
-    async function loadGroups() {
-      const q = query(collection(db, 'groups'), where('departmentId', '==', formData.departmentId));
-      const snap = await getDocs(q);
-      const gs = snap.docs.map(g => ({ id: g.id, ...g.data() } as Group));
-      gs.sort((a, b) => a.name.localeCompare(b.name, 'uz-UZ'));
-      setGroups(gs);
-    }
-    loadGroups();
-  }, [formData.departmentId]);
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
-
-    const trimmedLogin = formData.login.trim();
-    if (!trimmedLogin) {
-      setError("Login bo'sh bo'lishi mumkin emas.");
-      setLoading(false);
-      return;
-    }
-
+    
     try {
-      // Create a case-insensitive check by fetching all users and matching manually
-      // because Firestore doesn't support case-insensitive 'where'
-      // For registration, we can just check if any user has this login (case-insensitive)
-      const q = query(collection(db, 'users'));
-      const qSnap = await getDocs(q);
-      const exists = qSnap.docs.some(d => (d.data().login || '').toLowerCase() === trimmedLogin.toLowerCase());
-      
-      if (exists) {
-         setError("Bu login allaqachon band. Iltimos boshqa login tanlang.");
-         setLoading(false);
-         return;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    let pass = formData.password;
-    let role = 'student';
-
-    let emailToUse = `${trimmedLogin.toLowerCase()}_${Date.now()}@student.uz`;
-
-    const teacherObj = teachers.find(t => t.uid === formData.teacherId);
-    const teacherName = teacherObj?.displayName || '';
-    const departmentName = departments.find(d => d.id === formData.departmentId)?.name || '';
-    const groupName = groups.find(g => g.id === formData.groupId)?.name || '';
-
-    try {
-      const res = await createUserWithEmailAndPassword(auth, emailToUse, pass);
-      
-      await setDoc(doc(db, 'users', res.user.uid), {
-        uid: res.user.uid,
-        displayName: `${formData.lastName} ${formData.firstName} ${formData.middleName}`,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        middleName: formData.middleName,
-        phone: formData.phone,
-        email: emailToUse,
-        login: trimmedLogin,
-        password: pass, // Requested behavior for simulated environment resets
-        teacherId: formData.teacherId,
-        teacherName: teacherName,
-        departmentId: formData.departmentId,
-        departmentName: departmentName,
-        groupId: formData.groupId,
-        groupName: groupName,
-        role: role,
-        createdAt: serverTimestamp(),
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account'
       });
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        // Create new staff
+        await setDoc(userDocRef, {
+          uid: user.uid,
+          displayName: user.displayName || 'Xodim',
+          email: user.email,
+          role: 'staff',
+          createdAt: serverTimestamp(),
+          spentBalls: 0
+        });
+      }
+      
+      try {
+         const sessionRef = await addDoc(collection(db, 'activityLogs'), {
+           userId: user.uid,
+           userDisplayName: user.displayName || 'Xodim',
+           role: userDoc.exists() ? userDoc.data()?.role : 'staff',
+           loginTime: Date.now(),
+           logoutTime: null,
+           durationMinutes: 0
+         });
+         localStorage.setItem('sessionId', sessionRef.id);
+         localStorage.setItem('sessionStart', Date.now().toString());
+      } catch (e) {}
 
       await refreshUser();
-      navigate('/student');
+      const finalRole = userDoc.exists() ? userDoc.data()?.role : 'staff';
+      if (finalRole === 'admin') navigate('/admin');
+      else if (finalRole === 'teacher' || finalRole === 'staff') navigate('/teacher');
+      else navigate('/student');
+      
     } catch (err: any) {
-      if (err.code === 'auth/weak-password') {
-        setError("Parol kamida 6 ta belgidan iborat bo'lishi kerak.");
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError('Bu login allaqachon band. Iltimos boshqa login tanlang.');
-      } else if (err.code === 'auth/invalid-email') {
-         setError('Yaroqsiz login formati kiritildi. Faqat harf va sonlardan foydalaning.');
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError("Oyna yopildi.");
       } else {
         setError('Xatolik yuz berdi: ' + err.message);
       }
+      auth.signOut();
     } finally {
       setLoading(false);
     }
@@ -160,16 +78,29 @@ export default function Register() {
               <BrainCircuit className="h-8 w-8 text-[#007aff]" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 tracking-tight mb-4">Ro'yxatdan o'tish</h2>
-            <div className="space-y-4 mb-8">
+            <div className="space-y-4 mb-4">
               <p className="text-gray-600 font-medium leading-relaxed">
-                Talabalar o'z tashkilotlari (universitet/maktab) orqali ro'yxatdan o'tkaziladi. 
+                Platformadan foydalanish va interaktiv testlar yaratish uchun Google orqali tizimga kiring.
               </p>
-              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 text-amber-700 text-sm font-medium">
-                Iltimos, login va parolingizni o'z tashkilotingiz ma'muriyatidan oling.
-              </div>
             </div>
-            <Link to="/login" className="inline-block w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all">
-              KIRISH SAHIFASIGA QAYTISH
+            
+            {error && (
+              <div className="p-4 bg-red-50 text-red-600 font-medium rounded-xl mb-6 text-sm">
+                {error}
+              </div>
+            )}
+            
+            <button 
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 py-4 bg-white border border-gray-200 text-gray-700 rounded-2xl font-black shadow-sm hover:bg-gray-50 transition-all mb-4"
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
+              GOOGLE ORQALI KIRISH
+            </button>
+
+            <Link to="/login" className="inline-block text-sm text-blue-600 border-b border-blue-600/30 font-semibold hover:border-blue-600 transition-colors">
+              Alallaqachon hisobingiz bormi? Kirish
             </Link>
         </div>
       </div>

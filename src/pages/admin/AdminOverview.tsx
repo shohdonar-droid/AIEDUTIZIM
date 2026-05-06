@@ -113,8 +113,6 @@ export default function AdminOverview() {
           { label: 'Kurslar', value: stats.courses, icon: BookOpen, color: 'bg-purple-50 text-purple-600', path: '/admin/courses' },
           { label: 'Testlar', value: stats.tests, icon: Brain, color: 'bg-green-50 text-green-600', path: '/admin/tests' },
           { label: 'Sertifikatlar', value: stats.certs, icon: Award, color: 'bg-orange-50 text-orange-600', path: '/admin/certificates' },
-          { label: 'Jami ball', value: stats.totalBalls, icon: Zap, color: 'bg-yellow-50 text-yellow-600', path: '/admin/billing' },
-          { label: 'Sarflangan ball', value: stats.spentBalls, icon: Zap, color: 'bg-red-50 text-red-600', path: '/admin/billing' },
         ].map((stat, i) => (
           <a href={stat.path} key={i} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex flex-col items-center text-center group cursor-pointer">
             <div className={`w-12 h-12 rounded-2xl ${stat.color} flex items-center justify-center mb-4 group-hover:rotate-12 transition-transform`}>

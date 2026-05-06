@@ -23,12 +23,6 @@ export default function AdminBilling() {
   // Stats
   const [stats, setStats] = useState({
     totalOrgs: 0,
-    orgRemainingBalls: 0,
-    orgSpentBalls: 0,
-    stdRemainingBalls: 0,
-    stdSpentBalls: 0,
-    staffRemainingBalls: 0,
-    staffSpentBalls: 0,
     staffCount: 0,
     totalIncome: 0,
     totalDocs: 0,
@@ -59,16 +53,10 @@ export default function AdminBilling() {
 
         setStats({
           totalOrgs: orgs.length,
-          orgRemainingBalls: orgs.reduce((acc, u) => acc + (u.ball || 0), 0),
-          orgSpentBalls: orgs.reduce((acc, u) => acc + (u.spentBalls || 0), 0),
-          stdRemainingBalls: stds.reduce((acc, u) => acc + (u.ball || 0), 0),
-          stdSpentBalls: stds.reduce((acc, u) => acc + (u.spentBalls || 0), 0),
-          staffRemainingBalls: stf.reduce((acc, u) => acc + (u.ball || 0), 0),
-          staffSpentBalls: stf.reduce((acc, u) => acc + (u.spentBalls || 0), 0),
           staffCount: stf.length,
           totalIncome: users.reduce((acc, u) => acc + (u.totalIncome || 0), 0),
           totalDocs: testsSnap.size + coursesSnap.size + resultsSnap.size,
-          totalSpentAmount: users.reduce((acc, u) => acc + ((u.spentBalls || 0) * (u.ballPrice || 1000)), 0)
+          totalSpentAmount: users.reduce((acc, u) => acc + (u.totalSpentAmount || 0), 0)
         });
 
       } catch (err) {
@@ -84,10 +72,8 @@ export default function AdminBilling() {
     if (!editingUser) return;
     setLoading(true);
     try {
-      const price = Number(editPrice) || 1000;
       let totalInc = editingUser.totalIncome || 0;
-      let spentBalls = editingUser.spentBalls || 0;
-      let remainingBalls = editingUser.ball || 0;
+      let totalSpent = editingUser.totalSpentAmount || 0;
       let transactions = editingUser.billingHistory || [];
 
       if (Number(editIncome) > 0) {
@@ -101,27 +87,21 @@ export default function AdminBilling() {
       }
 
       const expense = Number(editExpense);
-      if (expense < 0) {
+      if (Math.abs(expense) > 0) {
         const spentVal = Math.abs(expense);
-        const ballsToSubtract = Math.floor(spentVal / price);
-        spentBalls += ballsToSubtract;
+        totalSpent += spentVal;
         
         const newRecord = {
           type: 'chiqim',
-          amount: expense, // negative value
+          amount: expense < 0 ? expense : -expense,
           date: new Date().toISOString()
         };
         transactions = [...transactions, newRecord];
       }
       
-      const purchasedBalls = Math.floor(totalInc / price);
-      remainingBalls = purchasedBalls - spentBalls;
-
       const updateData: any = {
-        ballPrice: price,
         totalIncome: totalInc,
-        spentBalls: spentBalls,
-        ball: remainingBalls,
+        totalSpentAmount: totalSpent,
         billingHistory: transactions,
         updatedAt: serverTimestamp()
       };
@@ -155,11 +135,8 @@ export default function AdminBilling() {
     const exportData = data.map((u, i) => ({
       "№": i + 1,
       "Nomi / F.I.SH": u.displayName,
-      "1 Ball Narxi": u.ballPrice || "-",
-      "Jami Ball": Math.floor((u.totalIncome || 0) / (u.ballPrice || 1)),
-      "Sarflangan Ball": u.spentBalls || 0,
-      "Qolgan Ball": u.ball || 0,
       "Tushgan To'lov": u.totalIncome || 0,
+      "Ishlatilgan Summa": u.totalSpentAmount || 0,
       "Oxirgi To'lov Sanasi": u.lastIncomeDate?.toDate ? u.lastIncomeDate.toDate().toLocaleString() : "-"
     }));
 
@@ -233,32 +210,6 @@ export default function AdminBilling() {
 
          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-               <Zap className="w-20 h-20" />
-            </div>
-            <div className="flex items-center gap-4 mb-4">
-               <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                  <Zap className="w-6 h-6" />
-               </div>
-               <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Qolgan Ball</span>
-            </div>
-            <h3 className="text-3xl font-black text-gray-900">{(stats.orgRemainingBalls + stats.stdRemainingBalls + stats.staffRemainingBalls).toLocaleString()}</h3>
-         </div>
-
-         <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-               <ArrowUpRight className="w-20 h-20" />
-            </div>
-            <div className="flex items-center gap-4 mb-4">
-               <div className="p-3 bg-red-50 text-red-600 rounded-2xl">
-                  <ArrowUpRight className="w-6 h-6" />
-               </div>
-               <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Sarflangan Ballar</span>
-            </div>
-            <h3 className="text-3xl font-black text-gray-900">{(stats.orgSpentBalls + stats.stdSpentBalls + stats.staffSpentBalls).toLocaleString()}</h3>
-         </div>
-
-         <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
                <DollarSign className="w-20 h-20" />
             </div>
             <div className="flex items-center gap-4 mb-4">
@@ -326,10 +277,8 @@ export default function AdminBilling() {
                 {activeTab === 'org' && (
                    <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">Xodimlar soni</th>
                 )}
-                <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">1 Ball narxi</th>
                 <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">Jami tushum</th>
-                <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">Sarflangan</th>
-                <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">Qolgan Ball</th>
+                <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">Ishlatilgan Summa</th>
                 <th className="px-6 py-8 text-right text-xs font-black text-gray-400 uppercase tracking-widest">Amallar</th>
               </tr>
             </thead>
@@ -346,19 +295,11 @@ export default function AdminBilling() {
                        <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg">{(u as any).staffCount || 0} ta</span>
                     </td>
                   )}
-                  <td className="px-6 py-6 text-center font-bold text-sm">
-                    {u.ballPrice?.toLocaleString() || '1,000'} <span className="text-[10px] text-gray-400 uppercase">sum</span>
-                  </td>
                   <td className="px-6 py-6 text-center font-black text-green-600 bg-green-50/20">
                     {u.totalIncome?.toLocaleString() || '0'}
                   </td>
-                  <td className="px-6 py-6 text-center font-bold text-red-500">
-                    {u.spentBalls || 0}
-                  </td>
-                  <td className="px-6 py-6 text-center">
-                    <span className={`px-4 py-2 rounded-xl font-black ${ (u.ball || 0) < 10 ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600' }`}>
-                      {u.ball || 0}
-                    </span>
+                  <td className="px-6 py-6 text-center font-bold text-red-500 bg-red-50/20">
+                    {u.totalSpentAmount?.toLocaleString() || '0'}
                   </td>
                   <td className="px-6 py-6 text-right">
                     <div className="flex justify-end gap-2">
@@ -373,7 +314,6 @@ export default function AdminBilling() {
                        <button 
                          onClick={() => {
                            setEditingUser(u);
-                           setEditPrice(u.ballPrice || 1000);
                            setEditIncome(0);
                            setEditExpense(0);
                          }}
@@ -405,16 +345,6 @@ export default function AdminBilling() {
 
             <div className="space-y-6">
                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">1 ta ball narxi (so'mda)</label>
-                  <input 
-                    type="number"
-                    value={editPrice}
-                    onChange={e => setEditPrice(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600 focus:bg-white transition-all font-bold text-lg"
-                  />
-               </div>
-
-               <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Yangi to'lov summasi (so'mda)</label>
                   <div className="relative">
                      <input 
@@ -426,22 +356,22 @@ export default function AdminBilling() {
                      />
                      <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-indigo-300 uppercase tracking-tighter">sum</span>
                   </div>
-                  <p className="text-[10px] font-bold text-gray-400 italic mt-1">* Bu summa jami tushumga qo'shiladi va ball qayta hisoblanadi.</p>
+                  <p className="text-[10px] font-bold text-gray-400 italic mt-1">* Bu summa jami tushumga qo'shiladi.</p>
                </div>
 
                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Chiqim summasi (manfiy so'mda)</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Chiqim summasi</label>
                   <div className="relative">
                      <input 
                         type="number"
-                        placeholder="Masalan: -5000"
+                        placeholder="Masalan: 5000"
                         value={editExpense || ''}
                         onChange={e => setEditExpense(Number(e.target.value))}
                         className="w-full px-6 py-5 bg-red-50/30 rounded-2xl border-2 border-red-100 focus:border-red-600 focus:bg-white transition-all font-black text-2xl text-red-700"
                      />
                      <span className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-red-300 uppercase tracking-tighter">sum</span>
                   </div>
-                  <p className="text-[10px] font-bold text-gray-400 italic mt-1">* Bu summa qolgan balldan mos ravishda olib tashlanadi.</p>
+                  <p className="text-[10px] font-bold text-gray-400 italic mt-1">* Bu summa ishlatilgan summaga qo'shiladi.</p>
                </div>
 
                <div className="bg-gray-50 p-6 rounded-3xl space-y-3">
@@ -450,9 +380,9 @@ export default function AdminBilling() {
                      <span className="text-gray-900">{( (editingUser.totalIncome || 0) + (editIncome || 0) ).toLocaleString()} so'm</span>
                   </div>
                   <div className="flex justify-between text-sm font-bold">
-                     <span className="text-gray-400">Yangi ball balansi:</span>
-                     <span className="text-indigo-600 font-black">
-                        {Math.floor( ((editingUser.totalIncome || 0) + (editIncome || 0)) / (editPrice || 1) ) - (editingUser.spentBalls || 0) - Math.floor(Math.abs(editExpense) / (editPrice || 1))}
+                     <span className="text-gray-400">Ishlatilgan summa bo'ladi:</span>
+                     <span className="text-red-500 font-black">
+                        {( (editingUser.totalSpentAmount || 0) + Math.abs(editExpense || 0) ).toLocaleString()} so'm
                      </span>
                   </div>
                </div>

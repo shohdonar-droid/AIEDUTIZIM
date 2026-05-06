@@ -28,68 +28,7 @@ export default function TeacherTests() {
   const [maxAttempts, setMaxAttempts] = useState(1);
   const [generatedQuestions, setGeneratedQuestions] = useState<Question[]>([]);
   const [aiMode, setAiMode] = useState<'ai'|'manual'>('ai');
-  const [zeroBallWarning, setZeroBallWarning] = useState(false);
 
-  const deductBall = async (amount: number) => {
-    if (!user) return false;
-    
-    // Deduct from current user's ball (whether teacher or staff)
-    const targetUid = user.uid;
-    if (!targetUid) return false;
-
-    try {
-      const targetDoc = await getDoc(doc(db, 'users', targetUid));
-      if (!targetDoc.exists()) return false;
-      
-      const targetData = targetDoc.data();
-      const currentBall = targetData.ball || 0;
-
-      if (currentBall < amount) {
-         setZeroBallWarning(true);
-         setTimeout(() => setZeroBallWarning(false), 5000);
-         return false;
-      }
-
-      const newBall = currentBall - amount;
-      
-      // Update User's ball
-      await updateDoc(doc(db, 'users', targetUid), {
-        ball: newBall,
-        spentBalls: (targetData.spentBalls || 0) + amount
-      });
-
-      // Auto message if ball === 3
-      if (newBall === 3) {
-        try {
-          const nSnap = await getDoc(doc(db, 'siteContent', 'notifications'));
-          const cMsg = nSnap.exists() ? nSnap.data()?.lowBallChatMessage : null;
-          
-          let adminId = 'SYSTEM_ADMIN';
-          const aSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin'), limit(1)));
-          if (!aSnap.empty) {
-            adminId = aSnap.docs[0].id;
-          }
-
-          await addDoc(collection(db, 'messages'), {
-            senderId: adminId,
-            receiverId: targetUid,
-            text: cMsg || "Hurmatli hamkor, sizning ballaringiz eng past darajaga yaqinlashmoqda. Iltimos, hisobingizni to'ldiring.",
-            timestamp: serverTimestamp(),
-            isRead: false
-          });
-        } catch(e) { 
-          // Silently fail or log for auto-notif
-          console.error("Auto message error:", e); 
-        }
-      }
-
-      await refreshUser();
-      return true;
-    } catch (e) {
-      console.error(e);
-      return false;
-    }
-  };
   const defaultManualTemplate = `++++ savol matni
 ====
 nato'g'ri_variant
@@ -105,9 +44,6 @@ nato'g'ri_variant
   const parseManualText = async () => {
     if (!topic) return alert("Test namini (Kurs yoki Mavzuni) kiriting.");
     if (!manualText.trim()) return;
-
-    const ok = await deductBall(1);
-    if (!ok) return;
     
     // Find all blocks starting with "++++"
     const blocks = manualText.split('++++').map(b => b.trim()).filter(b => b);
@@ -263,9 +199,6 @@ nato'g'ri_variant
        return;
     }
 
-    const ok = await deductBall(1);
-    if (!ok) return;
-
     setLoading(true);
     try {
       const questions = await generateDynamicTest(topic, testCount, context);
@@ -375,9 +308,6 @@ nato'g'ri_variant
       alert("Iltimos, imtihon nomi va vaqtini kiriting.");
       return;
     }
-
-    const ok = await deductBall(2);
-    if (!ok) return;
 
     setLoading(true);
     try {
@@ -516,11 +446,6 @@ nato'g'ri_variant
 
   return (
     <div className="space-y-10">
-      {zeroBallWarning && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-red-600 text-white px-8 py-4 rounded-2xl font-black shadow-2xl animate-bounce">
-          Tashkilotingizda Ball yetarli emas yoki qolmagan...
-        </div>
-      )}
       {showFullEditor && (
         <div className="fixed inset-0 z-[100] bg-white overflow-y-auto p-4 md:p-10 space-y-10">
            <header className="flex flex-col md:flex-row justify-between items-start md:items-center max-w-5xl mx-auto gap-4">

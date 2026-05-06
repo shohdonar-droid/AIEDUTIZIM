@@ -38,6 +38,7 @@ export default function Navbar() {
     { name: 'Bosh sahifa', path: '/' },
     { name: 'Kurslar', path: '/courses' },
     { name: 'Testlar', path: '/tests' },
+    { name: 'Quizizz', path: '/quizizz' },
     { name: 'Chat', path: '/contact' },
   ];
 

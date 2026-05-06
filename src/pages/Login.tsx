@@ -272,7 +272,11 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Registration link removed as per requirement - users are created by orgs/admins */}
+          <div className="mt-6 text-center">
+            <Link to="/register" className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors decoration-2 underline-offset-4">
+              Xodim profilini Google orqali ochish
+            </Link>
+          </div>
         </div>
       </div>
     </div>

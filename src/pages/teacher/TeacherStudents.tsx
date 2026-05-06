@@ -286,10 +286,7 @@ export default function TeacherStudents() {
           "Guruh": u.groupName || '-'
         };
       } else {
-        return {
-          ...base,
-          "Sarflagan ball": u.spentBalls || 0
-        };
+        return base;
       }
     });
 
@@ -545,13 +542,11 @@ export default function TeacherStudents() {
                 <th className="px-6 py-4 text-left">№</th>
                 <th className="px-6 py-4 text-left">F.I.SH</th>
                 <th className="px-6 py-4 text-left">Tel raqam</th>
-                {activeTab === 'student' ? (
+                {activeTab === 'student' && (
                   <>
                     <th className="px-6 py-4 text-center">Yo'nalish</th>
                     <th className="px-6 py-4 text-center">Guruh</th>
                   </>
-                ) : (
-                  <th className="px-6 py-4 text-center">Sarflagan ball</th>
                 )}
                 <th className="px-6 py-4 text-center">Login</th>
                 <th className="px-6 py-4 text-center">Parol</th>
@@ -571,13 +566,11 @@ export default function TeacherStudents() {
                   <td className="px-6 py-4 font-bold text-gray-400">{i + 1}</td>
                   <td className="px-6 py-4 font-black">{u.displayName}</td>
                   <td className="px-6 py-4 font-medium text-sm text-gray-500">{u.phone || '-'}</td>
-                  {activeTab === 'student' ? (
+                  {activeTab === 'student' && (
                     <>
                       <td className="px-6 py-4 text-center font-bold text-sm text-indigo-600 bg-indigo-50/50">{u.departmentName || '-'}</td>
                       <td className="px-6 py-4 text-center font-bold text-sm text-gray-600">{u.groupName || '-'}</td>
                     </>
-                  ) : (
-                    <td className="px-6 py-4 text-center font-black text-sm text-red-600 bg-red-50/50">{u.spentBalls || 0}</td>
                   )}
                   <td className="px-6 py-4 text-center font-black text-sm text-blue-700 bg-blue-50/50">{u.login || '-'}</td>
                   <td className="px-6 py-4 text-center font-mono text-sm text-gray-400">{u.password || '-'}</td>

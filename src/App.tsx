@@ -23,6 +23,8 @@ import { Loader2 } from 'lucide-react';
 
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 
+import Quizizz from './pages/Quizizz';
+
 function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 'admin' | 'student' | 'teacher' | 'staff' }) {
   const { user, loading } = useAuth();
 
@@ -58,6 +60,7 @@ export default function App() {
               <Route path="/courses" element={<Courses />} />
               <Route path="/courses/:id" element={<ProtectedRoute><CourseView /></ProtectedRoute>} />
               <Route path="/tests" element={<Tests />} />
+              <Route path="/quizizz" element={<Quizizz />} />
               <Route path="/verify/:id" element={<VerifyCertificate />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<Login />} />

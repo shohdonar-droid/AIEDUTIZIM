@@ -15,6 +15,7 @@ import TeacherChat from './TeacherChat';
 import TeacherOverview from './TeacherOverview';
 import TeacherSubjects from '../../components/SubjectsManager';
 import SubjectRead from '../SubjectRead';
+import TeacherQuizizz from './TeacherQuizizz';
 
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, getDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -54,44 +55,17 @@ export default function TeacherDashboard() {
     return unsub;
   }, [user]);
 
-  useEffect(() => {
-    if (!user || user.role === 'admin') return;
-    
-    const checkBallAndNotify = async () => {
-      if (user.ball === 3) {
-        const lastNotif = localStorage.getItem(`notif_ball3_${user.uid}`);
-        const today = new Date().toDateString();
-        if (lastNotif === today) return;
-
-        try {
-          await addDoc(collection(db, 'messages'), {
-            senderId: 'system',
-            senderName: 'Tizim',
-            receiverId: user.uid,
-            text: "Diqqat! Hisobingizda 3 ta ball qoldi. Iltimos, hisobingizni to'ldiring.",
-            isRead: false,
-            createdAt: serverTimestamp()
-          });
-          localStorage.setItem(`notif_ball3_${user.uid}`, today);
-        } catch (e) {
-          console.error("Notif error:", e);
-        }
-      }
-    };
-    checkBallAndNotify();
-  }, [user?.ball]);
-
   const navItems = [
     { name: 'Asosiy ekran', path: '/teacher', icon: LayoutDashboard, exact: true },
     { name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
     { name: 'Yo\'nalishlar', path: '/teacher/departments', icon: Users, hidden: user?.role === 'staff' },
-    { name: 'Testlar', path: '/teacher/tests', icon: CheckCircle2 },
-    { name: 'Mavzular', path: '/teacher/subjects', icon: BookOpen },
+    { name: 'Testlar', path: '/teacher/tests', icon: CheckCircle2, hidden: user?.role === 'staff' },
+    { name: 'Mavzular', path: '/teacher/subjects', icon: BookOpen, hidden: user?.role === 'staff' },
     { name: 'Kurslar', path: '/teacher/courses', icon: Library, hidden: user?.role === 'staff' },
     { name: 'Talabalar', path: '/teacher/students', icon: Users, hidden: user?.role === 'staff' },
-    { name: 'Jurnal', path: '/teacher/jurnal', icon: FileText },
+    { name: 'Jurnal', path: '/teacher/jurnal', icon: FileText, hidden: user?.role === 'staff' },
+    { name: 'Quizizz', path: '/teacher/quizizz', icon: CheckCircle2, hidden: user?.role !== 'staff' },
     { name: 'Sertifikatlar', path: '/teacher/certificates', icon: FileText, hidden: user?.role === 'staff' },
-    { name: 'Xizmatlar', path: '/teacher/services', icon: BrainCircuit },
     { name: 'Chat', path: '/teacher/chat', icon: MessageSquare, badge: unreadCount },
   ].filter(item => !item.hidden);
 
@@ -128,15 +102,6 @@ export default function TeacherDashboard() {
               <p className="text-[8px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-0.5">
                 {user?.role === 'staff' ? 'Xodim' : (user?.role === 'admin' ? 'Administrator' : 'Tashkilot')}
               </p>
-              {user?.role !== 'admin' && (
-                <div className={`mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[8px] font-black uppercase transition-all ${
-                  (user?.ball || 0) <= 3 
-                    ? 'bg-red-50 text-red-600 animate-pulse' 
-                    : 'bg-blue-50 text-blue-600'
-                }`}>
-                  BALL: {user?.ball || 0}
-                </div>
-              )}
             </motion.div>
           )}
           {user?.isImpersonated && !isCollapsed && (
@@ -223,8 +188,8 @@ export default function TeacherDashboard() {
             <Route path="/subjects/read/:id" element={<SubjectRead />} />
             <Route path="/students" element={<TeacherStudents />} />
             <Route path="/jurnal" element={<TeacherJurnal />} />
+            <Route path="/quizizz" element={<TeacherQuizizz />} />
             <Route path="/certificates" element={<TeacherCertificates />} />
-            <Route path="/services" element={<TeacherServices />} />
             <Route path="/chat" element={<TeacherChat />} />
           </Routes>
         </div>

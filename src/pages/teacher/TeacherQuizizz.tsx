@@ -1,0 +1,560 @@
+import React, { useState, useEffect } from 'react';
+import { db } from '../../lib/firebase';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { generateDynamicTest } from '../../services/geminiService';
+import * as XLSX from 'xlsx';
+
+export default function TeacherQuizizz() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
+  
+  // Create / Edit State
+  const [loading, setLoading] = useState(false);
+  const [title, setTitle] = useState('');
+  const [context, setContext] = useState('');
+  const [testCount, setTestCount] = useState(10);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [showEditor, setShowEditor] = useState(false);
+  
+  // List State
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Active Running Session State
+  const [activeSession, setActiveSession] = useState<any>(null);
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [qTimer, setQTimer] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const orgId = user.role === 'staff' ? user.teacherId || user.uid : user.uid;
+    
+    const unsub = onSnapshot(query(collection(db, 'quiz_history'), where('teacherId', '==', orgId)), (snap) => {
+       const qs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+       qs.sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+       setQuizzes(qs);
+    });
+    return unsub;
+  }, [user]);
+
+  // Handle Generate with AI
+  const handleGenerate = async () => {
+    if (!title) return alert("Iltimos, testning mavzusini/nomini kiriting!");
+    setLoading(true);
+    try {
+      const generated = await generateDynamicTest(title, testCount, context);
+      setQuestions(generated);
+      setShowEditor(true);
+    } catch (err: any) {
+      alert("Xatolik: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generatePin = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for ( let i = 0; i < 6; i++ ) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const checkPinUnique = async (pin: string) => {
+    const s = await getDocs(query(collection(db, 'quiz_history'), where('pin', '==', pin)));
+    return s.empty;
+  };
+
+  const handleSaveTest = async () => {
+     if (!title || questions.length === 0) return;
+     setLoading(true);
+     try {
+       const orgId = user?.role === 'staff' ? user.teacherId || user.uid : user?.uid;
+       
+       let newPin = generatePin();
+       while (!(await checkPinUnique(newPin))) {
+          newPin = generatePin();
+       }
+
+       await addDoc(collection(db, 'quiz_history'), {
+         teacherId: orgId,
+         pin: newPin,
+         title,
+         context,
+         questions,
+         createdAt: serverTimestamp()
+       });
+
+       setTitle('');
+       setContext('');
+       setQuestions([]);
+       setShowEditor(false);
+       setActiveTab('list');
+
+     } catch(e) {
+       console.error(e);
+     } finally {
+       setLoading(false);
+     }
+  };
+
+  const handleStartSession = async (quiz: any) => {
+     setLoading(true);
+     try {
+       // Check if pin exists in active sessions
+       const sRef = doc(db, 'quiz_sessions', quiz.pin);
+       await setDoc(sRef, {
+         title: quiz.title,
+         teacherId: quiz.teacherId,
+         status: 'waiting',
+         currentQuestionIndex: -1,
+         questions: quiz.questions,
+         createdAt: serverTimestamp(),
+         historyId: quiz.id
+       });
+       setActiveSession({ id: quiz.pin, ...quiz });
+     } catch (e) {
+       console.error(e);
+     } finally {
+       setLoading(false);
+     }
+  };
+
+  // Monitor Active Session
+  useEffect(() => {
+     if (!activeSession) return;
+     const unsubSession = onSnapshot(doc(db, 'quiz_sessions', activeSession.id), (snap) => {
+        if (!snap.exists()) {
+           setActiveSession(null);
+        } else {
+           setActiveSession({ id: snap.id, ...snap.data() });
+        }
+     });
+     
+     const unsubParticipants = onSnapshot(query(collection(db, 'quiz_participants'), where('sessionId', '==', activeSession.id)), (snap) => {
+        const p = snap.docs.map(d => ({ pId: d.id, ...d.data() }));
+        setParticipants(p);
+     });
+
+     return () => { unsubSession(); unsubParticipants(); };
+  }, [activeSession?.id]);
+
+  // Handle Question Timer Logic locally to push next question
+  useEffect(() => {
+     let timer: any;
+     if (activeSession?.status === 'active' && activeSession.questionStartTime) {
+       timer = setInterval(() => {
+         const elapsed = Math.floor((Date.now() - activeSession.questionStartTime) / 1000);
+         if (elapsed >= 15) {
+            handleNextQuestion();
+         } else {
+            setQTimer(15 - elapsed);
+         }
+       }, 500);
+     }
+     return () => clearInterval(timer);
+  }, [activeSession?.status, activeSession?.questionStartTime, activeSession?.currentQuestionIndex]);
+
+  const handleBeginTest = async () => {
+    if (!activeSession) return;
+    await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
+      status: 'starting'
+    });
+    
+    // 3 second delay to let clients know it's starting
+    setTimeout(async () => {
+       await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
+         status: 'active',
+         currentQuestionIndex: 0,
+         questionStartTime: Date.now()
+       });
+    }, 3000);
+  };
+
+  const handleNextQuestion = async () => {
+    if (!activeSession) return;
+    const nextIdx = activeSession.currentQuestionIndex + 1;
+    if (nextIdx >= activeSession.questions.length) {
+      // Finish
+      await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
+        status: 'finished'
+      });
+      // Save participants history to the original quiz_history doc
+      await updateDoc(doc(db, 'quiz_history', activeSession.historyId), {
+         participants: participants,
+         lastRun: serverTimestamp()
+      });
+      // Do not delete quiz_sessions right away so guests see results.
+    } else {
+      await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
+        currentQuestionIndex: nextIdx,
+        questionStartTime: Date.now()
+      });
+    }
+  };
+  
+  const handleStopSession = async () => {
+    if (activeSession) {
+      await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
+        status: 'finished'
+      });
+      await updateDoc(doc(db, 'quiz_history', activeSession.historyId || activeSession.id), {
+         participants: participants,
+         lastRun: serverTimestamp()
+      });
+      setActiveSession(null);
+    }
+  };
+
+  const exportResults = (quiz: any) => {
+    if (!quiz.participants || quiz.participants.length === 0) return alert("Qatnashuvchilar yo'q");
+    
+    const pData = quiz.participants.map((p: any) => {
+      let correctCount = 0;
+      const row: any = { "F.I.SH": p.name };
+      
+      quiz.questions.forEach((q: any, i: number) => {
+         const ans = p.answers?.[i];
+         if (ans?.isCorrect) {
+            correctCount++;
+            row[`${i+1}-test`] = 'To\'g\'ri';
+         } else if (ans) {
+            row[`${i+1}-test`] = 'Xato';
+         } else {
+            row[`${i+1}-test`] = 'Belgilanmagan';
+         }
+      });
+      row["Jami To'g'ri"] = correctCount;
+      return row;
+    });
+
+    pData.sort((a: any, b: any) => b["Jami To'g'ri"] - a["Jami To'g'ri"]);
+
+    const worksheet = XLSX.utils.json_to_sheet(pData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Natijalar');
+    XLSX.writeFile(workbook, `Quiz_Result_${quiz.title.replace(/\s+/g, '_')}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-6">
+      {!activeSession && (
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-black text-gray-900">Quizizz Paneli</h1>
+            <p className="text-gray-500 mt-1">Interaktiv testlar yaratish va boshqarish.</p>
+          </div>
+          <div className="flex bg-gray-100 p-1.5 rounded-xl border border-gray-200">
+             <button
+                onClick={() => setActiveTab('create')}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === 'create' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+             >
+               Test Yaratish
+             </button>
+             <button
+                onClick={() => setActiveTab('list')}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+             >
+               Jurnal
+             </button>
+          </div>
+        </header>
+      )}
+
+      {/* ACTIVE SESSION VIEW */}
+      {activeSession && (
+        <div className="fixed inset-0 z-[100] bg-gray-100 p-4 md:p-8 overflow-y-auto">
+           <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col min-h-[80vh]">
+              <div className="bg-blue-600 p-8 text-white flex justify-between items-center">
+                 <div>
+                    <h2 className="text-3xl font-black mb-2">{activeSession.title}</h2>
+                    <p className="text-blue-100 text-lg">
+                      O'quvchilarga ayting: <strong>Quizizz</strong> menyusiga kirib PIN kodni yozishsin.
+                    </p>
+                 </div>
+                 <div className="text-right bg-white/10 p-6 rounded-2xl border border-white/20">
+                    <span className="block text-sm font-bold uppercase tracking-widest text-blue-200 mb-1">PIN KOD</span>
+                    <span className="text-6xl font-black tracking-widest">{activeSession.id}</span>
+                 </div>
+              </div>
+              
+              <div className="p-8 flex-1">
+                 {activeSession.status === 'waiting' && (
+                    <div className="text-center py-12">
+                       <Users className="w-20 h-20 text-gray-300 mx-auto mb-4" />
+                       <h3 className="text-2xl font-bold text-gray-900 mb-2">Mehmonlar kutilmoqda ({participants.length})</h3>
+                       <div className="flex flex-wrap justify-center gap-3 mt-8 max-w-3xl mx-auto">
+                          {participants.map(p => (
+                             <div key={p.pId} className="px-4 py-2 bg-blue-50 text-blue-700 font-bold rounded-xl animate-bounce border border-blue-100">
+                                {p.name}
+                             </div>
+                          ))}
+                       </div>
+                       {participants.length > 0 && (
+                         <button 
+                           onClick={handleBeginTest}
+                           className="mt-12 px-10 py-5 bg-green-500 text-white font-black text-2xl rounded-2xl shadow-xl shadow-green-200 hover:bg-green-600 hover:scale-105 transition-all"
+                         >
+                           TESTNI BOSHLASH
+                         </button>
+                       )}
+                    </div>
+                 )}
+
+                 {(activeSession.status === 'starting' || activeSession.status === 'active') && (
+                    <div className="text-center py-12">
+                       {activeSession.status === 'starting' ? (
+                          <h2 className="text-4xl font-black text-blue-600 animate-pulse">Test boshlanyapti...</h2>
+                       ) : (
+                          <>
+                            <div className="text-6xl font-black text-blue-600 mb-8">{qTimer}s</div>
+                            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                              Savol {activeSession.currentQuestionIndex + 1}: {activeSession.questions[activeSession.currentQuestionIndex]?.text}
+                            </h2>
+                            <p className="text-gray-500 font-medium">Barcha o'quvchilar javob berishini kuting (Yoki taymer tugashini)</p>
+                          </>
+                       )}
+                    </div>
+                 )}
+
+                 {activeSession.status === 'finished' && (
+                    <div className="py-8">
+                       <h2 className="text-3xl font-black text-center text-gray-900 mb-8">Natijalar Jadvali</h2>
+                       <div className="overflow-x-auto">
+                          <table className="w-full text-left bg-white border border-gray-100 rounded-2xl">
+                             <thead className="bg-gray-50/50">
+                                <tr>
+                                   <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">O'rin</th>
+                                   <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">F.I.SH</th>
+                                   {activeSession.questions.map((_: any, i: number) => (
+                                      <th key={i} className="px-4 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">{i+1}-T</th>
+                                   ))}
+                                   <th className="px-6 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">Bal</th>
+                                </tr>
+                             </thead>
+                             <tbody>
+                                {participants.sort((a,b) => {
+                                  const getScore = (p: any) => Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - (ans.timeTaken || 0) : 0), 0);
+                                  return getScore(b) - getScore(a);
+                                }).map((p: any, idx) => (
+                                  <tr key={p.pId} className="border-t border-gray-100">
+                                     <td className="px-6 py-4 font-black text-gray-400">{idx + 1}</td>
+                                     <td className="px-6 py-4 font-bold text-gray-900">{p.name}</td>
+                                     {activeSession.questions.map((_: any, i: number) => {
+                                        const ans = p.answers?.[i];
+                                        return (
+                                          <td key={i} className="px-4 py-4 text-center">
+                                            {ans?.isCorrect ? (
+                                               <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
+                                            ) : ans ? (
+                                               <XCircle className="w-5 h-5 text-red-500 mx-auto" />
+                                            ) : (
+                                               <span className="text-gray-300">-</span>
+                                            )}
+                                          </td>
+                                        )
+                                     })}
+                                     <td className="px-6 py-4 text-center font-black text-blue-600">
+                                       {Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 1 : 0), 0)} / {activeSession.questions.length}
+                                     </td>
+                                  </tr>
+                                ))}
+                             </tbody>
+                          </table>
+                       </div>
+                       <div className="flex justify-center mt-8">
+                         <button onClick={handleStopSession} className="px-8 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200">
+                           Chiqaish
+                         </button>
+                       </div>
+                    </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* CREATE TAB */}
+      {!activeSession && activeTab === 'create' && !showEditor && (
+        <div className="bg-white p-6 md:p-10 rounded-3xl border border-gray-100 shadow-sm max-w-4xl mx-auto space-y-8">
+           <div className="space-y-4">
+              <label className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                 <FileUp className="w-4 h-4 text-blue-500" />
+                 Test Nomi / Mavzusi
+              </label>
+              <input
+                 type="text"
+                 value={title}
+                 onChange={(e) => setTitle(e.target.value)}
+                 className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-blue-500 transition-all font-bold text-lg"
+                 placeholder="Masalan: Frontend texnologiyalari..."
+              />
+           </div>
+
+           <div className="space-y-4">
+              <label className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                 <Brain className="w-4 h-4 text-purple-500" />
+                 Qo'shimcha Matn (Ixtiyoriy)
+              </label>
+              <textarea
+                 value={context}
+                 onChange={(e) => setContext(e.target.value)}
+                 className="w-full min-h-[150px] px-6 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-purple-500 transition-all font-medium text-gray-700"
+                 placeholder="AI ga qo'shimcha ma'lumot bering yoki matnni shu yerga qo'ying..."
+              />
+              <p className="text-sm text-gray-500 font-medium">Bu yerdagi matn asosida testlar generatsiya qilinadi.</p>
+           </div>
+
+           <div className="space-y-4">
+              <label className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                 Testlar Soni
+              </label>
+              <input
+                 type="number"
+                 value={testCount}
+                 onChange={(e) => setTestCount(Number(e.target.value))}
+                 className="w-full max-w-[200px] px-6 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-blue-500 transition-all font-bold text-lg"
+                 min="1"
+                 max="40"
+              />
+           </div>
+           
+           <button
+             onClick={handleGenerate}
+             disabled={loading}
+             className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-blue-200 hover:scale-[1.02] transition-all flex justify-center items-center gap-2 text-lg"
+           >
+              {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
+              AI ORQALI YARATISH
+           </button>
+        </div>
+      )}
+
+      {/* EDITOR */}
+      {!activeSession && activeTab === 'create' && showEditor && (
+         <div className="space-y-6">
+            <div className="flex items-center justify-between">
+               <h2 className="text-2xl font-black text-gray-900">Testlarni Tahrirlash</h2>
+               <div className="flex gap-2">
+                 <button onClick={() => setShowEditor(false)} className="px-6 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200">Bekor qilish</button>
+                 <button onClick={handleSaveTest} disabled={loading} className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-200">
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                    Testni Saqlash
+                 </button>
+               </div>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-6">
+               {questions.map((q, idx) => (
+                 <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+                    <div className="flex justify-between items-start gap-4">
+                       <textarea 
+                          value={q.text}
+                          onChange={(e) => {
+                             const n = [...questions];
+                             n[idx].text = e.target.value;
+                             setQuestions(n);
+                          }}
+                          className="flex-1 px-4 py-3 bg-gray-50 font-bold border border-gray-200 rounded-xl"
+                          rows={2}
+                       />
+                       <button onClick={() => setQuestions(q => q.filter((_, i) => i !== idx))} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-5 h-5" /></button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                       {q.options.map((opt: string, oIdx: number) => (
+                           <div key={oIdx} className={`flex items-center gap-2 p-3 rounded-xl border ${opt === q.correctAnswer ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'}`}>
+                              <input 
+                                type="text"
+                                value={opt}
+                                onChange={(e) => {
+                                  const n = [...questions];
+                                  if (n[idx].correctAnswer === n[idx].options[oIdx]) {
+                                     n[idx].correctAnswer = e.target.value;
+                                  }
+                                  n[idx].options[oIdx] = e.target.value;
+                                  setQuestions(n);
+                                }}
+                                className="flex-1 bg-transparent border-none outline-none font-medium"
+                              />
+                              <input 
+                                type="radio" 
+                                name={`correct-${idx}`} 
+                                checked={opt === q.correctAnswer}
+                                onChange={() => {
+                                  const n = [...questions];
+                                  n[idx].correctAnswer = opt;
+                                  setQuestions(n);
+                                }}
+                                className="w-5 h-5 text-green-600"
+                              />
+                           </div>
+                       ))}
+                    </div>
+                 </div>
+               ))}
+            </div>
+         </div>
+      )}
+
+      {/* LIST TAB (JURNAL) */}
+      {!activeSession && activeTab === 'list' && (
+         <div className="space-y-6">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Test nomini qidiring..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white border border-gray-200 focus:border-blue-500 transition-colors font-medium shadow-sm"
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {quizzes.filter(q => q.title?.toLowerCase().includes(searchTerm.toLowerCase())).map((quiz) => (
+                  <div key={quiz.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-col hover:shadow-lg transition-shadow group relative overflow-hidden">
+                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+                        <PlayCircle className="w-24 h-24" />
+                     </div>
+                     <span className="inline-flex max-w-max mb-4 items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest bg-blue-50 text-blue-600">
+                        PIN: {quiz.pin || quiz.id}
+                     </span>
+                     <h3 className="text-xl font-black text-gray-900 mb-2">{quiz.title}</h3>
+                     <p className="text-gray-500 font-medium mb-6 text-sm line-clamp-2">{quiz.context || 'Qo\'shimcha matn mavjud emas.'}</p>
+                     
+                     <div className="mt-auto flex flex-col gap-2 relative z-10">
+                        {quiz.participants && quiz.participants.length > 0 && (
+                          <button
+                            onClick={() => exportResults(quiz)}
+                            className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                          >
+                             <Download className="w-5 h-5" /> Excel
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleStartSession(quiz)}
+                          className="w-full py-4 bg-blue-600 text-white rounded-xl font-black shadow-md shadow-blue-200 hover:bg-blue-700 transition-all flex justify-center items-center gap-2"
+                        >
+                          <PlayCircle className="w-5 h-5" /> START
+                        </button>
+                     </div>
+                  </div>
+               ))}
+               {quizzes.length === 0 && (
+                 <div className="col-span-full py-12 text-center text-gray-500 font-medium bg-white rounded-3xl border border-dashed border-gray-300">
+                   Hali hech qanday test yaratilmagan.
+                 </div>
+               )}
+            </div>
+         </div>
+      )}
+    </div>
+  );
+}

@@ -15,7 +15,6 @@ export default function TeacherCourses() {
   const [loading, setLoading] = useState(true);
   const [editingCourse, setEditingCourse] = useState<Partial<Course> | null>(null);
   const [originalCourse, setOriginalCourse] = useState<Course | null>(null);
-  const [zeroBallWarning, setZeroBallWarning] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -44,19 +43,7 @@ export default function TeacherCourses() {
     if (!editingCourse?.title || !user) return;
     setLoading(true);
 
-    let cost = 0;
     const isNew = !editingCourse.id;
-
-    if (isNew) {
-      cost = 5;
-    }
-
-    if (cost > 0 && (user.ball || 0) < cost) {
-       setZeroBallWarning(true);
-       setTimeout(() => setZeroBallWarning(false), 7000);
-       setLoading(false);
-       return;
-    }
 
     try {
       let finalModules = editingCourse.modules || [];
@@ -95,37 +82,6 @@ export default function TeacherCourses() {
            teacherId: user.role === 'staff' ? user.teacherId : user.uid,
            createdAt: serverTimestamp()
         });
-      }
-
-      if (cost > 0) {
-        const newBall = (user.ball || 0) - cost;
-        const newSpent = (user.spentBalls || 0) + cost;
-        await updateDoc(doc(db, 'users', user.uid), { 
-          ball: newBall,
-          spentBalls: newSpent
-        });
-
-        if (newBall === 3) {
-          try {
-            const nSnap = await getDoc(doc(db, 'siteContent', 'notifications'));
-            const cMsg = nSnap.exists() ? nSnap.data()?.lowBallChatMessage : null;
-
-            let adminId = 'SYSTEM_ADMIN';
-            const aSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin'), limit(1)));
-            if (!aSnap.empty) {
-              adminId = aSnap.docs[0].id;
-            }
-
-            await addDoc(collection(db, 'messages'), {
-              senderId: adminId,
-              receiverId: user.uid,
-              text: cMsg || "Hurmatli hamkor, sizning ballaringiz eng past darajaga yaqinlashmoqda. Iltimos, hisobingizni to'ldiring.",
-              timestamp: serverTimestamp(),
-              isRead: false
-            });
-          } catch(e) { console.error("Auto message error:", e); }
-        }
-        if (refreshUser) await refreshUser();
       }
 
       setEditingCourse(null);
@@ -193,11 +149,6 @@ export default function TeacherCourses() {
 
   return (
     <div className="space-y-10">
-      {zeroBallWarning && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-red-600 text-white px-8 py-4 rounded-2xl font-black shadow-2xl animate-bounce">
-          Sizda tizimdan foydalanish uchun Limit ball yetarli emas
-        </div>
-      )}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">O'z Kurslarim</h1>
