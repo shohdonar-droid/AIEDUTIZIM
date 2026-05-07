@@ -56,12 +56,7 @@ export default function TeacherQuizizz() {
   };
 
   const generatePin = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for ( let i = 0; i < 6; i++ ) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
+    return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
   const checkPinUnique = async (pin: string) => {
@@ -105,8 +100,8 @@ export default function TeacherQuizizz() {
   const handleStartSession = async (quiz: any) => {
      setLoading(true);
      try {
-       // Check if pin exists in active sessions
-       const sRef = doc(db, 'quiz_sessions', quiz.pin);
+       const sessionPin = quiz.pin || quiz.id.substring(0, 6).toUpperCase();
+       const sRef = doc(db, 'quiz_sessions', sessionPin);
        await setDoc(sRef, {
          title: quiz.title,
          teacherId: quiz.teacherId,
@@ -116,7 +111,7 @@ export default function TeacherQuizizz() {
          createdAt: serverTimestamp(),
          historyId: quiz.id
        });
-       setActiveSession({ id: quiz.pin, ...quiz });
+       setActiveSession({ id: sessionPin, ...quiz });
      } catch (e) {
        console.error(e);
      } finally {
@@ -534,7 +529,7 @@ export default function TeacherQuizizz() {
                         <PlayCircle className="w-24 h-24" />
                      </div>
                      <span className="inline-flex max-w-max mb-4 items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest bg-blue-50 text-blue-600">
-                        PIN: {quiz.pin || quiz.id}
+                        PIN: {quiz.pin || quiz.id.substring(0, 6).toUpperCase()}
                      </span>
                      <h3 className="text-xl font-black text-gray-900 mb-2">{quiz.title}</h3>
                      <p className="text-gray-500 font-medium mb-6 text-sm line-clamp-2">{quiz.context || 'Qo\'shimcha matn mavjud emas.'}</p>
