@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download } from 'lucide-react';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download, BarChart2, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { generateDynamicTest } from '../../services/geminiService';
 import * as XLSX from 'xlsx';
@@ -21,6 +21,7 @@ export default function TeacherQuizizz() {
   // List State
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewedResult, setViewedResult] = useState<any>(null);
   
   // Active Running Session State
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -142,6 +143,12 @@ export default function TeacherQuizizz() {
      return () => { unsubSession(); unsubParticipants(); };
   }, [activeSession?.id]);
 
+  const isTransitioningRef = React.useRef(false);
+
+  useEffect(() => {
+     isTransitioningRef.current = false;
+  }, [activeSession?.currentQuestionIndex, activeSession?.status]);
+
   // Handle Question Timer Logic locally to push next question
   useEffect(() => {
      let timer: any;
@@ -175,19 +182,22 @@ export default function TeacherQuizizz() {
   };
 
   const handleNextQuestion = async () => {
-    if (!activeSession) return;
+    if (!activeSession || isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
     const nextIdx = activeSession.currentQuestionIndex + 1;
+    
     if (nextIdx >= activeSession.questions.length) {
       // Finish
       await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
         status: 'finished'
       });
       // Save participants history to the original quiz_history doc
-      await updateDoc(doc(db, 'quiz_history', activeSession.historyId), {
-         participants: participants,
-         lastRun: serverTimestamp()
-      });
-      // Do not delete quiz_sessions right away so guests see results.
+      if (activeSession.historyId) {
+         await updateDoc(doc(db, 'quiz_history', activeSession.historyId), {
+            participants: participants,
+            lastRun: serverTimestamp()
+         });
+      }
     } else {
       await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
         currentQuestionIndex: nextIdx,
@@ -531,12 +541,20 @@ export default function TeacherQuizizz() {
                      
                      <div className="mt-auto flex flex-col gap-2 relative z-10">
                         {quiz.participants && quiz.participants.length > 0 && (
-                          <button
-                            onClick={() => exportResults(quiz)}
-                            className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                          >
-                             <Download className="w-5 h-5" /> Excel
-                          </button>
+                          <div className="flex gap-2">
+                             <button
+                               onClick={() => setViewedResult(quiz)}
+                               className="flex-1 py-3 bg-blue-50 text-blue-700 rounded-xl font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+                             >
+                                <BarChart2 className="w-5 h-5" /> Natija
+                             </button>
+                             <button
+                               onClick={() => exportResults(quiz)}
+                               className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                             >
+                                <Download className="w-5 h-5" /> Excel
+                             </button>
+                          </div>
                         )}
                         <button 
                           onClick={() => handleStartSession(quiz)}
@@ -554,6 +572,67 @@ export default function TeacherQuizizz() {
                )}
             </div>
          </div>
+      )}
+
+      {/* VIEW RESULTS MODAL */}
+      {viewedResult && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4">
+           <div className="bg-white max-w-5xl w-full max-h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                 <div>
+                   <h2 className="text-2xl font-black text-gray-900">{viewedResult.title} - Natijalar</h2>
+                   <p className="text-gray-500 font-medium text-sm mt-1">Sana: {viewedResult.lastRun ? new Date(viewedResult.lastRun.toMillis()).toLocaleString('uz-UZ') : 'Noma\'lum'}</p>
+                 </div>
+                 <button onClick={() => setViewedResult(null)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors">
+                    <X className="w-6 h-6" />
+                 </button>
+              </div>
+              <div className="p-6 overflow-y-auto">
+                  <div className="overflow-x-auto">
+                     <table className="w-full text-left bg-white border border-gray-100 rounded-2xl">
+                        <thead className="bg-gray-50/50">
+                           <tr>
+                              <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">O'rin</th>
+                              <th className="px-6 py-4 font-black text-gray-500 text-xs uppercase tracking-widest">F.I.SH</th>
+                              {viewedResult.questions.map((_: any, i: number) => (
+                                 <th key={i} className="px-4 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">{i+1}-T</th>
+                              ))}
+                              <th className="px-6 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">Bal</th>
+                           </tr>
+                        </thead>
+                        <tbody>
+                           {[...viewedResult.participants].sort((a: any,b: any) => {
+                             const getScore = (p: any) => Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - (ans.timeTaken || 0) : 0), 0);
+                             return getScore(b) - getScore(a);
+                           }).map((p: any, idx: number) => (
+                             <tr key={p.pId} className="border-t border-gray-100">
+                                <td className="px-6 py-4 font-black text-gray-400">{idx + 1}</td>
+                                <td className="px-6 py-4 font-bold text-gray-900">{p.name}</td>
+                                {viewedResult.questions.map((_: any, i: number) => {
+                                   const ans = p.answers?.[i];
+                                   return (
+                                     <td key={i} className="px-4 py-4 text-center">
+                                       {ans?.isCorrect ? (
+                                          <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
+                                       ) : ans ? (
+                                          <XCircle className="w-5 h-5 text-red-500 mx-auto" />
+                                       ) : (
+                                          <span className="text-gray-300">-</span>
+                                       )}
+                                     </td>
+                                   )
+                                })}
+                                <td className="px-6 py-4 text-center font-black text-blue-600">
+                                  {Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 1 : 0), 0)} / {viewedResult.questions.length}
+                                </td>
+                             </tr>
+                           ))}
+                        </tbody>
+                     </table>
+                  </div>
+              </div>
+           </div>
+        </div>
       )}
     </div>
   );
