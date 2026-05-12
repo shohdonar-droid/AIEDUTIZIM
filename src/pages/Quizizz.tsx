@@ -168,15 +168,15 @@ export default function Quizizz() {
             <input 
               type="text" 
               placeholder="PIN KOD" 
+              maxLength={8}
               value={pin}
-              onChange={e => setPin(e.target.value.toUpperCase())}
+              onChange={e => setPin(e.target.value)}
               className="w-full text-center text-3xl tracking-widest font-black px-4 py-4 rounded-2xl bg-gray-100 border-2 border-transparent focus:border-blue-500 focus:bg-white transition-colors"
-              maxLength={6}
             />
             {error && <p className="text-red-500 font-bold">{error}</p>}
             <button 
               type="submit" 
-              disabled={loading || pin.length < 4}
+              disabled={loading || pin.length !== 8}
               className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'KIRISH'}

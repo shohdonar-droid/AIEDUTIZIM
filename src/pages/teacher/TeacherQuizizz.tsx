@@ -46,7 +46,11 @@ export default function TeacherQuizizz() {
     setLoading(true);
     try {
       const generated = await generateDynamicTest(title, testCount, context);
-      setQuestions(generated);
+      const mapped = generated.map((q: any) => ({
+        ...q,
+        correctAnswer: q.options[q.correctIdx || 0]
+      }));
+      setQuestions(mapped);
       setShowEditor(true);
     } catch (err: any) {
       alert("Xatolik: " + err.message);
@@ -56,7 +60,12 @@ export default function TeacherQuizizz() {
   };
 
   const generatePin = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for ( let i = 0; i < 8; i++ ) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
   };
 
   const checkPinUnique = async (pin: string) => {
@@ -100,20 +109,27 @@ export default function TeacherQuizizz() {
   const handleStartSession = async (quiz: any) => {
      setLoading(true);
      try {
-       const sessionPin = quiz.pin || quiz.id.substring(0, 6).toUpperCase();
+       const sessionPin = (quiz.pin && quiz.pin.length === 8) ? quiz.pin : quiz.id.substring(0, 8).toUpperCase();
+       
+       // Clear old participants from this session pin
+       const oldParticipants = await getDocs(query(collection(db, 'quiz_participants'), where('sessionId', '==', sessionPin)));
+       const deletePromises = oldParticipants.docs.map(d => deleteDoc(d.ref));
+       await Promise.all(deletePromises);
+
        const sRef = doc(db, 'quiz_sessions', sessionPin);
        await setDoc(sRef, {
-         title: quiz.title,
-         teacherId: quiz.teacherId,
+         title: quiz.title || 'Nomsiz',
+         teacherId: quiz.teacherId || '',
          status: 'waiting',
          currentQuestionIndex: -1,
-         questions: quiz.questions,
+         questions: quiz.questions || [],
          createdAt: serverTimestamp(),
-         historyId: quiz.id
+         historyId: quiz.id || ''
        });
-       setActiveSession({ id: sessionPin, ...quiz });
-     } catch (e) {
-       console.error(e);
+       setActiveSession({ id: sessionPin, ...quiz, status: 'waiting' });
+     } catch (e: any) {
+       console.error("Start Session Error:", e);
+       alert("Sessiyani boshlashda xatolik: " + e.message);
      } finally {
        setLoading(false);
      }
@@ -123,16 +139,19 @@ export default function TeacherQuizizz() {
   useEffect(() => {
      if (!activeSession) return;
      const unsubSession = onSnapshot(doc(db, 'quiz_sessions', activeSession.id), (snap) => {
-        if (!snap.exists()) {
-           setActiveSession(null);
-        } else {
-           setActiveSession({ id: snap.id, ...snap.data() });
+        console.log("Session snapshot fired! exists:", snap.exists(), "data:", snap.data(), "hasPendingWrites:", snap.metadata.hasPendingWrites);
+        if (snap.exists()) {
+           setActiveSession(prev => ({ ...prev, id: snap.id, ...snap.data() }));
         }
+     }, (err) => {
+        console.error("Session snapshot error:", err);
      });
      
      const unsubParticipants = onSnapshot(query(collection(db, 'quiz_participants'), where('sessionId', '==', activeSession.id)), (snap) => {
         const p = snap.docs.map(d => ({ pId: d.id, ...d.data() }));
         setParticipants(p);
+     }, (err) => {
+        console.error("Participants snapshot error:", err);
      });
 
      return () => { unsubSession(); unsubParticipants(); };
@@ -277,16 +296,14 @@ export default function TeacherQuizizz() {
       {activeSession && (
         <div className="fixed inset-0 z-[100] bg-gray-100 p-4 md:p-8 overflow-y-auto">
            <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col min-h-[80vh]">
-              <div className="bg-blue-600 p-8 text-white flex justify-between items-center">
-                 <div>
-                    <h2 className="text-3xl font-black mb-2">{activeSession.title}</h2>
-                    <p className="text-blue-100 text-lg">
-                      O'quvchilarga ayting: <strong>Quizizz</strong> menyusiga kirib PIN kodni yozishsin.
-                    </p>
-                 </div>
-                 <div className="text-right bg-white/10 p-6 rounded-2xl border border-white/20">
-                    <span className="block text-sm font-bold uppercase tracking-widest text-blue-200 mb-1">PIN KOD</span>
-                    <span className="text-6xl font-black tracking-widest">{activeSession.id}</span>
+              <div className="bg-blue-600 p-8 text-white flex flex-col items-center justify-center text-center">
+                 <h2 className="text-3xl font-black mb-4">{activeSession.title}</h2>
+                 <p className="text-blue-100 text-xl font-medium mb-6 whitespace-nowrap">
+                   O'quvchilarga ayting: <strong>Quizizz</strong> menyusiga kirib PIN kodni yozishsin.
+                 </p>
+                 <div className="bg-white text-blue-600 px-10 py-6 rounded-3xl shadow-2xl flex items-center gap-6 border-4 border-blue-500/30">
+                    <span className="text-3xl font-black text-gray-400">PIN KOD:</span>
+                    <span className="text-6xl md:text-7xl font-black tracking-[0.2em] font-mono">{activeSession.id}</span>
                  </div>
               </div>
               
@@ -346,8 +363,8 @@ export default function TeacherQuizizz() {
                              </thead>
                              <tbody>
                                 {participants.sort((a,b) => {
-                                  const getScore = (p: any) => Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - (ans.timeTaken || 0) : 0), 0);
-                                  return getScore(b) - getScore(a);
+                                  const getScore = (p: any): number => Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - Number(ans.timeTaken || 0) : 0), 0);
+                                  return Number(getScore(b)) - Number(getScore(a));
                                 }).map((p: any, idx) => (
                                   <tr key={p.pId} className="border-t border-gray-100">
                                      <td className="px-6 py-4 font-black text-gray-400">{idx + 1}</td>
@@ -473,34 +490,27 @@ export default function TeacherQuizizz() {
                        <button onClick={() => setQuestions(q => q.filter((_, i) => i !== idx))} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-5 h-5" /></button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                       {q.options.map((opt: string, oIdx: number) => (
-                           <div key={oIdx} className={`flex items-center gap-2 p-3 rounded-xl border ${opt === q.correctAnswer ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'}`}>
-                              <input 
-                                type="text"
-                                value={opt}
-                                onChange={(e) => {
-                                  const n = [...questions];
-                                  if (n[idx].correctAnswer === n[idx].options[oIdx]) {
-                                     n[idx].correctAnswer = e.target.value;
-                                  }
-                                  n[idx].options[oIdx] = e.target.value;
-                                  setQuestions(n);
-                                }}
-                                className="flex-1 bg-transparent border-none outline-none font-medium"
-                              />
-                              <input 
-                                type="radio" 
-                                name={`correct-${idx}`} 
-                                checked={opt === q.correctAnswer}
-                                onChange={() => {
-                                  const n = [...questions];
-                                  n[idx].correctAnswer = opt;
-                                  setQuestions(n);
-                                }}
-                                className="w-5 h-5 text-green-600"
-                              />
-                           </div>
-                       ))}
+                       {q.options.map((opt: string, oIdx: number) => {
+                           const isCorrect = opt === q.correctAnswer;
+                           return (
+                             <div key={oIdx} className={`flex items-center gap-2 p-3 rounded-xl border ${isCorrect ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'}`}>
+                                {isCorrect && <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />}
+                                <input 
+                                  type="text"
+                                  value={opt}
+                                  onChange={(e) => {
+                                    const n = [...questions];
+                                    if (n[idx].correctAnswer === n[idx].options[oIdx]) {
+                                       n[idx].correctAnswer = e.target.value;
+                                    }
+                                    n[idx].options[oIdx] = e.target.value;
+                                    setQuestions(n);
+                                  }}
+                                  className="flex-1 bg-transparent border-none outline-none font-medium w-full"
+                                />
+                             </div>
+                           )
+                       })}
                     </div>
                  </div>
                ))}
@@ -522,46 +532,61 @@ export default function TeacherQuizizz() {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-               {quizzes.filter(q => q.title?.toLowerCase().includes(searchTerm.toLowerCase())).map((quiz) => (
-                  <div key={quiz.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-col hover:shadow-lg transition-shadow group relative overflow-hidden">
-                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-                        <PlayCircle className="w-24 h-24" />
-                     </div>
-                     <span className="inline-flex max-w-max mb-4 items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest bg-blue-50 text-blue-600">
-                        PIN: {quiz.pin || quiz.id.substring(0, 6).toUpperCase()}
-                     </span>
-                     <h3 className="text-xl font-black text-gray-900 mb-2">{quiz.title}</h3>
-                     <p className="text-gray-500 font-medium mb-6 text-sm line-clamp-2">{quiz.context || 'Qo\'shimcha matn mavjud emas.'}</p>
-                     
-                     <div className="mt-auto flex flex-col gap-2 relative z-10">
-                        {quiz.participants && quiz.participants.length > 0 && (
-                          <div className="flex gap-2">
-                             <button
-                               onClick={() => setViewedResult(quiz)}
-                               className="flex-1 py-3 bg-blue-50 text-blue-700 rounded-xl font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left whitespace-nowrap">
+                   <thead className="bg-gray-50/50 text-gray-400 font-bold uppercase tracking-wider text-xs">
+                     <tr>
+                       <th className="px-6 py-4">№</th>
+                       <th className="px-6 py-4">Test Nomi</th>
+                       <th className="px-6 py-4">Testlar Soni</th>
+                       <th className="px-6 py-4">Yaratilgan vaqti</th>
+                       <th className="px-6 py-4 text-center">Harakatlar</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-100 text-sm">
+                     {quizzes.filter(q => q.title?.toLowerCase().includes(searchTerm.toLowerCase())).map((quiz, idx) => (
+                       <tr key={quiz.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4 font-black text-gray-400">{idx + 1}</td>
+                          <td className="px-6 py-4">
+                             <div className="font-bold text-gray-900">{quiz.title}</div>
+                             <div className="text-gray-500 max-w-xs truncate" title={quiz.context}>{quiz.context || "Qo'shimcha matn mavjud emas"}</div>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-gray-700">{quiz.questions?.length || 0} ta</td>
+                          <td className="px-6 py-4 text-gray-500 font-medium font-mono">
+                             {quiz.createdAt ? new Date(quiz.createdAt.toMillis()).toLocaleString('uz-UZ') : 'Noma\'lum'}
+                          </td>
+                          <td className="px-6 py-4 flex items-center justify-center gap-2">
+                             {quiz.participants && quiz.participants.length > 0 && (
+                                <>
+                                  <button
+                                    onClick={() => setViewedResult(quiz)}
+                                    className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-bold hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+                                  >
+                                     <BarChart2 className="w-4 h-4" /> Natija
+                                  </button>
+                                  <button
+                                    onClick={() => exportResults(quiz)}
+                                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition-colors flex items-center gap-1.5"
+                                  >
+                                     <Download className="w-4 h-4" /> Excel
+                                  </button>
+                                </>
+                             )}
+                             <button 
+                               onClick={() => handleStartSession(quiz)}
+                               className="px-6 py-2 bg-blue-600 text-white rounded-lg font-black shadow-md shadow-blue-200 hover:bg-blue-700 transition-all flex justify-center items-center gap-2"
                              >
-                                <BarChart2 className="w-5 h-5" /> Natija
+                               <PlayCircle className="w-4 h-4" /> START
                              </button>
-                             <button
-                               onClick={() => exportResults(quiz)}
-                               className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                             >
-                                <Download className="w-5 h-5" /> Excel
-                             </button>
-                          </div>
-                        )}
-                        <button 
-                          onClick={() => handleStartSession(quiz)}
-                          className="w-full py-4 bg-blue-600 text-white rounded-xl font-black shadow-md shadow-blue-200 hover:bg-blue-700 transition-all flex justify-center items-center gap-2"
-                        >
-                          <PlayCircle className="w-5 h-5" /> START
-                        </button>
-                     </div>
-                  </div>
-               ))}
+                          </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
                {quizzes.length === 0 && (
-                 <div className="col-span-full py-12 text-center text-gray-500 font-medium bg-white rounded-3xl border border-dashed border-gray-300">
+                 <div className="py-12 text-center text-gray-500 font-medium">
                    Hali hech qanday test yaratilmagan.
                  </div>
                )}
@@ -597,8 +622,8 @@ export default function TeacherQuizizz() {
                         </thead>
                         <tbody>
                            {[...viewedResult.participants].sort((a: any,b: any) => {
-                             const getScore = (p: any) => Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - (ans.timeTaken || 0) : 0), 0);
-                             return getScore(b) - getScore(a);
+                             const getScore = (p: any): number => Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - Number(ans.timeTaken || 0) : 0), 0);
+                             return Number(getScore(b)) - Number(getScore(a));
                            }).map((p: any, idx: number) => (
                              <tr key={p.pId} className="border-t border-gray-100">
                                 <td className="px-6 py-4 font-black text-gray-400">{idx + 1}</td>

@@ -62,6 +62,16 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    match /quiz_history/{id} {
+      allow read, write: if true;
+    }
+    match /quiz_sessions/{id} {
+      allow read, write: if true;
+    }
+    match /quiz_participants/{id} {
+      allow read, write: if true;
+    }
+
     match /testResults/{id} {
       allow read: if true;
       allow write: if true;
