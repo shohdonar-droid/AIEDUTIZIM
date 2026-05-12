@@ -135,7 +135,7 @@ export default function TeacherQuizizz() {
          createdAt: serverTimestamp(),
          historyId: quiz.id || ''
        });
-       setActiveSession({ id: sessionPin, ...quiz, status: 'waiting' });
+       setActiveSession({ ...quiz, id: sessionPin, status: 'waiting' });
      } catch (e: any) {
        console.error("Start Session Error:", e);
        alert("Sessiyani boshlashda xatolik: " + e.message);
