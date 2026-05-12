@@ -178,8 +178,12 @@ export default function TeacherQuizizz() {
       const pSnap = await getDocs(query(collection(db, 'quiz_participants'), where('sessionId', '==', activeSession.id)));
       const p = pSnap.docs.map(d => ({ pId: d.id, ...d.data() }));
       setParticipants(p);
+      if (p.length === 0) {
+        alert("Hozircha hech qanday foydalanuvchi ulanmagan.");
+      }
     } catch (e: any) {
       console.error("Yangi qatnashuvchilarni yuklashda xatolik:", e);
+      alert("Xatolik: " + e.message);
     }
   };
 
@@ -388,8 +392,11 @@ export default function TeacherQuizizz() {
                              </thead>
                              <tbody>
                                 {participants.sort((a,b) => {
-                                  const getScore = (p: any): number => (Object.values(p.answers || {}) as any[]).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - Number(ans.timeTaken || 0) : 0), 0);
-                                  return Number(getScore(b)) - Number(getScore(a));
+                                  const getCorrectCount = (p: any) => Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).length;
+                                  const getTimeTaken = (p: any) => Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).reduce((acc: number, ans: any) => acc + Number(ans?.timeTaken || 0), 0);
+                                  const diff = getCorrectCount(b) - getCorrectCount(a);
+                                  if (diff !== 0) return diff;
+                                  return getTimeTaken(a) - getTimeTaken(b);
                                 }).map((p: any, idx) => (
                                   <tr key={p.pId} className="border-t border-gray-100">
                                      <td className="px-6 py-4 font-black text-gray-400">{idx + 1}</td>
@@ -399,9 +406,15 @@ export default function TeacherQuizizz() {
                                         return (
                                           <td key={i} className="px-4 py-4 text-center">
                                             {ans?.isCorrect ? (
-                                               <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
+                                               <div className="flex flex-col items-center justify-center">
+                                                 <CheckCircle className="w-5 h-5 text-green-500 mb-1 mx-auto" />
+                                                 <span className="text-[10px] text-gray-500 font-bold">{ans.timeTaken}s</span>
+                                               </div>
                                             ) : ans ? (
-                                               <XCircle className="w-5 h-5 text-red-500 mx-auto" />
+                                               <div className="flex flex-col items-center justify-center">
+                                                 <XCircle className="w-5 h-5 text-red-500 mb-1 mx-auto" />
+                                                 <span className="text-[10px] text-gray-400 font-medium">{ans.timeTaken}s</span>
+                                               </div>
                                             ) : (
                                                <span className="text-gray-300">-</span>
                                             )}
@@ -656,8 +669,11 @@ export default function TeacherQuizizz() {
                         </thead>
                         <tbody>
                            {[...viewedResult.participants].sort((a: any,b: any) => {
-                             const getScore = (p: any): number => (Object.values(p.answers || {}) as any[]).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - Number(ans.timeTaken || 0) : 0), 0);
-                             return Number(getScore(b)) - Number(getScore(a));
+                             const getCorrectCount = (p: any) => Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).length;
+                             const getTimeTaken = (p: any) => Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).reduce((acc: number, ans: any) => acc + Number(ans?.timeTaken || 0), 0);
+                             const diff = getCorrectCount(b) - getCorrectCount(a);
+                             if (diff !== 0) return diff;
+                             return getTimeTaken(a) - getTimeTaken(b);
                            }).map((p: any, idx: number) => (
                              <tr key={p.pId} className="border-t border-gray-100">
                                 <td className="px-6 py-4 font-black text-gray-400">{idx + 1}</td>
@@ -667,9 +683,15 @@ export default function TeacherQuizizz() {
                                    return (
                                      <td key={i} className="px-4 py-4 text-center">
                                        {ans?.isCorrect ? (
-                                          <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
+                                         <div className="flex flex-col items-center justify-center">
+                                           <CheckCircle className="w-5 h-5 text-green-500 mb-1" />
+                                           <span className="text-[10px] text-gray-500 font-bold">{ans.timeTaken}s</span>
+                                         </div>
                                        ) : ans ? (
-                                          <XCircle className="w-5 h-5 text-red-500 mx-auto" />
+                                         <div className="flex flex-col items-center justify-center">
+                                           <XCircle className="w-5 h-5 text-red-500 mb-1" />
+                                           <span className="text-[10px] text-gray-400 font-medium">{ans.timeTaken}s</span>
+                                         </div>
                                        ) : (
                                           <span className="text-gray-300">-</span>
                                        )}
