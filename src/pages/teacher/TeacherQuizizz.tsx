@@ -262,12 +262,14 @@ export default function TeacherQuizizz() {
     
     const pData = quiz.participants.map((p: any) => {
       let correctCount = 0;
+      let totalTime = 0;
       const row: any = { "F.I.SH": p.name };
       
       quiz.questions.forEach((q: any, i: number) => {
          const ans = p.answers?.[i];
          if (ans?.isCorrect) {
             correctCount++;
+            totalTime += Number(ans.timeTaken || 0);
             row[`${i+1}-test`] = 'To\'g\'ri';
          } else if (ans) {
             row[`${i+1}-test`] = 'Xato';
@@ -275,11 +277,16 @@ export default function TeacherQuizizz() {
             row[`${i+1}-test`] = 'Belgilanmagan';
          }
       });
-      row["Jami To'g'ri"] = correctCount;
+      row["To'g'ri javoblar"] = correctCount;
+      row["Sarflangan vaqt (s)"] = totalTime;
       return row;
     });
 
-    pData.sort((a: any, b: any) => b["Jami To'g'ri"] - a["Jami To'g'ri"]);
+    pData.sort((a: any, b: any) => {
+      const diff = b["To'g'ri javoblar"] - a["To'g'ri javoblar"];
+      if (diff !== 0) return diff;
+      return a["Sarflangan vaqt (s)"] - b["Sarflangan vaqt (s)"];
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(pData);
     const workbook = XLSX.utils.book_new();
@@ -377,7 +384,7 @@ export default function TeacherQuizizz() {
 
                  {activeSession.status === 'finished' && (
                     <div className="py-8">
-                       <h2 className="text-3xl font-black text-center text-gray-900 mb-8">Natijalar Jadvali</h2>
+                       <h2 className="text-3xl font-black text-center text-gray-900 mb-8">Natijalar jadvali</h2>
                        <div className="overflow-x-auto">
                           <table className="w-full text-left bg-white border border-gray-100 rounded-2xl">
                              <thead className="bg-gray-50/50">
@@ -387,7 +394,8 @@ export default function TeacherQuizizz() {
                                    {activeSession.questions.map((_: any, i: number) => (
                                       <th key={i} className="px-4 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">{i+1}-T</th>
                                    ))}
-                                   <th className="px-6 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">Bal</th>
+                                   <th className="px-6 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">To'g'ri javoblar</th>
+                                   <th className="px-6 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">Sarflangan vaqt</th>
                                 </tr>
                              </thead>
                              <tbody>
@@ -424,6 +432,9 @@ export default function TeacherQuizizz() {
                                      <td className="px-6 py-4 text-center font-black text-blue-600">
                                        {Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 1 : 0), 0)} / {activeSession.questions.length}
                                      </td>
+                                     <td className="px-6 py-4 text-center font-black text-orange-600">
+                                       {Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).reduce((acc: number, ans: any) => acc + Number(ans?.timeTaken || 0), 0)}s
+                                     </td>
                                   </tr>
                                 ))}
                              </tbody>
@@ -431,7 +442,7 @@ export default function TeacherQuizizz() {
                        </div>
                        <div className="flex justify-center mt-8">
                          <button onClick={handleStopSession} className="px-8 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200">
-                           Chiqaish
+                           Chiqish
                          </button>
                        </div>
                     </div>
@@ -647,7 +658,7 @@ export default function TeacherQuizizz() {
            <div className="bg-white max-w-5xl w-full max-h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
               <div className="flex items-center justify-between p-6 border-b border-gray-100">
                  <div>
-                   <h2 className="text-2xl font-black text-gray-900">{viewedResult.title} - Natijalar</h2>
+                   <h2 className="text-2xl font-black text-gray-900">{viewedResult.title} - Natijalar jadvali</h2>
                    <p className="text-gray-500 font-medium text-sm mt-1">Sana: {viewedResult.lastRun ? new Date(viewedResult.lastRun.toMillis()).toLocaleString('uz-UZ') : 'Noma\'lum'}</p>
                  </div>
                  <button onClick={() => setViewedResult(null)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors">
@@ -664,7 +675,8 @@ export default function TeacherQuizizz() {
                               {viewedResult.questions.map((_: any, i: number) => (
                                  <th key={i} className="px-4 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">{i+1}-T</th>
                               ))}
-                              <th className="px-6 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">Bal</th>
+                              <th className="px-6 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">To'g'ri javoblar</th>
+                              <th className="px-6 py-4 text-center font-black text-gray-500 text-xs uppercase tracking-widest">Sarflangan vaqt</th>
                            </tr>
                         </thead>
                         <tbody>
@@ -700,6 +712,9 @@ export default function TeacherQuizizz() {
                                 })}
                                 <td className="px-6 py-4 text-center font-black text-blue-600">
                                   {Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 1 : 0), 0)} / {viewedResult.questions.length}
+                                </td>
+                                <td className="px-6 py-4 text-center font-black text-orange-600">
+                                  {Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).reduce((acc: number, ans: any) => acc + Number(ans?.timeTaken || 0), 0)}s
                                 </td>
                              </tr>
                            ))}
