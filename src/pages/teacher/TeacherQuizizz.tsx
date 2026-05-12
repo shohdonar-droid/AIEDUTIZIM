@@ -328,14 +328,13 @@ export default function TeacherQuizizz() {
                              </div>
                           ))}
                        </div>
-                       {participants.length > 0 && (
-                         <button 
-                           onClick={handleBeginTest}
-                           className="mt-12 px-10 py-5 bg-green-500 text-white font-black text-2xl rounded-2xl shadow-xl shadow-green-200 hover:bg-green-600 hover:scale-105 transition-all"
-                         >
-                           TESTNI BOSHLASH
-                         </button>
-                       )}
+                       <button 
+                         onClick={handleBeginTest}
+                         disabled={participants.length === 0}
+                         className={`mt-12 px-10 py-5 font-black text-2xl rounded-2xl shadow-xl transition-all ${participants.length > 0 ? 'bg-green-500 text-white shadow-green-200 hover:bg-green-600 hover:scale-105' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                       >
+                         TESTNI BOSHLASH
+                       </button>
                     </div>
                  )}
 
