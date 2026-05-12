@@ -170,7 +170,7 @@ export default function Quizizz() {
               placeholder="PIN KOD" 
               maxLength={8}
               value={pin}
-              onChange={e => setPin(e.target.value)}
+              onChange={e => setPin(e.target.value.toUpperCase())}
               className="w-full text-center text-3xl tracking-widest font-black px-4 py-4 rounded-2xl bg-gray-100 border-2 border-transparent focus:border-blue-500 focus:bg-white transition-colors"
             />
             {error && <p className="text-red-500 font-bold">{error}</p>}

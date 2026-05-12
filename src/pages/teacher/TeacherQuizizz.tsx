@@ -106,6 +106,15 @@ export default function TeacherQuizizz() {
      }
   };
 
+  const handleDeleteTest = async (id: string) => {
+    if(!window.confirm("Rostdan ham ushbu testni o'chirishni xohlaysizmi?")) return;
+    try {
+      await deleteDoc(doc(db, 'quiz_history', id));
+    } catch(err: any) {
+      alert("Xatolik: " + err.message);
+    }
+  };
+
   const handleStartSession = async (quiz: any) => {
      setLoading(true);
      try {
@@ -268,7 +277,7 @@ export default function TeacherQuizizz() {
       {!activeSession && (
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-black text-gray-900">Quizizz Paneli</h1>
+            <h1 className="text-3xl font-black text-gray-900">Quizizz paneli</h1>
             <p className="text-gray-500 mt-1">Interaktiv testlar yaratish va boshqarish.</p>
           </div>
           <div className="flex bg-gray-100 p-1.5 rounded-xl border border-gray-200">
@@ -363,7 +372,7 @@ export default function TeacherQuizizz() {
                              </thead>
                              <tbody>
                                 {participants.sort((a,b) => {
-                                  const getScore = (p: any): number => Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - Number(ans.timeTaken || 0) : 0), 0);
+                                  const getScore = (p: any): number => (Object.values(p.answers || {}) as any[]).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - Number(ans.timeTaken || 0) : 0), 0);
                                   return Number(getScore(b)) - Number(getScore(a));
                                 }).map((p: any, idx) => (
                                   <tr key={p.pId} className="border-t border-gray-100">
@@ -539,6 +548,7 @@ export default function TeacherQuizizz() {
                      <tr>
                        <th className="px-6 py-4">№</th>
                        <th className="px-6 py-4">Test Nomi</th>
+                       <th className="px-6 py-4">PIN KOD</th>
                        <th className="px-6 py-4">Testlar Soni</th>
                        <th className="px-6 py-4">Yaratilgan vaqti</th>
                        <th className="px-6 py-4 text-center">Harakatlar</th>
@@ -552,6 +562,7 @@ export default function TeacherQuizizz() {
                              <div className="font-bold text-gray-900">{quiz.title}</div>
                              <div className="text-gray-500 max-w-xs truncate" title={quiz.context}>{quiz.context || "Qo'shimcha matn mavjud emas"}</div>
                           </td>
+                          <td className="px-6 py-4 font-black text-blue-600 tracking-widest">{quiz.pin || 'Yo\'q'}</td>
                           <td className="px-6 py-4 font-bold text-gray-700">{quiz.questions?.length || 0} ta</td>
                           <td className="px-6 py-4 text-gray-500 font-medium font-mono">
                              {quiz.createdAt ? new Date(quiz.createdAt.toMillis()).toLocaleString('uz-UZ') : 'Noma\'lum'}
@@ -578,6 +589,13 @@ export default function TeacherQuizizz() {
                                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-black shadow-md shadow-blue-200 hover:bg-blue-700 transition-all flex justify-center items-center gap-2"
                              >
                                <PlayCircle className="w-4 h-4" /> START
+                             </button>
+                             <button
+                               onClick={() => handleDeleteTest(quiz.id)}
+                               className="px-3 py-2 bg-red-50 text-red-700 rounded-lg font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5 ml-2"
+                               title="O'chirish"
+                             >
+                               <Trash2 className="w-5 h-5" />
                              </button>
                           </td>
                        </tr>
@@ -622,7 +640,7 @@ export default function TeacherQuizizz() {
                         </thead>
                         <tbody>
                            {[...viewedResult.participants].sort((a: any,b: any) => {
-                             const getScore = (p: any): number => Object.values(p.answers || {}).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - Number(ans.timeTaken || 0) : 0), 0);
+                             const getScore = (p: any): number => (Object.values(p.answers || {}) as any[]).reduce((acc: number, ans: any) => acc + (ans.isCorrect ? 100 - Number(ans.timeTaken || 0) : 0), 0);
                              return Number(getScore(b)) - Number(getScore(a));
                            }).map((p: any, idx: number) => (
                              <tr key={p.pId} className="border-t border-gray-100">
