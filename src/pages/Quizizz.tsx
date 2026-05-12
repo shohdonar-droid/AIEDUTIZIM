@@ -14,17 +14,6 @@ export default function Quizizz() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
-  // Restore session from localStorage if exists
-  useEffect(() => {
-    const savedPid = localStorage.getItem('quiz_participant_id');
-    const savedPin = localStorage.getItem('quiz_pin');
-    if (savedPid && savedPin) {
-      setPin(savedPin);
-      setParticipantId(savedPid);
-      joinSession(savedPin, savedPid, true);
-    }
-  }, []);
-
   useEffect(() => {
     if (!session || !session.id) return;
     const unsub = onSnapshot(doc(db, 'quiz_sessions', session.id), (snap) => {
