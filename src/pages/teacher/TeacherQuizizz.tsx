@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download, BarChart2, X } from 'lucide-react';
+import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download, BarChart2, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { generateDynamicTest } from '../../services/geminiService';
 import * as XLSX from 'xlsx';
@@ -172,6 +172,17 @@ export default function TeacherQuizizz() {
      isTransitioningRef.current = false;
   }, [activeSession?.currentQuestionIndex, activeSession?.status]);
 
+  const handleRefreshParticipants = async () => {
+    if (!activeSession) return;
+    try {
+      const pSnap = await getDocs(query(collection(db, 'quiz_participants'), where('sessionId', '==', activeSession.id)));
+      const p = pSnap.docs.map(d => ({ pId: d.id, ...d.data() }));
+      setParticipants(p);
+    } catch (e: any) {
+      console.error("Yangi qatnashuvchilarni yuklashda xatolik:", e);
+    }
+  };
+
   // Handle Question Timer Logic locally to push next question
   useEffect(() => {
      let timer: any;
@@ -320,7 +331,13 @@ export default function TeacherQuizizz() {
                  {activeSession.status === 'waiting' && (
                     <div className="text-center py-12">
                        <Users className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-                       <h3 className="text-2xl font-bold text-gray-900 mb-2">Mehmonlar kutilmoqda ({participants.length})</h3>
+                       <div className="flex items-center justify-center gap-4 mb-2">
+                         <h3 className="text-2xl font-bold text-gray-900">Mehmonlar kutilmoqda ({participants.length})</h3>
+                         <button onClick={handleRefreshParticipants} className="px-4 py-2 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-2">
+                           <RefreshCw className="w-5 h-5" />
+                           Tekshirish
+                         </button>
+                       </div>
                        <div className="flex flex-wrap justify-center gap-3 mt-8 max-w-3xl mx-auto">
                           {participants.map(p => (
                              <div key={p.pId} className="px-4 py-2 bg-blue-50 text-blue-700 font-bold rounded-xl animate-bounce border border-blue-100">
