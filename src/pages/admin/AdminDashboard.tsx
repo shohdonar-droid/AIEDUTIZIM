@@ -15,7 +15,8 @@ import {
   Home,
   ChevronRight,
   MessageSquare,
-  Wallet
+  Wallet,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { auth, db } from '../../lib/firebase';
@@ -33,6 +34,7 @@ import AdminJurnal from './AdminJurnal';
 import AdminCertificates from './AdminCertificates';
 import AdminNotifications from './AdminNotifications';
 import AdminBilling from './AdminBilling';
+import AdminQuizizz from './AdminQuizizz';
 import AdminServices from './AdminServices';
 import AdminSubjects from '../../components/SubjectsManager';
 import SubjectRead from '../SubjectRead';
@@ -65,14 +67,15 @@ export default function AdminDashboard() {
     { name: 'Info', path: '/admin/info', icon: Info },
     { name: 'Kurslar', path: '/admin/courses', icon: BookOpen },
     { name: 'Testlar', path: '/admin/tests', icon: Brain },
+    { name: 'Quizizz', path: '/admin/quizizz', icon: CheckCircle2 },
     { name: 'Mavzular', path: '/admin/subjects', icon: BookOpen },
     { name: 'Yo\'nalishlar', path: '/admin/departments', icon: UsersIcon },
     { name: 'Foydalanuvchilar', path: '/admin/users', icon: UsersIcon },
     { name: 'Jurnal', path: '/admin/jurnal', icon: TrendingUp },
     { name: 'Sertifikatlar', path: '/admin/certificates', icon: Award },
-    { name: 'Billing', path: '/admin/billing', icon: Wallet },
-    { name: 'Tepa va Footer', path: '/admin/footer', icon: Dock },
+    { name: 'FOOTER', path: '/admin/footer', icon: Dock },
     { name: 'Bildirishnomalar', path: '/admin/notifications', icon: AlertCircle },
+    { name: 'Billing', path: '/admin/billing', icon: Wallet },
     { name: 'Chat', path: '/admin/chat', icon: MessageSquare, badge: unreadCount },
   ];
 
@@ -179,6 +182,7 @@ export default function AdminDashboard() {
             <Route path="/billing" element={<AdminBilling />} />
             <Route path="/footer" element={<AdminFooter />} />
             <Route path="/notifications" element={<AdminNotifications />} />
+            <Route path="/quizizz" element={<AdminQuizizz />} />
             <Route path="/chat" element={<ChatSection />} />
           </Routes>
         </div>

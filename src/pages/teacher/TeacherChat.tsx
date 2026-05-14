@@ -17,8 +17,18 @@ export default function TeacherChat() {
   useEffect(() => {
     if (!user) return;
     async function loadContacts() {
-      const orgId = user?.role === 'staff' ? user.teacherId : user?.uid;
+      
+      let orgId = user?.role === 'staff' ? user.teacherId : user?.uid;
+      if (user?.role === 'staff' && !orgId) {
+         // Fallback to UY
+         const qUy = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
+         const uySnap = await getDocs(qUy);
+         if (!uySnap.empty) {
+            orgId = uySnap.docs[0].id;
+         }
+      }
       if (!orgId) return;
+
 
       // Load all admins but only prioritize Elyorbek
       const aSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin')));
@@ -35,9 +45,18 @@ export default function TeacherChat() {
         }
       }
 
+      
+      
       // Load org students
       const sSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'student'), where('teacherId', '==', orgId)));
       const students = sSnap.docs.map(d => ({ ...d.data(), uid: d.id } as UserProfile));
+      
+      // Load org staff
+      let staff: UserProfile[] = [];
+      const stSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'staff'), where('teacherId', '==', orgId)));
+      staff = stSnap.docs.map(d => ({ ...d.data(), uid: d.id } as UserProfile)).filter(s => s.uid !== user?.uid);
+
+
       
       // Check for SYSTEM_ADMIN messages
       const systemMsgQuery = query(collection(db, 'messages'), where('senderId', '==', 'SYSTEM_ADMIN'), where('receiverId', '==', user.uid), limit(1));
@@ -53,6 +72,8 @@ export default function TeacherChat() {
       }
       
       // Sort students alphabetically by FISH
+      
+      // Sort students alphabetically by FISH
       students.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
 
       const finalContacts: UserProfile[] = [...sysContact];
@@ -60,12 +81,19 @@ export default function TeacherChat() {
       if (adminToShow) {
          finalContacts.push({
             ...adminToShow,
-            displayName: adminToShow.displayName?.includes('Elyorbek') ? 'Elyorbek (Admin)' : adminToShow.displayName
+            displayName: adminToShow.displayName?.includes('Elyorbek') ? 'Elyorbek (Admin)' : (adminToShow.displayName + ' (Admin)')
          });
       }
-      finalContacts.push(...ownerContact);
+      if (ownerContact.length > 0) {
+         finalContacts.push({
+            ...ownerContact[0],
+            displayName: `Tashkilot (${ownerContact[0].displayName})`
+         });
+      }
+      finalContacts.push(...staff);
       finalContacts.push(...students);
       setContacts(finalContacts);
+
     }
     loadContacts();
 
@@ -170,7 +198,7 @@ export default function TeacherChat() {
               </div>
               <div className="overflow-hidden">
                 <p className="font-bold text-gray-900 truncate">{c.displayName || 'Ismsiz'}</p>
-                <p className="text-xs text-gray-500 capitalize">{c.role === 'admin' ? 'Admin' : 'Talaba'}</p>
+                <p className="text-xs text-gray-500 capitalize">{c.role === 'admin' ? 'Admin' : c.role === 'teacher' ? 'Tashkilot' : c.role === 'staff' ? 'Xodim' : 'Talaba'}</p>
               </div>
             </button>
           ))}
@@ -183,7 +211,7 @@ export default function TeacherChat() {
           <>
             <div className="h-16 border-b border-gray-100 bg-white flex items-center px-6">
               <span className="font-bold text-lg">{selectedContact.displayName || 'Ismsiz'}</span>
-              <span className="ml-2 text-sm text-gray-500 capitalize px-2 py-0.5 bg-gray-100 rounded-lg">{selectedContact.role === 'admin' ? 'Admin' : 'Talaba'}</span>
+              <span className="ml-2 text-sm text-gray-500 capitalize px-2 py-0.5 bg-gray-100 rounded-lg">{selectedContact.role === 'admin' ? 'Admin' : selectedContact.role === 'teacher' ? 'Tashkilot' : selectedContact.role === 'staff' ? 'Xodim' : 'Talaba'}</span>
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-4">

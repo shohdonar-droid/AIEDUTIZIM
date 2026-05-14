@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { generateDynamicTest } from '../services/geminiService';
 import { BookOpen, Brain, Loader2, Save, Trash2, Plus, PlayCircle } from 'lucide-react';
-import { TeacherTestModal } from '../pages/student/TestExecute'; // We might need to build a custom executor or just reuse TestExecute
+// We might need to build a custom executor or just reuse TestExecute
 import { useNavigate } from 'react-router-dom';
 
 export default function SubjectsManager() {
@@ -56,7 +56,7 @@ export default function SubjectsManager() {
         q = query(collection(db, 'subjects'), where('creatorId', '==', user.uid));
       }
       const snap = await getDocs(q);
-      let loadedSubjects = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let loadedSubjects = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
       
       if (isStudent && user) {
          // Filter based on user dept/group/organization
@@ -78,15 +78,48 @@ export default function SubjectsManager() {
          const tSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'teacher')));
          setOrganizations(tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
          
-         const dSnap = await getDocs(collection(db, 'departments'));
-         setDepartments(dSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+         let dQ = collection(db, 'departments') as any;
+         let gQ = collection(db, 'groups') as any;
          
-         const gSnap = await getDocs(collection(db, 'groups'));
-         setGroups(gSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+         if (!isAdmin) {
+             const orgUid = user?.role === 'staff' ? user.teacherId || user.uid : user?.uid;
+             dQ = query(collection(db, 'departments'), where('creatorId', '==', orgUid));
+             gQ = query(collection(db, 'groups'), where('creatorId', '==', orgUid));
+         }
+
+         const dSnap = await getDocs(dQ);
+         setDepartments((dSnap as any).docs.map((doc: any) => ({ id: doc.id, ...(doc.data() as object) })));
+         
+         const gSnap = await getDocs(gQ);
+         setGroups((gSnap as any).docs.map((doc: any) => ({ id: doc.id, ...(doc.data() as object) })));
       }
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const downloadWord = (subjectTitle: string, qs: any[]) => {
+    if (!qs || qs.length === 0) return alert("Test savollari yo'q");
+    let content = `<html><head><meta charset="UTF-8"></head><body><h2>${subjectTitle}</h2><br/>`;
+    qs.forEach((q: any) => {
+      content += `<div>++++<br/> ${q.text}</div>`;
+      q.options.forEach((opt: string, optIdx: number) => {
+        const isCorrect = q.correctIdx === optIdx;
+        const prefix = isCorrect ? '#' : '';
+        content += `<div>====</div><div>${prefix}${opt}</div>`;
+      });
+      content += '<br/>';
+    });
+    content += '</body></html>';
+    const blob = new Blob(['\ufeff', content], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Test_${subjectTitle.replace(/\s+/g, '_')}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleGenerate = async () => {
@@ -258,13 +291,21 @@ export default function SubjectsManager() {
               <div className="space-y-4 mt-6 border-t border-gray-100 pt-6">
                  <div className="p-4 bg-green-50 text-green-700 rounded-xl font-bold flex justify-between items-center">
                     <span>{questions.length} ta test savollari muvaffaqiyatli generatsiya qilindi. Quyida testlarni tahrirlashingiz mumkin.</span>
-                    <button 
-                      onClick={handleSave} 
-                      disabled={loading}
-                      className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
-                    >
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} SAQLASH
-                    </button>
+                    <div className="flex gap-2">
+                       <button
+                         onClick={() => downloadWord(title, questions)}
+                         className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                       >
+                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Word
+                       </button>
+                       <button 
+                         onClick={handleSave} 
+                         disabled={loading}
+                         className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+                       >
+                         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} SAQLASH
+                       </button>
+                    </div>
                  </div>
                  <div className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar pr-2">
                     {questions.map((q, idx) => (
@@ -330,6 +371,7 @@ export default function SubjectsManager() {
                 </div>
                 {!isStudent && (
                    <div className="flex gap-2">
+                     <button onClick={() => downloadWord(s.title, s.questions || [])} className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg">Word</button>
                      <button onClick={() => {
                         setEditingId(s.id);
                         setTitle(s.title);

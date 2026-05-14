@@ -44,6 +44,7 @@ export default function TestExecute() {
                 id: testId,
                 title: sub.title,
                 type: 'subject',
+                creatorId: sub.creatorId,
                 questions: allQuestions,
                 maxAttempts: 100 // Subjects might have infinite attempts or something, we'll set to 100
              };

@@ -32,6 +32,7 @@ export interface UserProfile {
   ball?: number;
   ballPrice?: number;
   totalIncome?: number;
+  totalSpentAmount?: number;
   aiTestLimit?: number;
   spentBalls?: number;
   lastIncomeDate?: any;
@@ -86,6 +87,7 @@ export interface Subject {
 }
 
 export interface Question {
+  id?: string;
   text: string;
   options: string[];
   correctIdx: number;
@@ -101,7 +103,7 @@ export interface Test {
   id: string;
   title: string;
   questions: Question[]; 
-  type: 'module' | 'topic' | 'exam';
+  type: 'module' | 'topic' | 'exam' | 'subject';
   moduleId?: string;
   courseId?: string;
   startTime?: any;
@@ -146,6 +148,11 @@ export interface Message {
   text: string;
   timestamp: any;
   isRead: boolean;
+  replyTo?: {
+    id: string;
+    text: string;
+    senderId: string;
+  };
 }
 
 export interface InfoSection {

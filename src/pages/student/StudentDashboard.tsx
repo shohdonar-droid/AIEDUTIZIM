@@ -9,7 +9,6 @@ import StudentGrades from './StudentGrades';
 import StudentCourses from './StudentCourses';
 import StudentTests from './StudentTests';
 import StudentCertificates from './StudentCertificates';
-import StudentServices from './StudentServices';
 import SubjectsManager from '../../components/SubjectsManager';
 import SubjectRead from '../SubjectRead';
 import ChatSection from '../ChatSection';

@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, query, orderBy, onSnapshot, where, Timestamp, limit, getDocs, or, writeBatch, doc, getDoc } from 'firebase/firestore';
 import { Message, UserProfile } from '../types';
-import { Send, Loader2, User as UserIcon, Bell, MessageSquare, X } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Bell, MessageSquare, X, Reply } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function ChatSection() {
@@ -11,12 +11,13 @@ export default function ChatSection() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [replyMsg, setReplyMsg] = useState<Message | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [adminTab, setAdminTab] = useState<'teachers' | 'students'>('teachers');
+  const [adminTab, setAdminTab] = useState<'teachers' | 'students' | 'staff'>('teachers');
 
   // Load contacts
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function ChatSection() {
       const unsub = onSnapshot(q, (snap) => {
         const users = snap.docs.map(d => ({ uid: d.id, ...d.data() } as any));
         // Filter out self and only show relevant roles for tabs
-        const filtered = users.filter(u => u.uid !== user.uid && (u.role === 'teacher' || u.role === 'student'));
+        const filtered = users.filter(u => u.uid !== user.uid && (u.role === 'teacher' || u.role === 'student' || u.role === 'staff'));
         setContacts(filtered);
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-contacts-admin'));
       return unsub;
@@ -87,12 +88,13 @@ export default function ChatSection() {
   }, [user, isAdmin]);
 
   const filteredContacts = isAdmin 
-    ? contacts.filter(c => adminTab === 'teachers' ? c.role === 'teacher' : c.role === 'student')
+    ? contacts.filter(c => adminTab === 'teachers' ? c.role === 'teacher' : adminTab === 'students' ? c.role === 'student' : c.role === 'staff')
     : contacts;
 
   const adminUnreadCounts = {
     teachers: contacts.filter(c => c.role === 'teacher').reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
     students: contacts.filter(c => c.role === 'student').reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    staff: contacts.filter(c => c.role === 'staff').reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
   };
 
   // unread listener
@@ -193,8 +195,14 @@ export default function ChatSection() {
         text: text.trim(),
         timestamp: Timestamp.now(),
         isRead: false,
+        replyTo: replyMsg ? {
+          id: replyMsg.id,
+          text: replyMsg.text,
+          senderId: replyMsg.senderId,
+        } : null
       });
       setText('');
+      setReplyMsg(null);
     } catch (err: any) {
       console.error("Send Error:", err);
       alert("Xabar yuborishda xatolik: " + err.message);
@@ -259,6 +267,19 @@ export default function ChatSection() {
                       </span>
                    )}
                 </button>
+                <button
+                   onClick={() => setAdminTab('staff')}
+                   className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative ${
+                      adminTab === 'staff' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                   }`}
+                >
+                   Xodimlar
+                   {adminUnreadCounts.staff > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] flex items-center justify-center rounded-full">
+                         {adminUnreadCounts.staff}
+                      </span>
+                   )}
+                </button>
              </div>
           )}
           <div className="p-4 border-b border-gray-50 flex items-center justify-between">
@@ -316,7 +337,7 @@ export default function ChatSection() {
                     <div className="text-left overflow-hidden">
                       <p className="font-bold text-gray-800 text-sm truncate">{c.displayName || 'Ismsiz'}</p>
                       <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                        {c.role === 'teacher' ? 'Tashkilot' : c.role === 'admin' ? 'Admin' : (c.isAnonymousContact ? 'Saytdan xabar' : 'Talaba')}
+                        {c.role === 'teacher' ? 'Tashkilot' : c.role === 'admin' ? 'Admin' : c.role === 'staff' ? 'Xodim' : (c.isAnonymousContact ? 'Saytdan xabar' : 'Talaba')}
                       </p>
                     </div>
                   </div>
@@ -347,11 +368,21 @@ export default function ChatSection() {
                 {messages.length > 0 ? messages.map((m) => {
                   const isMe = m.senderId === user?.uid;
                   return (
-                    <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                      <div className={`max-w-[85%] md:max-w-[70%] px-5 py-3.5 rounded-2xl shadow-sm ${
-                        isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-gray-50 text-gray-900 rounded-tl-none border border-gray-100'
-                      }`}>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.text}</p>
+                    <div key={m.id} className={`flex flex-col group ${isMe ? 'items-end' : 'items-start'}`}>
+                      <div className={`flex items-center gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className={`max-w-[85%] md:max-w-[80%] px-5 py-3.5 rounded-2xl shadow-sm ${
+                          isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-gray-50 text-gray-900 rounded-tl-none border border-gray-100'
+                        }`}>
+                          {m.replyTo && (
+                             <div className={`text-xs pl-3 mb-2 py-1 border-l-2 ${isMe ? 'border-white/50 text-white/80 bg-white/10' : 'border-gray-300 text-gray-500 bg-gray-100'} rounded-r italic break-words`}>
+                               {m.replyTo.text}
+                             </div>
+                          )}
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.text}</p>
+                        </div>
+                        <button onClick={() => setReplyMsg(m)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full opacity-0 group-hover:opacity-100 transition-all">
+                           <Reply className="w-4 h-4" />
+                        </button>
                       </div>
                       <span className="text-[10px] text-gray-400 font-bold mt-1.5 uppercase tracking-tighter">
                         {m.timestamp?.toDate ? format(m.timestamp.toDate(), 'HH:mm') : ''}
@@ -370,10 +401,21 @@ export default function ChatSection() {
               </div>
 
               <footer className="p-4 md:p-6 border-t border-gray-50 bg-white">
-                <form onSubmit={handleSend} className="flex gap-3">
+                {replyMsg && (
+                   <div className="flex items-center justify-between bg-blue-50/50 p-3 rounded-t-2xl border border-blue-100 border-b-0">
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Javob qaytarilmoqda</span>
+                        <p className="text-sm text-gray-600 truncate">{replyMsg.text}</p>
+                      </div>
+                      <button type="button" onClick={() => setReplyMsg(null)} className="p-1 text-gray-400 hover:bg-gray-200 rounded-lg">
+                        <X className="w-4 h-4" />
+                      </button>
+                   </div>
+                )}
+                <form onSubmit={handleSend} className={`flex gap-3 ${replyMsg ? 'rounded-b-2xl border border-blue-100 border-t-0 p-3 bg-white' : ''}`}>
                   <input
                     type="text"
-                    className="flex-1 px-5 py-3.5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-sm font-medium"
+                    className="flex-1 px-5 py-3.5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-500 focus:bg-gray-100 transition-all text-sm font-medium"
                     placeholder="Xabar yozing..."
                     value={text}
                     onChange={(e) => setText(e.target.value)}

@@ -185,7 +185,6 @@ export default function ServicesPage() {
           }));
         });
         children.push(new Paragraph({
-          children: [new TextRun({ text: `====`, ...defaultStyles })],
           spacing: { after: 200 }
         }));
       });

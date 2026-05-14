@@ -29,7 +29,8 @@ export default function TeacherTests() {
   const [generatedQuestions, setGeneratedQuestions] = useState<Question[]>([]);
   const [aiMode, setAiMode] = useState<'ai'|'manual'>('ai');
 
-  const defaultManualTemplate = `++++ savol matni
+  const defaultManualTemplate = `++++
+ savol matni
 ====
 nato'g'ri_variant
 ====
@@ -37,8 +38,7 @@ nato'g'ri_variant
 ====
 nato'g'ri_variant
 ====
-nato'g'ri_variant
-====`;
+nato'g'ri_variant`;
   const [manualText, setManualText] = useState(defaultManualTemplate);
 
   const parseManualText = async () => {
@@ -82,7 +82,7 @@ nato'g'ri_variant
     }
     
     if (questions.length === 0) {
-      alert("Matnda test savollari topilmadi. Formatni tekshiring: ++++ savol \\n ====\\n #to'g'ri \\n ====\\n noto'g'ri \\n ====");
+      alert("Matnda test savollari topilmadi. Formatni tekshiring: ++++ savol \\n ====\\n nato'g'ri \\n ====\\n #to'g'ri \\n ====\\n nato'g'ri \\n ====\\n nato'g'ri");
       return;
     }
 
@@ -92,7 +92,7 @@ nato'g'ri_variant
 
   // Exam state
   const [examAiMode, setExamAiMode] = useState<'ai'|'manual'>('ai');
-  const [examManualText, setExamManualText] = useState('');
+  const [examManualText, setExamManualText] = useState(defaultManualTemplate);
   const [examMaxAttempts, setExamMaxAttempts] = useState(1);
   const [examData, setExamData] = useState({
     title: '',
@@ -142,7 +142,7 @@ nato'g'ri_variant
     }
     
     if (questions.length === 0) {
-      alert("Matnda test savollari topilmadi. Formatni tekshiring: ++++ savol \\n ====\\n #to'g'ri \\n ====\\n noto'g'ri \\n ====");
+      alert("Matnda test savollari topilmadi. Formatni tekshiring: ++++ savol \\n ====\\n nato'g'ri \\n ====\\n #to'g'ri \\n ====\\n nato'g'ri \\n ====\\n nato'g'ri");
       return;
     }
 
@@ -249,13 +249,13 @@ nato'g'ri_variant
     
     let content = `<html><head><meta charset="UTF-8"></head><body><h2>${test.title}</h2><br/>`;
     test.questions.forEach((q: any, i: number) => {
-      content += `<div>++++ ${q.text}</div>`;
+      content += `<div>++++<br/> ${q.text}</div>`;
       q.options.forEach((opt: string, optIdx: number) => {
         const isCorrect = q.correctIdx === optIdx;
         const prefix = isCorrect ? '#' : '';
         content += `<div>====</div><div>${prefix}${opt}</div>`;
       });
-      content += '<div>====</div><br/>';
+      content += '<br/>';
     });
     content += '</body></html>';
     

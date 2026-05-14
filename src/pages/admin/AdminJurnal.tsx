@@ -3,7 +3,7 @@ import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, orderBy, query, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import { Enrollment, Department, Group } from '../../types';
-import { Loader2, Download, Search, FileText, Trash2, Filter, Award } from 'lucide-react';
+import { Loader2, Download, Search, FileText, Trash2, Filter, Award, X } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import CertificateViewer from '../../components/CertificateViewer';
 import * as XLSX from 'xlsx';
@@ -19,6 +19,7 @@ export default function AdminJurnal() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'course' | 'test'>('course');
   const [testPage, setTestPage] = useState(0);
+  const [quizizzPage, setQuizizzPage] = useState(0);
 
   const [selectedCourse, setSelectedCourse] = useState<string>('');
 
@@ -30,6 +31,9 @@ export default function AdminJurnal() {
   const [filterGrp, setFilterGrp] = useState('');
 
   const [selectedCert, setSelectedCert] = useState<any>(null);
+
+  const [quizizzHistory, setQuizizzHistory] = useState<any[]>([]);
+  const [viewedQuizResult, setViewedQuizResult] = useState<any>(null);
 
   useEffect(() => {
     async function load() {
@@ -143,6 +147,15 @@ export default function AdminJurnal() {
         })
         .filter(r => r.testAuthorRole === 'admin' && users[r.userId] && users[r.userId].role === 'student');
         setTestResults(results);
+
+        // Fetch quiz_history
+        const qhSnap = await getDocs(query(collection(db, 'quiz_history')));
+        const allQuizizz = qhSnap.docs.map(d => {
+          const data = d.data();
+          return { id: d.id, ...data, creatorObj: users[data.teacherId] };
+        });
+        allQuizizz.sort((a: any, b: any) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+        setQuizizzHistory(allQuizizz);
 
       } catch (err) {
         handleFirestoreError(err, OperationType.LIST, 'admin-jurnal-loader');
@@ -269,6 +282,7 @@ export default function AdminJurnal() {
                >
                   Test jurnali
                </button>
+               
             </div>
           </div>
         </header>
@@ -514,6 +528,8 @@ export default function AdminJurnal() {
             )}
           </div>
         )}
+        
+
         <AnimatePresence>
            {selectedCert && (
               <CertificateViewer selectedCert={selectedCert} onClose={() => setSelectedCert(null)} />

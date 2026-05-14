@@ -23,7 +23,7 @@ export default function TeacherJurnal() {
   
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'course' | 'test' | 'exam'>('course');
+  const [activeTab, setActiveTab] = useState<'course' | 'test' | 'exam'>(user?.role === 'staff' ? 'test' : 'course');
   
   // Filters
   const [filterDept, setFilterDept] = useState('');
@@ -104,14 +104,38 @@ export default function TeacherJurnal() {
         const tArr: {id: string, title: string}[] = [];
         tSnap.forEach(d => {
           const tData = d.data();
-          const isOrgTest = tData.teacherId === orgUid || tData.creatorId === orgUid;
-          const isAdminTest = tData.creatorRole === 'admin';
+          let shouldInclude = false;
           
-          if (isOrgTest || isAdminTest) {
+          if (user.role === 'staff') {
+            shouldInclude = tData.creatorId === user.uid;
+          } else {
+            shouldInclude = tData.teacherId === orgUid || tData.creatorId === orgUid || tData.creatorRole === 'admin';
+          }
+          
+          if (shouldInclude) {
             testsInOrg[d.id] = tData.title;
             tArr.push({ id: d.id, title: tData.title });
           }
         });
+
+        const subSnap = await getDocs(collection(db, 'subjects'));
+        subSnap.docs.forEach(d => {
+          const sData = d.data();
+          const subjectTestId = 'subject_' + d.id;
+          let shouldInclude = false;
+          
+          if (user.role === 'staff') {
+            shouldInclude = sData.creatorId === user.uid;
+          } else {
+            shouldInclude = sData.creatorId === orgUid || sData.creatorRole === 'admin' || (sData.organizationIds && sData.organizationIds.includes(orgUid));
+          }
+          
+          if (shouldInclude) {
+            testsInOrg[subjectTestId] = sData.title;
+            tArr.push({ id: subjectTestId, title: sData.title });
+          }
+        });
+
         setAllTests(tArr);
 
         // Show results for all tests belonging to this org's students
@@ -253,16 +277,18 @@ export default function TeacherJurnal() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Tashkilot Jurnali</h1>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">{user?.role === 'staff' ? 'Xodim Jurnali' : 'Tashkilot Jurnali'}</h1>
           <p className="text-gray-500 mt-2 text-lg">O'z kurslar va testlaringiz natijalari.</p>
         </div>
         <div className="flex bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm">
-          <button
-            onClick={() => setActiveTab('course')}
-            className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'course' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-gray-600'}`}
-          >
-            Kurs jurnali
-          </button>
+          {user?.role !== 'staff' && (
+            <button
+              onClick={() => setActiveTab('course')}
+              className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'course' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Kurs jurnali
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('test')}
             className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'test' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-gray-600'}`}

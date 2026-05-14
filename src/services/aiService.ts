@@ -91,14 +91,13 @@ export async function generateAIDocument({ type, topic, pages = 5, additionalTex
       Javobni quyidagi maxsus formatda bering (bu juda muhim!):
       ++++ Savol matni
       ====
-      #To'g'ri javob
-      ====
       Noto'g'ri javob 1
+      ====
+      #To'g'ri javob
       ====
       Noto'g'ri javob 2
       ====
       Noto'g'ri javob 3
-      ====
       
       Har bir savolni alohida ++++ bilan boshlang. Savollarni takrorlamang.`;
       break;

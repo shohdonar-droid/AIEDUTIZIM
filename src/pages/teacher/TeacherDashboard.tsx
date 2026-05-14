@@ -10,7 +10,6 @@ import TeacherTests from './TeacherTests';
 import TeacherStudents from './TeacherStudents';
 import TeacherJurnal from './TeacherJurnal';
 import TeacherCertificates from './TeacherCertificates';
-import TeacherServices from './TeacherServices';
 import TeacherChat from './TeacherChat';
 import TeacherOverview from './TeacherOverview';
 import TeacherSubjects from '../../components/SubjectsManager';
@@ -59,12 +58,12 @@ export default function TeacherDashboard() {
     { name: 'Asosiy ekran', path: '/teacher', icon: LayoutDashboard, exact: true },
     { name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
     { name: 'Yo\'nalishlar', path: '/teacher/departments', icon: Users, hidden: user?.role === 'staff' },
-    { name: 'Testlar', path: '/teacher/tests', icon: CheckCircle2, hidden: user?.role === 'staff' },
-    { name: 'Mavzular', path: '/teacher/subjects', icon: BookOpen, hidden: user?.role === 'staff' },
+    { name: 'Testlar', path: '/teacher/tests', icon: CheckCircle2 },
+    { name: 'Mavzular', path: '/teacher/subjects', icon: BookOpen },
     { name: 'Kurslar', path: '/teacher/courses', icon: Library, hidden: user?.role === 'staff' },
     { name: 'Talabalar', path: '/teacher/students', icon: Users, hidden: user?.role === 'staff' },
-    { name: 'Jurnal', path: '/teacher/jurnal', icon: FileText, hidden: user?.role === 'staff' },
-    { name: 'Quizizz', path: '/teacher/quizizz', icon: CheckCircle2, hidden: user?.role !== 'staff' },
+    { name: 'Jurnal', path: '/teacher/jurnal', icon: FileText },
+    { name: 'Quizizz', path: '/teacher/quizizz', icon: CheckCircle2 },
     { name: 'Sertifikatlar', path: '/teacher/certificates', icon: FileText, hidden: user?.role === 'staff' },
     { name: 'Chat', path: '/teacher/chat', icon: MessageSquare, badge: unreadCount },
   ].filter(item => !item.hidden);

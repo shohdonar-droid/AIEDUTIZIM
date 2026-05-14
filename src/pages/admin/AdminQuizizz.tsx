@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download, BarChart2, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -12,7 +12,7 @@ const formatTime = (timeInSecs: number) => {
   return `${seconds.toString().padStart(2, '0')}:${ms.toString().padStart(2, '0')}`;
 };
 
-export default function TeacherQuizizz() {
+export default function AdminQuizizz() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
   
@@ -38,10 +38,26 @@ export default function TeacherQuizizz() {
     if (!user) return;
     const orgId = user.role === 'staff' ? user.teacherId || user.uid : user.uid;
     
-    const unsub = onSnapshot(query(collection(db, 'quiz_history'), where('teacherId', '==', orgId)), (snap) => {
-       const qs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-       qs.sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-       setQuizzes(qs);
+    const unsub = onSnapshot(collection(db, 'quiz_history'), async (snap) => {
+       try {
+           const uSnap = await getDocs(collection(db, 'users'));
+           const usersMap: any = {};
+           uSnap.docs.forEach(d => {
+              const ud = d.data();
+              usersMap[d.id] = ud;
+           });
+           
+           const qs = snap.docs.map(d => ({ 
+              id: d.id, 
+              ...d.data(), 
+              creatorName: usersMap[d.data().teacherId]?.displayName || usersMap[d.data().teacherId]?.name || 'Noma\'lum',
+              creatorRole: usersMap[d.data().teacherId]?.role || 'Noma\'lum'
+           }));
+           qs.sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+           setQuizzes(qs);
+       } catch (err) {
+           handleFirestoreError(err, OperationType.LIST, 'admin-quizizz');
+       }
     });
     return unsub;
   }, [user]);
@@ -83,7 +99,7 @@ export default function TeacherQuizizz() {
      if (!title || questions.length === 0) return;
      setLoading(true);
      try {
-       const orgId = user?.role === 'staff' ? user.teacherId || user.uid : user?.uid;
+       const orgId = user?.uid;
        
        let newPin = generatePin();
        while (!(await checkPinUnique(newPin))) {
@@ -115,12 +131,19 @@ export default function TeacherQuizizz() {
   const handleDeleteTest = async (id: string) => {
     if(!window.confirm("Rostdan ham ushbu testni o'chirishni xohlaysizmi?")) return;
     try {
+      // First, try to find any active sessions for this quiz and delete them
+      const q = query(collection(db, 'quiz_sessions'), where('historyId', '==', id));
+      const snaps = await getDocs(q);
+      const delPromises = snaps.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(delPromises);
+      
+      // Delete from quiz_history
       await deleteDoc(doc(db, 'quiz_history', id));
     } catch(err: any) {
-      alert("Xatolik: " + err.message);
+      handleFirestoreError(err, OperationType.DELETE, `quiz_history/${id}`);
+      alert("Xatolik yuz berdi: " + err.message);
     }
   };
-
   const handleStartSession = async (quiz: any) => {
      setLoading(true);
      try {
@@ -645,9 +668,11 @@ export default function TeacherQuizizz() {
                      <tr>
                        <th className="px-6 py-4">№</th>
                        <th className="px-6 py-4">Test Nomi</th>
-                       <th className="px-6 py-4">PIN KOD</th>
+                        <th className="px-6 py-4">Yaratuvchi</th>
+                        <th className="px-6 py-4">PIN KOD</th>
                        <th className="px-6 py-4">Testlar Soni</th>
-                       <th className="px-6 py-4">Yaratilgan vaqti</th>
+                        <th className="px-6 py-4">Qatnashchilar</th>
+                        <th className="px-6 py-4">Yaratilgan vaqti</th>
                        <th className="px-6 py-4 text-center">Harakatlar</th>
                      </tr>
                    </thead>
@@ -656,12 +681,17 @@ export default function TeacherQuizizz() {
                        <tr key={quiz.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-6 py-4 font-black text-gray-400">{idx + 1}</td>
                           <td className="px-6 py-4">
-                             <div className="font-bold text-gray-900">{quiz.title}</div>
-                             <div className="text-gray-500 max-w-xs truncate" title={quiz.context}>{quiz.context || "Qo'shimcha matn mavjud emas"}</div>
-                          </td>
-                          <td className="px-6 py-4 font-black text-blue-600 tracking-widest">{quiz.pin || 'Yo\'q'}</td>
+                              <div className="font-bold text-gray-900">{quiz.title}</div>
+                              <div className="text-gray-500 max-w-xs truncate" title={quiz.context}>{quiz.context || "Qo'shimcha matn mavjud emas"}</div>
+                           </td>
+                           <td className="px-6 py-4">
+                              <div className="font-bold text-gray-700">{quiz.creatorName}</div>
+                              <div className="text-xs text-gray-400 capitalize">{quiz.creatorRole}</div>
+                           </td>
+                           <td className="px-6 py-4 font-black text-blue-600 tracking-widest">{quiz.pin || 'Yo\'q'}</td>
                           <td className="px-6 py-4 font-bold text-gray-700">{quiz.questions?.length || 0} ta</td>
-                          <td className="px-6 py-4 text-gray-500 font-medium font-mono">
+                           <td className="px-6 py-4 font-bold text-green-600">{quiz.participants?.length || 0} ta</td>
+                           <td className="px-6 py-4 text-gray-500 font-medium font-mono">
                              {quiz.createdAt ? new Date(quiz.createdAt.toMillis()).toLocaleString('uz-UZ') : 'Noma\'lum'}
                           </td>
                           <td className="px-6 py-4 flex items-center justify-center gap-2">

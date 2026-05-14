@@ -125,7 +125,8 @@ export default function Quizizz() {
     const currentQIndex = session.currentQuestionIndex;
     const question = session.questions[currentQIndex];
     const isCorrect = option === question.correctAnswer;
-    const timeTaken = 15 - timeLeft;
+    const elapsedSec = session.questionStartTime ? (Date.now() - session.questionStartTime) / 1000 : 0;
+    const timeTaken = parseFloat(elapsedSec.toFixed(2));
 
     try {
       const pRef = doc(db, 'quiz_participants', participantId);
@@ -258,9 +259,6 @@ export default function Quizizz() {
       <div className="bg-white px-6 py-4 border-b flex justify-between items-center shadow-sm">
         <div className="font-bold text-gray-600">
           Savol {session.currentQuestionIndex + 1} / {session.questions.length}
-        </div>
-        <div className={`font-black text-3xl ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-blue-600'}`}>
-          00:{timeLeft.toString().padStart(2, '0')}
         </div>
       </div>
       

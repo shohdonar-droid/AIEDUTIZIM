@@ -3,7 +3,7 @@ import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router-dom';
 import { BrainCircuit, Loader2 } from 'lucide-react';
-import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Register() {
@@ -27,17 +27,56 @@ export default function Register() {
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
       
+      
       if (!userDoc.exists()) {
+        let uyOrgId = '';
+        const q = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
+        const uySnap = await getDocs(q);
+        if (!uySnap.empty) {
+          uyOrgId = uySnap.docs[0].id;
+        } else {
+          try {
+            const orgRef = doc(collection(db, 'users'));
+            await setDoc(orgRef, {
+               uid: orgRef.id,
+               displayName: 'UY',
+               role: 'teacher',
+               createdAt: serverTimestamp(),
+               login: 'uy_admin',
+               password: 'uy_password',
+               maxStudents: 99999,
+               teachersCount: 99999,
+               status: 'active'
+            });
+            uyOrgId = orgRef.id;
+          } catch(e) { console.error(e) }
+        }
+
         // Create new staff
         await setDoc(userDocRef, {
           uid: user.uid,
           displayName: user.displayName || 'Xodim',
           email: user.email,
           role: 'staff',
+          teacherId: uyOrgId,
           createdAt: serverTimestamp(),
           spentBalls: 0
         });
+      } else {
+         const existingData = userDoc.data();
+         if (existingData?.role === 'staff' && !existingData.teacherId) {
+            let uyOrgId = '';
+            const q = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
+            const uySnap = await getDocs(q);
+            if (!uySnap.empty) uyOrgId = uySnap.docs[0].id;
+            
+            if (uyOrgId) {
+               await setDoc(userDocRef, { teacherId: uyOrgId }, { merge: true });
+            }
+         }
       }
+
+
       
       try {
          const sessionRef = await addDoc(collection(db, 'activityLogs'), {
