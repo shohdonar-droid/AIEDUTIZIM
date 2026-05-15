@@ -64,7 +64,7 @@ export default function TeacherDashboard() {
     { name: 'Talabalar', path: '/teacher/students', icon: Users, hidden: user?.role === 'staff' },
     { name: 'Jurnal', path: '/teacher/jurnal', icon: FileText },
     { name: 'Quizizz', path: '/teacher/quizizz', icon: CheckCircle2 },
-    { name: 'Sertifikatlar', path: '/teacher/certificates', icon: FileText, hidden: user?.role === 'staff' },
+    { name: 'Sertifikatlar', path: '/teacher/certificates', icon: FileText },
     { name: 'Chat', path: '/teacher/chat', icon: MessageSquare, badge: unreadCount },
   ].filter(item => !item.hidden);
 

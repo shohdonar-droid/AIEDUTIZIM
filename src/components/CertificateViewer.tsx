@@ -37,11 +37,25 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
     async function loadData() {
       try {
         const isSubject = (selectedCert as any).isSubjectItem || (selectedCert as any).testType === 'subject';
+        const isQuizizz = (selectedCert as any).isQuizizzItem || (selectedCert as any).testType === 'quizizz';
+        
+        const siteSnap = await getDoc(doc(db, 'siteContent', 'main'));
+        if (siteSnap.exists()) {
+          setSiteSettings(siteSnap.data().header || {});
+        }
+
+        if (isQuizizz) {
+          setTemplate({
+            title: 'SERTIFIKAT',
+            completionText: 'FAOL QATNASHUVCHI',
+            coursePrefix: 'Ushbu sertifikat',
+            courseSuffix: 'nomli quizizz testda faol qatnashgani uchun beriladi.'
+          });
+          return;
+        }
+
         const templateDocRef = doc(db, 'settings', isSubject ? 'certificate_subject_template' : 'certificate_template');
-        const [templateSnap, siteSnap] = await Promise.all([
-          getDoc(templateDocRef),
-          getDoc(doc(db, 'siteContent', 'main'))
-        ]);
+        const templateSnap = await getDoc(templateDocRef);
 
         if (templateSnap.exists()) {
           setTemplate(templateSnap.data() as CertTemplate);

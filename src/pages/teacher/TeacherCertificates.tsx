@@ -36,17 +36,22 @@ export default function TeacherCertificates() {
       setStudents(myStudents);
       const studentIds = myStudents.map(s => s.uid);
 
-      if (studentIds.length > 0) {
-          const eSnap = await getDocs(query(collection(db, 'enrollments'), where('completed', '==', true)));
-          const allCerts = eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-          
-          const sSnap = await getDocs(query(collection(db, 'testResults'), where('testType', '==', 'subject')));
-          const allSubs = sSnap.docs.map(doc => ({ id: doc.id, isSubjectItem: true, ...doc.data() } as any));
-          
-          const combined = [
-             ...allCerts.filter(c => studentIds.includes(c.userId)),
-             ...allSubs.filter(c => studentIds.includes(c.userId) && c.score >= 90)
-          ];
+      let combined: any[] = [];
+      try {
+        const eSnap = await getDocs(query(collection(db, 'enrollments'), where('completed', '==', true)));
+        const allCerts = eSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        
+        const sSnap = await getDocs(query(collection(db, 'testResults'), where('testType', '==', 'subject')));
+        const allSubs = sSnap.docs.map(doc => ({ id: doc.id, isSubjectItem: true, ...doc.data() } as any));
+        
+        const myQuizizzCerts = allCerts.filter(c => c.isQuizizzItem && c.creatorId === user.uid);
+        
+        combined = [
+           ...allCerts.filter(c => studentIds.includes(c.userId) && !c.isQuizizzItem),
+           ...myQuizizzCerts,
+           ...allSubs.filter(c => studentIds.includes(c.userId) && c.score >= 90)
+        ];
+      } catch (e) {}
           
           combined.sort((a, b) => {
              const idA = a.certificateId || '';
@@ -57,9 +62,6 @@ export default function TeacherCertificates() {
           });
 
           setCerts(combined);
-      } else {
-          setCerts([]);
-      }
       
       setLoading(false);
     }
@@ -79,10 +81,10 @@ export default function TeacherCertificates() {
 
   const openCert = (c: any) => {
     const student = students.find(s => s.uid === c.userId);
-    const studentName = student?.displayName || "Talaba";
+    const studentName = c.studentName || student?.displayName || "Talaba";
     setSelectedCert({
        ...c, 
-       courseTitle: courses[c.courseId] || 'Kurs', 
+       courseTitle: c.courseTitle || courses[c.courseId] || 'Kurs', 
        studentName
     });
   };
@@ -205,12 +207,13 @@ export default function TeacherCertificates() {
                             <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md text-xs border border-blue-100">{c.certificateId || ('YAU-' + c.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase())}</span>
                           </td>
                           <td className="py-4 px-6">
-                            <span className="font-black text-gray-900">{student?.displayName || "Noma'lum Talaba"}</span>
+                            <span className="font-black text-gray-900">{c.studentName || student?.displayName || "Noma'lum Talaba"}</span>
                           </td>
                           <td className="py-4 px-6">
                             <span className="font-bold text-gray-600">
                                 {c.isSubjectItem ? <span className="mr-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md text-xs">Fanlar</span> : null}
-                                {title}
+                                {c.isQuizizzItem ? <span className="mr-2 px-2 py-0.5 bg-pink-100 text-pink-700 rounded-md text-xs">Quizizz</span> : null}
+                                {c.courseTitle || title}
                             </span>
                           </td>
                           <td className="py-4 px-6 text-center">
@@ -223,7 +226,7 @@ export default function TeacherCertificates() {
                           </td>
                           <td className="py-4 px-6 text-right font-bold text-gray-500 whitespace-nowrap">
                             {(() => {
-                              const ts = c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed;
+                              const ts = c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.createdAt || c.lastAccessed;
                               if (!ts) return '';
                               const dateObj = ts?.toMillis ? new Date(ts.toMillis()) : (ts instanceof Date ? ts : new Date());
                               return dateObj.toLocaleDateString('uz-UZ');
@@ -234,8 +237,8 @@ export default function TeacherCertificates() {
                                <button
                                   onClick={() => setSelectedCert({
                                      ...c, 
-                                     courseTitle: title, 
-                                     studentName: student?.displayName || "Talaba",
+                                     courseTitle: c.courseTitle || title, 
+                                     studentName: c.studentName || student?.displayName || "Talaba",
                                      lastAccessed: c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed
                                   } as any)}
                                   className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
@@ -247,8 +250,8 @@ export default function TeacherCertificates() {
                                   onClick={() => {
                                     setSelectedCert({
                                        ...c, 
-                                       courseTitle: title, 
-                                       studentName: student?.displayName || "Talaba",
+                                       courseTitle: c.courseTitle || title, 
+                                       studentName: c.studentName || student?.displayName || "Talaba",
                                        lastAccessed: c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed,
                                        autoDownload: true
                                     } as any);

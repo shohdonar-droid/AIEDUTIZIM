@@ -225,10 +225,10 @@ export default function AdminCertificates() {
 
   const openCert = (c: any) => {
     const student = students.find(s => s.uid === c.userId);
-    const studentName = student?.displayName || "Talaba";
+    const studentName = c.studentName || student?.displayName || "Talaba";
     setSelectedCert({
        ...c, 
-       courseTitle: courses[c.courseId], 
+       courseTitle: c.courseTitle || courses[c.courseId] || 'Kurs', 
        studentName
     });
   };
@@ -518,7 +518,8 @@ export default function AdminCertificates() {
                           <td className="py-4 px-6">
                             <span className="font-bold text-gray-600">
                                 {c.isSubjectItem ? <span className="mr-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md text-xs">Fanlar</span> : null}
-                                {title}
+                                {c.isQuizizzItem ? <span className="mr-2 px-2 py-0.5 bg-pink-100 text-pink-700 rounded-md text-xs">Quizizz</span> : null}
+                                {c.courseTitle || title}
                             </span>
                           </td>
                           <td className="py-4 px-6 text-center">
@@ -531,7 +532,7 @@ export default function AdminCertificates() {
                           </td>
                           <td className="py-4 px-6 text-right font-bold text-gray-500 whitespace-nowrap">
                             {(() => {
-                               const ts = c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed;
+                               const ts = c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.createdAt || c.lastAccessed;
                                if (!ts) return '';
                                const dateObj = ts?.toMillis ? new Date(ts.toMillis()) : (ts instanceof Date ? ts : new Date());
                                return dateObj.toLocaleDateString('uz-UZ');
@@ -542,8 +543,8 @@ export default function AdminCertificates() {
                                <button
                                   onClick={() => setSelectedCert({
                                      ...c, 
-                                     courseTitle: title, 
-                                     studentName: student?.displayName || "Talaba",
+                                     courseTitle: c.courseTitle || title, 
+                                     studentName: c.studentName || student?.displayName || "Talaba",
                                      lastAccessed: c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed
                                   } as any)}
                                   className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
@@ -555,8 +556,8 @@ export default function AdminCertificates() {
                                   onClick={() => {
                                     setSelectedCert({
                                        ...c, 
-                                       courseTitle: title, 
-                                       studentName: student?.displayName || "Talaba",
+                                       courseTitle: c.courseTitle || title, 
+                                       studentName: c.studentName || student?.displayName || "Talaba",
                                        lastAccessed: c.isSubjectItem ? (c.createdAt || c.lastAccessed) : c.lastAccessed,
                                        autoDownload: true
                                     } as any);

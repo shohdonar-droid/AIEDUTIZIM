@@ -4,12 +4,14 @@ import { db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { ShieldCheck, Award, XCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import CertificateViewer from '../components/CertificateViewer';
 
 export default function VerifyCertificate() {
   const { id } = useParams();
   const [loading, setLoading] = useState(true);
   const [cert, setCert] = useState<any>(null);
   const [error, setError] = useState(false);
+  const [showViewer, setShowViewer] = useState(false);
 
   useEffect(() => {
     async function verify() {
@@ -24,9 +26,12 @@ export default function VerifyCertificate() {
           
           setCert({
             ...data,
+            id: docSnap.id,
             studentName: uSnap.exists() ? uSnap.data().displayName : 'Talaba',
-            courseTitle: cSnap.exists() ? cSnap.data().title : 'Kurs'
+            courseTitle: cSnap.exists() ? cSnap.data().title : 'Kurs',
+            autoDownload: true
           });
+          setShowViewer(true);
         } else {
           setError(true);
         }
@@ -94,10 +99,20 @@ export default function VerifyCertificate() {
                <Link to="/" className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black hover:bg-gray-200 transition-all text-sm uppercase">
                  Bosh sahifa
                </Link>
-               <button onClick={() => window.print()} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 text-sm uppercase">
-                 Print qilish
+               <button 
+                 onClick={() => setShowViewer(true)} 
+                 className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 text-sm uppercase"
+               >
+                 Yuklab olish
                </button>
             </div>
+
+            {showViewer && (
+              <CertificateViewer 
+                selectedCert={{ ...cert, autoDownload: true }} 
+                onClose={() => setShowViewer(false)} 
+              />
+            )}
           </>
         )}
       </motion.div>

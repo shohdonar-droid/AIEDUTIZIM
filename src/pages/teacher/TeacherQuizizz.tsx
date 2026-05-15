@@ -226,6 +226,37 @@ export default function TeacherQuizizz() {
     }, 3000);
   };
 
+  const issueCertificateForWinner = async (session: any, parts: any[]) => {
+    if (!parts || parts.length === 0) return;
+    const sortedParts = [...parts].sort((a: any, b: any) => {
+       const getCorrectCount = (p: any) => Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).length;
+       const getTimeTaken = (p: any) => Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).reduce((acc: number, ans: any) => acc + Number(ans?.timeTaken || 0), 0) as number;
+       const diff = getCorrectCount(b) - getCorrectCount(a);
+       if (diff !== 0) return diff;
+       return getTimeTaken(a) - getTimeTaken(b);
+    });
+    
+    const winner = sortedParts[0];
+    if (!winner) return;
+
+    try {
+      await setDoc(doc(db, 'enrollments', `quiz_${session.id}_cert`), {
+        isQuizizzItem: true,
+        completed: true,
+        userId: 'quizizz_anonymous',
+        studentName: winner.name,
+        courseId: session.historyId || session.id,
+        courseTitle: session.title,
+        creatorId: session.teacherId || user?.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        certificateId: String(Date.now()).slice(-8)
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleNextQuestion = async () => {
     if (!activeSession || isTransitioningRef.current) return;
     isTransitioningRef.current = true;
@@ -243,6 +274,7 @@ export default function TeacherQuizizz() {
             lastRun: serverTimestamp()
          });
       }
+      await issueCertificateForWinner(activeSession, participants);
     } else {
       await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
         currentQuestionIndex: nextIdx,
@@ -260,6 +292,7 @@ export default function TeacherQuizizz() {
          participants: participants,
          lastRun: serverTimestamp()
       });
+      await issueCertificateForWinner(activeSession, participants);
       setActiveSession(null);
     }
   };
