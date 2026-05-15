@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { SiteContent, InfoSection } from '../types';
-import { ArrowLeft, FileText, Download, Lock, Check, Layout } from 'lucide-react';
+import { ArrowLeft, FileText, Download, Lock, Check, Layout, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { makeDirectImageUrl } from '../lib/helpers';
 
 export default function InfoDetail() {
   const [content, setContent] = useState<SiteContent['hero'] | null>(null);
@@ -75,7 +76,7 @@ export default function InfoDetail() {
         {/* Hero Card Preview - Keep it for context but make it smaller or secondary if needed */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
           <div className="mac-window overflow-hidden rounded-3xl shadow-2xl">
-            <img src={content.rightImage || null} alt="Cover" className="w-full h-[400px] object-cover" />
+            <img src={makeDirectImageUrl(content.rightImage || null)} referrerPolicy="no-referrer" alt="Cover" className="w-full h-[400px] object-cover" />
           </div>
           <div className="space-y-6">
              <span className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-widest inline-block">
@@ -158,7 +159,7 @@ export default function InfoDetail() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                        {currentSection.images.map((img, i) => (
                          <div key={i} className="mac-window rounded-3xl overflow-hidden shadow-2xl hover:scale-[1.02] transition-transform cursor-pointer">
-                           <img src={img} className="w-full h-auto" onClick={() => window.open(img, '_blank')} />
+                           <img src={makeDirectImageUrl(img)} referrerPolicy="no-referrer" className="w-full h-auto" onClick={() => window.open(makeDirectImageUrl(img), '_blank')} />
                          </div>
                        ))}
                     </div>
@@ -170,7 +171,9 @@ export default function InfoDetail() {
                         <a 
                           key={i}
                           href={file.url}
-                          download={file.name}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={file.type !== 'link' ? file.name : undefined}
                           className="bg-gray-50 p-6 rounded-3xl border border-gray-100 flex items-center gap-6 hover:bg-white hover:shadow-2xl transition-all group border-b-4 border-b-gray-100 hover:border-b-blue-600"
                         >
                            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors flex-shrink-0">
@@ -178,10 +181,12 @@ export default function InfoDetail() {
                            </div>
                            <div className="flex-1 min-w-0">
                              <p className="text-xl font-black text-gray-900 truncate tracking-tight">{file.name}</p>
-                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mt-1 opacity-60">Siz yuklab olishingiz mumkin</p>
+                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mt-1 opacity-60">
+                               {file.type === 'link' ? "Havolaga o'tish" : "Siz yuklab olishingiz mumkin"}
+                             </p>
                            </div>
                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-gray-300 group-hover:text-blue-600 transition-colors">
-                             <Download className="w-6 h-6" />
+                             {file.type === 'link' ? <ExternalLink className="w-6 h-6" /> : <Download className="w-6 h-6" />}
                            </div>
                         </a>
                       ))}

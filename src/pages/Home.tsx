@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, GraduationCap, LayoutGrid, BarChart3, Users, Settings, Award, ArrowRight, BrainCircuit, Database, Download, FileText, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { makeDirectImageUrl } from '../lib/helpers';
 
 export default function Home() {
   const { user } = useAuth();
@@ -119,7 +120,8 @@ export default function Home() {
               >
                 {content.banners[currentBanner]?.type === 'image' ? (
                   <img 
-                    src={content.banners[currentBanner].url || null} 
+                    src={makeDirectImageUrl(content.banners[currentBanner].url || null)} 
+                    referrerPolicy="no-referrer"
                     alt="Banner" 
                     className="h-full w-full object-cover"
                   />
@@ -173,7 +175,8 @@ export default function Home() {
           <Link to="/info" className="mac-window overflow-hidden flex flex-col group h-full cursor-pointer hover:shadow-2xl transition-all">
             <div className="h-[75%] w-full overflow-hidden relative border-b border-gray-100">
               <img 
-                src={content.hero.rightImage || null} 
+                src={makeDirectImageUrl(content.hero.rightImage || null)} 
+                referrerPolicy="no-referrer"
                 alt="Info" 
                 className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
@@ -214,7 +217,7 @@ export default function Home() {
                 className="w-full mac-window overflow-hidden flex flex-col"
               >
                 <div className="h-48 overflow-hidden relative">
-                  <img src={course.thumbnail || null} alt={course.title} className="h-full w-full object-cover" />
+                  <img src={makeDirectImageUrl(course.thumbnail || null)} referrerPolicy="no-referrer" alt={course.title} className="h-full w-full object-cover" />
                   <div className="absolute top-3 right-3"><span className="badge backdrop-blur-md bg-white/80 text-gray-900">Premium</span></div>
                 </div>
                 <div className="p-6 flex-1 flex flex-col bg-white">
@@ -292,7 +295,7 @@ export default function Home() {
             <div className="col-span-1">
               <Link to="/" className="flex items-center gap-2 mb-4">
                 {content.footer.logoUrl ? (
-                  <img src={content.footer.logoUrl || null} alt="Logo" className="h-10 object-contain" />
+                  <img src={makeDirectImageUrl(content.footer.logoUrl || null)} referrerPolicy="no-referrer" alt="Logo" className="h-10 object-contain" />
                 ) : (
                   <>
                     <div className="rounded-xl bg-[#007aff] p-2 shadow-sm">

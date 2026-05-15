@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { SiteContent, InfoSection } from '../../types';
 import { Save, Loader2, Image as ImageIcon, Type, FileText, Plus, Trash2, Globe, Layout, Lock, Unlock, FileUp, TextSelection, CheckCircle2, Link as LinkIcon, X } from 'lucide-react';
+import { makeDirectImageUrl } from '../../lib/helpers';
 
 export default function AdminInfo() {
   const [content, setContent] = useState<SiteContent | null>(null);
@@ -392,7 +393,8 @@ export default function AdminInfo() {
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Karta ko'rinishi (Preview)</label>
           <div className="bg-white rounded-[40px] border-8 border-gray-100 shadow-2xl overflow-hidden flex flex-col h-[480px]">
             <img 
-              src={content.hero.rightImage || 'https://via.placeholder.com/800x600?text=No+Image'} 
+              src={makeDirectImageUrl(content.hero.rightImage || null) || 'https://via.placeholder.com/800x600?text=No+Image'} 
+              referrerPolicy="no-referrer"
               alt="Preview" 
               className="h-[60%] w-full object-cover"
             />
@@ -526,7 +528,7 @@ export default function AdminInfo() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                     {(currentSection.images || []).map((img, idx) => (
                       <div key={idx} className="relative group aspect-square rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                        <img src={img} className="w-full h-full object-cover" />
+                        <img src={makeDirectImageUrl(img)} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                         <button 
                           onClick={() => {
                              const filtered = currentSection.images?.filter((_, i) => i !== idx);
