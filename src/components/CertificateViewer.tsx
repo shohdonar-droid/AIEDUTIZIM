@@ -262,12 +262,35 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                    {/* Bottom Area: Three parts - Score (Left), QR (Center), Date (Right) */}
                    <div className="w-full grid grid-cols-3 items-end mt-[10px]">
                       {/* Score Result Bottom Left */}
-                      <div className="text-left flex flex-col gap-2 translate-y-5">
-                         <p className="text-[12px] font-black text-[#1e3a8a]/60 uppercase tracking-widest leading-none">Umumiy natija</p>
-                         <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm self-start w-[190px] h-[60px] -translate-x-10">
-                            <span className="text-4xl font-black text-[#1e3a8a]">{score}%</span>
+                      {selectedCert.isQuizizzItem ? (
+                         <div className="text-left flex flex-col justify-center translate-y-[2px] translate-x-5 w-[190px]">
+                            {/* Decorative Seal for 1st Place */}
+                            <div className="relative w-[170px] h-[170px] flex items-center justify-center">
+                               <svg className="absolute inset-0 w-full h-full z-0" viewBox="0 0 100 100" style={{ filter: 'drop-shadow(0 10px 15px rgba(30,58,138,0.15))' }}>
+                                 {/* Burst Shape bg */}
+                                 <path d="M50 2 L56 12 L67 9 L70 19 L81 20 L80 31 L90 35 L86 45 L95 50 L86 55 L90 65 L80 69 L81 80 L70 81 L67 91 L56 88 L50 98 L44 88 L33 91 L30 81 L19 80 L20 69 L10 65 L14 55 L5 50 L14 45 L10 35 L20 31 L19 20 L30 19 L33 9 L44 12 Z" fill="#1e3a8a" />
+                                 {/* Outer gold border */}
+                                 <path d="M50 4 L55 13 L65 10.5 L68 19.5 L78 20.5 L77 30.5 L86 34 L82.5 43.5 L91 48 L83.5 54 L87 63.5 L77 67 L78 77 L68 78 L65 87.5 L55 85 L50 94 L45 85 L35 87.5 L32 78 L22 77 L23 67 L13 63.5 L16.5 54 L9 48 L17.5 43.5 L14 34 L23 30.5 L22 20.5 L32 19.5 L35 10.5 L45 13 Z" fill="none" stroke="#c5a059" strokeWidth="1" />
+                                 {/* Inner circles */}
+                                 <circle cx="50" cy="50" r="35" fill="#fff" />
+                                 <circle cx="50" cy="50" r="32" fill="none" stroke="#c5a059" strokeWidth="1" strokeDasharray="3 2" />
+                                 <circle cx="50" cy="50" r="28" fill="none" stroke="#1e3a8a" strokeWidth="0.5" />
+                               </svg>
+                               <div className="relative z-10 flex flex-col items-center justify-center text-center">
+                                  <span className="text-[26px] font-black text-[#c5a059] leading-none whitespace-nowrap drop-shadow-sm px-1">
+                                     1-O'RIN
+                                  </span>
+                               </div>
+                            </div>
                          </div>
-                      </div>
+                      ) : (
+                         <div className="text-left flex flex-col gap-2 translate-y-5">
+                            <p className="text-[12px] font-black text-[#1e3a8a]/60 uppercase tracking-widest leading-none">Umumiy natija</p>
+                            <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm self-start w-[190px] h-[60px] -translate-x-10">
+                               <span className="text-4xl font-black text-[#1e3a8a]">{score}%</span>
+                            </div>
+                         </div>
+                      )}
 
                       {/* QR Code Center with Text */}
                       <div className="flex flex-col items-center gap-3 translate-y-[24px]">

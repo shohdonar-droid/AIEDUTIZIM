@@ -509,7 +509,7 @@ export default function AdminCertificates() {
                           <td className="py-4 px-6">
                             <span className="font-bold text-gray-500">{i + 1}</span>
                           </td>
-                          <td className="py-4 px-6">
+                          <td className="py-4 px-6 whitespace-nowrap">
                             <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md text-xs border border-blue-100">{c.certificateId || ('YAU-' + c.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase())}</span>
                           </td>
                           <td className="py-4 px-6">

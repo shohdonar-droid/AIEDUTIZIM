@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc, runTransaction } from 'firebase/firestore';
 import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download, BarChart2, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { generateDynamicTest } from '../../services/geminiService';
@@ -263,7 +263,26 @@ export default function AdminQuizizz() {
     if (!winner) return;
 
     try {
-      await setDoc(doc(db, 'enrollments', `quiz_${session.id}_cert`), {
+      const certRef = doc(db, 'enrollments', `quiz_${session.id}_cert`);
+      const counterRef = doc(db, 'counters', 'certificates');
+      
+      let newCertId = '';
+      try {
+        newCertId = await runTransaction(db, async (transaction) => {
+          const docSnap = await transaction.get(counterRef);
+          let currentCount = 0;
+          if (docSnap.exists()) {
+             currentCount = docSnap.data().count || 0;
+          }
+          const nextCount = currentCount + 1;
+          transaction.set(counterRef, { count: nextCount }, { merge: true });
+          return `YAU-${String(nextCount).padStart(5, '0')}`;
+        });
+      } catch (err) {
+        newCertId = `YAU-${String(Date.now()).slice(-8).toUpperCase()}`;
+      }
+
+      await setDoc(certRef, {
         isQuizizzItem: true,
         completed: true,
         userId: 'quizizz_anonymous',
@@ -273,7 +292,7 @@ export default function AdminQuizizz() {
         creatorId: session.teacherId || user?.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        certificateId: String(Date.now()).slice(-8)
+        certificateId: newCertId
       });
     } catch (e) {
       console.error(e);
