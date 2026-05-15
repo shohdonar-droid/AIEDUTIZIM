@@ -1,13 +1,80 @@
-import { useState, useEffect } from 'react';
-import { db } from '../../lib/firebase';
+import { useState, useEffect, useRef } from 'react';
+import { db, storage } from '../../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { SiteContent, InfoSection } from '../../types';
-import { Save, Loader2, Image as ImageIcon, Type, FileText, Plus, Trash2, Globe, Layout, Lock, Unlock, FileUp, TextSelection } from 'lucide-react';
+import { Save, Loader2, Image as ImageIcon, Type, FileText, Plus, Trash2, Globe, Layout, Lock, Unlock, FileUp, TextSelection, CheckCircle2 } from 'lucide-react';
 
 export default function AdminInfo() {
   const [content, setContent] = useState<SiteContent | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<null | 'saving' | 'saved'>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) return resolve(file);
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+          if (width > height && width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+          else if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) { resolve(new File([blob], file.name, { type: 'image/jpeg' })); }
+            else { resolve(file); }
+          }, 'image/jpeg', 0.6);
+        };
+        img.onerror = () => resolve(file);
+      };
+      reader.onerror = () => resolve(file);
+    });
+  };
+
+  const uploadFileToStorage = async (file: File, disableProgressCounter = false): Promise<string> => {
+    if (!disableProgressCounter) {
+      setIsUploading(true);
+      setUploadProgress(0);
+    }
+    try {
+      const processedFile = file.type.startsWith('image/') ? await compressImage(file) : file;
+      const ext = processedFile.name.split('.').pop() || '';
+      const storageRef = ref(storage, `siteContent/${Date.now()}_${Math.random().toString(36).substring(2)}.${ext}`);
+      const uploadTask = uploadBytesResumable(storageRef, processedFile);
+      
+      return await new Promise<string>((resolve, reject) => {
+        uploadTask.on('state_changed', 
+          (snapshot) => {
+            if (!disableProgressCounter) {
+              const prog = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              setUploadProgress(prog);
+            }
+          },
+          (error) => reject(error),
+          async () => {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(url);
+          }
+        );
+      });
+    } finally {
+      if (!disableProgressCounter) {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -40,29 +107,124 @@ export default function AdminInfo() {
     load();
   }, []);
 
-  const handleUpdate = async () => {
+  const handleHeroUpdate = () => {
     if (!content) return;
-    setLoading(true);
-    try {
-      await setDoc(doc(db, 'siteContent', 'main'), { hero: content.hero }, { merge: true });
-      alert('Ma\'lumotlar saqlandi!');
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus(null), 3000);
+
+    (async () => {
+      try {
+        let finalRightImage = content.hero.rightImage || '';
+        if (finalRightImage.startsWith('blob:') || finalRightImage.startsWith('data:')) {
+          setIsUploading(true);
+          const res = await fetch(finalRightImage);
+          const blob = await res.blob();
+          const file = new File([blob], 'hero_image.jpg', { type: blob.type });
+          finalRightImage = await uploadFileToStorage(file, false);
+        }
+
+        await setDoc(doc(db, 'siteContent', 'main'), { 
+          hero: { 
+            rightImage: finalRightImage, 
+            rightText: content.hero.rightText || '', 
+            rightBadge: content.hero.rightBadge || '' 
+          } 
+        }, { merge: true });
+        
+      } catch (err) { 
+        console.error(err); 
+        setIsUploading(false);
+      }
+    })();
+  };
+
+  const [sectionSaveStatus, setSectionSaveStatus] = useState<null | 'saving' | 'saved'>(null);
+
+  const handleSectionUpdate = () => {
+    if (!content) return;
+    
+    // Optimistic UI updates
+    setSectionSaveStatus('saved');
+    setTimeout(() => setSectionSaveStatus(null), 3000);
+
+    const newSections = JSON.parse(JSON.stringify(content.hero.infoSections || [])) as InfoSection[];
+    
+    // Background upload & save
+    (async () => {
+      try {
+        setIsUploading(true);
+        setUploadProgress(0);
+
+        let totalBlobsToUpload = 0;
+        let uploadedBlobsCount = 0;
+        
+        for (const sec of newSections) {
+          for (const imgUrl of (sec.images || [])) {
+            if (imgUrl.startsWith('blob:') || imgUrl.startsWith('data:')) totalBlobsToUpload++;
+          }
+          for (const f of (sec.files || [])) {
+            if (f.url.startsWith('blob:') || f.url.startsWith('data:')) totalBlobsToUpload++;
+          }
+        }
+
+        const uploadBlobUrl = async (blobUrl: string, originalName: string = 'image.jpg') => {
+          const res = await fetch(blobUrl);
+          const blob = await res.blob();
+          const file = new File([blob], originalName, { type: blob.type });
+          const realUrl = await uploadFileToStorage(file, totalBlobsToUpload > 1);
+          uploadedBlobsCount++;
+          if (totalBlobsToUpload > 1) {
+            setUploadProgress(Math.round((uploadedBlobsCount / totalBlobsToUpload) * 100));
+          }
+          return realUrl;
+        };
+
+        for (const section of newSections) {
+          if (section.images) {
+            section.images = await Promise.all(section.images.map(async (img) => {
+              if (img.startsWith('blob:') || img.startsWith('data:')) {
+                 return await uploadBlobUrl(img, 'image.jpg');
+              }
+              return img;
+            }));
+          }
+          if (section.files) {
+            section.files = await Promise.all(section.files.map(async (f) => {
+              if (f.url.startsWith('blob:') || f.url.startsWith('data:')) {
+                 const newUrl = await uploadBlobUrl(f.url, f.name);
+                 return { ...f, url: newUrl };
+              }
+              return f;
+            }));
+          }
+        }
+
+        setIsUploading(false);
+        setUploadProgress(0);
+
+        await setDoc(doc(db, 'siteContent', 'main'), { 
+          hero: { infoSections: newSections } 
+        }, { merge: true });
+        
+      } catch (err) { 
+        console.error(err); 
+        setIsUploading(false);
+        setUploadProgress(0);
+      }
+    })();
   };
 
   const addSection = () => {
     if (!content) return;
-    const name = prompt("Bo'lim nomini kiriting:");
-    if (!name) return;
     const id = `sec_${Date.now()}`;
-    const newSection: InfoSection = { id, name, content: '', files: [], images: [] };
+    const newSection: InfoSection = { id, name: 'Yangi bo\'lim', content: '', files: [], images: [] };
     const updated = { ...content, hero: { ...content.hero, infoSections: [...(content.hero.infoSections || []), newSection] } };
     setContent(updated);
     setActiveTab(id);
   };
 
   const deleteSection = (id: string) => {
-    if (!content || !confirm("Ushbu bo'limni o'chirishni tasdiqlaysizmi?")) return;
+    if (!content || !window.confirm("Ushbu bo'limni o'chirishni tasdiqlaysizmi?")) return;
     const filtered = (content.hero.infoSections || []).filter(s => s.id !== id);
     setContent({ ...content, hero: { ...content.hero, infoSections: filtered } });
     if (activeTab === id) setActiveTab(filtered[0]?.id || null);
@@ -86,12 +248,12 @@ export default function AdminInfo() {
           <p className="text-gray-500 mt-2 text-lg">Yangilik kartasi va Batafsil sahifa mazmuni.</p>
         </div>
         <button
-          onClick={handleUpdate}
-          disabled={loading}
-          className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all disabled:opacity-50"
+          onClick={handleHeroUpdate}
+          disabled={saveStatus === 'saving' || isUploading}
+          className={`flex items-center gap-2 px-8 py-4 text-white rounded-2xl font-black shadow-2xl transition-all disabled:opacity-50 ${saveStatus === 'saved' ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'}`}
         >
-          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-          SAQLASH
+          {saveStatus === 'saving' || isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : (saveStatus === 'saved' ? <CheckCircle2 className="h-5 w-5" /> : <Save className="h-5 w-5" />)}
+          {saveStatus === 'saving' ? 'SAQLANMOQDA...' : (isUploading ? `YUKLANMOQDA... ${uploadProgress}%` : (saveStatus === 'saved' ? 'SAQLANDI!' : 'SAQLASH'))}
         </button>
       </header>
 
@@ -112,14 +274,15 @@ export default function AdminInfo() {
                 type="file"
                 accept="image/*"
                 className="w-full px-5 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-600 font-medium file:cursor-pointer file:bg-blue-600 file:text-white file:border-0 file:py-2 file:px-4 file:rounded-xl file:mr-4 file:font-semibold"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if(!file) return;
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    setContent({ ...content, hero: { ...content.hero, rightImage: reader.result as string } });
-                  };
-                  reader.readAsDataURL(file);
+                  try {
+                    const url = URL.createObjectURL(file);
+                    setContent({ ...content, hero: { ...content.hero, rightImage: url } });
+                  } catch (err) {
+                    alert("Rasm yuklashda xatolik yuz berdi");
+                  }
                 }}
               />
             </div>
@@ -181,12 +344,22 @@ export default function AdminInfo() {
               </div>
               <h3 className="text-2xl font-black text-gray-900">Batafsil ma'lumot (Bo'limlar)</h3>
            </div>
-           <button 
-             onClick={addSection}
-             className="flex items-center gap-2 px-6 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-600 hover:text-white transition-all"
-           >
-             <Plus className="w-5 h-5" /> BO'LIM YARATISH
-           </button>
+           <div className="flex items-center gap-4">
+             <button
+               onClick={handleSectionUpdate}
+               disabled={sectionSaveStatus === 'saving' || isUploading}
+               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 text-white ${sectionSaveStatus === 'saved' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+             >
+               {sectionSaveStatus === 'saving' || isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : (sectionSaveStatus === 'saved' ? <CheckCircle2 className="h-5 w-5" /> : <Save className="h-5 w-5" />)}
+               {sectionSaveStatus === 'saving' ? 'SAQLANMOQDA...' : (isUploading ? `YUKLANMOQDA... ${uploadProgress}%` : (sectionSaveStatus === 'saved' ? 'SAQLANDI!' : 'SAQLASH'))}
+             </button>
+             <button 
+               onClick={addSection}
+               className="flex items-center gap-2 px-6 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-600 hover:text-white transition-all"
+             >
+               <Plus className="w-5 h-5" /> BO'LIM YARATISH
+             </button>
+           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -217,6 +390,19 @@ export default function AdminInfo() {
             <div className="lg:col-span-8 space-y-10">
                <div className="space-y-4">
                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                   <Type className="w-4 h-4" /> Bo'lim nomi
+                 </label>
+                 <input
+                   type="text"
+                   value={currentSection.name || ''}
+                   onChange={(e) => updateSection(currentSection.id, { name: e.target.value })}
+                   className="w-full px-5 py-4 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-600 font-medium"
+                   placeholder="Bo'lim nomi"
+                 />
+               </div>
+
+               <div className="space-y-4">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                    <TextSelection className="w-4 h-4" /> Matnli ma'lumot
                  </label>
                  <textarea
@@ -232,15 +418,16 @@ export default function AdminInfo() {
                         const file = document.createElement('input');
                         file.type = 'file';
                         file.accept = 'image/*';
-                        file.onchange = (e: any) => {
+                        file.onchange = async (e: any) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
+                          try {
+                            const url = URL.createObjectURL(f);
                             const currentImages = currentSection.images || [];
-                            updateSection(currentSection.id, { images: [...currentImages, reader.result as string] });
-                          };
-                          reader.readAsDataURL(f);
+                            updateSection(currentSection.id, { images: [...currentImages, url] });
+                          } catch (err) {
+                            alert("Rasm tanlashda xatolik yuz berdi");
+                          }
                         };
                         file.click();
                      }}
@@ -276,15 +463,16 @@ export default function AdminInfo() {
                         const file = document.createElement('input');
                         file.type = 'file';
                         file.accept = 'image/*';
-                        file.onchange = (e: any) => {
+                        file.onchange = async (e: any) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
+                          try {
+                            const url = URL.createObjectURL(f);
                             const currentImages = currentSection.images || [];
-                            updateSection(currentSection.id, { images: [...currentImages, reader.result as string] });
-                          };
-                          reader.readAsDataURL(f);
+                            updateSection(currentSection.id, { images: [...currentImages, url] });
+                          } catch (err) {
+                            alert("Rasm tanlashda xatolik yuz berdi");
+                          }
                         };
                         file.click();
                       }}
@@ -309,17 +497,18 @@ export default function AdminInfo() {
                       onClick={() => {
                         const file = document.createElement('input');
                         file.type = 'file';
-                        file.onchange = (e: any) => {
+                        file.onchange = async (e: any) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
+                          try {
+                            const url = URL.createObjectURL(f);
                             const currentFiles = currentSection.files || [];
                             updateSection(currentSection.id, { 
-                              files: [...currentFiles, { name: f.name, url: reader.result as string, type: f.type }] 
+                              files: [...currentFiles, { name: f.name, url: url, type: f.type }] 
                             });
-                          };
-                          reader.readAsDataURL(f);
+                          } catch (err) {
+                            alert("Fayl tanlashda xatolik yuz berdi");
+                          }
                         };
                         file.click();
                       }}

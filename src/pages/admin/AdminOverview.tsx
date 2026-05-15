@@ -36,7 +36,7 @@ export default function AdminOverview() {
           const logsSnap = await getDocs(query(collection(db, 'activityLogs'), orderBy('loginTime', 'desc'), limit(5)));
           setLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch(e) {
-          handleFirestoreError(e, OperationType.LIST, 'activityLogs');
+          console.error("Error loading activity logs", e);
         }
         
         setStats({
@@ -49,8 +49,13 @@ export default function AdminOverview() {
           totalBalls: totalActiveBalls,
           spentBalls: totalSpentBalls
         });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'admin-overview-stats');
+      } catch (err: any) {
+        if (err.message && err.message.includes('OperationType')) {
+           // It's already handled/thrown by handleFirestoreError somewhere
+           console.error("Stats loading error:", err);
+        } else {
+           handleFirestoreError(err, OperationType.LIST, 'admin-overview-stats');
+        }
       } finally {
         setLoading(false);
       }
