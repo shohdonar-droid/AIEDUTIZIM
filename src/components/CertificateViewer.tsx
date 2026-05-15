@@ -273,7 +273,7 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                       <div className="flex flex-col items-center gap-3 translate-y-[24px]">
                         <div className="p-3 bg-white border-2 border-[#c5a059]/30 rounded-2xl shadow-xl shadow-[#1e3a8a]/5">
                            <QRCodeSVG
-                              value={`${window.location.origin}/verify/${selectedCert.id}`}
+                              value="aiedutizim.vercel.app saytining ID menyusi orqali sertifikatni haqiqiyligini tekshiring"
                               size={110}
                               level="H"
                               fgColor="#1e3a8a"
