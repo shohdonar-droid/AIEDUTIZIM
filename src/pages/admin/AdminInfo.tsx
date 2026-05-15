@@ -3,7 +3,7 @@ import { db, storage } from '../../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { SiteContent, InfoSection } from '../../types';
-import { Save, Loader2, Image as ImageIcon, Type, FileText, Plus, Trash2, Globe, Layout, Lock, Unlock, FileUp, TextSelection, CheckCircle2 } from 'lucide-react';
+import { Save, Loader2, Image as ImageIcon, Type, FileText, Plus, Trash2, Globe, Layout, Lock, Unlock, FileUp, TextSelection, CheckCircle2, Link as LinkIcon, X } from 'lucide-react';
 
 export default function AdminInfo() {
   const [content, setContent] = useState<SiteContent | null>(null);
@@ -107,56 +107,56 @@ export default function AdminInfo() {
     load();
   }, []);
 
-  const handleHeroUpdate = () => {
+  const handleHeroUpdate = async () => {
     if (!content) return;
-    setSaveStatus('saved');
-    setTimeout(() => setSaveStatus(null), 3000);
+    setSaveStatus('saving');
 
-    (async () => {
-      try {
-        let finalRightImage = content.hero.rightImage || '';
-        if (finalRightImage.startsWith('blob:') || finalRightImage.startsWith('data:')) {
-          setIsUploading(true);
-          const res = await fetch(finalRightImage);
-          const blob = await res.blob();
-          const file = new File([blob], 'hero_image.jpg', { type: blob.type });
-          finalRightImage = await uploadFileToStorage(file, false);
-        }
-
-        await setDoc(doc(db, 'siteContent', 'main'), { 
-          hero: { 
-            rightImage: finalRightImage, 
-            rightText: content.hero.rightText || '', 
-            rightBadge: content.hero.rightBadge || '' 
-          } 
-        }, { merge: true });
-        
-      } catch (err) { 
-        console.error(err); 
-        setIsUploading(false);
+    try {
+      let finalRightImage = content.hero.rightImage || '';
+      if (finalRightImage.startsWith('blob:') || finalRightImage.startsWith('data:')) {
+        setIsUploading(true);
+        const res = await fetch(finalRightImage);
+        const blob = await res.blob();
+        const file = new File([blob], 'hero_image.jpg', { type: blob.type });
+        finalRightImage = await uploadFileToStorage(file, false);
       }
-    })();
+
+      await setDoc(doc(db, 'siteContent', 'main'), { 
+        hero: { 
+          rightImage: finalRightImage, 
+          rightText: content.hero.rightText || '', 
+          rightBadge: content.hero.rightBadge || '' 
+        } 
+      }, { merge: true });
+      
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(null), 3000);
+    } catch (err) { 
+      console.error(err); 
+      setSaveStatus(null);
+      setIsUploading(false);
+      alert("Saqlashda xatolik yuz berdi: " + (err as Error).message);
+    }
   };
 
   const [sectionSaveStatus, setSectionSaveStatus] = useState<null | 'saving' | 'saved'>(null);
+  const [linkPrompt, setLinkPrompt] = useState<{ type: 'image' | 'file', sectionId: string } | null>(null);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkName, setLinkName] = useState('');
 
-  const handleSectionUpdate = () => {
+  const handleSectionUpdate = async () => {
     if (!content) return;
     
-    // Optimistic UI updates
-    setSectionSaveStatus('saved');
-    setTimeout(() => setSectionSaveStatus(null), 3000);
+    setSectionSaveStatus('saving');
 
     const newSections = JSON.parse(JSON.stringify(content.hero.infoSections || [])) as InfoSection[];
     
-    // Background upload & save
-    (async () => {
-      try {
-        setIsUploading(true);
-        setUploadProgress(0);
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
 
-        let totalBlobsToUpload = 0;
-        let uploadedBlobsCount = 0;
+      let totalBlobsToUpload = 0;
+      let uploadedBlobsCount = 0;
         
         for (const sec of newSections) {
           for (const imgUrl of (sec.images || [])) {
@@ -181,21 +181,27 @@ export default function AdminInfo() {
 
         for (const section of newSections) {
           if (section.images) {
-            section.images = await Promise.all(section.images.map(async (img) => {
+            const newImages: string[] = [];
+            for (const img of section.images) {
               if (img.startsWith('blob:') || img.startsWith('data:')) {
-                 return await uploadBlobUrl(img, 'image.jpg');
+                 newImages.push(await uploadBlobUrl(img, 'image.jpg'));
+              } else {
+                 newImages.push(img);
               }
-              return img;
-            }));
+            }
+            section.images = newImages;
           }
           if (section.files) {
-            section.files = await Promise.all(section.files.map(async (f) => {
+            const newFiles = [];
+            for (const f of section.files) {
               if (f.url.startsWith('blob:') || f.url.startsWith('data:')) {
                  const newUrl = await uploadBlobUrl(f.url, f.name);
-                 return { ...f, url: newUrl };
+                 newFiles.push({ ...f, url: newUrl });
+              } else {
+                 newFiles.push(f);
               }
-              return f;
-            }));
+            }
+            section.files = newFiles;
           }
         }
 
@@ -206,12 +212,15 @@ export default function AdminInfo() {
           hero: { infoSections: newSections } 
         }, { merge: true });
         
+        setSectionSaveStatus('saved');
+        setTimeout(() => setSectionSaveStatus(null), 3000);
       } catch (err) { 
         console.error(err); 
         setIsUploading(false);
         setUploadProgress(0);
+        setSectionSaveStatus(null);
+        alert("Xatolik: " + (err as Error).message);
       }
-    })();
   };
 
   const addSection = () => {
@@ -242,6 +251,71 @@ export default function AdminInfo() {
 
   return (
     <div className="space-y-10 pb-20">
+      
+        {linkPrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-black text-gray-900">
+                  {linkPrompt.type === 'image' ? 'Rasm linkini kiritish' : 'Fayl linkini kiritish'}
+                </h3>
+                <button onClick={() => { setLinkPrompt(null); setLinkUrl(''); setLinkName(''); }} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                {linkPrompt.type === 'file' && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Fayl nomi (ixtiyoriy)</label>
+                    <input 
+                      type="text" 
+                      value={linkName} 
+                      onChange={e => setLinkName(e.target.value)} 
+                      placeholder="Masalan: document.pdf" 
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-600 font-medium"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">URL qadar (Link)</label>
+                  <input 
+                    type="url" 
+                    value={linkUrl} 
+                    onChange={e => setLinkUrl(e.target.value)} 
+                    placeholder="https://" 
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-600 font-medium"
+                  />
+                </div>
+                <button 
+                  onClick={() => {
+                    if (linkUrl.trim()) {
+                      if (linkPrompt.type === 'image') {
+                        const currentImages = content?.hero.infoSections?.find(s => s.id === linkPrompt.sectionId)?.images || [];
+                        updateSection(linkPrompt.sectionId, { images: [...currentImages, linkUrl.trim()] });
+                      } else {
+                        const currentFiles = content?.hero.infoSections?.find(s => s.id === linkPrompt.sectionId)?.files || [];
+                        let fName = linkName.trim();
+                        if (!fName) {
+                          fName = linkUrl.split('/').pop()?.split('?')[0] || 'Link file';
+                        }
+                        updateSection(linkPrompt.sectionId, { 
+                          files: [...currentFiles, { name: fName, url: linkUrl.trim(), type: 'link' }] 
+                        });
+                      }
+                      setLinkPrompt(null);
+                      setLinkUrl('');
+                      setLinkName('');
+                    }
+                  }}
+                  className="w-full mt-4 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition"
+                >
+                  QO'SHISH
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       <header className="flex justify-between items-center">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">Info tahrirlash</h1>
@@ -433,9 +507,15 @@ export default function AdminInfo() {
                      }}
                      className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-black hover:bg-green-600 hover:text-white transition-all shadow-sm"
                    >
-                     <Plus className="w-3.5 h-3.5" /> RASM QO'SHISH
+                     <Plus className="w-3.5 h-3.5" /> RASM YUKLASH
                    </button>
-                   <span className="text-[10px] text-gray-400 font-bold italic">Rasm va fayllarni pastdan boshqaring.</span>
+                   <button 
+                     onClick={() => setLinkPrompt({ type: 'image', sectionId: currentSection.id })}
+                     className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-black hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                   >
+                     <LinkIcon className="w-3.5 h-3.5" /> LINK ORQALI QO'SHISH
+                   </button>
+                   <span className="text-[10px] text-gray-400 font-bold italic ml-auto">Rasm va fayllarni pastdan boshqaring.</span>
                  </div>
                </div>
 
@@ -493,29 +573,39 @@ export default function AdminInfo() {
                        <FileUp className="w-4 h-4 text-blue-600" />
                        Hujjatlar
                     </h4>
-                    <button 
-                      onClick={() => {
-                        const file = document.createElement('input');
-                        file.type = 'file';
-                        file.onchange = async (e: any) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          try {
-                            const url = URL.createObjectURL(f);
-                            const currentFiles = currentSection.files || [];
-                            updateSection(currentSection.id, { 
-                              files: [...currentFiles, { name: f.name, url: url, type: f.type }] 
-                            });
-                          } catch (err) {
-                            alert("Fayl tanlashda xatolik yuz berdi");
-                          }
-                        };
-                        file.click();
-                      }}
-                      className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
+                    <div className="flex gap-2">
+                       <button 
+                         onClick={() => setLinkPrompt({ type: 'file', sectionId: currentSection.id })}
+                         className="p-2 bg-gray-100 text-blue-600 rounded-lg hover:bg-gray-200 transition"
+                         title="Link orqali qo'shish"
+                       >
+                         <LinkIcon className="w-4 h-4" />
+                       </button>
+                       <button 
+                         onClick={() => {
+                           const file = document.createElement('input');
+                           file.type = 'file';
+                           file.onchange = async (e: any) => {
+                             const f = e.target.files?.[0];
+                             if (!f) return;
+                             try {
+                               const url = URL.createObjectURL(f);
+                               const currentFiles = currentSection.files || [];
+                               updateSection(currentSection.id, { 
+                                 files: [...currentFiles, { name: f.name, url: url, type: f.type }] 
+                               });
+                             } catch (err) {
+                               alert("Fayl tanlashda xatolik yuz berdi");
+                             }
+                           };
+                           file.click();
+                         }}
+                         className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                         title="Fayl yuklash"
+                       >
+                         <Plus className="w-4 h-4" />
+                       </button>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
@@ -527,7 +617,7 @@ export default function AdminInfo() {
                            </div>
                            <div className="flex-1 overflow-hidden">
                              <p className="text-sm font-bold text-gray-900 truncate">{file.name}</p>
-                             <p className="text-[10px] font-black text-gray-400 uppercase">{file.type.split('/')[1] || 'PDF'}</p>
+                             <p className="text-[10px] font-black text-gray-400 uppercase">{file.type === 'link' ? 'LINK' : (file.type.split('/')[1] || 'Fayl')}</p>
                            </div>
                         </div>
                         <button 
