@@ -94,9 +94,9 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
     if (!certRef.current) return;
     setDownloading(true);
     try {
-      const dataUrl = await htmlToImage.toPng(certRef.current, {
-        quality: 1.0,
-        pixelRatio: 2,
+      const dataUrl = await htmlToImage.toJpeg(certRef.current, {
+        quality: 0.8,
+        pixelRatio: 1.5,
         backgroundColor: '#ffffff',
         style: {
           transform: 'none',
@@ -111,8 +111,8 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
       });
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (794 * pdfWidth) / 1123;
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Sertifikat_${selectedCert.studentName?.replace(/ /g, '_')}.pdf`);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Sertifikat_${selectedCert.studentName?.replace(/ /g, '_') || 'Hujjat'}.pdf`);
     } catch (err) {
       console.error("Export error:", err);
       alert("Xatolik yuz berdi.");
