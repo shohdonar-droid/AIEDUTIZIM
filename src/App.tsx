@@ -19,6 +19,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import CourseView from './pages/CourseView';
 import InfoDetail from './pages/InfoDetail';
 import VerifyCertificate from './pages/VerifyCertificate';
+import SearchCertificate from './pages/SearchCertificate';
 import { Loader2 } from 'lucide-react';
 
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
@@ -62,6 +63,7 @@ export default function App() {
               <Route path="/tests" element={<Tests />} />
               <Route path="/quizizz" element={<Quizizz />} />
               <Route path="/verify/:id" element={<VerifyCertificate />} />
+              <Route path="/search-cert" element={<SearchCertificate />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
