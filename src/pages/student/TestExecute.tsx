@@ -90,6 +90,11 @@ export default function TestExecute() {
             t.questions = allQuestions;
           }
 
+          if (t.randomQuestionCount && t.questions && t.questions.length > t.randomQuestionCount) {
+            const shuffled = [...t.questions].sort(() => 0.5 - Math.random());
+            t.questions = shuffled.slice(0, t.randomQuestionCount);
+          }
+
           setTest(t);
         }
       } catch (err) {

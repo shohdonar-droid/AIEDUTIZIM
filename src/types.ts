@@ -118,6 +118,7 @@ export interface Test {
   departmentIds?: string[];
   groupIds?: string[];
   maxAttempts?: number;
+  randomQuestionCount?: number;
   createdAt?: any;
 }
 

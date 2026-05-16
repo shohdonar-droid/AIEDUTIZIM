@@ -135,8 +135,9 @@ export default function AdminInfo() {
     } catch (err) { 
       console.error(err); 
       setSaveStatus(null);
-      setIsUploading(false);
       alert("Saqlashda xatolik yuz berdi: " + (err as Error).message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -153,11 +154,8 @@ export default function AdminInfo() {
     const newSections = JSON.parse(JSON.stringify(content.hero.infoSections || [])) as InfoSection[];
     
     try {
-      setIsUploading(true);
-      setUploadProgress(0);
-
-      let totalBlobsToUpload = 0;
-      let uploadedBlobsCount = 0;
+        let totalBlobsToUpload = 0;
+        let uploadedBlobsCount = 0;
         
         for (const sec of newSections) {
           for (const imgUrl of (sec.images || [])) {
@@ -168,59 +166,67 @@ export default function AdminInfo() {
           }
         }
 
-        const uploadBlobUrl = async (blobUrl: string, originalName: string = 'image.jpg') => {
-          const res = await fetch(blobUrl);
-          const blob = await res.blob();
-          const file = new File([blob], originalName, { type: blob.type });
-          const realUrl = await uploadFileToStorage(file, totalBlobsToUpload > 1);
-          uploadedBlobsCount++;
-          if (totalBlobsToUpload > 1) {
-            setUploadProgress(Math.round((uploadedBlobsCount / totalBlobsToUpload) * 100));
-          }
-          return realUrl;
-        };
+        if (totalBlobsToUpload > 0) {
+          setIsUploading(true);
+          setUploadProgress(0);
 
-        for (const section of newSections) {
-          if (section.images) {
-            const newImages: string[] = [];
-            for (const img of section.images) {
-              if (img.startsWith('blob:') || img.startsWith('data:')) {
-                 newImages.push(await uploadBlobUrl(img, 'image.jpg'));
-              } else {
-                 newImages.push(img);
-              }
+          const uploadBlobUrl = async (blobUrl: string, originalName: string = 'image.jpg') => {
+            const res = await fetch(blobUrl);
+            const blob = await res.blob();
+            const file = new File([blob], originalName, { type: blob.type });
+            const realUrl = await uploadFileToStorage(file, totalBlobsToUpload > 1);
+            uploadedBlobsCount++;
+            if (totalBlobsToUpload > 1) {
+              setUploadProgress(Math.round((uploadedBlobsCount / totalBlobsToUpload) * 100));
             }
-            section.images = newImages;
-          }
-          if (section.files) {
-            const newFiles = [];
-            for (const f of section.files) {
-              if (f.url.startsWith('blob:') || f.url.startsWith('data:')) {
-                 const newUrl = await uploadBlobUrl(f.url, f.name);
-                 newFiles.push({ ...f, url: newUrl });
-              } else {
-                 newFiles.push(f);
+            return realUrl;
+          };
+
+          for (const section of newSections) {
+            if (section.images) {
+              const newImages: string[] = [];
+              for (const img of section.images) {
+                if (img.startsWith('blob:') || img.startsWith('data:')) {
+                   newImages.push(await uploadBlobUrl(img, 'image.jpg'));
+                } else {
+                   newImages.push(img);
+                }
               }
+              section.images = newImages;
             }
-            section.files = newFiles;
+            if (section.files) {
+              const newFiles = [];
+              for (const f of section.files) {
+                if (f.url.startsWith('blob:') || f.url.startsWith('data:')) {
+                   const newUrl = await uploadBlobUrl(f.url, f.name);
+                   newFiles.push({ ...f, url: newUrl });
+                } else {
+                   newFiles.push(f);
+                }
+              }
+              section.files = newFiles;
+            }
           }
         }
-
-        setIsUploading(false);
-        setUploadProgress(0);
 
         await setDoc(doc(db, 'siteContent', 'main'), { 
           hero: { infoSections: newSections } 
         }, { merge: true });
         
+        setContent(prev => {
+          if (!prev) return prev;
+          return { ...prev, hero: { ...prev.hero, infoSections: newSections } }
+        });
+
         setSectionSaveStatus('saved');
         setTimeout(() => setSectionSaveStatus(null), 3000);
       } catch (err) { 
         console.error(err); 
-        setIsUploading(false);
-        setUploadProgress(0);
         setSectionSaveStatus(null);
         alert("Xatolik: " + (err as Error).message);
+      } finally {
+        setIsUploading(false);
+        setUploadProgress(0);
       }
   };
 
@@ -349,15 +355,21 @@ export default function AdminInfo() {
                 type="file"
                 accept="image/*"
                 className="w-full px-5 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-600 font-medium file:cursor-pointer file:bg-blue-600 file:text-white file:border-0 file:py-2 file:px-4 file:rounded-xl file:mr-4 file:font-semibold"
-                onChange={async (e) => {
+                onChange={(e) => {
                   const file = e.target.files?.[0];
                   if(!file) return;
-                  try {
-                    const url = URL.createObjectURL(file);
-                    setContent({ ...content, hero: { ...content.hero, rightImage: url } });
-                  } catch (err) {
-                    alert("Rasm yuklashda xatolik yuz berdi");
-                  }
+                  const tempUrl = URL.createObjectURL(file);
+                  setContent({ ...content, hero: { ...content.hero, rightImage: tempUrl } });
+                  
+                  uploadFileToStorage(file, true).then(url => {
+                     setContent(prev => {
+                        if (!prev) return prev;
+                        if (prev.hero.rightImage === tempUrl) {
+                           return { ...prev, hero: { ...prev.hero, rightImage: url } };
+                        }
+                        return prev;
+                     });
+                  }).catch(() => {});
                 }}
               />
             </div>
@@ -494,16 +506,26 @@ export default function AdminInfo() {
                         const file = document.createElement('input');
                         file.type = 'file';
                         file.accept = 'image/*';
-                        file.onchange = async (e: any) => {
+                        file.onchange = (e: any) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          try {
-                            const url = URL.createObjectURL(f);
-                            const currentImages = currentSection.images || [];
-                            updateSection(currentSection.id, { images: [...currentImages, url] });
-                          } catch (err) {
-                            alert("Rasm tanlashda xatolik yuz berdi");
-                          }
+                          
+                          const tempUrl = URL.createObjectURL(f);
+                          const currentImages = currentSection.images || [];
+                          updateSection(currentSection.id, { images: [...currentImages, tempUrl] });
+
+                          uploadFileToStorage(f, true).then(url => {
+                             setContent(prev => {
+                                if (!prev) return prev;
+                                const newSections = prev.hero.infoSections?.map(s => {
+                                   if (s.id === currentSection.id) {
+                                      return { ...s, images: s.images?.map(img => img === tempUrl ? url : img) };
+                                   }
+                                   return s;
+                                });
+                                return { ...prev, hero: { ...prev.hero, infoSections: newSections } };
+                             });
+                          }).catch(() => {});
                         };
                         file.click();
                      }}
@@ -545,16 +567,26 @@ export default function AdminInfo() {
                         const file = document.createElement('input');
                         file.type = 'file';
                         file.accept = 'image/*';
-                        file.onchange = async (e: any) => {
+                        file.onchange = (e: any) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          try {
-                            const url = URL.createObjectURL(f);
-                            const currentImages = currentSection.images || [];
-                            updateSection(currentSection.id, { images: [...currentImages, url] });
-                          } catch (err) {
-                            alert("Rasm tanlashda xatolik yuz berdi");
-                          }
+                          
+                          const tempUrl = URL.createObjectURL(f);
+                          const currentImages = currentSection.images || [];
+                          updateSection(currentSection.id, { images: [...currentImages, tempUrl] });
+
+                          uploadFileToStorage(f, true).then(url => {
+                             setContent(prev => {
+                                if (!prev) return prev;
+                                const newSections = prev.hero.infoSections?.map(s => {
+                                   if (s.id === currentSection.id) {
+                                      return { ...s, images: s.images?.map(img => img === tempUrl ? url : img) };
+                                   }
+                                   return s;
+                                });
+                                return { ...prev, hero: { ...prev.hero, infoSections: newSections } };
+                             });
+                          }).catch(() => {});
                         };
                         file.click();
                       }}
@@ -587,18 +619,28 @@ export default function AdminInfo() {
                          onClick={() => {
                            const file = document.createElement('input');
                            file.type = 'file';
-                           file.onchange = async (e: any) => {
+                           file.onchange = (e: any) => {
                              const f = e.target.files?.[0];
                              if (!f) return;
-                             try {
-                               const url = URL.createObjectURL(f);
-                               const currentFiles = currentSection.files || [];
-                               updateSection(currentSection.id, { 
-                                 files: [...currentFiles, { name: f.name, url: url, type: f.type }] 
-                               });
-                             } catch (err) {
-                               alert("Fayl tanlashda xatolik yuz berdi");
-                             }
+                             
+                             const tempUrl = URL.createObjectURL(f);
+                             const currentFiles = currentSection.files || [];
+                             updateSection(currentSection.id, { 
+                               files: [...currentFiles, { name: f.name, url: tempUrl, type: f.type }] 
+                             });
+
+                             uploadFileToStorage(f, true).then(url => {
+                                setContent(prev => {
+                                   if (!prev) return prev;
+                                   const newSections = prev.hero.infoSections?.map(s => {
+                                      if (s.id === currentSection.id) {
+                                         return { ...s, files: s.files?.map(file => file.url === tempUrl ? { ...file, url } : file) };
+                                      }
+                                      return s;
+                                   });
+                                   return { ...prev, hero: { ...prev.hero, infoSections: newSections } };
+                                });
+                             }).catch(() => {});
                            };
                            file.click();
                          }}

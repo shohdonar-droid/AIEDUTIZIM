@@ -26,6 +26,7 @@ export default function TeacherTests() {
   const [context, setContext] = useState('');
   const [testCount, setTestCount] = useState(10);
   const [maxAttempts, setMaxAttempts] = useState(1);
+  const [randomQuestionCount, setRandomQuestionCount] = useState<number | null>(null);
   const [generatedQuestions, setGeneratedQuestions] = useState<Question[]>([]);
   const [aiMode, setAiMode] = useState<'ai'|'manual'>('ai');
 
@@ -101,7 +102,8 @@ nato'g'ri_variant`;
     rules: [
       { subject: '', context: '', count: 10 }
     ],
-    questions: [] as Question[]
+    questions: [] as Question[],
+    randomQuestionCount: null as number | null
   });
 
   const parseExamManualText = () => {
@@ -220,6 +222,7 @@ nato'g'ri_variant`;
         departmentIds: testDepartmentIds,
         groupIds: testGroupIds,
         maxAttempts: maxAttempts,
+        randomQuestionCount: randomQuestionCount || generatedQuestions.length,
         creatorId: user.uid,
         teacherId: user.role === 'staff' ? user.teacherId : user.uid,
         creatorRole: user.role,
@@ -282,10 +285,15 @@ nato'g'ri_variant`;
     }
   };
 
-  const updateTestMetadata = async (id: string, newTitle: string, dIds: string[], gIds: string[]) => {
+  const updateTestMetadata = async (id: string, newTitle: string, dIds: string[], gIds: string[], randCount: number | null) => {
     if (!user) return;
     try {
-      await setDoc(doc(db, 'tests', id), { title: newTitle, departmentIds: dIds || [], groupIds: gIds || [] }, { merge: true });
+      await setDoc(doc(db, 'tests', id), { 
+        title: newTitle, 
+        departmentIds: dIds || [], 
+        groupIds: gIds || [],
+        randomQuestionCount: randCount
+      }, { merge: true });
       await loadTests(user.uid);
       setEditingTest(null);
     } catch (err) { console.error(err); }
@@ -326,6 +334,7 @@ nato'g'ri_variant`;
         departmentIds: testDepartmentIds,
         groupIds: testGroupIds,
         maxAttempts: examMaxAttempts,
+        randomQuestionCount: examData.randomQuestionCount || (examAiMode === 'manual' ? examData.questions.length : null),
         creatorId: user.uid,
         teacherId: user.role === 'staff' ? user.teacherId : user.uid,
         creatorRole: user.role,
@@ -336,7 +345,8 @@ nato'g'ri_variant`;
       setExamData({
         title: '', startTime: '', endTime: '',
         rules: [{ subject: '', context: '', count: 10 }],
-        questions: [] as Question[]
+        questions: [] as Question[],
+        randomQuestionCount: null
       });
       setExamManualText('');
     } catch (err) { console.error(err); }
@@ -367,11 +377,22 @@ nato'g'ri_variant`;
                       onChange={e => setEditingTest({ ...editingTest, title: e.target.value })}
                       className="px-3 py-1 font-bold rounded-lg border-gray-300 w-full"
                     />
-                    <button onClick={() => updateTestMetadata(test.id, editingTest.title, editingTest.departmentIds, editingTest.groupIds)} className="bg-blue-600 text-white p-2 rounded-lg"><Save className="w-4 h-4" /></button>
+                    <button onClick={() => updateTestMetadata(test.id, editingTest.title, editingTest.departmentIds, editingTest.groupIds, editingTest.randomQuestionCount)} className="bg-blue-600 text-white p-2 rounded-lg"><Save className="w-4 h-4" /></button>
                     <button onClick={() => setEditingTest(null)} className="bg-gray-200 text-gray-600 p-2 rounded-lg"><X className="w-4 h-4" /></button>
                   </div>
                   
                   <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase">Tasodifiy savollar soni</label>
+                        <input 
+                           type="number" 
+                           value={editingTest.randomQuestionCount || ''}
+                           onChange={e => setEditingTest({ ...editingTest, randomQuestionCount: e.target.value ? parseInt(e.target.value) : null })}
+                           className="px-3 py-1 font-bold rounded-lg border-gray-300 w-full"
+                         />
+                      </div>
+                    </div>
                     <MultiSelectDropdown
                       label="Yo'nalishlar"
                       options={departments}
@@ -404,7 +425,13 @@ nato'g'ri_variant`;
                 <h4 className="text-lg font-bold text-gray-900 flex flex-wrap items-center gap-2 mb-2">
                   <span className="text-sm font-black text-gray-400 bg-gray-200 px-2 py-0.5 rounded-md">{index + 1}</span>
                   {test.title}
-                  <button onClick={() => setEditingTest({ id: test.id, title: test.title, departmentIds: test.departmentIds || [], groupIds: test.groupIds || [] })} className="text-gray-400 hover:text-blue-600"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => setEditingTest({ 
+                    id: test.id, 
+                    title: test.title, 
+                    departmentIds: test.departmentIds || [], 
+                    groupIds: test.groupIds || [],
+                    randomQuestionCount: test.randomQuestionCount || null
+                  })} className="text-gray-400 hover:text-blue-600"><Edit className="w-4 h-4" /></button>
                   <button onClick={() => setShowFullEditor({ ...test })} className="text-gray-400 hover:text-green-600 ml-2" title="Savollarni tahrirlash"><FileText className="w-4 h-4" /></button>
                   {test.isPublished ? (
                     <span className="ml-2 text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded-md">Saytda</span>
@@ -416,6 +443,7 @@ nato'g'ri_variant`;
               <p className="text-sm text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                 Tur: {test.type === 'topic' ? 'Mavzuli Test' : 'Imtihon'} 
                 {test.questions?.length ? ` • Savollar: ${test.questions.length} ta` : ''}
+                {test.randomQuestionCount && ` • Tasodifiy: ${test.randomQuestionCount} ta`}
                 {test.createdAt && test.createdAt.seconds && (
                   <span> • Sana: {new Date(test.createdAt.seconds * 1000).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                 )}
@@ -470,6 +498,17 @@ nato'g'ri_variant`;
                      className="w-full px-5 py-4 rounded-xl border-none font-bold shadow-sm focus:ring-2 focus:ring-blue-600"
                      value={showFullEditor.title}
                      onChange={e => setShowFullEditor({ ...showFullEditor, title: e.target.value })}
+                   />
+                 </div>
+
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Tasodifiy savollar soni</label>
+                   <input 
+                     type="number"
+                     className="w-full px-5 py-4 rounded-xl border-none font-bold shadow-sm focus:ring-2 focus:ring-blue-600"
+                     value={showFullEditor.randomQuestionCount || ''}
+                     onChange={e => setShowFullEditor({ ...showFullEditor, randomQuestionCount: e.target.value ? parseInt(e.target.value) : null })}
+                     placeholder="Barcha savollarni ko'rsatish"
                    />
                  </div>
 
@@ -638,30 +677,41 @@ nato'g'ri_variant`;
               </button>
             </div>
 
-            <div className="space-y-6">
-              <div className="flex gap-4">
-                <div className="flex-1 space-y-4">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Test (Mavzu) nomi</label>
-                  <input
-                    type="text"
-                    placeholder="Masalan: Python malumot turlari..."
-                    className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-purple-600 font-bold"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                  />
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-4">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Test (Mavzu) nomi</label>
+                    <input
+                      type="text"
+                      placeholder="Masalan: Python malumot turlari..."
+                      className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-purple-600 font-bold"
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Jami savollar</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="500"
+                      className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-purple-600 font-bold"
+                      value={testCount}
+                      onChange={(e) => setTestCount(parseInt(e.target.value) || 10)}
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Tasodifiy savollar</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Masalan: 10"
+                      className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-purple-600 font-bold"
+                      value={randomQuestionCount || ''}
+                      onChange={(e) => setRandomQuestionCount(e.target.value ? parseInt(e.target.value) : null)}
+                    />
+                  </div>
                 </div>
-                <div className="w-1/3 space-y-4">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Test soni</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-purple-600 font-bold"
-                    value={testCount}
-                    onChange={(e) => setTestCount(parseInt(e.target.value) || 10)}
-                  />
-                </div>
-              </div>
 
               <div className="flex flex-col gap-4">
                 <div className="flex gap-4">
@@ -929,6 +979,19 @@ nato'g'ri_variant`;
                     value={examMaxAttempts}
                     onChange={(e) => setExamMaxAttempts(parseInt(e.target.value) || 1)}
                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                     <Sparkles className="h-3 w-3" /> Tasodifiy savollar
+                   </label>
+                   <input
+                     type="number"
+                     min="1"
+                     className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 text-gray-900 font-bold focus:ring-2 focus:ring-blue-600"
+                     value={examData.randomQuestionCount || ''}
+                     onChange={(e) => setExamData({ ...examData, randomQuestionCount: e.target.value ? parseInt(e.target.value) : null })}
+                     placeholder="Barchasi"
+                   />
                 </div>
               </div>
             </div>
