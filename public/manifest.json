@@ -1,19 +1,19 @@
 {
   "name": "AIEDUTIZIM",
   "short_name": "AIEDUTIZIM",
-  "description": "Sun'iy intellekt asosidagi zamonaviy ta'lim tizimi.",
+  "description": "Ta'lim va Sun'iy intellekt uyg'unligidagi zamonaviy o'quv platformasi.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/4601/4601560.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/10061/10061730.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/4601/4601560.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/10061/10061730.png",
       "sizes": "512x512",
       "type": "image/png"
     }
