@@ -140,10 +140,37 @@ export default function CourseView() {
                     return `YAU-${String(nextCount).padStart(5, '0')}`;
                 });
                 updateData.certificateId = newCertId;
+
+                // Save to permanent certificates collection
+                const certData = {
+                  userId: user?.uid,
+                  studentName: user?.displayName || 'Talaba',
+                  entityId: course.id,
+                  entityTitle: course.title,
+                  entityType: 'course',
+                  score: score,
+                  issuedAt: serverTimestamp(),
+                  certificateId: newCertId
+                };
+                await setDoc(doc(db, 'certificates', newCertId), certData);
              } catch (err) {
                 console.error("Sertifikat raqamini yaratishda xato, yuz berdi", err);
                 const fallbackStr = enrollment.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase();
-                updateData.certificateId = `YAU-${fallbackStr}`;
+                const fallbackCertId = `YAU-${fallbackStr}`;
+                updateData.certificateId = fallbackCertId;
+
+                // Save to permanent certificates collection with fallback
+                const certData = {
+                  userId: user?.uid,
+                  studentName: user?.displayName || 'Talaba',
+                  entityId: course.id,
+                  entityTitle: course.title,
+                  entityType: 'course',
+                  score: score,
+                  issuedAt: serverTimestamp(),
+                  certificateId: fallbackCertId
+                };
+                await setDoc(doc(db, 'certificates', fallbackCertId), certData);
              }
          }
       }

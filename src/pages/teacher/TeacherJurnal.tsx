@@ -328,66 +328,60 @@ export default function TeacherJurnal() {
           "O'rtacha (%)": d?.progress + "%",
         };
       });
-    } else if (type === "test") {
-      filename = "Test_Jurnali.xlsx";
-      exportData = displayedTestStudents.map((student, i) => {
-        const r = filterTestId
-          ? testResults.find(
-              (x) =>
-                x.userId === student.uid &&
-                x.testId === filterTestId &&
-                x.testType !== "exam",
-            )
-          : testResults.find(
-              (x) => x.userId === student.uid && x.testType !== "exam",
-            );
-        const pct = r ? Math.round((r.score / r.totalQuestions) * 100) : 0;
+    } else if (type === "test" || type === "exam") {
+      const isExam = type === "exam";
+      filename = isExam ? "Imtihon_Jurnali.xlsx" : "Test_Jurnali.xlsx";
+
+      const filteredResults = testResults
+        .filter((r) => {
+          const student = studentProfiles[r.userId];
+          if (!student) return false;
+
+          const matchSearch =
+            !searchTerm ||
+            student.displayName
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase());
+          const matchDept = !filterDept || student.departmentId === filterDept;
+          const matchGrp = !filterGrp || student.groupId === filterGrp;
+          const matchTest = !filterTestId || r.testId === filterTestId;
+          const matchType = isExam
+            ? r.testType === "exam"
+            : r.testType !== "exam";
+
+          return matchSearch && matchDept && matchGrp && matchTest && matchType;
+        })
+        .sort((a, b) => {
+          const studentA = studentProfiles[a.userId];
+          const studentB = studentProfiles[b.userId];
+          return (studentA?.displayName || "").localeCompare(
+            studentB?.displayName || "",
+          );
+        });
+
+      exportData = filteredResults.map((r, i) => {
+        const student = studentProfiles[r.userId];
+        const deptName =
+          teacherDepts.find((x) => x.id === student?.departmentId)?.name || "-";
+        const grpName =
+          teacherGroups.find((x) => x.id === student?.groupId)?.name || "-";
+        const pct = r.score;
+        const correctCount =
+          r.correctAnswers !== undefined
+            ? r.correctAnswers
+            : Math.round((r.score / 100) * r.totalQuestions);
+
         return {
           "№": i + 1,
-          "F.I.SH": student.displayName,
-          "Yo'nalish":
-            teacherDepts.find((x) => x.id === student.departmentId)?.name ||
-            "-",
-          Guruh:
-            teacherGroups.find((x) => x.id === student.groupId)?.name || "-",
-          Test: r?.testTitle || "-",
-          "To'g'ri": r?.score || 0,
-          Jami: r?.totalQuestions || 0,
+          FISH: student?.displayName || r.userName || "-",
+          "Yo'nalish": deptName,
+          Guruh: grpName,
+          "Test nomi": r.testTitle || "-",
+          "To'g'ri ishlangan testlar soni": correctCount,
+          "Jami test soni": r.totalQuestions || 0,
           "Foiz (%)": pct + "%",
-          Baho: r ? getResultGrade(pct) : "-",
-          Sana: r?.createdAt?.toDate
-            ? r.createdAt.toDate().toLocaleString()
-            : "-",
-        };
-      });
-    } else if (type === "exam") {
-      filename = "Imtihon_Jurnali.xlsx";
-      exportData = displayedTestStudents.map((student, i) => {
-        const r = filterTestId
-          ? testResults.find(
-              (x) =>
-                x.userId === student.uid &&
-                x.testId === filterTestId &&
-                x.testType === "exam",
-            )
-          : testResults.find(
-              (x) => x.userId === student.uid && x.testType === "exam",
-            );
-        const pct = r ? Math.round((r.score / r.totalQuestions) * 100) : 0;
-        return {
-          "№": i + 1,
-          "F.I.SH": student.displayName,
-          "Yo'nalish":
-            teacherDepts.find((x) => x.id === student.departmentId)?.name ||
-            "-",
-          Guruh:
-            teacherGroups.find((x) => x.id === student.groupId)?.name || "-",
-          Imtihon: r?.testTitle || "-",
-          "Foiz (%)": pct + "%",
-          Baho: r ? getResultGrade(pct) : "-",
-          Sana: r?.createdAt?.toDate
-            ? r.createdAt.toDate().toLocaleString()
-            : "-",
+          Baho: getResultGrade(pct),
+          Sana: r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString("uz-UZ") : "-",
         };
       });
     }

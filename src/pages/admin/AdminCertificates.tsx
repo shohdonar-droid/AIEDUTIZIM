@@ -37,26 +37,37 @@ export default function AdminCertificates() {
   const [type, setType] = useState<'certificate' | 'contract'>('certificate');
 
   const [showSubjectTemplateModal, setShowSubjectTemplateModal] = useState(false);
+  const [showRewardTemplateModal, setShowRewardTemplateModal] = useState(false);
   const [subjectTemplate, setSubjectTemplate] = useState<CertTemplate>({
     title: 'SERTIFIKAT',
     completionText: "Mavzuni a'lo darajada o'zlashtirgani uchun",
     coursePrefix: 'Ushbu sertifikat',
     courseSuffix: 'mavzusidan muvaffaqiyatli o\'tganligini tasdiqlaydi.'
   });
+  const [rewardTemplate, setRewardTemplate] = useState<CertTemplate>({
+    title: 'TIZIMNING FAOL FOYDALANUVCHISI',
+    completionText: "MAXSUS MUKOFOT",
+    coursePrefix: 'ushbu sertifikat platformadan faol qatnashib kelayotganligi uchun beriladi.',
+    courseSuffix: ''
+  });
 
   useEffect(() => {
     async function load() {
       try {
         // Load templates
-        const [tDoc, stDoc] = await Promise.all([
+        const [tDoc, stDoc, rtDoc] = await Promise.all([
            getDoc(doc(db, 'settings', 'certificate_template')),
-           getDoc(doc(db, 'settings', 'certificate_subject_template'))
+           getDoc(doc(db, 'settings', 'certificate_subject_template')),
+           getDoc(doc(db, 'settings', 'certificate_reward_template'))
         ]);
         if (tDoc.exists()) {
           setTemplate(tDoc.data() as CertTemplate);
         }
         if (stDoc.exists()) {
           setSubjectTemplate(stDoc.data() as CertTemplate);
+        }
+        if (rtDoc.exists()) {
+           setRewardTemplate(rtDoc.data() as CertTemplate);
         }
 
         // Load courses map
@@ -125,6 +136,20 @@ export default function AdminCertificates() {
     }
   };
 
+  const saveRewardTemplate = async () => {
+    setSavingTemplate(true);
+    try {
+      await setDoc(doc(db, 'settings', 'certificate_reward_template'), rewardTemplate);
+      setShowRewardTemplateModal(false);
+      alert("Rag'batlantirish sertifikat matnlari saqlandi!");
+    } catch (err) {
+      console.error(err);
+      alert("Xatolik yuz berdi");
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   const createDoc = async () => {
     if (!selectedStudent) return;
     setLoading(true);
@@ -169,6 +194,18 @@ export default function AdminCertificates() {
            console.error(err);
         }
 
+        const newCertData = {
+           userId: student.uid,
+           studentName: student.displayName || 'Talaba',
+           entityId: 'reward',
+           entityTitle: 'FAOL FOYDALANUVCHI',
+           entityType: 'reward',
+           score: 100,
+           issuedAt: serverTimestamp(),
+           certificateId: certId
+        };
+        await setDoc(doc(db, 'certificates', certId), newCertData);
+
         const newCertRef = await addDoc(collection(db, 'enrollments'), {
            userId: student.uid,
            courseId: 'reward',
@@ -185,7 +222,8 @@ export default function AdminCertificates() {
            courseId: 'reward',
            completed: true,
            score: 100,
-           certificateId: certId
+           certificateId: certId,
+           entityTitle: 'FAOL FOYDALANUVCHI'
         };
         
         setCerts(prev => {
@@ -241,6 +279,13 @@ export default function AdminCertificates() {
           <p className="text-gray-500 mt-2 text-lg">Sertifikatlar va talabalar bilan shartnomalar boshqaruvi.</p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => setShowRewardTemplateModal(true)}
+            className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-100 text-gray-900 rounded-2xl font-black shadow-lg hover:bg-gray-50 transition-all border-2 border-gray-100"
+          >
+            <Settings className="h-5 w-5 text-gray-400" />
+            R-TAHRIRLASH
+          </button>
           <button
             onClick={() => setShowSubjectTemplateModal(true)}
             className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-100 text-gray-900 rounded-2xl font-black shadow-lg hover:bg-gray-50 transition-all border-2 border-gray-100"
@@ -401,6 +446,70 @@ export default function AdminCertificates() {
 
               <button
                 onClick={saveSubjectTemplate}
+                disabled={savingTemplate}
+                className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 transition-all font-serif"
+              >
+                {savingTemplate ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                SAQLASH VA QO'LLASH
+              </button>
+           </motion.div>
+        </div>
+      )}
+
+      {/* Reward Template Editor Modal */}
+      {showRewardTemplateModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="bg-white rounded-[40px] p-10 max-w-2xl w-full shadow-2xl space-y-8"
+           >
+              <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                <div className="flex items-center gap-3">
+                   <Settings className="h-6 w-6 text-blue-600" />
+                   <h3 className="text-2xl font-black text-gray-900 uppercase">Rag'batlantirish Sertifikati Matni</h3>
+                </div>
+                <button onClick={() => setShowRewardTemplateModal(false)} className="p-2 text-gray-400 hover:text-red-500">
+                   <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-2 col-span-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Sertifikat Sarlavhasi</label>
+                    <input 
+                      type="text" 
+                      value={rewardTemplate.title}
+                      onChange={e => setRewardTemplate({...rewardTemplate, title: e.target.value})}
+                      className="w-full px-5 py-4 bg-gray-50 rounded-2xl font-bold border-none focus:ring-2 focus:ring-blue-100"
+                    />
+                 </div>
+                 <div className="space-y-2 col-span-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Mukofot turi (tag sarlavha)</label>
+                    <input 
+                      type="text" 
+                      value={rewardTemplate.completionText}
+                      onChange={e => setRewardTemplate({...rewardTemplate, completionText: e.target.value})}
+                      className="w-full px-5 py-4 bg-gray-50 rounded-2xl font-bold border-none focus:ring-2 focus:ring-blue-100"
+                    />
+                 </div>
+                 <div className="space-y-2 col-span-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Asosiy matn</label>
+                    <textarea 
+                      value={rewardTemplate.coursePrefix}
+                      onChange={e => setRewardTemplate({...rewardTemplate, coursePrefix: e.target.value})}
+                      rows={3}
+                      className="w-full px-5 py-4 bg-gray-50 rounded-2xl font-bold border-none focus:ring-2 focus:ring-blue-100"
+                    />
+                 </div>
+              </div>
+
+              <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 italic text-sm text-blue-600">
+                <p><strong>Eslatma:</strong> Ushbu matnlar rag'batlantirish (Reward) sertifikatlarida qo'llaniladi.</p>
+              </div>
+
+              <button
+                onClick={saveRewardTemplate}
                 disabled={savingTemplate}
                 className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 transition-all font-serif"
               >

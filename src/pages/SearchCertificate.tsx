@@ -24,32 +24,50 @@ export default function SearchCertificate() {
       const term = searchTerm.trim().toUpperCase();
       let found: any = null;
 
-      // 1. Try to find by exact certificateId in enrollments and testResults first (faster)
-      const qEn = query(collection(db, 'enrollments'), where('certificateId', '==', term));
-      const qTr = query(collection(db, 'testResults'), where('certificateId', '==', term));
-      const [snapEn, snapTr] = await Promise.all([getDocs(qEn), getDocs(qTr)]);
+      // 1. Try to find by exact ID in dedicated certificates collection (The new source of truth)
+      const qCert = query(collection(db, 'certificates'), where('certificateId', '==', term));
+      const snapCert = await getDocs(qCert);
       
-      if (!snapEn.empty) found = { id: snapEn.docs[0].id, ...snapEn.docs[0].data() };
-      else if (!snapTr.empty) found = { id: snapTr.docs[0].id, isSubjectItem: true, ...snapTr.docs[0].data() };
+      if (!snapCert.empty) {
+        found = { id: snapCert.docs[0].id, ...snapCert.docs[0].data() };
+        // Map to standard fields for viewer
+        found.lastAccessed = found.issuedAt;
+        found.courseTitle = found.entityTitle;
+      } else {
+        // 2. Try legacy collections
+        const qEn = query(collection(db, 'enrollments'), where('certificateId', '==', term));
+        const qTr = query(collection(db, 'testResults'), where('certificateId', '==', term));
+        const [snapEn, snapTr] = await Promise.all([getDocs(qEn), getDocs(qTr)]);
+        
+        if (!snapEn.empty) found = { id: snapEn.docs[0].id, ...snapEn.docs[0].data() };
+        else if (!snapTr.empty) found = { id: snapTr.docs[0].id, isSubjectItem: true, ...snapTr.docs[0].data() };
+      }
 
-      // 2. If not found by query, pull all valid certs to check dynamically
+      // 3. Dynamic search for fuzzy matches or dynamic IDs
       if (!found) {
         const enSnap = await getDocs(query(collection(db, 'enrollments'), where('completed', '==', true)));
         const trSnap = await getDocs(query(collection(db, 'testResults'), where('testType', '==', 'subject')));
+        const certSnap = await getDocs(collection(db, 'certificates'));
         
         const allCerts = [
+          ...certSnap.docs.map(d => ({ id: d.id, isFromCertCollection: true, ...d.data() })),
           ...enSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-          ...trSnap.docs.map(d => ({ id: d.id, isSubjectItem: true, ...d.data() })).filter((c: any) => c.score >= 90)
+          ...trSnap.docs.map(d => ({ id: d.id, isSubjectItem: true, ...d.data() })).filter((c: any) => (c.score || 0) >= 90)
         ];
 
-        for (const c of allCerts) {
-           const dynamicId = 'YAU-' + c.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase();
+        for (const c of (allCerts as any[])) {
+           const dynamicId = 'YAU-' + (c.id as string).replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase();
+           const certId = (c as any).certificateId;
            if (
-             (c.certificateId && c.certificateId.toUpperCase().endsWith(term)) || 
+             (certId && certId.toUpperCase().endsWith(term)) || 
              dynamicId.endsWith(term) || 
-             c.id.toUpperCase().endsWith(term)
+             (c.id as string).toUpperCase().endsWith(term)
            ) {
               found = c;
+              if (c.isFromCertCollection) {
+                 found.lastAccessed = found.issuedAt;
+                 found.courseTitle = found.entityTitle;
+              }
               break;
            }
         }

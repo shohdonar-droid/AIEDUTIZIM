@@ -142,6 +142,18 @@ export interface Enrollment {
   lastAccessed: any;
 }
 
+export interface Certificate {
+  id: string;
+  userId: string;
+  studentName: string;
+  entityId: string;
+  entityTitle: string;
+  entityType: 'course' | 'subject' | 'quizizz' | 'reward';
+  score: number;
+  issuedAt: any;
+  certificateId: string; // Human readable ID like YAU-00001
+}
+
 export interface Message {
   id: string;
   senderId: string;

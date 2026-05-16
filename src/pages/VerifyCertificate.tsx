@@ -17,18 +17,45 @@ export default function VerifyCertificate() {
     async function verify() {
       if (!id) return;
       try {
+        // 1. Try new certificates collection first
+        const certSnap = await getDoc(doc(db, 'certificates', id));
+        if (certSnap.exists()) {
+           const data = certSnap.data();
+           setCert({
+             ...data,
+             id: certSnap.id,
+             studentName: data.studentName,
+             courseTitle: data.entityTitle,
+             updatedAt: data.issuedAt,
+             autoDownload: true
+           });
+           setShowViewer(true);
+           setLoading(false);
+           return;
+        }
+
+        // 2. Try legacy enrollments
         const docSnap = await getDoc(doc(db, 'enrollments', id));
         if (docSnap.exists() && docSnap.data().completed) {
           const data = docSnap.data();
           // Fetch student name and course name
-          const uSnap = await getDoc(doc(db, 'users', data.userId));
-          const cSnap = await getDoc(doc(db, 'courses', data.courseId));
+          let studentName = 'Talaba';
+          let courseTitle = 'Kurs';
+
+          try {
+            const uSnap = await getDoc(doc(db, 'users', data.userId));
+            const cSnap = await getDoc(doc(db, 'courses', data.courseId));
+            studentName = uSnap.exists() ? uSnap.data().displayName : 'Talaba';
+            courseTitle = cSnap.exists() ? cSnap.data().title : 'Kurs';
+          } catch (e) {
+            console.error("Meta fetch error:", e);
+          }
           
           setCert({
             ...data,
             id: docSnap.id,
-            studentName: uSnap.exists() ? uSnap.data().displayName : 'Talaba',
-            courseTitle: cSnap.exists() ? cSnap.data().title : 'Kurs',
+            studentName,
+            courseTitle,
             autoDownload: true
           });
           setShowViewer(true);

@@ -319,18 +319,63 @@ export default function AdminJurnal() {
     scores: userTestMatrix[student.uid] || {},
   }));
 
+  const getResultGrade = (pct: number) => {
+    if (pct < 30) return 1;
+    if (pct <= 55) return 2;
+    if (pct <= 71) return 3;
+    if (pct <= 86) return 4;
+    return 5;
+  };
+
   const exportTests = () => {
     const filename = "Test_Natijalari.xlsx";
-    const exportData = matrixRows.map((row, idx) => {
-      const item: any = {
-        "№": idx + 1,
-        Talaba: row.name,
-      };
-      testCols.forEach((t, i) => {
-        item[`Test ${testPage * testsPerPage + i + 1}`] =
-          row.scores[t.id] !== undefined ? row.scores[t.id] : 0;
+
+    const filteredResults = testResults
+      .filter((r) => {
+        const student = allSystemUsers.find((u) => u.uid === r.userId);
+        if (!student) return false;
+
+        const matchSearch =
+          !searchTerm ||
+          student.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchOrg = !filterOrg || student.org === filterOrg;
+        const matchDept = !filterDept || student.dept === filterDept;
+        const matchGrp = !filterGrp || student.grp === filterGrp;
+        const matchTest = !filterTestId || r.testId === filterTestId;
+
+        return matchSearch && matchOrg && matchDept && matchGrp && matchTest;
+      })
+      .sort((a, b) => {
+        const studentA = allSystemUsers.find((u) => u.uid === a.userId);
+        const studentB = allSystemUsers.find((u) => u.uid === b.userId);
+        return (studentA?.name || "").localeCompare(studentB?.name || "");
       });
-      return item;
+
+    const exportData = filteredResults.map((r, idx) => {
+      const student = allSystemUsers.find((u) => u.uid === r.userId);
+      const deptName =
+        departments.find((d) => d.id === student?.dept)?.name || "-";
+      const grpName = groups.find((g) => g.id === student?.grp)?.name || "-";
+      const pct = r.score;
+      const correctCount =
+        r.correctAnswers !== undefined
+          ? r.correctAnswers
+          : Math.round((r.score / 100) * r.totalQuestions);
+
+      return {
+        "№": idx + 1,
+        FISH: student?.name || r.userName || "-",
+        "Yo'nalish": deptName,
+        Guruh: grpName,
+        "Test nomi": r.testTitle || "-",
+        "To'g'ri ishlangan testlar soni": correctCount,
+        "Jami test soni": r.totalQuestions || 0,
+        "Foiz (%)": pct + "%",
+        Baho: getResultGrade(pct),
+        Sana: r.createdAt?.toDate
+          ? r.createdAt.toDate().toLocaleString("uz-UZ")
+          : "-",
+      };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);

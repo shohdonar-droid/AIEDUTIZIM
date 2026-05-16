@@ -192,6 +192,19 @@ export default function TestExecute() {
 
        if (certId) {
          payload.certificateId = certId;
+
+         // Save to permanent certificates collection
+         const certData = {
+           userId: uId,
+           studentName: uName,
+           entityId: test.id,
+           entityTitle: test.title,
+           entityType: (test.type === 'subject' ? 'subject' : 'test') as any,
+           score: finalScore,
+           issuedAt: serverTimestamp(),
+           certificateId: certId
+         };
+         await setDoc(doc(db, 'certificates', certId), certData);
        }
 
        await setDoc(doc(db, 'testResults', resultId), payload);
