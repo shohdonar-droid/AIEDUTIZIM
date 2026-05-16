@@ -1,7 +1,21 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { auth } from '../lib/firebase';
-import { LogOut, User, LayoutDashboard, BrainCircuit, Menu, X } from 'lucide-react';
+import { 
+  LogOut, 
+  User, 
+  LayoutDashboard, 
+  BrainCircuit, 
+  Menu, 
+  X, 
+  Home, 
+  BookOpen, 
+  FileText, 
+  Gamepad2, 
+  MessageCircle, 
+  Search,
+  Award
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -35,11 +49,12 @@ export default function Navbar() {
   }, []);
 
   const navLinks = [
-    { name: 'Bosh sahifa', path: '/' },
-    { name: 'Kurslar', path: '/courses' },
-    { name: 'Testlar', path: '/tests' },
-    { name: 'Quizizz', path: '/quizizz' },
-    { name: 'Chat', path: '/contact' },
+    { name: 'Asosiy', path: '/', icon: Home },
+    { name: 'Kurslar', path: '/courses', icon: BookOpen },
+    { name: 'Testlar', path: '/tests', icon: FileText },
+    { name: 'Quizizz', path: '/quizizz', icon: Gamepad2 },
+    { name: 'Chat', path: '/contact', icon: MessageCircle },
+    { name: 'ID', path: '/search-cert', icon: Award },
   ];
 
   const handleLogout = async () => {
@@ -64,188 +79,160 @@ export default function Navbar() {
   };
 
   const isActive = (path: string) => location.pathname === path;
+  const isDashboard = location.pathname.startsWith('/student') || 
+                      location.pathname.startsWith('/teacher') || 
+                      location.pathname.startsWith('/admin');
 
   const bgClass = headerConfig?.bgClass || 'glass-nav';
   const textClass = headerConfig?.textClass || 'text-gray-900';
   const isWhiteText = textClass.includes('white');
 
   return (
-    <nav className={`sticky top-0 z-50 ${bgClass} ${textClass}`}>
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 justify-between items-center">
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center gap-2">
-              {headerConfig?.logoUrl ? (
-                <img src={headerConfig.logoUrl || null} alt="Logo" className="h-8 object-contain" />
+    <>
+      {/* Top Navbar */}
+      <nav className={`sticky top-0 z-50 ${bgClass} ${textClass}`}>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 justify-between items-center">
+            <div className="flex items-center">
+              <Link to="/" className="flex items-center gap-2">
+                {headerConfig?.logoUrl ? (
+                  <img src={headerConfig.logoUrl || null} alt="Logo" className="h-8 object-contain" />
+                ) : (
+                  <div className="rounded-xl bg-[#007aff] p-1.5 shadow-sm">
+                    <BrainCircuit className="h-6 w-6 text-white" />
+                  </div>
+                )}
+                {headerConfig?.siteName ? (
+                  <span className={`text-xl font-bold tracking-tight hidden sm:block ${textClass}`}>
+                    {headerConfig.siteName}
+                  </span>
+                ) : (
+                  <span className={`text-xl font-bold tracking-tight hidden sm:block ${textClass}`}>
+                    EDU<span className="text-[#007aff]">AI</span>
+                  </span>
+                )}
+              </Link>
+            </div>
+
+            {/* Desktop Nav */}
+            <div className="hidden md:ml-6 md:flex md:items-center md:space-x-8">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`text-sm font-medium transition-colors ${
+                    isActive(link.path) 
+                      ? (isWhiteText ? 'text-blue-300 font-bold' : 'text-[#007aff]')
+                      : (isWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-[#007aff]')
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              ))}
+              
+              {user ? (
+                <div className={`flex items-center gap-4 ml-4 border-l pl-6 ${isWhiteText ? 'border-white/20' : 'border-gray-200'}`}>
+                  <Link
+                    to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' ? '/teacher' : '/student')}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all border ${
+                      isWhiteText 
+                        ? 'bg-white/10 text-white border-white/20 hover:bg-white/20' 
+                        : 'bg-gray-100/80 text-gray-700 border-gray-200/50 hover:bg-gray-200'
+                    }`}
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    {isAdmin ? 'Admin' : 'Profil'}
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className={`p-2 transition-colors ${isWhiteText ? 'text-gray-300 hover:text-red-400' : 'text-gray-500 hover:text-red-500'}`}
+                  >
+                    <LogOut className="h-5 w-5" />
+                  </button>
+                </div>
               ) : (
-                <div className="rounded-xl bg-[#007aff] p-1.5 shadow-sm">
-                  <BrainCircuit className="h-6 w-6 text-white" />
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/login"
+                    className="mac-btn-primary"
+                  >
+                    Kirish
+                  </Link>
                 </div>
               )}
-              {headerConfig?.siteName ? (
-                <span className={`text-xl font-bold tracking-tight hidden sm:block ${textClass}`}>
-                  {headerConfig.siteName}
-                </span>
-              ) : (
-                <span className={`text-xl font-bold tracking-tight hidden sm:block ${textClass}`}>
-                  EDU<span className="text-[#007aff]">AI</span>
-                </span>
-              )}
-            </Link>
-          </div>
+            </div>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:ml-6 md:flex md:items-center md:space-x-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`text-sm font-medium transition-colors ${
-                  isActive(link.path) 
-                    ? (isWhiteText ? 'text-blue-300 font-bold' : 'text-[#007aff]')
-                    : (isWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-[#007aff]')
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-            
-            {user ? (
-              <div className={`flex items-center gap-4 ml-4 border-l pl-6 ${isWhiteText ? 'border-white/20' : 'border-gray-200'}`}>
-                <Link
-                  to="/search-cert"
-                  className={`px-3 py-1.5 font-bold text-sm tracking-wide rounded-xl border-2 transition-all ${
-                     isWhiteText ? 'border-white/50 text-white hover:bg-white/10' : 'border-[#007aff] text-[#007aff] hover:bg-blue-50'
-                  }`}
-                >
-                  ID
-                </Link>
+            {/* Mobile Top actions (just profile/logout if needed, or keeping it clean) */}
+            <div className="flex items-center gap-3 md:hidden">
+              {user && (
                 <Link
                   to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' ? '/teacher' : '/student')}
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all border ${
+                  className={`p-2 rounded-xl border ${
                     isWhiteText 
                       ? 'bg-white/10 text-white border-white/20 hover:bg-white/20' 
-                      : 'bg-gray-100/80 text-gray-700 border-gray-200/50 hover:bg-gray-200'
+                      : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
                   }`}
                 >
-                  <LayoutDashboard className="h-4 w-4" />
-                  {isAdmin ? 'Admin' : 'Profil'}
+                  <User className="h-5 w-5" />
                 </Link>
+              )}
+              {!user && (
+                <Link
+                  to="/login"
+                  className="px-4 py-1.5 bg-[#007aff] text-white rounded-lg font-bold text-sm shadow-sm"
+                >
+                  Kirish
+                </Link>
+              )}
+              {user && (
                 <button
                   onClick={handleLogout}
                   className={`p-2 transition-colors ${isWhiteText ? 'text-gray-300 hover:text-red-400' : 'text-gray-500 hover:text-red-500'}`}
                 >
                   <LogOut className="h-5 w-5" />
                 </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Link
-                  to="/search-cert"
-                  className={`px-3 py-1.5 font-bold text-sm tracking-wide rounded-xl border-2 transition-all ${
-                     isWhiteText ? 'border-white/50 text-white hover:bg-white/10' : 'border-[#007aff] text-[#007aff] hover:bg-blue-50'
-                  }`}
-                >
-                  ID
-                </Link>
-                <Link
-                  to="/login"
-                  className="mac-btn-primary"
-                >
-                  Kirish
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="flex items-center md:hidden">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className={`p-2 rounded-lg ${isWhiteText ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100/50 text-gray-600'}`}
-            >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </nav>
 
-      {/* Mobile Nav */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className={`md:hidden border-t ${isWhiteText ? 'border-white/20 bg-gray-900/90' : 'border-gray-200/50 bg-white/90'} backdrop-blur-xl`}
-          >
-            <div className="space-y-1 pb-3 pt-2">
-              {navLinks.map((link) => (
+      {/* Bottom Mobile Navigation */}
+      {!isDashboard && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-100 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <div className="flex overflow-x-auto scrollbar-hide items-center justify-between px-2 py-1 gap-2">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const active = isActive(link.path);
+              return (
                 <Link
                   key={link.path}
                   to={link.path}
-                  onClick={() => setIsOpen(false)}
-                  className={`block px-4 py-3 text-base font-medium ${
-                    isActive(link.path) 
-                      ? (isWhiteText ? 'bg-white/10 text-blue-300' : 'bg-[#007aff]/10 text-[#007aff]') 
-                      : (isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50')
+                  className={`flex flex-col items-center justify-center min-w-[72px] py-1 transition-all ${
+                    active ? 'text-[#007aff]' : 'text-gray-400 hover:text-gray-600'
                   }`}
                 >
-                  {link.name}
+                  <div className={`p-1.5 rounded-xl transition-all ${active ? 'bg-blue-50' : ''}`}>
+                    <Icon className={`w-5 h-5 ${active ? 'fill-[#007aff] text-[#007aff]' : ''}`} />
+                  </div>
+                  <span className={`text-[10px] font-bold mt-0.5 whitespace-nowrap ${active ? 'text-[#007aff]' : 'text-gray-400'}`}>
+                    {link.name}
+                  </span>
+                  {active && (
+                     <motion.div 
+                       layoutId="mobile-nav-indicator"
+                       className="absolute -bottom-1 w-1 h-1 bg-[#007aff] rounded-full" 
+                     />
+                  )}
                 </Link>
-              ))}
-              <Link
-                key="/search-cert"
-                to="/search-cert"
-                onClick={() => setIsOpen(false)}
-                className={`block px-4 py-3 text-base font-medium ${
-                  isActive('/search-cert') 
-                    ? (isWhiteText ? 'bg-white/10 text-blue-300' : 'bg-[#007aff]/10 text-[#007aff]') 
-                    : (isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50')
-                }`}
-              >
-                Sertifikat tekshirish (ID)
-              </Link>
-              {user ? (
-                <>
-                  <Link
-                    to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' ? '/teacher' : '/student')}
-                    onClick={() => setIsOpen(false)}
-                    className={`block px-4 py-3 text-base font-medium flex items-center gap-2 ${
-                      isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <LayoutDashboard className="h-5 w-5" />
-                    Dashboard
-                  </Link>
-                  <button
-                    onClick={() => {
-                      handleLogout();
-                      setIsOpen(false);
-                    }}
-                    className={`block w-full text-left px-4 py-3 text-base font-medium flex items-center gap-2 ${
-                      isWhiteText ? 'text-red-400 hover:bg-red-400/10' : 'text-red-600 hover:bg-red-50'
-                    }`}
-                  >
-                    <LogOut className="h-5 w-5" />
-                    Chiqish
-                  </button>
-                </>
-              ) : (
-                <Link
-                  to="/login"
-                  onClick={() => setIsOpen(false)}
-                  className={`block px-4 py-3 text-base font-medium ${
-                    isWhiteText ? 'text-blue-300 hover:bg-white/5' : 'text-[#007aff] hover:bg-blue-50'
-                  }`}
-                >
-                  Kirish
-                </Link>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Spacer for bottom nav on mobile */}
+      {!isDashboard && <div className="h-16 md:hidden"></div>}
+    </>
   );
 }

@@ -95,6 +95,21 @@ export default function TestExecute() {
             t.questions = shuffled.slice(0, t.randomQuestionCount);
           }
 
+          // Shuffle options for each question
+          if (t.questions && t.questions.length > 0) {
+            t.questions = t.questions.map((q: Question) => {
+              const originalCorrectOption = q.options[q.correctIdx];
+              // Fisher-Yates shuffle or similar for options
+              const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
+              const newCorrectIdx = shuffledOptions.indexOf(originalCorrectOption);
+              return {
+                ...q,
+                options: shuffledOptions,
+                correctIdx: newCorrectIdx
+              };
+            });
+          }
+
           setTest(t);
         }
       } catch (err) {

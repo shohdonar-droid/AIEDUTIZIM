@@ -82,10 +82,10 @@ export default function AdminDashboard() {
   const handleLogout = () => auth.signOut();
 
   return (
-    <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px)] relative overflow-hidden bg-gray-50 text-gray-900 border-t border-gray-100">
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px)] relative overflow-hidden bg-gray-50 text-gray-900 border-t border-gray-100 pb-16 md:pb-0">
       
-      {/* Sidebar */}
-      <aside className={`bg-white border-r border-gray-200 flex flex-col p-4 shadow-sm z-20 transition-all duration-300 relative group/sidebar ${isCollapsed ? 'md:w-24' : 'md:w-72'} w-full`}>
+      {/* Desktop Sidebar */}
+      <aside className={`bg-white border-r border-gray-200 flex flex-col p-4 shadow-sm z-20 transition-all duration-300 relative group/sidebar ${isCollapsed ? 'md:w-24' : 'md:w-72'} hidden md:flex`}>
         {/* Toggle Button */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -162,6 +162,33 @@ export default function AdminDashboard() {
           </button>
         </div>
       </aside>
+
+      {/* Mobile Bottom Bar for Admin Dashboard */}
+      <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-gray-200 shadow-xl md:hidden">
+        <div className="flex overflow-x-auto scrollbar-hide items-center justify-start gap-1 p-2">
+          {menuItems.map((item) => {
+             const active = location.pathname === item.path;
+             const Icon = item.icon;
+             return (
+               <Link
+                 key={item.name}
+                 to={item.path}
+                 className={`flex flex-col items-center justify-center min-w-[72px] px-2 py-2 rounded-xl transition-all relative ${
+                   active ? 'text-blue-700 bg-blue-50' : 'text-gray-400'
+                 }`}
+               >
+                 <Icon className="h-5 w-5" />
+                 <span className="text-[10px] font-bold mt-1 whitespace-nowrap uppercase tracking-tighter">{item.name}</span>
+                 {item.badge !== undefined && item.badge > 0 && (
+                   <span className="absolute top-1 right-2 bg-red-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                     {item.badge}
+                   </span>
+                 )}
+               </Link>
+             );
+          })}
+        </div>
+      </div>
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 md:p-12 overflow-y-auto z-10 bg-gray-50">
