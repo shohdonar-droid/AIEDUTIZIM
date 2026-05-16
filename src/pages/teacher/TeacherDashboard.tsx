@@ -69,8 +69,8 @@ export default function TeacherDashboard() {
   ].filter(item => !item.hidden);
 
   return (
-    <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px)] bg-[#f8f9fa] pb-16 md:pb-0">
-      <aside className={`bg-white border-r border-gray-100 flex flex-col md:sticky md:top-16 md:h-[calc(100vh-64px)] shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 transition-all duration-300 relative group/sidebar ${isCollapsed ? 'md:w-24' : 'md:w-72'} hidden md:flex`}>
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px)] bg-[#f8f9fa]">
+      <aside className={`bg-white border-r border-gray-100 flex flex-col md:sticky md:top-16 md:h-[calc(100vh-64px)] shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 transition-all duration-300 relative group/sidebar ${isCollapsed ? 'md:w-24' : 'md:w-72'} w-full`}>
         {/* Toggle Button */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -174,35 +174,6 @@ export default function TeacherDashboard() {
           </button>
         </div>
       </aside>
-
-      {/* Mobile Bottom Bar for Teacher Dashboard */}
-      <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-gray-100 shadow-xl md:hidden">
-        <div className="flex overflow-x-auto scrollbar-hide items-center justify-start gap-1 p-2">
-          {navItems.map((item) => {
-             const isActive = item.exact 
-                ? location.pathname === item.path
-                : location.pathname.startsWith(item.path);
-             const Icon = item.icon;
-             return (
-               <Link
-                 key={item.name}
-                 to={item.path}
-                 className={`flex flex-col items-center justify-center min-w-[72px] px-2 py-2 rounded-xl transition-all relative ${
-                   isActive ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400'
-                 }`}
-               >
-                 <Icon className="h-5 w-5" />
-                 <span className="text-[10px] font-bold mt-1 whitespace-nowrap">{item.name}</span>
-                 {item.badge !== undefined && item.badge > 0 && (
-                   <span className="absolute top-1 right-2 bg-red-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                     {item.badge}
-                   </span>
-                 )}
-               </Link>
-             );
-          })}
-        </div>
-      </div>
 
       <main className="flex-1 p-4 md:p-8 md:pl-10 w-full overflow-hidden flex flex-col items-center">
         <div className="w-full max-w-[1200px]">
