@@ -139,7 +139,8 @@ export default function StudentGrades() {
                </thead>
                <tbody className="divide-y divide-gray-50">
                  {testResults.map((r) => {
-                   const pct = Math.round((r.score / r.totalQuestions) * 100);
+                   const correctCount = r.correctAnswers !== undefined ? r.correctAnswers : Math.round((r.score / 100) * r.totalQuestions);
+                   const pct = r.score;
                    return (
                      <tr key={r.id} className="hover:bg-gray-50/50">
                        <td className="px-6 py-4 text-sm font-bold text-gray-500">
@@ -147,7 +148,7 @@ export default function StudentGrades() {
                        </td>
                        <td className="px-6 py-4 font-black">{r.testTitle}</td>
                        <td className="px-6 py-4 text-center font-bold text-indigo-600 bg-indigo-50/30">
-                         {r.score} / {r.totalQuestions}
+                         {correctCount}/{r.totalQuestions}
                        </td>
                        <td className="px-6 py-4 text-center font-black">
                          {pct}%

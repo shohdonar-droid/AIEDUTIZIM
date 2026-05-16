@@ -110,19 +110,20 @@ export default function TestExecute() {
     setAnswers(prev => ({ ...prev, [qIndex]: optionIndex }));
   };
 
-  const calculateScore = () => {
-    if (!test) return 0;
+  const calculateResults = () => {
+    if (!test) return { score: 0, correct: 0 };
     let correct = 0;
     test.questions.forEach((q, idx) => {
       if (answers[idx] === q.correctIdx) correct++;
     });
-    return Math.round((correct / test.questions.length) * 100);
+    const finalScore = Math.round((correct / test.questions.length) * 100);
+    return { score: finalScore, correct: correct };
   };
 
   const handleFinish = async () => {
     if (!test) return;
     setSaving(true);
-    const finalScore = calculateScore();
+    const { score: finalScore, correct: correctCount } = calculateResults();
     try {
        const uId = user ? user.uid : "GUEST_" + Math.random().toString(36).substring(2, 9);
        const uName = user ? (user.displayName || 'Talaba') : 'Mexmon (Guest)';
@@ -166,6 +167,7 @@ export default function TestExecute() {
          teacherId: user?.teacherId || 'admin',
          creatorId: test.creatorId || 'admin',
          score: finalScore,
+         correctAnswers: correctCount,
          totalQuestions: test.questions.length,
          attempts: attemptsInfo.count + 1,
          answers: answers,

@@ -374,10 +374,10 @@ export default function TeacherJurnal() {
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                     {displayedCourseStudents.length === 0 && (
+                     {displayedCourseStudents.length === 0 ? (
                         <tr><td colSpan={8} className="text-center py-10 font-bold text-gray-400">Hech narsa topilmadi</td></tr>
-                     )}
-                     {displayedCourseStudents.map((student, i) => {
+                     ) : (
+                       displayedCourseStudents.map((student, i) => {
                         const d = filterCourse ? data.find(x => x.userId === student.uid && x.courseId === filterCourse) : data.find(x => x.userId === student.uid);
                         const deptName = teacherDepts.find(x => x.id === student.departmentId)?.name || '-';
                         return (
@@ -406,7 +406,8 @@ export default function TeacherJurnal() {
                               </td>
                            </tr>
                         );
-                     })}
+                       })
+                     )}
                   </tbody>
                </table>
             </div>
@@ -428,10 +429,10 @@ export default function TeacherJurnal() {
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                     {displayedTestStudents.length === 0 && (
+                     {displayedTestStudents.length === 0 ? (
                         <tr><td colSpan={6} className="text-center py-10 font-bold text-gray-400">Hech narsa topilmadi</td></tr>
-                     )}
-                     {displayedTestStudents.map((student, i) => {
+                     ) : (
+                       displayedTestStudents.map((student, i) => {
                         const r = testResults.find(x => x.userId === student.uid && x.testType === 'exam');
                         const pct = r ? Math.round((r.score / r.totalQuestions) * 100) : 0;
                         const gradeNum = r ? getResultGrade(pct) : 0;
@@ -459,7 +460,8 @@ export default function TeacherJurnal() {
                               </td>
                            </tr>
                         );
-                     })}
+                       })
+                     )}
                   </tbody>
                </table>
             </div>
@@ -483,51 +485,53 @@ export default function TeacherJurnal() {
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                     {displayedTestStudents.length === 0 && (
+                     {displayedTestStudents.length === 0 ? (
                         <tr><td colSpan={9} className="text-center py-10 font-bold text-gray-400">Hech narsa topilmadi</td></tr>
+                     ) : (
+                        displayedTestStudents.map((student, i) => {
+                          const r = testResults.find(x => x.userId === student.uid && x.testType !== 'exam');
+                          const pct = r ? r.score : 0;
+                          const correctCount = r ? (r.correctAnswers !== undefined ? r.correctAnswers : Math.round((r.score / 100) * r.totalQuestions)) : 0;
+                          const gradeNum = r ? getResultGrade(pct) : 0;
+                          const deptName = teacherDepts.find(x => x.id === student.departmentId)?.name || '-';
+                          const grpName = teacherGroups.find(x => x.id === student.groupId)?.name || '-';
+                          return (
+                             <tr key={student.uid}>
+                                <td className="px-6 py-4 font-bold text-gray-400">{i + 1}</td>
+                                <td className="px-6 py-4 font-black">{student.displayName}</td>
+                                <td className="px-6 py-4 font-bold text-gray-500 text-sm whitespace-nowrap">{deptName}</td>
+                                <td className="px-6 py-4 font-bold text-gray-500 text-sm whitespace-nowrap">{grpName}</td>
+                                <td className="px-6 py-4 text-center font-bold">
+                                   {r ? `${correctCount}/${r.totalQuestions}` : '-'}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                   {r ? (
+                                      <span className={`font-black px-3 py-1 rounded-lg text-sm ${pct >= 60 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                         {pct}%
+                                      </span>
+                                   ) : '-'}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                   {r ? (
+                                      <span className={`font-black px-4 py-1.5 rounded-xl text-lg ${gradeNum >= 4 ? 'bg-green-500 text-white' : gradeNum === 3 ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white'}`}>
+                                         {gradeNum}
+                                      </span>
+                                   ) : '-'}
+                                </td>
+                                <td className="px-6 py-4 text-right text-xs font-bold text-gray-500 whitespace-nowrap">
+                                   {r?.createdAt?.toDate ? r.createdAt.toDate().toLocaleString('uz-UZ') : '-'}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                   {r && (
+                                      <button onClick={() => handleDeleteTestResult(r.id, true)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                                         <Trash2 className="w-5 h-5"/>
+                                      </button>
+                                   )}
+                                </td>
+                             </tr>
+                          );
+                        })
                      )}
-                     {displayedTestStudents.map((student, i) => {
-                        const r = testResults.find(x => x.userId === student.uid && x.testType !== 'exam');
-                        const pct = r ? Math.round((r.score / r.totalQuestions) * 100) : 0;
-                        const gradeNum = r ? getResultGrade(pct) : 0;
-                        const deptName = teacherDepts.find(x => x.id === student.departmentId)?.name || '-';
-                        const grpName = teacherGroups.find(x => x.id === student.groupId)?.name || '-';
-                        return (
-                           <tr key={student.uid}>
-                              <td className="px-6 py-4 font-bold text-gray-400">{i + 1}</td>
-                              <td className="px-6 py-4 font-black">{student.displayName}</td>
-                              <td className="px-6 py-4 font-bold text-gray-500 text-sm whitespace-nowrap">{deptName}</td>
-                              <td className="px-6 py-4 font-bold text-gray-500 text-sm whitespace-nowrap">{grpName}</td>
-                              <td className="px-6 py-4 text-center font-bold">
-                                 {r ? `${r.score} / ${r.totalQuestions}` : '-'}
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                 {r ? (
-                                    <span className={`font-black px-3 py-1 rounded-lg text-sm ${pct >= 60 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                       {pct}%
-                                    </span>
-                                 ) : '-'}
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                 {r ? (
-                                    <span className={`font-black px-4 py-1.5 rounded-xl text-lg ${gradeNum >= 4 ? 'bg-green-500 text-white' : gradeNum === 3 ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white'}`}>
-                                       {gradeNum}
-                                    </span>
-                                 ) : '-'}
-                              </td>
-                              <td className="px-6 py-4 text-right text-xs font-bold text-gray-500 whitespace-nowrap">
-                                 {r?.createdAt?.toDate ? r.createdAt.toDate().toLocaleString('uz-UZ') : '-'}
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                 {r && (
-                                    <button onClick={() => handleDeleteTestResult(r.id, true)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                                       <Trash2 className="w-5 h-5"/>
-                                    </button>
-                                 )}
-                              </td>
-                           </tr>
-                        );
-                     })}
                   </tbody>
                </table>
             </div>
