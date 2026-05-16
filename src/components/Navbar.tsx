@@ -54,7 +54,6 @@ export default function Navbar() {
     { name: 'Testlar', path: '/tests', icon: FileText },
     { name: 'Quizizz', path: '/quizizz', icon: Gamepad2 },
     { name: 'Chat', path: '/contact', icon: MessageCircle },
-    { name: 'ID', path: '/search-cert', icon: Award },
   ];
 
   const handleLogout = async () => {
@@ -133,6 +132,14 @@ export default function Navbar() {
               {user ? (
                 <div className={`flex items-center gap-4 ml-4 border-l pl-6 ${isWhiteText ? 'border-white/20' : 'border-gray-200'}`}>
                   <Link
+                    to="/search-cert"
+                    className={`px-3 py-1.5 font-bold text-sm tracking-wide rounded-xl border-2 transition-all ${
+                      isWhiteText ? 'border-white/50 text-white hover:bg-white/10' : 'border-[#007aff] text-[#007aff] hover:bg-blue-50'
+                    }`}
+                  >
+                    ID
+                  </Link>
+                  <Link
                     to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' ? '/teacher' : '/student')}
                     className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all border ${
                       isWhiteText 
@@ -152,6 +159,14 @@ export default function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
+                  <Link
+                    to="/search-cert"
+                    className={`px-3 py-1.5 font-bold text-sm tracking-wide rounded-xl border-2 transition-all ${
+                      isWhiteText ? 'border-white/50 text-white hover:bg-white/10' : 'border-[#007aff] text-[#007aff] hover:bg-blue-50'
+                    }`}
+                  >
+                    ID
+                  </Link>
                   <Link
                     to="/login"
                     className="mac-btn-primary"
@@ -198,6 +213,18 @@ export default function Navbar() {
                     {link.name}
                   </Link>
                 ))}
+                
+                <Link
+                  to="/search-cert"
+                  onClick={() => setIsOpen(false)}
+                  className={`block px-4 py-3 text-base font-medium ${
+                    isActive('/search-cert') 
+                      ? (isWhiteText ? 'bg-white/10 text-blue-300' : 'bg-[#007aff]/10 text-[#007aff]') 
+                      : (isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50')
+                  }`}
+                >
+                  Sertifikat tekshirish (ID)
+                </Link>
                 
                 {user ? (
                   <>
