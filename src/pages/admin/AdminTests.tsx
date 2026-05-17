@@ -233,6 +233,12 @@ nato'g'ri_variant`;
       });
       await loadTests();
       alert(`Test muvaffaqiyatli saqlandi ${publish ? 'va saytga chiqarildi' : '(faqat bazaga)'}!`);
+      setTestOrganizationIds([]);
+      setTestDepartmentIds([]);
+      setTestGroupIds([]);
+      setTopic('');
+      setGeneratedQuestions([]);
+      setManualText(defaultManualTemplate);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -342,6 +348,9 @@ nato'g'ri_variant`;
       });
       await loadTests();
       alert('Imtihon saqlandi!');
+      setTestOrganizationIds([]);
+      setTestDepartmentIds([]);
+      setTestGroupIds([]);
       setExamData({
         title: '', startTime: '', endTime: '',
         rules: [{ subject: '', context: '', count: 10 }],

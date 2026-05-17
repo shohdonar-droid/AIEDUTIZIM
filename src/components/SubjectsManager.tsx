@@ -61,13 +61,20 @@ export default function SubjectsManager() {
       if (isStudent && user) {
          // Filter based on user dept/group/organization
          loadedSubjects = loadedSubjects.filter(sub => {
-            const hasNoFilters = (!sub.organizationIds || sub.organizationIds.length===0) && 
-                                 (!sub.departmentIds || sub.departmentIds.length===0) && 
-                                 (!sub.groupIds || sub.groupIds.length===0);
-            const matchesOrg = sub.organizationIds?.includes(user.teacherId || '');
-            const matchesDept = sub.departmentIds?.includes(user.departmentId || '');
-            const matchesGroup = sub.groupIds?.includes(user.groupId || '');
-            return hasNoFilters || matchesOrg || matchesDept || matchesGroup;
+            const hasGroupFilter = (sub.groupIds?.length || 0) > 0;
+            const hasDeptFilter = (sub.departmentIds?.length || 0) > 0;
+            const hasOrgFilter = (sub.organizationIds?.length || 0) > 0;
+
+            const isGlobal = !hasGroupFilter && !hasDeptFilter && !hasOrgFilter;
+            
+            if (isGlobal) return true;
+
+            // Strict mapping: if group is set, only students in that group see it
+            if (hasGroupFilter) return sub.groupIds?.includes(user.groupId || '') || false;
+            if (hasDeptFilter) return sub.departmentIds?.includes(user.departmentId || '') || false;
+            if (hasOrgFilter) return sub.organizationIds?.includes(user.teacherId || '') || false;
+
+            return false;
          });
       }
       

@@ -156,14 +156,16 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
 
   const score = getScore(selectedCert);
   const isReward = (selectedCert as any).courseId === 'reward' || (selectedCert as any).entityType === 'reward';
+  const isSubject = (selectedCert as any).isSubjectItem || (selectedCert as any).testType === 'subject';
   const certId = selectedCert.certificateId || (selectedCert as any).id?.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase();
 
   // Handle specific ID fallbacks for deleted courses
   let displayTitle = (selectedCert as any).entityTitle || selectedCert.courseTitle || 'MAXSUS KURSI';
   if (displayTitle === 'O\'chirilgan kurs' || !displayTitle || displayTitle === 'Kurs') {
-    if (certId === 'YAU-00003') displayTitle = 'KOMPYUTER SAVODXONLIGI';
-    if (certId === 'YAU-00005') displayTitle = 'GRAFIK DIZAYN';
-    if (certId === 'YAU-00006') displayTitle = 'FRONTEND DASTURLASH';
+    const cleanId = certId.replace(/-/g, '');
+    if (cleanId === 'YAU00003') displayTitle = 'KOMPYUTER SAVODXONLIGI';
+    if (cleanId === 'YAU00005') displayTitle = 'GRAFIK DIZAYN';
+    if (cleanId === 'YAU00006') displayTitle = 'FRONTEND DASTURLASH';
   }
 
   return (
@@ -273,14 +275,16 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
 
                     {/* Main Content */}
                     <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-4xl mt-[-30px]">
-                       <h1 className="text-8xl font-black text-[#1e3a8a] tracking-[0.15em] mb-4 drop-shadow-sm uppercase">
+                       <h1 className="text-7xl font-black text-[#1e3a8a] tracking-[0.1em] mb-4 drop-shadow-sm uppercase">
                          {template.title}
                        </h1>
-                       <p className="text-2xl font-bold text-[#c5a059] uppercase tracking-[0.3em] mb-10 font-serif italic">
-                         {template.completionText}
-                       </p>
+                       {(template.completionText && !isSubject && (template.title !== 'TIZIMNING FAOL FOYDALANUVCHISI' || template.completionText !== 'MAXSUS MUKOFOT')) && (
+                          <p className="text-2xl font-bold text-[#c5a059] uppercase tracking-[0.3em] mb-10 font-serif italic">
+                            {template.completionText}
+                          </p>
+                       )}
  
-                       <div className="mb-2 relative w-full flex flex-col items-center">
+                       <div className={`${(template.title === 'TIZIMNING FAOL FOYDALANUVCHISI' || isSubject) ? 'mt-4 mb-4' : 'mb-2'} relative w-full flex flex-col items-center`}>
                           <span 
                             className="font-black text-gray-900 px-16 py-1 uppercase tracking-tight italic font-serif leading-tight whitespace-nowrap"
                             style={{ fontSize: (selectedCert.studentName || "TALABA ISMI FAMILIYASI").length > 35 ? '2rem' : (selectedCert.studentName || "TALABA ISMI FAMILIYASI").length > 25 ? '2.5rem' : (selectedCert.studentName || "TALABA ISMI FAMILIYASI").length > 18 ? '3rem' : '3.75rem' }}
@@ -302,13 +306,13 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                     </div>
 
                    {/* Bottom Area: Three parts - Score (Left), QR (Center), Date (Right) */}
-                   <div className={`w-full grid grid-cols-3 items-end mt-[10px] ${isReward ? 'translate-y-[75px]' : ''}`}>
+                   <div className={`w-full grid grid-cols-3 items-end mt-[10px] ${isReward ? 'translate-y-[85px]' : 'translate-y-[15px]'}`}>
                       {/* Score Result Bottom Left */}
                       {isReward ? (
                          <div className="text-left flex flex-col justify-center translate-y-[2px] translate-x-5 w-[190px]">
                             <div className="relative w-[170px] h-[170px] flex items-center justify-center">
-                               <svg className="absolute inset-0 w-full h-full z-0" viewBox="0 0 100 100" style={{ filter: 'drop-shadow(0 10px 20px rgba(220,38,38,0.3))' }}>
-                                 <path d="M50 2 L58 12 L70 10 L75 20 L87 22 L88 34 L98 38 L94 48 L100 56 L94 62 L98 72 L88 76 L87 88 L75 90 L70 100 L58 98 L50 108 L42 98 L30 100 L25 90 L13 88 L12 76 L2 72 L6 62 L0 56 L6 48 L2 38 L12 34 L13 22 L25 20 L30 10 L42 12 Z" fill="#b91c1c" />
+                               <svg className="absolute inset-0 w-full h-full z-0" viewBox="0 0 100 100" style={{ filter: `drop-shadow(0 10px 20px ${template.title.length % 2 === 0 ? 'rgba(220,38,38,0.3)' : 'rgba(30,58,138,0.3)'})` }}>
+                                 <path d="M50 2 L58 12 L70 10 L75 20 L87 22 L88 34 L98 38 L94 48 L100 56 L94 62 L98 72 L88 76 L87 88 L75 90 L70 100 L58 98 L50 108 L42 98 L30 100 L25 90 L13 88 L12 76 L2 72 L6 62 L0 56 L6 48 L2 38 L12 34 L13 22 L25 20 L30 10 L42 12 Z" fill={template.title.length % 2 === 0 ? "#b91c1c" : "#1e3a8a"} />
                                  <circle cx="50" cy="50" r="38" fill="none" stroke="#fbbf24" strokeWidth="2" />
                                  <circle cx="50" cy="50" r="32" fill="none" stroke="#fbbf24" strokeWidth="1" strokeDasharray="4 2" />
                                </svg>
@@ -343,9 +347,10 @@ export default function CertificateViewer({ selectedCert, onClose }: Certificate
                          </div>
                       ) : (
                          <div className="text-left flex flex-col gap-2 translate-y-5">
-                            <p className="text-[12px] font-black text-[#1e3a8a]/60 uppercase tracking-widest leading-none">Umumiy natija</p>
-                            <div className="flex items-center justify-center bg-white/80 rounded-2xl border-2 border-[#c5a059]/30 shadow-sm self-start w-[190px] h-[60px] -translate-x-10">
-                               <span className="text-4xl font-black text-[#1e3a8a]">{score}%</span>
+                            <p className="text-[14px] font-black text-[#c5a059] uppercase tracking-widest leading-none drop-shadow-sm font-serif italic ml-2">Natija</p>
+                            <div className="flex items-center justify-center bg-white rounded-2xl border-2 border-[#c5a059]/40 shadow-xl self-start w-[180px] h-[75px] -translate-x-4 relative overflow-hidden group">
+                               <div className="absolute inset-0 bg-gradient-to-br from-[#c5a059]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                               <span className="text-5xl font-black text-[#1e3a8a] z-10 drop-shadow-sm">{score}%</span>
                             </div>
                          </div>
                       )}

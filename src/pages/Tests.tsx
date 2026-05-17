@@ -46,12 +46,23 @@ export default function Tests() {
        // Admin content
        if (isGlobalAdminTest) return true;
 
-       // Organization content
-       const isFromMyOrg = t.organizationIds?.includes(user.teacherId || '') || t.creatorId === user.teacherId;
-       const isFromMyDept = t.departmentIds?.includes(user.departmentId || '');
-       const isFromMyGroup = t.groupIds?.includes(user.groupId || '');
+       // Strictly check hierarchy if assigned
+       const hasGroupFilter = (t.groupIds?.length || 0) > 0;
+       const hasDeptFilter = (t.departmentIds?.length || 0) > 0;
+       const hasOrgFilter = (t.organizationIds?.length || 0) > 0;
 
-       if (isFromMyOrg || isFromMyDept || isFromMyGroup) return true;
+       if (hasGroupFilter) {
+          return t.groupIds?.includes(user.groupId || '') || false;
+       }
+       if (hasDeptFilter) {
+          return t.departmentIds?.includes(user.departmentId || '') || false;
+       }
+       if (hasOrgFilter) {
+          return t.organizationIds?.includes(user.teacherId || '') || false;
+       }
+
+       // Secondary case: creator matches user's teacher
+       if (t.creatorId === user.teacherId) return true;
     }
 
     // 3. Teachers/Organizations see their own tests

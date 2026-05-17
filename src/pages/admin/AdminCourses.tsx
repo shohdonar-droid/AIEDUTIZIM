@@ -17,6 +17,7 @@ export default function AdminCourses() {
   const [loading, setLoading] = useState(true);
   const [seedLoading, setSeedLoading] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Partial<Course> | null>(null);
+  const [teachersList, setTeachersList] = useState<any[]>([]);
   type TabType = 'base' | 'orgs' | 'all';
   const [activeTab, setActiveTab] = useState<TabType>('base');
 
@@ -36,7 +37,9 @@ export default function AdminCourses() {
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'groups'));
 
     const unsubTeachers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'teacher')), (snap) => {
-      setTeachers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
+      const teachers = snap.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
+      setTeachers(teachers);
+      setTeachersList(teachers);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'teachers'));
 
     return () => { unsubCourses(); unsubDepts(); unsubGroups(); unsubTeachers(); };
@@ -213,8 +216,62 @@ export default function AdminCourses() {
                 onChange={(e) => setEditingCourse({ ...editingCourse, thumbnail: e.target.value })}
               />
             </div>
-            <div className="md:col-span-2 space-y-4 text-sm font-medium text-gray-500 bg-gray-50 p-4 rounded-xl italic">
-               Ushbu kurs barcha talabalar uchun ochiq bo'ladi.
+            <div className="md:col-span-2 space-y-4">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Ko'rinish filtri</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                <MultiSelectDropdown
+                  label="Tashkilotlar"
+                  options={teachersList.map(t => ({ id: t.id, name: t.displayName }))}
+                  selectedIds={editingCourse.organizationIds || []}
+                  onChange={(id, checked) => {
+                    const nextOrgs = checked 
+                      ? [...(editingCourse.organizationIds || []), id]
+                      : (editingCourse.organizationIds || []).filter(oId => oId !== id);
+                    setEditingCourse({ 
+                      ...editingCourse, 
+                      organizationIds: nextOrgs,
+                      departmentIds: [],
+                      groupIds: []
+                    });
+                  }}
+                  placeholder="Barcha uchun ochiq"
+                />
+                <MultiSelectDropdown
+                  label="Yo'nalishlar"
+                  options={(editingCourse.organizationIds || []).length > 0 
+                    ? departments.filter(d => (editingCourse.organizationIds || []).includes(d.creatorId || '')) 
+                    : departments}
+                  selectedIds={editingCourse.departmentIds || []}
+                  onChange={(id, checked) => {
+                    const nextDepts = checked 
+                      ? [...(editingCourse.departmentIds || []), id]
+                      : (editingCourse.departmentIds || []).filter(dId => dId !== id);
+                    setEditingCourse({ 
+                      ...editingCourse, 
+                      departmentIds: nextDepts,
+                      groupIds: (editingCourse.groupIds || []).filter(gid => {
+                         const g = groups.find(x => x.id === gid);
+                         return g && (nextDepts.includes(g.departmentId));
+                      })
+                    });
+                  }}
+                  placeholder="Barcha yo'nalishlar"
+                />
+                <MultiSelectDropdown
+                  label="Guruhlar"
+                  options={(editingCourse.departmentIds || []).length > 0
+                    ? groups.filter(g => (editingCourse.departmentIds || []).includes(g.departmentId))
+                    : []}
+                  selectedIds={editingCourse.groupIds || []}
+                  onChange={(id, checked) => {
+                    const nextGroups = checked 
+                      ? [...(editingCourse.groupIds || []), id]
+                      : (editingCourse.groupIds || []).filter(gId => gId !== id);
+                    setEditingCourse({ ...editingCourse, groupIds: nextGroups });
+                  }}
+                  placeholder={(editingCourse.departmentIds || []).length > 0 ? "Barcha guruhlar" : "Oldin yo'nalishni tanlang"}
+                />
+              </div>
             </div>
             
             <div className="md:col-span-2 space-y-4">

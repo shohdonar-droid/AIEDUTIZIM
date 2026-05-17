@@ -24,19 +24,35 @@ export default function StudentTests() {
 
       // Filter by user department and group
       const filtered = allTests.filter(t => {
-        // 1. Global content (Admin created)
         const isAdminTest = t.creatorRole === 'admin' || !t.creatorRole;
         const isGlobalAdminTest = isAdminTest && 
                                  (!t.organizationIds || t.organizationIds.length === 0) &&
                                  (!t.departmentIds || t.departmentIds.length === 0) &&
                                  (!t.groupIds || t.groupIds.length === 0);
+        
         if (isGlobalAdminTest) return true;
 
-        // 2. Teacher/Organization assignment
-        if (t.creatorId === user.teacherId) return true;
-        if (t.organizationIds?.includes(user.teacherId || '')) return true;
-        if (t.departmentIds?.includes(user.departmentId || '')) return true;
-        if (t.groupIds?.includes(user.groupId || '')) return true;
+        const hasGroupFilter = (t.groupIds?.length || 0) > 0;
+        const hasDeptFilter = (t.departmentIds?.length || 0) > 0;
+        const hasOrgFilter = (t.organizationIds?.length || 0) > 0;
+
+        // If specific groups are set, student MUST be in one of them
+        if (hasGroupFilter) {
+          return t.groupIds?.includes(user.groupId || '') || false;
+        }
+        
+        // If no group but specific departments are set
+        if (hasDeptFilter) {
+          return t.departmentIds?.includes(user.departmentId || '') || false;
+        }
+
+        // If no group/dept but specific organizations are set
+        if (hasOrgFilter) {
+          return t.organizationIds?.includes(user.teacherId || '') || false;
+        }
+
+        // Fallback for older tests or tests with no filters but created by the user's teacher
+        if (t.creatorId === user.teacherId || t.teacherId === user.teacherId) return true;
 
         return false;
       });

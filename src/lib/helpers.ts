@@ -1,5 +1,5 @@
-export function makeDirectImageUrl(url: string | null | undefined): string {
-  if (!url) return '';
+export function makeDirectImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
   if (url.includes('drive.google.com/file/d/')) {
     const match = url.match(/d\/([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {

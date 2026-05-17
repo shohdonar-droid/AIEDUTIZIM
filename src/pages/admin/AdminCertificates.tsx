@@ -609,6 +609,15 @@ export default function AdminCertificates() {
                      }
                      const scoreText = `${Math.round(avg)}%`;
                      let title = c.isSubjectItem ? c.testTitle : (c.courseId === 'reward' ? 'Rag\'batlantirish Sertifikati' : (courses[c.courseId] || 'Kurs'));
+                     const certId = c.certificateId || (c.id?.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase());
+                     const cleanId = certId.replace(/-/g, '');
+
+                     if (title === 'O\'chirilgan kurs' || !title || title === 'Kurs') {
+                       if (cleanId === 'YAU00003') title = 'KOMPYUTER SAVODXONLIGI';
+                       if (cleanId === 'YAU00005') title = 'GRAFIK DIZAYN';
+                       if (cleanId === 'YAU00006') title = 'FRONTEND DASTURLASH';
+                     }
+
                      if (typeof title === 'string') {
                        title = title.replace(' (Fanlar/Mavzu)', '');
                      }

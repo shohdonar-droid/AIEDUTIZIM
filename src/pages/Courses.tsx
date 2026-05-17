@@ -46,12 +46,23 @@ export default function Courses() {
        // Students see Admin content (if global/public)
        if (isGlobalAdminCourse) return true;
 
-       // Students see their organization's content
-       const isFromMyOrg = c.organizationIds?.includes(user.teacherId || '') || c.creatorId === user.teacherId;
-       const isFromMyDept = c.departmentIds?.includes(user.departmentId || '');
-       const isFromMyGroup = c.groupIds?.includes(user.groupId || '');
+       // Strictly check hierarchy if assigned
+       const hasGroupFilter = (c.groupIds?.length || 0) > 0;
+       const hasDeptFilter = (c.departmentIds?.length || 0) > 0;
+       const hasOrgFilter = (c.organizationIds?.length || 0) > 0;
 
-       if (isFromMyOrg || isFromMyDept || isFromMyGroup) return true;
+       if (hasGroupFilter) {
+          return c.groupIds?.includes(user.groupId || '') || false;
+       }
+       if (hasDeptFilter) {
+          return c.departmentIds?.includes(user.departmentId || '') || false;
+       }
+       if (hasOrgFilter) {
+          return c.organizationIds?.includes(user.teacherId || '') || false;
+       }
+
+       // Secondary case: if course was created by their teacher directly
+       if (c.creatorId === user.teacherId) return true;
     }
 
     // 3. Teachers/Organizations see their own courses

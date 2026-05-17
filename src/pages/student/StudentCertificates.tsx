@@ -70,7 +70,16 @@ export default function StudentCertificates() {
     }
     
     return list.map((c) => {
-      const rawTitle = isSubject ? c.testTitle : (courses[c.courseId] || 'Kurs');
+      let rawTitle = isSubject ? c.testTitle : (courses[c.courseId] || 'Kurs');
+      const certId = c.certificateId || (c.id?.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase());
+      const cleanId = certId.replace(/-/g, '');
+
+      if (rawTitle === 'O\'chirilgan kurs' || !rawTitle || rawTitle === 'Kurs') {
+        if (cleanId === 'YAU00003') rawTitle = 'KOMPYUTER SAVODXONLIGI';
+        if (cleanId === 'YAU00005') rawTitle = 'GRAFIK DIZAYN';
+        if (cleanId === 'YAU00006') rawTitle = 'FRONTEND DASTURLASH';
+      }
+
       const title = typeof rawTitle === 'string' ? rawTitle.replace(' (Fanlar/Mavzu)', '') : rawTitle;
       return (
         <div key={c.id} className="relative bg-white rounded-[40px] p-10 border-2 border-blue-50 shadow-xl shadow-blue-50/50 flex flex-col group overflow-hidden">

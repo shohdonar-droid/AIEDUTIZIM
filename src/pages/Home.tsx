@@ -44,13 +44,37 @@ export default function Home() {
       const coursesSnap = await getDocs(collection(db, 'courses'));
       let coursesData = coursesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
       
-      // Filter for global global admin courses
+      // Filter for highlighted courses
       coursesData = coursesData.filter(c => {
-         const isGlobal = c.creatorRole === 'admin' && 
-                          (!c.organizationIds || c.organizationIds.length === 0) &&
-                          (!c.departmentIds || c.departmentIds.length === 0) &&
-                          (!c.groupIds || c.groupIds.length === 0);
-         return isGlobal || c.isPublic === true;
+         const isAdminCourse = c.creatorRole === 'admin' || !c.creatorRole;
+         const isGlobalAdminCourse = isAdminCourse && 
+                                    (!c.organizationIds || c.organizationIds.length === 0) &&
+                                    (!c.departmentIds || c.departmentIds.length === 0) &&
+                                    (!c.groupIds || c.groupIds.length === 0);
+
+         if (!user) {
+            return isGlobalAdminCourse && c.isPublic !== false;
+         }
+
+         if (user.role === 'admin') return true;
+
+         if (user.role === 'student') {
+            if (isGlobalAdminCourse) return true;
+
+            const hasGroupFilter = (c.groupIds?.length || 0) > 0;
+            const hasDeptFilter = (c.departmentIds?.length || 0) > 0;
+            const hasOrgFilter = (c.organizationIds?.length || 0) > 0;
+
+            if (hasGroupFilter) return c.groupIds?.includes(user.groupId || '') || false;
+            if (hasDeptFilter) return c.departmentIds?.includes(user.departmentId || '') || false;
+            if (hasOrgFilter) return c.organizationIds?.includes(user.teacherId || '') || false;
+
+            if (c.creatorId === user.teacherId) return true;
+         }
+
+         if (user.role === 'teacher' && c.creatorId === user.uid) return true;
+
+         return false;
       });
 
       setCourses(coursesData.length > 0 ? coursesData.slice(0, 6) : [

@@ -119,6 +119,7 @@ export interface Test {
   groupIds?: string[];
   maxAttempts?: number;
   randomQuestionCount?: number;
+  teacherId?: string;
   createdAt?: any;
 }
 
