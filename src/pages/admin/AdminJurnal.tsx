@@ -176,9 +176,7 @@ export default function AdminJurnal() {
           const tData = d.data();
           const role = tData.creatorRole || "admin";
           testsMap[d.id] = { title: tData.title, role: role };
-          if (role === "admin") {
-            tArr.push({ id: d.id, title: tData.title });
-          }
+          tArr.push({ id: d.id, title: tData.title });
         });
         setAllTests(tArr);
 
@@ -202,7 +200,6 @@ export default function AdminJurnal() {
           })
           .filter(
             (r) =>
-              r.testAuthorRole === "admin" &&
               users[r.userId] &&
               users[r.userId].role === "student",
           );
