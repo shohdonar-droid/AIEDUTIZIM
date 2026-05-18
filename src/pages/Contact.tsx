@@ -40,11 +40,18 @@ export default function Contact() {
 
     try {
       // Find admin
-      const adminsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin'), limit(1)));
-      const adminId = adminsSnap.docs[0]?.id;
+      let adminId = '';
+      try {
+        const adminsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin'), limit(1)));
+        adminId = adminsSnap.docs[0]?.id;
+      } catch (e) {
+        console.warn("Could not query admins:", e);
+      }
 
       if (!adminId) {
-        throw new Error('Tizimda admin topilmadi');
+        // Fallback: try finding by hardcoded email if we can
+        const fallbackSnap = await getDocs(query(collection(db, 'users'), where('email', 'in', ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com']), limit(1)));
+        adminId = fallbackSnap.docs[0]?.id || 'SYSTEM_ADMIN';
       }
 
       let senderId = '';
@@ -67,6 +74,7 @@ export default function Contact() {
       await addDoc(collection(db, 'messages'), {
         senderId,
         receiverId: adminId,
+        receiverRole: 'admin',
         text: fullMessage,
         timestamp: Timestamp.now(),
         isRead: false

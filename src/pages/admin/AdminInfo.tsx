@@ -435,7 +435,7 @@ export default function AdminInfo() {
 
         <div className="flex flex-col">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Karta ko'rinishi (Preview)</label>
-          <div className="bg-white rounded-[40px] border-8 border-gray-100 shadow-2xl overflow-hidden flex flex-col flex-1 min-h-[480px]">
+          <div className="bg-white rounded-[40px] border-8 border-gray-100 shadow-2xl overflow-hidden flex flex-col flex-1">
             <img 
               src={makeDirectImageUrl(content.hero.rightImage || null) || 'https://via.placeholder.com/800x600?text=No+Image'} 
               referrerPolicy="no-referrer"

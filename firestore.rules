@@ -8,10 +8,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email in ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'] ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin') ||
-         getUserRole() == 'admin'
+        request.auth.token.get('email', '') in ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'] ||
+        getUserRole() == 'admin'
       );
     }
 
@@ -21,7 +19,7 @@ service cloud.firestore {
 
     // Role-based helpers
     function getUserRole() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') 
         : '';
     }
@@ -39,7 +37,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if true;
       allow list: if true;
-      allow create: if isSignedIn() && (userId == request.auth.uid || isTeacher());
+      allow create: if (isSignedIn() && (userId == request.auth.uid || isTeacher())) || 
+                     (request.resource.data.get('isAnonymousContact', false) == true);
       allow update: if isOwner(userId) || isTeacher();
       allow delete: if isTeacher();
     }

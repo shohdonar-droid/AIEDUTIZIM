@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { auth, db } from '../../lib/firebase';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, or, and } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import AdminOverview from './AdminOverview';
 import AdminBanner from './AdminBanner';
@@ -50,15 +50,37 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    const q = query(
+
+    // Split into two listeners to avoid complex OR query issues and potential index requirements
+    let count1 = 0;
+    let count2 = 0;
+
+    const q1 = query(
       collection(db, 'messages'),
-      where('receiverId', '==', user.uid),
-      where('isRead', '==', false)
+      where('isRead', '==', false),
+      where('receiverId', '==', user.uid)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      setUnreadCount(snap.docs.length);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'messages (unread count)'));
-    return unsub;
+
+    const q2 = query(
+      collection(db, 'messages'),
+      where('isRead', '==', false),
+      where('receiverRole', '==', 'admin')
+    );
+
+    const unsub1 = onSnapshot(q1, (snap) => {
+      count1 = snap.docs.length;
+      setUnreadCount(count1 + count2);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'messages (unread count 1)'));
+
+    const unsub2 = onSnapshot(q2, (snap) => {
+      count2 = snap.docs.length;
+      setUnreadCount(count1 + count2);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'messages (unread count 2)'));
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
   }, [user]);
 
   const menuItems = [
@@ -133,7 +155,7 @@ export default function AdminDashboard() {
                 )}
                 
                 {item.badge && item.badge > 0 && (
-                   <span className={`bg-red-500 text-white flex items-center justify-center text-[10px] font-bold shadow-md shadow-red-200 rounded-full ${isCollapsed ? 'absolute -top-1 -right-1 w-4 h-4' : 'w-5 h-5'}`}>
+                   <span className={`bg-red-500 text-white flex items-center justify-center text-[10px] font-bold shadow-md shadow-red-200 rounded-full absolute -top-1 -right-1 ${isCollapsed ? 'w-4 h-4' : 'w-5 h-5'}`}>
                       {item.badge}
                    </span>
                 )}

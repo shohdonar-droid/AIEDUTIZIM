@@ -251,6 +251,13 @@ export default function AdminQuizizz() {
 
   const issueCertificateForWinner = async (session: any, parts: any[]) => {
     if (!parts || parts.length === 0) return;
+    
+    // Prevention: Check if already issued in this session object
+    if (session.certificateIssued) {
+      console.log("Certificate already issued for this session.");
+      return;
+    }
+
     const sortedParts = [...parts].sort((a: any, b: any) => {
        const getCorrectCount = (p: any) => Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).length;
        const getTimeTaken = (p: any) => Object.values(p.answers || {}).filter((ans: any) => ans?.isCorrect).reduce((acc: number, ans: any) => acc + Number(ans?.timeTaken || 0), 0) as number;
@@ -263,6 +270,11 @@ export default function AdminQuizizz() {
     if (!winner) return;
 
     try {
+      // Mark as issued in the session document FIRST to prevent race conditions
+      await updateDoc(doc(db, 'quiz_sessions', session.id), {
+        certificateIssued: true
+      });
+
       const certRef = doc(collection(db, 'enrollments'));
       const counterRef = doc(db, 'counters', 'certificates');
       

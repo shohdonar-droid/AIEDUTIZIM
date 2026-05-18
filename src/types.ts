@@ -159,6 +159,7 @@ export interface Message {
   id: string;
   senderId: string;
   receiverId: string;
+  receiverRole?: string;
   text: string;
   timestamp: any;
   isRead: boolean;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, addDoc, query, orderBy, onSnapshot, where, Timestamp, limit, getDocs, or, writeBatch, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, where, Timestamp, limit, getDocs, or, and, writeBatch, doc, getDoc } from 'firebase/firestore';
 import { Message, UserProfile } from '../types';
 import { Send, Loader2, User as UserIcon, Bell, MessageSquare, X, Reply } from 'lucide-react';
 import { format } from 'date-fns';
@@ -17,7 +17,7 @@ export default function ChatSection() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [adminTab, setAdminTab] = useState<'teachers' | 'students' | 'staff'>('teachers');
+  const [adminTab, setAdminTab] = useState<'teachers' | 'students' | 'staff' | 'inquiries'>('teachers');
 
   // Load contacts
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function ChatSection() {
       const unsub = onSnapshot(q, (snap) => {
         const users = snap.docs.map(d => ({ uid: d.id, ...d.data() } as any));
         // Filter out self and only show relevant roles for tabs
-        const filtered = users.filter(u => u.uid !== user.uid && (u.role === 'teacher' || u.role === 'student' || u.role === 'staff'));
+        const filtered = users.filter(u => u.uid !== user.uid && (u.role === 'teacher' || u.role === 'student' || u.role === 'staff' || u.isAnonymousContact));
         setContacts(filtered);
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-contacts-admin'));
       return unsub;
@@ -88,32 +88,72 @@ export default function ChatSection() {
   }, [user, isAdmin]);
 
   const filteredContacts = isAdmin 
-    ? contacts.filter(c => adminTab === 'teachers' ? c.role === 'teacher' : adminTab === 'students' ? c.role === 'student' : c.role === 'staff')
+    ? contacts.filter(c => {
+        if (adminTab === 'inquiries') return c.isAnonymousContact;
+        if (adminTab === 'teachers') return c.role === 'teacher' && !c.isAnonymousContact;
+        if (adminTab === 'students') return c.role === 'student' && !c.isAnonymousContact;
+        if (adminTab === 'staff') return c.role === 'staff' && !c.isAnonymousContact;
+        return false;
+      })
     : contacts;
 
   const adminUnreadCounts = {
-    teachers: contacts.filter(c => c.role === 'teacher').reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
-    students: contacts.filter(c => c.role === 'student').reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
-    staff: contacts.filter(c => c.role === 'staff').reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    teachers: contacts.filter(c => c.role === 'teacher' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    students: contacts.filter(c => c.role === 'student' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    staff: contacts.filter(c => c.role === 'staff' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    inquiries: contacts.filter(c => c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
   };
 
   // unread listener
   useEffect(() => {
     if (user) {
-      const q = query(
+      let counts1: Record<string, number> = {};
+      let counts2: Record<string, number> = {};
+
+      const updateAllCounts = () => {
+        const merged: Record<string, number> = { ...counts1 };
+        Object.keys(counts2).forEach(key => {
+          merged[key] = (merged[key] || 0) + counts2[key];
+        });
+        setUnreadCounts(merged);
+      };
+
+      const q1 = query(
         collection(db, 'messages'),
-        where('receiverId', '==', user.uid),
-        where('isRead', '==', false)
+        where('isRead', '==', false),
+        where('receiverId', '==', user.uid)
       );
-      const unsub = onSnapshot(q, (snap) => {
+
+      const q2 = query(
+        collection(db, 'messages'),
+        where('isRead', '==', false),
+        where('receiverRole', '==', 'admin')
+      );
+
+      const unsub1 = onSnapshot(q1, (snap) => {
         const counts: Record<string, number> = {};
         snap.docs.forEach(doc => {
           const senderId = doc.data().senderId;
           counts[senderId] = (counts[senderId] || 0) + 1;
         });
-        setUnreadCounts(counts);
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-unread-counts'));
-      return unsub;
+        counts1 = counts;
+        updateAllCounts();
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-unread-counts-1'));
+
+      const unsub2 = onSnapshot(q2, (snap) => {
+        const counts: Record<string, number> = {};
+        snap.docs.forEach(doc => {
+          const senderId = doc.data().senderId;
+          counts[senderId] = (counts[senderId] || 0) + 1;
+        });
+        counts2 = counts;
+        updateAllCounts();
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-unread-counts-2'));
+
+      return () => {
+        unsub1();
+        unsub2();
+      };
     }
   }, [user]);
 
@@ -124,64 +164,68 @@ export default function ChatSection() {
        return;
     }
 
-    const q1 = query(
-      collection(db, 'messages'),
-      where('senderId', '==', user.uid),
-      where('receiverId', '==', selectedContactId)
-    );
-    const q2 = query(
-      collection(db, 'messages'),
-      where('senderId', '==', selectedContactId),
-      where('receiverId', '==', user.uid)
-    );
+    // Use a single map to track messages to prevent duplication and simplify logic
+    const messagesMap = new Map<string, Message>();
 
-    let msgs1: Message[] = [];
-    let msgs2: Message[] = [];
-
-    const processMessages = () => {
-      // Merge, remove duplicates, sort
-      const allMsgs = [...msgs1, ...msgs2];
-      const unique = Array.from(new Map(allMsgs.map(m => [m.id, m])).values());
-      unique.sort((a, b) => {
-        const t1 = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
-        const t2 = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+    const updateMessages = (newMsgs: Message[]) => {
+      newMsgs.forEach(m => messagesMap.set(m.id, m));
+      const sorted = Array.from(messagesMap.values()).sort((a, b) => {
+        const t1 = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+        const t2 = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
         return t1 - t2;
       });
-
-      setMessages(unique);
-      setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      setMessages(sorted);
+      
+      if (sorted.length > 0) {
+        setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      }
 
       // Mark unread messages as read
-      const unreadMsgs = unique.filter(m => m.receiverId === user.uid && !m.isRead);
+      const unreadMsgs = sorted.filter(m => (m.receiverId === user.uid || (isAdmin && m.receiverRole === 'admin')) && !m.isRead);
       if (unreadMsgs.length > 0) {
-        try {
-          const batch = writeBatch(db);
-          unreadMsgs.forEach(m => {
-            const msgRef = doc(db, 'messages', m.id);
-            batch.update(msgRef, { isRead: true });
-          });
-          batch.commit().catch(e => console.error(e));
-        } catch (e) {
-          console.error("Xabarlarni o'qilgan qilishda xatolik:", e);
-        }
+        const batch = writeBatch(db);
+        unreadMsgs.forEach(m => {
+          batch.update(doc(db, 'messages', m.id), { isRead: true });
+        });
+        batch.commit().catch(e => console.error("Mark read error:", e));
       }
     };
 
+    // Query 1: Messages sent by this contact
+    const q1 = query(
+      collection(db, 'messages'),
+      where('senderId', '==', selectedContactId)
+    );
+
+    // Query 2: Messages sent TO this contact
+    const q2 = query(
+      collection(db, 'messages'),
+      where('receiverId', '==', selectedContactId)
+    );
+
     const unsub1 = onSnapshot(q1, (snap) => {
-      msgs1 = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
-      processMessages();
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
+      // For non-admins, filter to only show messages where we are the receiver
+      // For admins, show messages where they are the receiver or it's an admin message
+      const filtered = (isAdmin) 
+        ? msgs.filter(m => m.receiverId === user.uid || m.receiverRole === 'admin') 
+        : msgs.filter(m => m.receiverId === user.uid);
+      updateMessages(filtered);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-messages-1'));
 
     const unsub2 = onSnapshot(q2, (snap) => {
-      msgs2 = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
-      processMessages();
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
+      // For non-admins, filter to only show messages where we are the sender
+      // For admins, show messages sent by ANY admin if it's a conversation with this contact
+      const filtered = (isAdmin) ? msgs : msgs.filter(m => m.senderId === user.uid);
+      updateMessages(filtered);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-messages-2'));
 
     return () => {
       unsub1();
       unsub2();
     };
-  }, [user, selectedContactId]);
+  }, [user, selectedContactId, isAdmin]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,9 +233,14 @@ export default function ChatSection() {
 
     setLoading(true);
     try {
+      const recipientDoc = await getDoc(doc(db, 'users', selectedContactId));
+      const recipientData = recipientDoc.data();
+      const receiverRole = recipientData?.role === 'admin' ? 'admin' : (selectedContactId === 'SYSTEM_ADMIN' ? 'admin' : null);
+
       await addDoc(collection(db, 'messages'), {
         senderId: user.uid,
         receiverId: selectedContactId,
+        receiverRole: receiverRole,
         text: text.trim(),
         timestamp: Timestamp.now(),
         isRead: false,
@@ -277,6 +326,19 @@ export default function ChatSection() {
                    {adminUnreadCounts.staff > 0 && (
                       <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] flex items-center justify-center rounded-full">
                          {adminUnreadCounts.staff}
+                      </span>
+                   )}
+                </button>
+                <button
+                   onClick={() => setAdminTab('inquiries')}
+                   className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative ${
+                      adminTab === 'inquiries' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                   }`}
+                >
+                   Murojaatlar
+                   {adminUnreadCounts.inquiries > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] flex items-center justify-center rounded-full">
+                         {adminUnreadCounts.inquiries}
                       </span>
                    )}
                 </button>
