@@ -55,6 +55,7 @@ service cloud.firestore {
     match /billing/{id} { allow read: if isTeacher(); allow write: if isAdmin(); }
     match /counters/{id} { allow read: if true; allow write: if isSignedIn(); }
     match /test-connection/{id} { allow read: if true; }
+    match /certificates/{id} { allow read: if true; allow write: if isSignedIn(); }
 
     // --- Dynamic Data Collections ---
     match /enrollments/{id} {

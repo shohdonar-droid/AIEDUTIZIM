@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, query, where, doc, setDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
-import { Users, BookOpen, Brain, Award, Loader2, Zap, Clock, LayoutDashboard } from 'lucide-react';
+import { Users, BookOpen, Brain, Award, Loader2, Clock, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function AdminOverview() {
@@ -63,31 +63,6 @@ export default function AdminOverview() {
     loadStats();
   }, []);
 
-  const initializeDefaultData = async () => {
-    setLoading(true);
-    try {
-      await setDoc(doc(db, 'siteContent', 'main'), {
-        hero: {
-          rightImage: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800",
-          rightText: "Zamonaviy AI texnologiyalari asosida ta'lim jarayonini optimizatsiya qiling."
-        },
-        banners: [
-          { url: "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&q=80&w=1200", type: "image" },
-          { url: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200", type: "image" }
-        ],
-        footer: {
-          top: "Raqamli ta'limda sun'iy intellekt platformasi",
-          bottom: "© 2026 Barcha huquqlar himoyalangan."
-        }
-      });
-      alert('Tizim muvaffaqiyatli ishga tushirildi!');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   if (loading) return (
     <div className="flex h-96 items-center justify-center">
       <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
@@ -101,13 +76,6 @@ export default function AdminOverview() {
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">Umumiy tizim holati</h1>
           <p className="text-gray-500 mt-2 text-lg">Platformaning asosiy ko'rsatkichlari va sozlamalari.</p>
         </div>
-        <button
-          onClick={initializeDefaultData}
-          className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-xl"
-        >
-          <Zap className="h-4 w-4 text-yellow-400" />
-          Default ma'lumotlarni o'rnatish
-        </button>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-6">

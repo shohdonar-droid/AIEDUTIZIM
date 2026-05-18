@@ -263,7 +263,7 @@ export default function AdminQuizizz() {
     if (!winner) return;
 
     try {
-      const certRef = doc(db, 'enrollments', `quiz_${session.id}_cert`);
+      const certRef = doc(collection(db, 'enrollments'));
       const counterRef = doc(db, 'counters', 'certificates');
       
       let newCertId = '';
@@ -294,6 +294,19 @@ export default function AdminQuizizz() {
         updatedAt: serverTimestamp(),
         certificateId: newCertId
       });
+
+      // Save to permanent certificates collection
+      const certData = {
+        userId: 'quizizz_anonymous',
+        studentName: winner.name,
+        entityId: session.historyId || session.id,
+        entityTitle: session.title,
+        entityType: 'quizizz',
+        score: 100, // Winner gets 100 for now
+        issuedAt: serverTimestamp(),
+        certificateId: newCertId
+      };
+      await setDoc(doc(db, 'certificates', newCertId), certData);
     } catch (e) {
       console.error(e);
     }

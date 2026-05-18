@@ -73,7 +73,8 @@ export default function StudentCourses() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {courses.map((course) => {
           const en = enrollments[course.id];
-          const progress = en ? Math.min(100, (en.currentModuleIndex / 4) * 100) : 0;
+          const totalModules = course.modules?.length || 1;
+          const progress = en ? (en.completed ? 100 : Math.min(100, Math.round((en.currentModuleIndex / totalModules) * 100))) : 0;
           
           return (
             <div key={course.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-2xl hover:shadow-blue-50 transition-all">
@@ -99,7 +100,7 @@ export default function StudentCourses() {
                 {en ? (
                   <div className="space-y-4">
                     <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-gray-400">
-                      <span>Progress</span>
+                      <span>{en.completed ? 'YAKUNLANGAN' : `${en.currentModuleIndex + 1} / ${totalModules} MODUL`}</span>
                       <span className="text-blue-600">{progress}%</span>
                     </div>
                     <div className="h-2 bg-gray-50 rounded-full overflow-hidden">

@@ -133,7 +133,7 @@ export default function SearchCertificate() {
           <div className="mx-auto w-20 h-20 bg-blue-50 text-blue-600 flex items-center justify-center rounded-2xl shadow-inner mb-6">
             <ShieldCheck className="w-10 h-10" />
           </div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-4">Sertifikatni Tekshirish</h1>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-4">Sertifikatni tekshirish</h1>
           <p className="text-gray-500 font-medium">Sertifikat ID raqamini kiriting va hujjatning haqiqiyligini tekshirib olishingiz mumkun</p>
         </div>
 

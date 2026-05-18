@@ -192,6 +192,7 @@ export interface SiteContent {
     detailHtml?: string; // Rich text / HTML for detail page
     detailFiles?: Array<{ name: string; url: string; type: string }>; // PDF, PPT etc
     infoSections?: InfoSection[];
+    showInfoSection?: boolean;
   };
   banners: Array<{
     url: string;

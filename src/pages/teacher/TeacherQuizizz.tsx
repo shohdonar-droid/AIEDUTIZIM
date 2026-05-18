@@ -240,7 +240,7 @@ export default function TeacherQuizizz() {
     if (!winner) return;
 
     try {
-      const certRef = doc(db, 'enrollments', `quiz_${session.id}_cert`);
+      const certRef = doc(collection(db, 'enrollments'));
       const counterRef = doc(db, 'counters', 'certificates');
       
       let newCertId = '';

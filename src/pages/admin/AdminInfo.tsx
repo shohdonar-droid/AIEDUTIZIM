@@ -126,7 +126,8 @@ export default function AdminInfo() {
         hero: { 
           rightImage: finalRightImage, 
           rightText: content.hero.rightText || '', 
-          rightBadge: content.hero.rightBadge || '' 
+          rightBadge: content.hero.rightBadge || '',
+          showInfoSection: content.hero.showInfoSection !== false
         } 
       }, { merge: true });
       
@@ -349,29 +350,42 @@ export default function AdminInfo() {
           <div className="space-y-6">
             <div className="space-y-4">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" /> Rasm (Yuklash)
+                <ImageIcon className="h-4 w-4" /> Rasm layoqati (Yuklash yoki URL orqali)
               </label>
-              <input
-                type="file"
-                accept="image/*"
-                className="w-full px-5 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-600 font-medium file:cursor-pointer file:bg-blue-600 file:text-white file:border-0 file:py-2 file:px-4 file:rounded-xl file:mr-4 file:font-semibold"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if(!file) return;
-                  const tempUrl = URL.createObjectURL(file);
-                  setContent({ ...content, hero: { ...content.hero, rightImage: tempUrl } });
-                  
-                  uploadFileToStorage(file, true).then(url => {
-                     setContent(prev => {
-                        if (!prev) return prev;
-                        if (prev.hero.rightImage === tempUrl) {
-                           return { ...prev, hero: { ...prev.hero, rightImage: url } };
-                        }
-                        return prev;
-                     });
-                  }).catch(() => {});
-                }}
-              />
+              <div className="flex flex-col gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="w-full px-5 py-3 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-600 font-medium file:cursor-pointer file:bg-blue-600 file:text-white file:border-0 file:py-2 file:px-4 file:rounded-xl file:mr-4 file:font-semibold"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if(!file) return;
+                    const tempUrl = URL.createObjectURL(file);
+                    setContent({ ...content, hero: { ...content.hero, rightImage: tempUrl } });
+                    
+                    uploadFileToStorage(file, true).then(url => {
+                       setContent(prev => {
+                          if (!prev) return prev;
+                          if (prev.hero.rightImage === tempUrl) {
+                             return { ...prev, hero: { ...prev.hero, rightImage: url } };
+                          }
+                          return prev;
+                       });
+                    }).catch(() => {});
+                  }}
+                />
+                
+                <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2 focus-within:ring-2 focus-within:ring-blue-600">
+                  <LinkIcon className="w-5 h-5 text-gray-400" />
+                  <input
+                    type="url"
+                    placeholder="Yoki URL orqali rasm kiriting (https://...)"
+                    className="w-full bg-transparent border-none p-2 font-medium focus:ring-0"
+                    value={content.hero.rightImage && !content.hero.rightImage.startsWith('blob:') && !content.hero.rightImage.startsWith('data:') ? content.hero.rightImage : ''}
+                    onChange={(e) => setContent({ ...content, hero: { ...content.hero, rightImage: e.target.value } })}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -398,12 +412,30 @@ export default function AdminInfo() {
                 onChange={(e) => setContent({ ...content, hero: { ...content.hero, rightText: e.target.value } })}
               />
             </div>
+
+            <div className="space-y-4 flex items-center justify-between bg-gray-50 p-4 rounded-xl">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Globe className="h-4 w-4" /> Info Bo'limni Ko'rsatish
+                </label>
+                <p className="text-xs text-gray-500 mt-1 font-medium">Bosh sahifada ushbu bo'limni ochiq yoki yopiq holatga keltirish</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer"
+                  checked={content.hero.showInfoSection !== false} // default true if undefined
+                  onChange={(e) => setContent({ ...content, hero: { ...content.hero, showInfoSection: e.target.checked } })}
+                />
+                <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col justify-end">
+        <div className="flex flex-col">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Karta ko'rinishi (Preview)</label>
-          <div className="bg-white rounded-[40px] border-8 border-gray-100 shadow-2xl overflow-hidden flex flex-col h-[480px]">
+          <div className="bg-white rounded-[40px] border-8 border-gray-100 shadow-2xl overflow-hidden flex flex-col flex-1 min-h-[480px]">
             <img 
               src={makeDirectImageUrl(content.hero.rightImage || null) || 'https://via.placeholder.com/800x600?text=No+Image'} 
               referrerPolicy="no-referrer"

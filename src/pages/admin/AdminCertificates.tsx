@@ -631,7 +631,7 @@ export default function AdminCertificates() {
                             <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md text-xs border border-blue-100">{c.certificateId || ('YAU-' + c.id.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase())}</span>
                           </td>
                           <td className="py-4 px-6">
-                            <span className="font-black text-gray-900">{student?.displayName || "Noma'lum Talaba"}</span>
+                            <span className="font-black text-gray-900">{c.studentName || student?.displayName || "Noma'lum Talaba"}</span>
                           </td>
                           <td className="py-4 px-6">
                             <span className="font-bold text-gray-600">

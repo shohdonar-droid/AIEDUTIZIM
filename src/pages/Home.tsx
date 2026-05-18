@@ -117,12 +117,12 @@ export default function Home() {
   }, [content]);
 
   const features = [
-    { title: "Tashkilotlar uchun qulaylik", desc: "Tashkilotlar o'z talabalari, guruhlari va yo'nalishlarini qulay boshqarishi mumkin.", icon: LayoutGrid },
-    { title: "Testlar muallifligi", desc: "Testlarni mualliflik huquqi bilan himoyalangan holda yaratish va tahrirlash imkoniyati.", icon: FileText },
-    { title: "Sertifikatlar tizimi", desc: "Kurs va testlardan muvaffaqiyatli o'tganlarga avtomatik ravishda sertifikatlar berish.", icon: Award },
-    { title: "Baho va jurnallar", desc: "Talabalarning o'zlashtirishini kuzatish va avtomatlashgan jurnallar orqali baholash.", icon: BarChart3 },
-    { title: "Xavfsizlik va nazorat", desc: "Platforma ma'lumotlari xavfsiz himoyalangan va har bir foydalanuvchining huquqlari nazoratda.", icon: CheckCircle2 },
-    { title: "O'zaro muloqot", desc: "Tashkilotlar, talabalar va adminlar o'rtasida to'g'ridan-to'g'ri integratsiyalashgan chat tizimi.", icon: Users },
+    { title: "Interaktiv quizizz va test tizimi", desc: "Tashkilotlar va talabalar uchun vaqt rejimida real-time musobaqalar uyushtirish. Bilimlarni geymifikatsiya orqali mustahkamlash.", icon: LayoutGrid },
+    { title: "Sun'iy intellekt bilan test yaratish", desc: "O'qituvchilar uchun AI orqali mavzuga oid savollarni avtomatik shakllantirish, o'quv jarayonini sezilarli darajada tezlashtirish.", icon: FileText },
+    { title: "Avtomatik sertifikatlar", desc: "Kurslar yoki testlardan muvaffaqiyatli o'tganlarga (shuningdek, Quizizz g'oliblariga) real vaqtda QR kodli sertifikat taqdim etish.", icon: Award },
+    { title: "Zamonaviy modulli ta'lim", desc: "Talabalarning kurs doirasidagi barcha qadamlarini interaktiv modullar orqali kuzatish va ilg'or o'zlashtirish statistikasi.", icon: BarChart3 },
+    { title: "Xavfsizlik va avtomatlashgan jurnal", desc: "Baholar, sertifikatlar haqqoniyligi va ishtirokchilar tarixi mutlaqo xavfsiz va tizimli kataloglanadi.", icon: CheckCircle2 },
+    { title: "O'zaro muloqot va chat", desc: "Tashkilotlar, talabalar va adminlar o'rtasida to'g'ridan-to'g'ri integratsiyalashgan, guruhli muloqot va ijtimoiy muhit.", icon: Users },
   ];
 
   if (!content) return null;
@@ -133,7 +133,7 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[450px]">
            {/* Banner Slider */}
-          <div className="lg:col-span-2 relative mac-window overflow-hidden group">
+          <div className={`${content.hero.showInfoSection === false ? 'lg:col-span-3' : 'lg:col-span-2'} relative mac-window overflow-hidden group`}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentBanner}
@@ -196,27 +196,29 @@ export default function Home() {
           </div>
 
           {/* Right Info */}
-          <Link to="/info" className="mac-window overflow-hidden flex flex-col group h-full cursor-pointer hover:shadow-2xl transition-all">
-            <div className="h-[75%] w-full overflow-hidden relative border-b border-gray-100">
-              <img 
-                src={makeDirectImageUrl(content.hero.rightImage || null)} 
-                referrerPolicy="no-referrer"
-                alt="Info" 
-                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700"
-              />
-            </div>
-            <div className="p-8 flex-1 flex flex-col justify-center bg-white/60 backdrop-blur-md">
-              <span className="text-xs font-semibold text-[#007aff] tracking-wide mb-2 inline-block">
-                {content.hero.rightBadge || "Yangilik"}
-              </span>
-              <p className="text-lg font-bold text-gray-900 leading-snug mb-6">
-                {content.hero.rightText}
-              </p>
-              <div className="flex items-center gap-2 text-[#007aff] font-semibold text-sm hover:gap-3 transition-all">
-                Batafsil ma'lumot <ArrowRight className="h-4 w-4" />
+          {content.hero.showInfoSection !== false && (
+            <Link to="/info" className="mac-window overflow-hidden flex flex-col group h-full cursor-pointer hover:shadow-2xl transition-all">
+              <div className="h-[75%] w-full overflow-hidden relative border-b border-gray-100">
+                <img 
+                  src={makeDirectImageUrl(content.hero.rightImage || null)} 
+                  referrerPolicy="no-referrer"
+                  alt="Info" 
+                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700"
+                />
               </div>
-            </div>
-          </Link>
+              <div className="p-8 flex-1 flex flex-col justify-center bg-white/60 backdrop-blur-md">
+                <span className="text-xs font-semibold text-[#007aff] tracking-wide mb-2 inline-block">
+                  {content.hero.rightBadge || "Yangilik"}
+                </span>
+                <p className="text-lg font-bold text-gray-900 leading-snug mb-6">
+                  {content.hero.rightText}
+                </p>
+                <div className="flex items-center gap-2 text-[#007aff] font-semibold text-sm hover:gap-3 transition-all">
+                  Batafsil ma'lumot <ArrowRight className="h-4 w-4" />
+                </div>
+              </div>
+            </Link>
+          )}
         </div>
       </section>
 
