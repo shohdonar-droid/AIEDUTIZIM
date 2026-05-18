@@ -53,7 +53,7 @@ service cloud.firestore {
     match /siteContent/{id} { allow read: if true; allow write: if isAdmin(); }
     match /settings/{id} { allow read: if true; allow write: if isAdmin(); }
     match /billing/{id} { allow read: if isTeacher(); allow write: if isAdmin(); }
-    match /counters/{id} { allow read: if true; allow write: if isSignedIn(); }
+    match /counters/{id} { allow read: if true; allow write: if true; }
     match /test-connection/{id} { allow read: if true; }
     match /certificates/{id} { allow read: if true; allow write: if isSignedIn(); }
 

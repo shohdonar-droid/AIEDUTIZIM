@@ -316,7 +316,10 @@ export default function TeacherQuizizz() {
   };
   
   const handleStopSession = async () => {
-    if (activeSession) {
+    if (!activeSession || isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+    const isAlreadyFinished = activeSession.status === 'finished';
+    try {
       await updateDoc(doc(db, 'quiz_sessions', activeSession.id), {
         status: 'finished'
       });
@@ -324,8 +327,12 @@ export default function TeacherQuizizz() {
          participants: participants,
          lastRun: serverTimestamp()
       });
-      await issueCertificateForWinner(activeSession, participants);
+      if (!isAlreadyFinished) {
+        await issueCertificateForWinner(activeSession, participants);
+      }
       setActiveSession(null);
+    } finally {
+      isTransitioningRef.current = false;
     }
   };
 
