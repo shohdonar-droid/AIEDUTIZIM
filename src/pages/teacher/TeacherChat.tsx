@@ -231,7 +231,7 @@ export default function TeacherChat() {
   });
 
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex h-[70vh]">
+    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex h-[calc(100vh-140px)] md:h-[70vh]">
       {/* Sidebar */}
       <div className="w-1/3 border-r border-gray-100 flex flex-col">
         <div className="p-4 border-b border-gray-100 shrink-0">

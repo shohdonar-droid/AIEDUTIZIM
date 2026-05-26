@@ -201,39 +201,18 @@ export default function StudentProfile() {
                   <Building className="h-4 w-4" />
                   Yo'nalish
                 </label>
-                <select
-                  required
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-bold text-gray-900"
-                  value={formData.departmentId}
-                  onChange={(e) => setFormData({ ...formData, departmentId: e.target.value, groupId: '' })}
-                >
-                  <option value="">Tanlang</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-2xl font-bold text-gray-500">
+                  {user?.departmentName || "Kiritilmagan"}
+                </div>
               </div>
               <div>
                 <label className="flex items-center gap-2 text-xs font-black text-gray-400 mb-2 uppercase tracking-widest">
                   <Users className="h-4 w-4" />
                   Guruh
                 </label>
-                <select
-                  required
-                  disabled={!formData.departmentId}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-bold text-gray-900 disabled:opacity-50"
-                  value={formData.groupId}
-                  onChange={(e) => setFormData({ ...formData, groupId: e.target.value })}
-                >
-                  <option value="">Tanlang</option>
-                  {filteredGroups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-2xl font-bold text-gray-500">
+                  {user?.groupName || "Kiritilmagan"}
+                </div>
               </div>
             </div>
 

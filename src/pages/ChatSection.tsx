@@ -320,8 +320,8 @@ export default function ChatSection() {
   const currentContact = contacts.find(c => (c.uid) === selectedContactId);
 
   return (
-    <div className="flex flex-col h-[700px] bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-6">
-      <header className="px-8 py-5 border-b border-gray-50 flex items-center justify-between bg-white z-10">
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[700px] bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-6">
+      <header className="px-8 py-5 border-b border-gray-50 flex items-center justify-between bg-white z-10 shrink-0">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
             <MessageSquare className="h-5 w-5" />
@@ -343,7 +343,7 @@ export default function ChatSection() {
         ) : null}
       </header>
 
-      <div className="flex flex-1 min-w-0">
+      <div className="flex flex-1 min-w-0 overflow-hidden">
         <div className={`w-full md:w-1/3 border-r border-gray-50 flex flex-col ${selectedContactId ? 'hidden md:flex' : 'flex'}`}>
           {isAdmin && (
              <div className="p-2 flex gap-1 border-b border-gray-50 bg-gray-50/50 shrink-0">

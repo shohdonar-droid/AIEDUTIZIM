@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { collection, getDocs, doc, deleteDoc, query, where, onSnapshot, updateDoc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { UserProfile, Department, Group } from '../../types';
-import { Search, Trash2, Filter, Key, Plus, X, Save, Loader2, Download } from 'lucide-react';
+import { Search, Trash2, Filter, Key, Plus, X, Save, Loader2, Download, Edit } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import * as XLSX from 'xlsx';
 import firebaseConfig from '../../../firebase-applet-config.json';
@@ -31,6 +31,8 @@ export default function TeacherStudents() {
     password: ''
   });
   const [creating, setCreating] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Partial<UserProfile> | null>(null);
+  const [studentSaving, setStudentSaving] = useState(false);
 
   const getPrefix = (name: string) => {
     return name
@@ -242,6 +244,23 @@ export default function TeacherStudents() {
       console.error(error);
       alert("O'chirishda xatolik yuz berdi");
     }
+  };
+
+  const saveStudentEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent || !editingStudent.uid) return;
+    setStudentSaving(true);
+    try {
+       const deptName = teacherDepartments.find(d => d.id === editingStudent.departmentId)?.name || '';
+       const grpName = teacherGroups.find(g => g.id === editingStudent.groupId)?.name || '';
+       await updateDoc(doc(db, 'users', editingStudent.uid), {
+          departmentId: editingStudent.departmentId || '',
+          departmentName: deptName,
+          groupId: editingStudent.groupId || '',
+          groupName: grpName
+       });
+       setEditingStudent(null);
+    } catch (err: any) { alert(err.message); } finally { setStudentSaving(false); }
   };
 
   const resetPassword = async (uid: string) => {
@@ -576,6 +595,11 @@ export default function TeacherStudents() {
                   <td className="px-6 py-4 text-center font-mono text-sm text-gray-400">{u.password || '-'}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
+                      {activeTab === 'student' && (
+                        <button onClick={() => setEditingStudent(u)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm" title="Tahrirlash">
+                          <Edit className="w-5 h-5" />
+                        </button>
+                      )}
                       <button onClick={() => resetPassword(u.uid)} className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition shadow-sm" title="Parolni tiklash">
                         <Key className="w-5 h-5" />
                       </button>
@@ -590,6 +614,74 @@ export default function TeacherStudents() {
           </table>
         </div>
       </div>
+
+      {editingStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h2 className="text-xl font-black text-gray-900">Talabani tahrirlash</h2>
+              <button 
+                onClick={() => setEditingStudent(null)}
+                className="p-2 hover:bg-gray-200 rounded-xl transition-colors text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={saveStudentEdit} className="p-6 space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-1">FISH</label>
+                  <div className="p-3 bg-gray-50 rounded-xl font-bold text-gray-500 border border-gray-100">{editingStudent.displayName}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-1">Yo'nalish</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none font-medium"
+                    value={editingStudent.departmentId || ''}
+                    onChange={e => setEditingStudent({ ...editingStudent, departmentId: e.target.value, groupId: '' })}
+                  >
+                    <option value="">Tanlang...</option>
+                    {teacherDepartments.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-1">Guruh</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none font-medium disabled:opacity-50"
+                    value={editingStudent.groupId || ''}
+                    disabled={!editingStudent.departmentId}
+                    onChange={e => setEditingStudent({ ...editingStudent, groupId: e.target.value })}
+                  >
+                    <option value="">Tanlang...</option>
+                    {teacherGroups.filter(g => g.departmentId === editingStudent.departmentId).map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingStudent(null)}
+                  className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  Bekor qilish
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={studentSaving}
+                  className="px-6 py-2.5 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-lg flex items-center gap-2 disabled:opacity-50"
+                >
+                  {studentSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                  SAQLASH
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
