@@ -39,16 +39,13 @@ export default function ChatSection() {
          try {
            const newContacts: any[] = [];
            
-            // 1. Fetch Admin (Priority for Elyorbek)
+            // 1. Fetch Admins
             const aSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin')));
             if (!aSnap.empty) {
                const allAdmins = aSnap.docs.map(d => ({ uid: d.id, ...d.data() } as any));
-               const elyorbek = allAdmins.find(a => a.displayName?.toUpperCase().includes('ELYORBEK'));
-               if (elyorbek) {
-                  newContacts.push({ ...elyorbek, displayName: 'ELYORBEK (ADMIN)' });
-               } else if (allAdmins.length > 0) {
-                  newContacts.push({ ...allAdmins[0], displayName: `${allAdmins[0].displayName} (Admin)` });
-               }
+               allAdmins.forEach(admin => {
+                  newContacts.push({ ...admin, displayName: `${admin.displayName || 'Admin'} (Admin)` });
+               });
             }
 
             // 2. Fetch Organization
@@ -224,7 +221,14 @@ export default function ChatSection() {
       setMessages(sorted);
       
       if (sorted.length > 0) {
-        setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        setTimeout(() => {
+           if (scrollRef.current) {
+              const container = scrollRef.current.parentElement;
+              if (container) {
+                 container.scrollTop = container.scrollHeight;
+              }
+           }
+        }, 100);
       }
 
       // Mark unread messages as read
@@ -342,7 +346,7 @@ export default function ChatSection() {
       <div className="flex flex-1 min-w-0">
         <div className={`w-full md:w-1/3 border-r border-gray-50 flex flex-col ${selectedContactId ? 'hidden md:flex' : 'flex'}`}>
           {isAdmin && (
-             <div className="p-2 flex gap-1 border-b border-gray-50 bg-gray-50/50">
+             <div className="p-2 flex gap-1 border-b border-gray-50 bg-gray-50/50 shrink-0">
                 <button
                    onClick={() => setAdminTab('teachers')}
                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative ${
@@ -397,7 +401,7 @@ export default function ChatSection() {
                 </button>
              </div>
           )}
-          <div className="p-4 border-b border-gray-50 flex items-center justify-between">
+          <div className="p-4 border-b border-gray-50 flex items-center justify-between shrink-0">
              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Suhbatdoshlar</span>
              <div className="flex items-center gap-2">
                 {isAdmin && (

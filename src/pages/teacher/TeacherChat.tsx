@@ -12,6 +12,7 @@ export default function TeacherChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [lastMessageTimes, setLastMessageTimes] = useState<Record<string, number>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,21 +98,63 @@ export default function TeacherChat() {
     }
     loadContacts();
 
-    // Listen for unread messages targeting me
-    const q = query(collection(db, 'messages'), where('receiverId', '==', user.uid), where('isRead', '==', false));
-    const unsub = onSnapshot(q, (snap) => {
-      const counts: Record<string, number> = {};
-      snap.docs.forEach(doc => {
-        const msg = doc.data() as Message;
-        if (!counts[msg.senderId]) counts[msg.senderId] = 0;
-        counts[msg.senderId]++;
+    // Listen for unread messages targeting me AND message times
+    let counts1: Record<string, number> = {};
+    let times1: Record<string, number> = {};
+    let times3: Record<string, number> = {};
+
+    const updateAllCountsAndTimes = () => {
+      setUnreadCounts({ ...counts1 });
+      const mergedTimes: Record<string, number> = {};
+      const allKeys = new Set([...Object.keys(times1), ...Object.keys(times3)]);
+      allKeys.forEach(k => {
+          mergedTimes[k] = Math.max(times1[k] || 0, times3[k] || 0);
       });
-      setUnreadCounts(counts);
+      setLastMessageTimes(mergedTimes);
+    };
+
+    const q1 = query(collection(db, 'messages'), where('receiverId', '==', user.uid));
+    const q3 = query(collection(db, 'messages'), where('senderId', '==', user.uid));
+
+    const extractTime = (d: any) => d.timestamp?.toMillis ? d.timestamp.toMillis() : (d.timestamp?.seconds ? d.timestamp.seconds * 1000 : 0);
+
+    const unsub1 = onSnapshot(q1, (snap) => {
+      const counts: Record<string, number> = {};
+      const t: Record<string, number> = {};
+      snap.docs.forEach(doc => {
+        const d = doc.data() as Message;
+        const senderId = d.senderId;
+        const time = extractTime(d);
+        t[senderId] = Math.max(t[senderId] || 0, time);
+        if (!d.isRead) {
+           counts[senderId] = (counts[senderId] || 0) + 1;
+        }
+      });
+      counts1 = counts;
+      times1 = t;
+      updateAllCountsAndTimes();
     }, (err) => {
       console.error("TeacherChat Unread Snapshot Error:", err);
     });
 
-    return unsub;
+    const unsub3 = onSnapshot(q3, (snap) => {
+       const t: Record<string, number> = {};
+       snap.docs.forEach(doc => {
+          const d = doc.data() as Message;
+          const recId = d.receiverId;
+          const time = extractTime(d);
+          t[recId] = Math.max(t[recId] || 0, time);
+       });
+       times3 = t;
+       updateAllCountsAndTimes();
+    }, (err) => {
+       console.error("TeacherChat msg3 Snapshot Error:", err);
+    });
+
+    return () => {
+       unsub1();
+       unsub3();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -155,7 +198,14 @@ export default function TeacherChat() {
   }, [user, selectedContact]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+       if (messagesEndRef.current) {
+          const container = messagesEndRef.current.parentElement;
+          if (container) {
+             container.scrollTop = container.scrollHeight;
+          }
+       }
+    }, 100);
   }, [messages]);
 
   const sendMessage = async (e: React.FormEvent) => {
@@ -174,15 +224,21 @@ export default function TeacherChat() {
     });
   };
 
+  const sortedContacts = [...contacts].sort((a, b) => {
+    const tA = lastMessageTimes[a.uid] || 0;
+    const tB = lastMessageTimes[b.uid] || 0;
+    return tB - tA; // latest first
+  });
+
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex h-[70vh]">
       {/* Sidebar */}
       <div className="w-1/3 border-r border-gray-100 flex flex-col">
-        <div className="p-4 border-b border-gray-100">
+        <div className="p-4 border-b border-gray-100 shrink-0">
           <h2 className="text-xl font-bold">Chat</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {contacts.map(c => (
+          {sortedContacts.map(c => (
             <button 
               key={c.uid}
               onClick={() => setSelectedContact(c)}
