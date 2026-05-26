@@ -53,7 +53,7 @@ export default function Navbar() {
     { name: 'Kurslar', path: '/courses', icon: BookOpen },
     { name: 'Testlar', path: '/tests', icon: FileText },
     { name: 'Quizizz', path: '/quizizz', icon: Gamepad2 },
-    { name: 'Chat', path: '/contact', icon: MessageCircle },
+    { name: 'Bog\'lanish', path: '/contact', icon: MessageCircle },
   ];
 
   const handleLogout = async () => {

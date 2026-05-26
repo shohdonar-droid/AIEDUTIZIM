@@ -320,7 +320,7 @@ export default function ChatSection() {
   const currentContact = contacts.find(c => (c.uid) === selectedContactId);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[700px] bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-6">
+    <div className="flex flex-col h-[calc(100vh-140px)] bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-6">
       <header className="px-8 py-5 border-b border-gray-50 flex items-center justify-between bg-white z-10 shrink-0">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
@@ -343,8 +343,8 @@ export default function ChatSection() {
         ) : null}
       </header>
 
-      <div className="flex flex-1 min-w-0 overflow-hidden">
-        <div className={`w-full md:w-1/3 border-r border-gray-50 flex flex-col ${selectedContactId ? 'hidden md:flex' : 'flex'}`}>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className={`w-full md:w-1/3 border-r border-gray-50 flex flex-col h-full bg-white ${selectedContactId ? 'hidden md:flex' : 'flex'}`}>
           {isAdmin && (
              <div className="p-2 flex gap-1 border-b border-gray-50 bg-gray-50/50 shrink-0">
                 <button
@@ -471,15 +471,15 @@ export default function ChatSection() {
           </div>
         </div>
 
-        <div className={`flex-1 flex flex-col min-w-0 ${!selectedContactId ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-1 flex flex-col min-w-0 h-full ${!selectedContactId ? 'hidden md:flex' : 'flex'}`}>
           {selectedContactId ? (
             <>
-              <div className="p-4 border-b border-gray-50 bg-white flex items-center gap-3">
-                 <button onClick={() => setSelectedContactId(null)} className="md:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
+              <div className="p-4 border-b border-gray-50 bg-white flex items-center gap-3 shrink-0">
+                 <button onClick={() => setSelectedContactId(null)} className="md:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg shrink-0">
                     <X className="h-5 w-5" />
                  </button>
-                 <div>
-                    <h3 className="font-bold text-gray-900">{currentContact?.displayName || 'Ismsiz'}</h3>
+                 <div className="overflow-hidden">
+                    <h3 className="font-bold text-gray-900 truncate">{currentContact?.displayName || 'Ismsiz'}</h3>
                     <p className="text-xs text-gray-400">{currentContact?.role === 'admin' ? 'Tizim administratori' : currentContact?.role === 'teacher' ? 'Tashkilot profili' : 'Foydalanuvchi'}</p>
                  </div>
               </div>
@@ -519,7 +519,7 @@ export default function ChatSection() {
                 <div ref={scrollRef} />
               </div>
 
-              <footer className="p-4 md:p-6 border-t border-gray-50 bg-white">
+              <footer className="p-4 md:p-6 border-t border-gray-50 bg-white shrink-0">
                 {replyMsg && (
                    <div className="flex items-center justify-between bg-blue-50/50 p-3 rounded-t-2xl border border-blue-100 border-b-0">
                       <div className="flex flex-col min-w-0 pr-2">

@@ -231,9 +231,9 @@ export default function TeacherChat() {
   });
 
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex h-[calc(100vh-140px)] md:h-[70vh]">
+    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex h-[calc(100vh-140px)] mt-6">
       {/* Sidebar */}
-      <div className="w-1/3 border-r border-gray-100 flex flex-col">
+      <div className="w-1/3 border-r border-gray-100 flex flex-col h-full">
         <div className="p-4 border-b border-gray-100 shrink-0">
           <h2 className="text-xl font-bold">Chat</h2>
         </div>
@@ -262,10 +262,10 @@ export default function TeacherChat() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-gray-50/50">
+      <div className="flex-1 flex flex-col bg-gray-50/50 min-w-0 h-full">
         {selectedContact ? (
           <>
-            <div className="h-16 border-b border-gray-100 bg-white flex items-center px-6">
+            <div className="h-16 border-b border-gray-100 bg-white flex items-center px-6 shrink-0">
               <span className="font-bold text-lg">{selectedContact.displayName || 'Ismsiz'}</span>
               <span className="ml-2 text-sm text-gray-500 capitalize px-2 py-0.5 bg-gray-100 rounded-lg">{selectedContact.role === 'admin' ? 'Admin' : selectedContact.role === 'teacher' ? 'Tashkilot' : selectedContact.role === 'staff' ? 'Xodim' : 'Talaba'}</span>
             </div>
@@ -284,7 +284,7 @@ export default function TeacherChat() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-4 bg-white border-t border-gray-100">
+            <div className="p-4 bg-white border-t border-gray-100 shrink-0">
               <form onSubmit={sendMessage} className="flex gap-2">
                 <input 
                   type="text" 
