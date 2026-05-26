@@ -17,6 +17,7 @@ export default function ChatSection() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [lastMessageTimes, setLastMessageTimes] = useState<Record<string, number>>({});
   const [adminTab, setAdminTab] = useState<'teachers' | 'students' | 'staff' | 'inquiries'>('teachers');
 
   // Load contacts
@@ -104,58 +105,104 @@ export default function ChatSection() {
     inquiries: contacts.filter(c => c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
   };
 
-  // unread listener
+  // unread listener and message times
   useEffect(() => {
     if (user) {
       let counts1: Record<string, number> = {};
       let counts2: Record<string, number> = {};
+      
+      let times1: Record<string, number> = {};
+      let times2: Record<string, number> = {};
+      let times3: Record<string, number> = {};
 
-      const updateAllCounts = () => {
+      const updateAllCountsAndTimes = () => {
         const merged: Record<string, number> = { ...counts1 };
         Object.keys(counts2).forEach(key => {
           merged[key] = (merged[key] || 0) + counts2[key];
         });
         setUnreadCounts(merged);
+        
+        const mergedTimes: Record<string, number> = {};
+        const allKeys = new Set([...Object.keys(times1), ...Object.keys(times2), ...Object.keys(times3)]);
+        allKeys.forEach(k => {
+           mergedTimes[k] = Math.max(times1[k] || 0, times2[k] || 0, times3[k] || 0);
+        });
+        setLastMessageTimes(mergedTimes);
       };
 
       const q1 = query(
         collection(db, 'messages'),
-        where('isRead', '==', false),
         where('receiverId', '==', user.uid)
       );
 
-      const q2 = query(
+      const q2 = isAdmin ? query(
         collection(db, 'messages'),
-        where('isRead', '==', false),
         where('receiverRole', '==', 'admin')
+      ) : null;
+
+      const q3 = query(
+        collection(db, 'messages'),
+        where('senderId', '==', user.uid)
       );
+
+      const extractTime = (d: any) => d.timestamp?.toMillis ? d.timestamp.toMillis() : (d.timestamp?.seconds ? d.timestamp.seconds * 1000 : 0);
 
       const unsub1 = onSnapshot(q1, (snap) => {
         const counts: Record<string, number> = {};
+        const t: Record<string, number> = {};
         snap.docs.forEach(doc => {
-          const senderId = doc.data().senderId;
-          counts[senderId] = (counts[senderId] || 0) + 1;
+          const d = doc.data();
+          const senderId = d.senderId;
+          const time = extractTime(d);
+          t[senderId] = Math.max(t[senderId] || 0, time);
+          if (!d.isRead) {
+             counts[senderId] = (counts[senderId] || 0) + 1;
+          }
         });
         counts1 = counts;
-        updateAllCounts();
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-unread-counts-1'));
+        times1 = t;
+        updateAllCountsAndTimes();
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-counts-times-1'));
 
-      const unsub2 = onSnapshot(q2, (snap) => {
-        const counts: Record<string, number> = {};
-        snap.docs.forEach(doc => {
-          const senderId = doc.data().senderId;
-          counts[senderId] = (counts[senderId] || 0) + 1;
-        });
-        counts2 = counts;
-        updateAllCounts();
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-unread-counts-2'));
+      let unsub2 = () => {};
+      if (q2) {
+         unsub2 = onSnapshot(q2, (snap) => {
+           const counts: Record<string, number> = {};
+           const t: Record<string, number> = {};
+           snap.docs.forEach(doc => {
+             const d = doc.data();
+             const senderId = d.senderId;
+             const time = extractTime(d);
+             t[senderId] = Math.max(t[senderId] || 0, time);
+             if (!d.isRead) {
+                counts[senderId] = (counts[senderId] || 0) + 1;
+             }
+           });
+           counts2 = counts;
+           times2 = t;
+           updateAllCountsAndTimes();
+         }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-counts-times-2'));
+      }
+
+      const unsub3 = onSnapshot(q3, (snap) => {
+         const t: Record<string, number> = {};
+         snap.docs.forEach(doc => {
+            const d = doc.data();
+            const recId = d.receiverId;
+            const time = extractTime(d);
+            t[recId] = Math.max(t[recId] || 0, time);
+         });
+         times3 = t;
+         updateAllCountsAndTimes();
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-counts-times-3'));
 
       return () => {
         unsub1();
         unsub2();
+        unsub3();
       };
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
   // Messages listener
   useEffect(() => {
@@ -259,6 +306,12 @@ export default function ChatSection() {
       setLoading(false);
     }
   };
+
+  const sortedFilteredContacts = [...filteredContacts].sort((a, b) => {
+    const tA = lastMessageTimes[a.uid] || 0;
+    const tB = lastMessageTimes[b.uid] || 0;
+    return tB - tA; // latest first
+  });
 
   const currentContact = contacts.find(c => (c.uid) === selectedContactId);
 
@@ -380,7 +433,7 @@ export default function ChatSection() {
              </div>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {filteredContacts.map(c => {
+            {sortedFilteredContacts.map(c => {
               const cid = c.uid || '';
               const unread = unreadCounts[cid] || 0;
               const isSelected = selectedContactId === cid;
