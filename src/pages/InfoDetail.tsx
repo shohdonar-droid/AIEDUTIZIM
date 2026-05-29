@@ -73,23 +73,7 @@ export default function InfoDetail() {
           <ArrowLeft className="h-5 w-5" /> Bosh sahifaga qaytish
         </Link>
 
-        {/* Hero Card Preview - Keep it for context but make it smaller or secondary if needed */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-          <div className="mac-window overflow-hidden rounded-3xl shadow-2xl">
-            <img src={makeDirectImageUrl(content.rightImage || null)} referrerPolicy="no-referrer" alt="Cover" className="w-full h-[400px] object-cover" />
-          </div>
-          <div className="space-y-6">
-             <span className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-widest inline-block">
-               {content.rightBadge || "Yangilik"}
-             </span>
-             <h1 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight">
-               {content.rightText}
-             </h1>
-          </div>
-        </div>
-
-        {/* Sections Selection */}
-        <div className="pt-10 border-t border-gray-100">
+        <div>
            <div className="text-center mb-10">
               <h2 className="text-3xl font-black text-gray-900 tracking-tight">Batafsil ma'lumot</h2>
               <p className="text-gray-500 mt-2 font-medium">Kerakli bo'limni tanlang va ma'lumotlar bilan tanishing.</p>
