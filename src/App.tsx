@@ -7,6 +7,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import Navbar from './components/Navbar';
+import { ChatbotWidget } from './components/ChatbotWidget';
 import Home from './pages/Home';
 import Courses from './pages/Courses';
 import Tests from './pages/Tests';
@@ -96,6 +97,7 @@ export default function App() {
               } />
             </Routes>
           </main>
+          <ChatbotWidget />
         </div>
       </Router>
     </AuthProvider>

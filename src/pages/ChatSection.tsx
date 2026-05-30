@@ -85,21 +85,46 @@ export default function ChatSection() {
     }
   }, [user, isAdmin]);
 
+  // Combine contacts with any missing senders from messages
+  const [completeContacts, setCompleteContacts] = useState<UserProfile[]>([]);
+
+  useEffect(() => {
+     let newContacts = [...contacts];
+     const existingIds = new Set(contacts.map(c => c.uid));
+     
+     if (isAdmin) {
+        Object.keys(lastMessageTimes).forEach(senderId => {
+           if (senderId && senderId !== 'undefined' && !existingIds.has(senderId) && senderId !== user?.uid && senderId !== 'SYSTEM_ADMIN') {
+              newContacts.push({
+                 uid: senderId,
+                 id: senderId,
+                 displayName: senderId.startsWith('anon_') ? 'Mehmon ' + senderId.slice(-4) : 'Noma\'lum Foydalanuvchi',
+                 role: 'inquiry',
+                 isAnonymousContact: true,
+                 createdAt: Timestamp.now()
+              } as any);
+              existingIds.add(senderId);
+           }
+        });
+     }
+     setCompleteContacts(newContacts);
+  }, [contacts, lastMessageTimes, isAdmin, user?.uid]);
+
   const filteredContacts = isAdmin 
-    ? contacts.filter(c => {
-        if (adminTab === 'inquiries') return c.isAnonymousContact;
+    ? completeContacts.filter(c => {
+        if (adminTab === 'inquiries') return c.isAnonymousContact || (!c.role && !c.isAnonymousContact);
         if (adminTab === 'teachers') return c.role === 'teacher' && !c.isAnonymousContact;
         if (adminTab === 'students') return c.role === 'student' && !c.isAnonymousContact;
         if (adminTab === 'staff') return c.role === 'staff' && !c.isAnonymousContact;
         return false;
       })
-    : contacts;
+    : completeContacts;
 
   const adminUnreadCounts = {
-    teachers: contacts.filter(c => c.role === 'teacher' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
-    students: contacts.filter(c => c.role === 'student' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
-    staff: contacts.filter(c => c.role === 'staff' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
-    inquiries: contacts.filter(c => c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    teachers: completeContacts.filter(c => c.role === 'teacher' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    students: completeContacts.filter(c => c.role === 'student' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    staff: completeContacts.filter(c => c.role === 'staff' && !c.isAnonymousContact).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
+    inquiries: completeContacts.filter(c => c.isAnonymousContact || (!c.role && !c.isAnonymousContact)).reduce((acc, c) => acc + (unreadCounts[c.uid] || 0), 0),
   };
 
   // unread listener and message times
@@ -317,7 +342,7 @@ export default function ChatSection() {
     return tB - tA; // latest first
   });
 
-  const currentContact = contacts.find(c => (c.uid) === selectedContactId);
+  const currentContact = completeContacts.find(c => (c.uid) === selectedContactId);
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-6">

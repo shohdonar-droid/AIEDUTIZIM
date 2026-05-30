@@ -20,9 +20,11 @@ export default function InfoDetail() {
       const snap = await getDoc(doc(db, 'siteContent', 'main'));
       if (snap.exists()) {
         const data = snap.data() as SiteContent;
-        setContent(data.hero);
-        if (data.hero.infoSections && data.hero.infoSections.length > 0) {
-          setActiveTab(data.hero.infoSections[0].id);
+        if (data.hero) {
+          setContent(data.hero);
+          if (data.hero.infoSections && data.hero.infoSections.length > 0) {
+            setActiveTab(data.hero.infoSections[0].id);
+          }
         }
       }
       setLoading(false);

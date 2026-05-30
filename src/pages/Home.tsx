@@ -17,7 +17,6 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchData() {
-      // Default content if not in DB
       const defaultContent: SiteContent = {
         hero: {
           rightImage: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800",
@@ -34,57 +33,77 @@ export default function Home() {
         }
       };
 
-      const contentDoc = await getDoc(doc(db, 'siteContent', 'main'));
-      if (contentDoc.exists()) {
-        setContent(contentDoc.data() as SiteContent);
-      } else {
+      try {
+        const contentDoc = await getDoc(doc(db, 'siteContent', 'main'));
+        if (contentDoc.exists()) {
+          const data = contentDoc.data() as SiteContent;
+          setContent({
+            ...defaultContent,
+            ...data,
+            hero: { ...defaultContent.hero, ...(data.hero || {}) },
+            banners: data.banners || defaultContent.banners,
+            footer: { ...defaultContent.footer, ...(data.footer || {}) },
+          });
+        } else {
+          setContent(defaultContent);
+        }
+      } catch (err) {
+        console.error('Failed to load site content:', err);
         setContent(defaultContent);
       }
 
-      const coursesSnap = await getDocs(collection(db, 'courses'));
-      let coursesData = coursesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
-      
-      // Filter for highlighted courses
-      coursesData = coursesData.filter(c => {
-         const isAdminCourse = c.creatorRole === 'admin' || !c.creatorRole;
-         const isGlobalAdminCourse = isAdminCourse && 
-                                    (!c.organizationIds || c.organizationIds.length === 0) &&
-                                    (!c.departmentIds || c.departmentIds.length === 0) &&
-                                    (!c.groupIds || c.groupIds.length === 0);
+      try {
+        const coursesSnap = await getDocs(collection(db, 'courses'));
+        let coursesData = coursesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
+        
+        // Filter for highlighted courses
+        coursesData = coursesData.filter(c => {
+           const isAdminCourse = c.creatorRole === 'admin' || !c.creatorRole;
+           const isGlobalAdminCourse = isAdminCourse && 
+                                      (!c.organizationIds || c.organizationIds.length === 0) &&
+                                      (!c.departmentIds || c.departmentIds.length === 0) &&
+                                      (!c.groupIds || c.groupIds.length === 0);
 
-         if (!user) {
-            return isGlobalAdminCourse && c.isPublic !== false;
-         }
+           if (!user) {
+              return isGlobalAdminCourse && c.isPublic !== false;
+           }
 
-         if (user.role === 'admin') return true;
+           if (user.role === 'admin') return true;
 
-         if (user.role === 'student') {
-            if (isGlobalAdminCourse) return true;
+           if (user.role === 'student') {
+              if (isGlobalAdminCourse) return true;
 
-            const hasGroupFilter = (c.groupIds?.length || 0) > 0;
-            const hasDeptFilter = (c.departmentIds?.length || 0) > 0;
-            const hasOrgFilter = (c.organizationIds?.length || 0) > 0;
+              const hasGroupFilter = (c.groupIds?.length || 0) > 0;
+              const hasDeptFilter = (c.departmentIds?.length || 0) > 0;
+              const hasOrgFilter = (c.organizationIds?.length || 0) > 0;
 
-            if (hasGroupFilter) return c.groupIds?.includes(user.groupId || '') || false;
-            if (hasDeptFilter) return c.departmentIds?.includes(user.departmentId || '') || false;
-            if (hasOrgFilter) return c.organizationIds?.includes(user.teacherId || '') || false;
+              if (hasGroupFilter) return c.groupIds?.includes(user.groupId || '') || false;
+              if (hasDeptFilter) return c.departmentIds?.includes(user.departmentId || '') || false;
+              if (hasOrgFilter) return c.organizationIds?.includes(user.teacherId || '') || false;
 
-            if (c.creatorId === user.teacherId) return true;
-         }
+              if (c.creatorId === user.teacherId) return true;
+           }
 
-         if (user.role === 'teacher' && c.creatorId === user.uid) return true;
+           if (user.role === 'teacher' && c.creatorId === user.uid) return true;
 
-         return false;
-      });
+           return false;
+        });
 
-      setCourses(coursesData.length > 0 ? coursesData.slice(0, 6) : [
-        { id: '1', title: 'Python Asoslari', thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=400', description: 'Sun\'iy intellekt uchun asosiy tilni o\'rganing.', modules: [], createdAt: null },
-        { id: '2', title: 'Machine Learning', thumbnail: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?auto=format&fit=crop&q=80&w=400', description: 'Ma\'lumotlar tahlili va bashoratlash.', modules: [], createdAt: null },
-        { id: '3', title: 'Frontend Development', thumbnail: 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?auto=format&fit=crop&q=80&w=400', description: 'Zamonaviy web interfeyslar.', modules: [], createdAt: null },
-        { id: '4', title: 'Backend Development', thumbnail: 'https://images.unsplash.com/photo-1623479322729-28b25c16b011?auto=format&fit=crop&q=80&w=400', description: 'Node.js va ma\'lumotlar bazalari.', modules: [], createdAt: null },
-        { id: '5', title: 'Data Science', thumbnail: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=400', description: 'Katta hajmdagi ma\'lumotlarni ishlash.', modules: [], createdAt: null },
-        { id: '6', title: 'Mobile Development', thumbnail: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=400', description: 'Zamonaviy mobil ilovalar yaratish.', modules: [], createdAt: null }
-      ]);
+        setCourses(coursesData.length > 0 ? coursesData.slice(0, 6) : [
+          { id: '1', title: 'Python Asoslari', thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=400', description: 'Sun\'iy intellekt uchun asosiy tilni o\'rganing.', modules: [], createdAt: null },
+          { id: '2', title: 'Machine Learning', thumbnail: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?auto=format&fit=crop&q=80&w=400', description: 'Ma\'lumotlar tahlili va bashoratlash.', modules: [], createdAt: null },
+          { id: '3', title: 'Frontend Development', thumbnail: 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?auto=format&fit=crop&q=80&w=400', description: 'Zamonaviy web interfeyslar.', modules: [], createdAt: null },
+          { id: '4', title: 'Backend Development', thumbnail: 'https://images.unsplash.com/photo-1623479322729-28b25c16b011?auto=format&fit=crop&q=80&w=400', description: 'Node.js va ma\'lumotlar bazalari.', modules: [], createdAt: null },
+          { id: '5', title: 'Data Science', thumbnail: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=400', description: 'Katta hajmdagi ma\'lumotlarni ishlash.', modules: [], createdAt: null },
+          { id: '6', title: 'Mobile Development', thumbnail: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=400', description: 'Zamonaviy mobil ilovalar yaratish.', modules: [], createdAt: null }
+        ]);
+      } catch (e) {
+        console.error('Failed to load courses:', e);
+        setCourses([
+          { id: '1', title: 'Python Asoslari', thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=400', description: 'Sun\'iy intellekt uchun asosiy tilni o\'rganing.', modules: [], createdAt: null },
+          { id: '2', title: 'Machine Learning', thumbnail: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?auto=format&fit=crop&q=80&w=400', description: 'Ma\'lumotlar tahlili va bashoratlash.', modules: [], createdAt: null }
+        ]);
+      }
 
       try {
         const cSnap = await getCountFromServer(collection(db, 'courses'));

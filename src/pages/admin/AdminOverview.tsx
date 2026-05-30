@@ -33,7 +33,7 @@ export default function AdminOverview() {
         const staffCount = users.filter(u => u.role === 'staff').length;
 
         try {
-          const logsSnap = await getDocs(query(collection(db, 'activityLogs'), orderBy('loginTime', 'desc'), limit(5)));
+          const logsSnap = await getDocs(query(collection(db, 'activityLogs'), orderBy('loginTime', 'desc'), limit(500)));
           setLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch(e) {
           console.error("Error loading activity logs", e);
