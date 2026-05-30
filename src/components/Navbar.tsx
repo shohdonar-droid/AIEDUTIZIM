@@ -74,6 +74,7 @@ export default function Navbar() {
     
     localStorage.removeItem('sessionId');
     localStorage.removeItem('sessionStart');
+    localStorage.removeItem('lastActivityTime');
     auth.signOut();
   };
 

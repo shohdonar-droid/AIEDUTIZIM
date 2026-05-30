@@ -163,6 +163,7 @@ export interface Message {
   text: string;
   timestamp: any;
   isRead: boolean;
+  isEdited?: boolean;
   replyTo?: {
     id: string;
     text: string;

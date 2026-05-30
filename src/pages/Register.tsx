@@ -89,6 +89,7 @@ export default function Register() {
          });
          localStorage.setItem('sessionId', sessionRef.id);
          localStorage.setItem('sessionStart', Date.now().toString());
+         localStorage.setItem('lastActivityTime', Date.now().toString());
       } catch (e) {}
 
       await refreshUser();

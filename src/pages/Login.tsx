@@ -112,6 +112,7 @@ export default function Login() {
             });
             localStorage.setItem('sessionId', sessionRef.id);
             localStorage.setItem('sessionStart', Date.now().toString());
+            localStorage.setItem('lastActivityTime', Date.now().toString());
             localStorage.removeItem('impersonateUserId'); // Clear any impersonation
           } catch (e) {}
 
@@ -150,6 +151,7 @@ export default function Login() {
               });
               localStorage.setItem('sessionId', sessionRef.id);
               localStorage.setItem('sessionStart', Date.now().toString());
+              localStorage.setItem('lastActivityTime', Date.now().toString());
             } catch (e) {}
             
             await refreshUser();

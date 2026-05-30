@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, addDoc, query, orderBy, onSnapshot, where, Timestamp, limit, getDocs, or, and, writeBatch, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, where, Timestamp, limit, getDocs, or, and, writeBatch, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Message, UserProfile } from '../types';
-import { Send, Loader2, User as UserIcon, Bell, MessageSquare, X, Reply } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Bell, MessageSquare, X, Reply, MoreVertical, Edit2, Trash2, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function ChatSection() {
@@ -12,6 +12,8 @@ export default function ChatSection() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [replyMsg, setReplyMsg] = useState<Message | null>(null);
+  const [editMsg, setEditMsg] = useState<Message | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
@@ -40,12 +42,16 @@ export default function ChatSection() {
            const newContacts: any[] = [];
            
             // 1. Fetch Admins
-            const aSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin')));
+            const aSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin'), limit(1)));
             if (!aSnap.empty) {
-               const allAdmins = aSnap.docs.map(d => ({ uid: d.id, ...d.data() } as any));
-               allAdmins.forEach(admin => {
-                  newContacts.push({ ...admin, displayName: `${admin.displayName || 'Admin'} (Admin)` });
-               });
+               const admin = aSnap.docs[0].data();
+               newContacts.push({ uid: aSnap.docs[0].id, ...admin, displayName: `${admin.displayName || 'Admin'} (Admin)` });
+            } else {
+               const fallbackSnap = await getDocs(query(collection(db, 'users'), where('email', 'in', ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com']), limit(1)));
+               if (!fallbackSnap.empty) {
+                  const admin = fallbackSnap.docs[0].data();
+                  newContacts.push({ uid: fallbackSnap.docs[0].id, ...admin, displayName: `${admin.displayName || 'Admin'} (Admin)` });
+               }
             }
 
             // 2. Fetch Organization
@@ -309,28 +315,36 @@ export default function ChatSection() {
 
     setLoading(true);
     try {
-      const recipientDoc = await getDoc(doc(db, 'users', selectedContactId));
-      const recipientData = recipientDoc.data();
-      const receiverRole = recipientData?.role === 'admin' ? 'admin' : (selectedContactId === 'SYSTEM_ADMIN' ? 'admin' : null);
+      if (editMsg) {
+        await updateDoc(doc(db, 'messages', editMsg.id), {
+          text: text.trim(),
+          isEdited: true
+        });
+        setEditMsg(null);
+      } else {
+        const recipientDoc = await getDoc(doc(db, 'users', selectedContactId));
+        const recipientData = recipientDoc.data();
+        const receiverRole = recipientData?.role === 'admin' ? 'admin' : (selectedContactId === 'SYSTEM_ADMIN' ? 'admin' : null);
 
-      await addDoc(collection(db, 'messages'), {
-        senderId: user.uid,
-        receiverId: selectedContactId,
-        receiverRole: receiverRole,
-        text: text.trim(),
-        timestamp: Timestamp.now(),
-        isRead: false,
-        replyTo: replyMsg ? {
-          id: replyMsg.id,
-          text: replyMsg.text,
-          senderId: replyMsg.senderId,
-        } : null
-      });
+        await addDoc(collection(db, 'messages'), {
+          senderId: user.uid,
+          receiverId: selectedContactId,
+          receiverRole: receiverRole,
+          text: text.trim(),
+          timestamp: Timestamp.now(),
+          isRead: false,
+          replyTo: replyMsg ? {
+            id: replyMsg.id,
+            text: replyMsg.text,
+            senderId: replyMsg.senderId,
+          } : null
+        });
+        setReplyMsg(null);
+      }
       setText('');
-      setReplyMsg(null);
     } catch (err: any) {
       console.error("Send Error:", err);
-      alert("Xabar yuborishda xatolik: " + err.message);
+      alert("Xatolik yuz berdi: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -524,12 +538,37 @@ export default function ChatSection() {
                           )}
                           <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.text}</p>
                         </div>
-                        <button onClick={() => setReplyMsg(m)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full opacity-0 group-hover:opacity-100 transition-all">
-                           <Reply className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button onClick={() => setReplyMsg(m)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full">
+                             <Reply className="w-4 h-4" />
+                          </button>
+                          <div className="relative">
+                             <button onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-full">
+                                <MoreVertical className="w-4 h-4" />
+                             </button>
+                             {openMenuId === m.id && (
+                               <div className={`absolute z-10 w-36 bg-white rounded-xl shadow-lg border border-gray-100 py-1 ${isMe ? 'right-0' : 'left-0'} top-full mt-1`}>
+                                  {isMe && (
+                                    <button onClick={() => { setEditMsg(m); setText(m.text); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-700 transition-colors">
+                                      <Edit2 className="w-4 h-4" /> Tahrirlash
+                                    </button>
+                                  )}
+                                  <button onClick={() => { navigator.clipboard.writeText(m.text); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-700 transition-colors">
+                                    <Copy className="w-4 h-4" /> Nusxalash
+                                  </button>
+                                  {isMe && (
+                                    <button onClick={() => { deleteDoc(doc(db, 'messages', m.id)); setOpenMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-red-50 flex items-center gap-2 text-sm text-red-600 transition-colors">
+                                      <Trash2 className="w-4 h-4" /> O'chirish
+                                    </button>
+                                  )}
+                               </div>
+                             )}
+                          </div>
+                        </div>
                       </div>
                       <span className="text-[10px] text-gray-400 font-bold mt-1.5 uppercase tracking-tighter">
                         {m.timestamp?.toDate ? format(m.timestamp.toDate(), 'HH:mm') : ''}
+                        {m.isEdited && <span className="ml-1 italic lowercase font-normal">(tahrirlangan)</span>}
                       </span>
                     </div>
                   );
@@ -556,7 +595,18 @@ export default function ChatSection() {
                       </button>
                    </div>
                 )}
-                <form onSubmit={handleSend} className={`flex gap-3 ${replyMsg ? 'rounded-b-2xl border border-blue-100 border-t-0 p-3 bg-white' : ''}`}>
+                {editMsg && (
+                   <div className="flex items-center justify-between bg-amber-50/50 p-3 rounded-t-2xl border border-amber-100 border-b-0">
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Xabarni tahrirlash</span>
+                        <p className="text-sm text-gray-600 truncate">{editMsg.text}</p>
+                      </div>
+                      <button type="button" onClick={() => { setEditMsg(null); setText(''); }} className="p-1 text-gray-400 hover:bg-gray-200 rounded-lg">
+                        <X className="w-4 h-4" />
+                      </button>
+                   </div>
+                )}
+                <form onSubmit={handleSend} className={`flex gap-3 ${(replyMsg || editMsg) ? 'rounded-b-2xl border ' + (replyMsg ? 'border-blue-100' : 'border-amber-100') + ' border-t-0 p-3 bg-white' : ''}`}>
                   <input
                     type="text"
                     className="flex-1 px-5 py-3.5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-blue-500 focus:bg-gray-100 transition-all text-sm font-medium"

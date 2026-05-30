@@ -101,24 +101,40 @@ export default function AdminOverview() {
         <div className="bg-white rounded-3xl p-10 border border-gray-100 shadow-sm flex flex-col h-[400px]">
            <h3 className="text-xl font-black text-gray-900 mb-6 shrink-0">Oxirgi harakatlar</h3>
            <div className="space-y-4 overflow-y-auto flex-1 custom-scrollbar pr-4">
-              {logs.length > 0 ? logs.map(log => (
+              {logs.length > 0 ? logs.map(log => {
+                const now = Date.now();
+                const lastSeen = log.lastSeen || log.loginTime;
+                const isOnline = !log.logoutTime && (now - lastSeen < 3 * 60 * 1000); 
+                const isClosed = log.logoutTime || (!isOnline && !log.logoutTime);
+                const finalLogoutTime = log.logoutTime || lastSeen;
+                let durationMinutes = log.durationMinutes || 0;
+                
+                if (!log.logoutTime && isClosed) {
+                    durationMinutes = Math.max(0, Math.round((finalLogoutTime - log.loginTime) / 60000));
+                }
+
+                return (
                 <div key={log.id} className="flex justify-between items-start border-b border-gray-50 pb-4">
                   <div>
                     <p className="font-bold text-gray-900">{log.userDisplayName || 'Foydalanuvchi'}</p>
                     <p className="text-xs text-gray-500 font-medium">Kirish: {new Date(log.loginTime).toLocaleString('uz-UZ')}</p>
-                    {log.logoutTime ? (
+                    {isClosed ? (
                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                         <Clock className="w-3 h-3" /> Saytda bo'ldi: {log.durationMinutes} daqiqa (Chiqdi: {new Date(log.logoutTime).toLocaleTimeString('uz-UZ')})
+                         <Clock className="w-3 h-3" /> Saytda bo'ldi: {durationMinutes} daqiqa (Chiqdi: {new Date(finalLogoutTime).toLocaleTimeString('uz-UZ')})
                        </p>
                     ) : (
-                       <p className="text-xs text-green-500 mt-1 font-bold">Hozir tizimda</p>
+                       <p className="text-xs text-green-500 mt-1 font-bold flex items-center gap-1">
+                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                          Hozir tizimda
+                       </p>
                     )}
                   </div>
                   <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-md font-bold ${log.role === 'admin' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
                     {log.role}
                   </span>
                 </div>
-              )) : (
+              );
+              }) : (
                 <p className="text-gray-500 italic text-sm">Hozircha harakatlar mavjud emas.</p>
               )}
            </div>

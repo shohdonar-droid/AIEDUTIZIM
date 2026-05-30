@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { UserProfile } from '../types';
 
 interface AuthContextType {
@@ -68,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let userUnsub: (() => void) | null = null;
+    let actualUserUnsub: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (userUnsub) {
@@ -108,6 +109,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (userUnsub) userUnsub();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user || user.isImpersonated) return;
+    
+    const trackSession = async () => {
+      const sessionId = localStorage.getItem('sessionId');
+      const lastActivityTime = localStorage.getItem('lastActivityTime');
+      const now = Date.now();
+      
+      if (sessionId && lastActivityTime) {
+         if (now - parseInt(lastActivityTime) > 3 * 60 * 1000) {
+             // Too old, it's a new session. Close old one.
+             try {
+                await updateDoc(doc(db, 'activityLogs', sessionId), {
+                    logoutTime: parseInt(lastActivityTime)
+                });
+             } catch (e) {}
+             
+             // Create new session
+             try {
+                const sessionRef = await addDoc(collection(db, 'activityLogs'), {
+                   userId: user.uid,
+                   userDisplayName: user.displayName,
+                   role: user.role,
+                   loginTime: now,
+                   lastSeen: now,
+                   logoutTime: null,
+                   durationMinutes: 0
+                });
+                localStorage.setItem('sessionId', sessionRef.id);
+                localStorage.setItem('sessionStart', now.toString());
+                localStorage.setItem('lastActivityTime', now.toString());
+             } catch (e) {}
+         } else {
+             // Continue existing session
+             localStorage.setItem('lastActivityTime', now.toString());
+             try {
+                const sessionStart = localStorage.getItem('sessionStart') || now.toString();
+                const durationMinutes = Math.max(0, Math.round((now - parseInt(sessionStart)) / 60000));
+                await updateDoc(doc(db, 'activityLogs', sessionId), {
+                   lastSeen: now,
+                   durationMinutes
+                });
+             } catch (e) {}
+         }
+      } else {
+         // No session, create one
+         try {
+            const sessionRef = await addDoc(collection(db, 'activityLogs'), {
+               userId: user.uid,
+               userDisplayName: user.displayName,
+               role: user.role,
+               loginTime: now,
+               lastSeen: now,
+               logoutTime: null,
+               durationMinutes: 0
+            });
+            localStorage.setItem('sessionId', sessionRef.id);
+            localStorage.setItem('sessionStart', now.toString());
+            localStorage.setItem('lastActivityTime', now.toString());
+         } catch(e) {}
+      }
+    };
+    
+    trackSession();
+    const interval = setInterval(trackSession, 60000);
+    
+    return () => clearInterval(interval);
+  }, [user?.uid, user?.isImpersonated]);
 
   const isAdmin = user?.role === 'admin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
 

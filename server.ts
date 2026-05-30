@@ -57,7 +57,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       fullPrompt += `\n${userName || 'Foydalanuvchi'}: ${prompt}\nSiz:`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.5-flash",
         contents: fullPrompt,
         config: {
           systemInstruction,
