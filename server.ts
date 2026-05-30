@@ -2,6 +2,9 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 async function startServer() {
   const app = express();
@@ -64,7 +67,16 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
         }
       });
 
-      res.json({ reply: response.text });
+      let replyText = response.text || "";
+      if (!replyText && response.candidates?.[0]?.content?.parts?.[0]?.text) {
+        replyText = response.candidates[0].content.parts[0].text;
+      }
+
+      if (!replyText) {
+        throw new Error("Sun'iy intellektdan bo'sh javob qaytdi. Iltimos, qaytadan urinib ko'ring yoki boshqa savol berib ko'ring.");
+      }
+
+      res.json({ reply: replyText });
     } catch (error: any) {
       console.error("Gemini API xatosi:", error);
       let errMsg = error.message || "Xatolik yuz berdi";
