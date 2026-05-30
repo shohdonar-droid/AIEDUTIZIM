@@ -98,7 +98,7 @@ export default function ChatSection() {
               newContacts.push({
                  uid: senderId,
                  id: senderId,
-                 displayName: senderId.startsWith('anon_') ? 'Mehmon ' + senderId.slice(-4) : 'Noma\'lum Foydalanuvchi',
+                 displayName: senderId.startsWith('anon_') ? 'Mehmon ' + senderId.slice(-4) : (senderId.startsWith('chatbot_admin_') ? 'ADMIN' : "Noma'lum Foydalanuvchi"),
                  role: 'inquiry',
                  isAnonymousContact: true,
                  createdAt: Timestamp.now()

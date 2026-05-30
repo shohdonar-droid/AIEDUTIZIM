@@ -37,7 +37,7 @@ export function ChatbotWidget() {
   }, []);
 
   useEffect(() => {
-    let currentChatId = user?.uid;
+    let currentChatId = user?.role === 'admin' ? `chatbot_admin_${user.uid}` : user?.uid;
     if (!currentChatId) {
       let savedAnon = localStorage.getItem('ai_anon_id');
       if (savedAnon) {
@@ -94,8 +94,8 @@ export function ChatbotWidget() {
         // Register in DB so Admin can see
         await setDoc(doc(db, 'users', currentId), {
           uid: currentId,
-          displayName: 'Mehmon ' + currentId.slice(-4),
-          role: 'student', // Provide a fallback role just in case
+          displayName: currentId.startsWith('chatbot_admin_') ? 'ADMIN' : ('Mehmon ' + currentId.slice(-4)),
+          role: 'inquiry',
           isAnonymousContact: true,
           createdAt: Timestamp.now()
         });
@@ -121,7 +121,7 @@ export function ChatbotWidget() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: textToSend, history: historyForAI })
+        body: JSON.stringify({ prompt: textToSend, history: historyForAI, userName: user?.displayName || 'Mehmon' })
       });
       
       let aiResponseText = "Kechirasiz, sun'iy intellekt xizmatida xatolik yuz berdi.";

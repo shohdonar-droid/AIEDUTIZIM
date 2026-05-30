@@ -104,6 +104,15 @@ export default function AdminUsers() {
       } catch (err) {
         console.error("Auto-cleanup error:", err);
       }
+      
+      try {
+         // Cleanup old chatbot students
+         const sQ = query(collection(db, 'users'), where('role', '==', 'student'), where('isAnonymousContact', '==', true));
+         const sSnap = await getDocs(sQ);
+         for(const s of sSnap.docs) {
+             await deleteDoc(doc(db, 'users', s.id));
+         }
+      } catch(e) {}
     };
     runCleanup();
   }, []);

@@ -15,9 +15,9 @@ async function startServer() {
 
   app.post("/api/chat", async (req, res) => {
     try {
-      const { prompt, history } = req.body;
+      const { prompt, history, userName } = req.body;
       
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.NEW_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) {
         return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda sozlanmagan)." });
       }
@@ -36,18 +36,28 @@ async function startServer() {
       // but the easiest is simply sending a system instruction and the user prompt, 
       // maybe prefixing previous chat context to the prompt if history is small.
 
-      const systemInstruction = `Siz ushbu o'quv platformasining aqlli yordamchisisiz. Barcha savollarga aniq, to'g'ri va xushmuomalalik bilan o'zbek tilida javob bering. Siz har qanday mavzudagi savollarga (shuningdek ta'lim va tizimga oid bolmagan savollarga ham) batafsil javob bera olasiz.`;
+      const systemInstruction = `Siz ushbu o'quv platformasining aqlli yordamchisisiz. Siz suhbatlashayotgan foydalanuvchining ismi: ${userName || 'Mehmon'}. Barcha savollarga aniq, to'g'ri va xushmuomalalik bilan o'zbek tilida javob bering, suhbatni boshida uning ismi bilan murojaat qiling (agar ismini ishlatish zarur va mos kelsa).
+Siz har qanday mavzudagi savollarga (shuningdek ta'lim va tizimga oid bolmagan savollarga xam) batafsil javob bera olasiz. Har qanday masala bo'yicha boshida qisqa va aniq ma'lumot bering. Agar foydalanuvchi ko'proq tafsilot so'rasa yoki chuqurroq tushuntirish so'rasa, kengroq va to'liqroq ma'lumotli qilib kengaytirib bering.
+
+Tizim haqida va tizim imkoniyatlari haqida ma'lumot so'ralsa, quyidagilarni aytib o'ting (hozirgi o'quv platformasining to'liq mazmuni shulardan iborat, qisqacha ta'riflang):
+1. Kurslar: Foydalanuvchilar turli xil kurslarni ko'rishlari va o'rganishlari mumkin.
+2. Testlar va Quizizz: Bilimni sinab ko'rish uchun interaktiv testlar va Quizizz mashqlari mavjud.
+3. Jurnal va Baholar: Talabalar o'z baholarini va o'zlashtirishini kuzatib borishlari mumkin.
+4. Sertifikatlar: Kurslarni muvaffaqiyatli tugatganlarga sertifikatlar beriladi va ularni tekshirish tizimi mavjud.
+5. Chat va Murojaatlar: Foydalanuvchilar adminlar, o'qituvchilar yoki boshqa foydalanuvchilar bilan chat orqali muloqot qilishlari va murojaat qoldirishlari mumkin.
+6. Xizmatlar va Ma'lumotlar: Saytdagi qo'shimcha xizmatlar va yangiliklar bilan tanishish imkoniyati bor.
+Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirsa (masalan, "Admin bilan bog'lanmoqchiman", "Admin kerak"), unga "Bog'lanish" sahifasiga o'tishni maslahat bering va ushbu linkni yuboring: /contact . U yerdan to'g'ridan-to'g'ri xabar qoldirishlari mumkinligini ayting.`;
       
       let fullPrompt = "";
       if (history && Array.isArray(history)) {
           for (const msg of history) {
-              fullPrompt += `\n${msg.role === 'user' ? 'Foydalanuvchi' : 'Siz'}: ${msg.text}`;
+              fullPrompt += `\n${msg.role === 'user' ? (userName || 'Foydalanuvchi') : 'Siz'}: ${msg.text}`;
           }
       }
-      fullPrompt += `\nFoydalanuvchi: ${prompt}\nSiz:`;
+      fullPrompt += `\n${userName || 'Foydalanuvchi'}: ${prompt}\nSiz:`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         contents: fullPrompt,
         config: {
           systemInstruction,
@@ -60,6 +70,8 @@ async function startServer() {
       let errMsg = error.message || "Xatolik yuz berdi";
       if (errMsg.includes("API key not valid") || errMsg.includes("API_KEY_INVALID")) {
         errMsg = "API kaliti yaroqsiz. Iltimos, AI Studio sozlamalari orqali to'g'ri Gemini API kalitini o'rnating.";
+      } else if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+        errMsg = "Kechirasiz, sun'iy intellekt xizmatiga ayni vaqtda juda ko'p so'rov yuborildi (Kvota tugallangan). Iltimos, birozdan so'ng hisobingiz so'rovlarni yana qabul qilganda qayta urinib ko'ring.";
       }
       res.status(500).json({ error: errMsg });
     }
