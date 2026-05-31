@@ -14,6 +14,30 @@ export default function Login() {
   const [activeRole, setActiveRole] = useState<'admin' | 'teacher' | 'student' | 'staff'>('student');
   const navigate = useNavigate();
   const { refreshUser, user } = useAuth();
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const autoToken = params.get('auto');
+    if (autoToken && !user) {
+      try {
+         const decoded = atob(autoToken);
+         const separatorIdx = decoded.indexOf(':');
+         if (separatorIdx !== -1) {
+            const email = decoded.slice(0, separatorIdx);
+            const pass = decoded.slice(separatorIdx + 1);
+            setLoading(true);
+            signInWithEmailAndPassword(auth, email, pass).then(res => {
+               // success, useAuth will handle redirect via the other useEffect
+            }).catch(e => {
+               setError("Avtomatik kirishda xatolik: " + e.message);
+               setLoading(false);
+            });
+         }
+      } catch (e) {
+         console.error('Invalid auto login token');
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
       if (user) {

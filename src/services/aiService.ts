@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-const MODEL_NAME = "gemini-3-flash-preview";
+const MODEL_NAME = "gemini-2.0-flash-lite";
 
 export type ServiceType = 'course_work' | 'independent_work' | 'presentation' | 'test_builder' | 'article';
 

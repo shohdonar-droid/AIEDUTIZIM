@@ -7,12 +7,12 @@ import { launchBot } from "./telegram";
 
 dotenv.config();
 
-// Launch the Telegram bot silently in the background
-launchBot();
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Launch the Telegram bot silently in the background
+  launchBot();
 
   app.use(express.json());
 
@@ -131,7 +131,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
 
       const getResponse = async (contents) => {
           return await ai.models.generateContent({
-            model: "gemini-3.5-flash",
+            model: "gemini-2.0-flash-lite",
             contents: contents,
             config: {
               systemInstruction,

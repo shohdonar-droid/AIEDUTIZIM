@@ -3,7 +3,7 @@ import { Question } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MODEL_NAME = "gemini-3-flash-preview";
+const MODEL_NAME = "gemini-2.0-flash-lite";
 
 async function fetchWithRetry(modelParams: any, retries = 3): Promise<any> {
   let lastError: any;
