@@ -76,12 +76,24 @@ export default function TeacherCourses() {
           ...courseData,
           teacherId: user.role === 'staff' ? user.teacherId : user.uid,
         });
+        try {
+           await addDoc(collection(db, 'admin_notifications'), {
+              text: `📝 Kurs tahrirlandi:\n👤 Yaratuvchi: ${user.displayName}\n📚 Kurs nomi: ${courseData.title}`,
+              timestamp: serverTimestamp()
+           });
+        } catch (e) {}
       } else {
         await addDoc(collection(db, 'courses'), {
            ...courseData,
            teacherId: user.role === 'staff' ? user.teacherId : user.uid,
            createdAt: serverTimestamp()
         });
+        try {
+           await addDoc(collection(db, 'admin_notifications'), {
+              text: `➕ Yangi kurs yaratildi:\n👤 Yaratuvchi: ${user.displayName}\n📚 Kurs nomi: ${courseData.title}`,
+              timestamp: serverTimestamp()
+           });
+        } catch (e) {}
       }
 
       setEditingCourse(null);

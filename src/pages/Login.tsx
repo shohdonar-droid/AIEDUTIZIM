@@ -138,6 +138,12 @@ export default function Login() {
             localStorage.setItem('sessionStart', Date.now().toString());
             localStorage.setItem('lastActivityTime', Date.now().toString());
             localStorage.removeItem('impersonateUserId'); // Clear any impersonation
+            
+            // Notify admins
+            addDoc(collection(db, 'admin_notifications'), {
+               text: `Yangi tizimga ulanish (Web):\n👤 F.I.SH: ${userDoc.data().displayName}\n🛡 Profil: ${role.toUpperCase()}`,
+               timestamp: serverTimestamp()
+            });
           } catch (e) {}
 
           await refreshUser();

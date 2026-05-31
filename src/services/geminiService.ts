@@ -3,7 +3,7 @@ import { Question } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const MODEL_NAME = "gemini-2.0-flash-lite";
+const MODEL_NAME = "gemini-3.5-flash";
 
 async function fetchWithRetry(modelParams: any, retries = 3): Promise<any> {
   let lastError: any;
@@ -16,7 +16,6 @@ async function fetchWithRetry(modelParams: any, retries = 3): Promise<any> {
       return response;
     } catch (error: any) {
       lastError = error;
-      console.error(`AI attempt ${i + 1} failed:`, error);
       
       const errorCode = error?.code || error?.error?.code || error?.status || error?.error?.status;
       const errorMessage = (error?.message || error?.error?.message || '').toLowerCase();
@@ -78,7 +77,6 @@ export async function generateDynamicTest(topic: string, count: number, context?
     const json = JSON.parse(text || "[]");
     return json;
   } catch (error) {
-    console.error("AI test generation failed:", error);
     return [];
   }
 }
@@ -118,7 +116,6 @@ export async function generatePresentation(topic: string, count: number): Promis
     const json = JSON.parse(text || "[]");
     return json;
   } catch (error) {
-    console.error("AI presentation generation failed:", error);
     return [];
   }
 }
@@ -182,7 +179,6 @@ Javob faqat JSON formatida bo'lsin.`;
     const text = response.text;
     return JSON.parse(text || "{}");
   } catch (error) {
-    console.error("AI document generation failed:", error);
     return { title: '', content: 'Xatolik yuz berdi. Iltimos qaytadan urining.' };
   }
 }
@@ -224,7 +220,6 @@ export async function generateDynamicCourse(topic: string): Promise<any> {
     const text = response.text;
     return JSON.parse(text || "{}");
   } catch (error) {
-    console.error("AI course generation failed:", error);
     return null;
   }
 }

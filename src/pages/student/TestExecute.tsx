@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, collection, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, collection, setDoc, serverTimestamp, runTransaction, addDoc } from 'firebase/firestore';
 import { Test, Question } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { Loader2, BrainCircuit, CheckCircle2, ChevronRight, RefreshCcw, Sparkles } from 'lucide-react';
@@ -208,6 +208,14 @@ export default function TestExecute() {
        }
 
        await setDoc(doc(db, 'testResults', resultId), payload);
+       
+       try {
+          await addDoc(collection(db, 'admin_notifications'), {
+             text: `📝 Test yakunlandi:\n👤 Talaba: ${uName}\n📑 Test nomi: ${test.title}\n📊 Natija: ${finalScore} %${finalScore >= 60 ? ' ✅ (O\'tdi)' : ' ❌ (Yiqildi)'}`,
+             timestamp: serverTimestamp()
+          });
+       } catch (e) {}
+       
        setScore(finalScore);
        setIsFinished(true);
     } catch (err) {

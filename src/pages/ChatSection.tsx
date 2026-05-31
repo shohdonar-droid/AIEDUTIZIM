@@ -22,6 +22,32 @@ export default function ChatSection() {
   const [lastMessageTimes, setLastMessageTimes] = useState<Record<string, number>>({});
   const [adminTab, setAdminTab] = useState<'teachers' | 'students' | 'staff' | 'inquiries'>('teachers');
 
+  // Multi-menu student tabs state: AI Assistant and Admin Messaging
+  const [userTab, setUserTab] = useState<'ai' | 'admin'>('ai');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMessages, setAiMessages] = useState<any[]>([
+    {
+      id: 'ai-welcome',
+      senderId: 'gemini',
+      text: "Assalomu alaykum! Men sizning sun'iy intellekt yordamchingizman. Qanday savolingiz bor? Savolingizni yozing va men unga sun'iy intellekt yordamida tezkor javob beraman. Bu yozishmalarimiz mutlaqo maxfiy bo'lib, adminga ko'rinmaydi.",
+      timestamp: Timestamp.now()
+    }
+  ]);
+
+  // Auto-selection of Admin contact to seamlessly sync messages with Firebase messages thread
+  useEffect(() => {
+    if (!isAdmin && userTab === 'admin' && !selectedContactId) {
+      const adminContact = contacts.find(c => c.role === 'admin' || c.email === 'elyorbek@admin.uz');
+      if (adminContact) {
+        setSelectedContactId(adminContact.uid);
+      } else if (contacts.length > 0) {
+        setSelectedContactId(contacts[0].uid);
+      } else {
+        setSelectedContactId('SYSTEM_ADMIN');
+      }
+    }
+  }, [userTab, contacts, selectedContactId, isAdmin]);
+
   // Load contacts
   useEffect(() => {
     if (!user) return;
@@ -347,6 +373,76 @@ export default function ChatSection() {
       alert("Xatolik yuz berdi: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendAI = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim() || !user || aiLoading) return;
+
+    const userText = text.trim();
+    setText('');
+
+    const userMsg = {
+      id: Math.random().toString(),
+      senderId: user.uid,
+      text: userText,
+      timestamp: Timestamp.now()
+    };
+
+    setAiMessages(prev => [...prev, userMsg]);
+    setAiLoading(true);
+
+    try {
+      const historyForAI = aiMessages.filter(m => m.id !== 'ai-welcome').map(m => ({
+        role: m.senderId === 'gemini' ? 'model' : 'user',
+        text: m.text
+      }));
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: userText,
+          history: historyForAI,
+          userName: user.displayName || 'Foydalanuvchi',
+          isAdminMode: false
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const responseText = data.reply || "AI javob berishda xatolik yuz berdi.";
+        
+        setAiMessages(prev => [...prev, {
+          id: Math.random().toString(),
+          senderId: 'gemini',
+          text: responseText,
+          timestamp: Timestamp.now()
+        }]);
+      } else {
+        setAiMessages(prev => [...prev, {
+          id: Math.random().toString(),
+          senderId: 'gemini',
+          text: "Ulanishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.",
+          timestamp: Timestamp.now()
+        }]);
+      }
+    } catch (err: any) {
+      console.error("AI Error:", err);
+      setAiMessages(prev => [...prev, {
+        id: Math.random().toString(),
+        senderId: 'gemini',
+        text: "Xatolik: " + err.message,
+        timestamp: Timestamp.now()
+      }]);
+    } finally {
+      setAiLoading(false);
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
     }
   };
 

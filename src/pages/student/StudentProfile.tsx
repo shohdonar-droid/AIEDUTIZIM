@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { db, auth } from '../../lib/firebase';
-import { doc, updateDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, updateDoc, getDocs, collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { Camera, Save, Loader2, Mail, Phone, Calendar, User as UserIcon, Building, Users, Key } from 'lucide-react';
 import { Department, Group } from '../../types';
@@ -58,6 +58,14 @@ export default function StudentProfile() {
         groupName: grpName
       });
       await refreshUser();
+      
+      try {
+         await addDoc(collection(db, 'admin_notifications'), {
+            text: `📝 Profil tahrirlandi:\n👤 Talaba: ${formData.displayName}\n🏢 Yo'nalish: ${deptName || 'yoq'}\n👥 Guruh: ${grpName || 'yoq'}`,
+            timestamp: serverTimestamp()
+         });
+      } catch (e) {}
+      
       alert('Ma\'lumotlar yangilandi!');
     } catch (err) {
       console.error(err);

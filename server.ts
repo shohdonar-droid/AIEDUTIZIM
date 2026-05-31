@@ -22,7 +22,7 @@ async function startServer() {
 
   app.post("/api/chat", async (req, res) => {
     try {
-      const { prompt, history, userName, isAdminMode, functionResponses } = req.body;
+      const { prompt, history, userName, isAdminMode, systemContext, functionResponses, lastFunctionCall } = req.body;
       
       const apiKey = process.env.NEW_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -42,8 +42,8 @@ async function startServer() {
 
       if (isAdminMode) {
          systemInstruction = `Siz tizim administratorining bosh yordamchisisiz. Administrator ismi: ${userName}. 
-Sizda tizimdagi ma'lumotlarni o'qish va ma'lum amallarni bajarish (masalan, foydalanuvchilar sonini bilish, ularning ro'yxatini olish, tug'ilgan kuni bo'lganlarni ko'rish, testlarni faollashtirish) uchun maxsus funksiyalar (tools) mavjud.
-Agar admin tizim haqida so'rasa, albatta ushbu funksiyalarni chaqiring. Funksiya natijasini olgach, o'zbek tilida chiroyli va aniq qilib adminga hisobot bering. Agar funksiya chaqiruvi so'ralsa, uni bajaring.`;
+Sizda tizimdagi ma'lumotlarni o'qish va ma'lum amallarni bajarish (masalan, foydalanuvchilar sonini bilish, ularning ro'yxatini olish, tug'ilgan kuni bo'lganlarni ko'rish, testlarni faollashtirish, quizlar yaratish) uchun maxsus funksiyalar (tools) mavjud.
+Agar admin tizim haqida so'rasa, albatta ushbu funksiyalarni chaqiring yoki taqdim etilgan joriy tizim ma'lumotlaridan foydalaning. Funksiya natijasini olgach, o'zbek tilida chiroyli va aniq qilib adminga hisobot bering. Agar funksiya chaqiruvi so'ralsa, uni bajaring.`;
       } else {
          systemInstruction += `\nSiz har qanday mavzudagi savollarga batafsil javob bera olasiz. Har qanday masala bo'yicha boshida qisqa va aniq ma'lumot bering. Agar foydalanuvchi ko'proq tafsilot so'rasa yoki chuqurroq tushuntirish so'rasa, kengroq va to'liqroq ma'lumotli qilib kengaytirib bering.
 
@@ -56,15 +56,32 @@ Tizim haqida va tizim imkoniyatlari haqida ma'lumot so'ralsa, quyidagilarni ayti
 6. Xizmatlar va Ma'lumotlar: Saytdagi qo'shimcha xizmatlar va yangiliklar bilan tanishish imkoniyati bor.
 Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirsa, unga "Bog'lanish" sahifasiga o'tishni maslahat bering va ushbu linkni yuboring: /contact .`;
       }
+
+      if (systemContext) {
+        systemInstruction += `\n\n⚠️ TIZIMDAGI FAQOL VA HAQIQIY MA'LUMOTLAR VA STATISTIKA:\n${systemContext}\n\nFoydalanuvchi/ma'muriyat so'raganda albatta mutlaqo aniqlik va ishonchlilik bilan ushbu ma'lumotlardan foydalanib javob bering.`;
+      }
       
-      const parts = [];
-      if (prompt) {
-          parts.push({ text: prompt });
+      const reqContents = [];
+      if (history && Array.isArray(history)) {
+          for (const msg of history) {
+              if (msg.role === 'user' || msg.role === 'model') {
+                 reqContents.push({ role: msg.role, parts: [{ text: msg.text }] });
+              }
+          }
       }
 
-      if (functionResponses && Array.isArray(functionResponses)) {
+      if (prompt) {
+          reqContents.push({ role: "user", parts: [{ text: prompt }] });
+      }
+
+      if (lastFunctionCall) {
+          reqContents.push({ role: "model", parts: [{ functionCall: lastFunctionCall }] });
+      }
+
+      if (functionResponses && Array.isArray(functionResponses) && functionResponses.length > 0) {
+          const fnParts = [];
           functionResponses.forEach(r => {
-             parts.push({
+             fnParts.push({
                  functionResponse: {
                      name: r.name,
                      response: {
@@ -73,21 +90,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
                  }
              });
           });
-      }
-      
-      const reqContents = [];
-      if (history && Array.isArray(history)) {
-          for (const msg of history) {
-              if (msg.role === 'user' || msg.role === 'model') {
-                 // For simplified implementation, we convert simple history to google/genai content schema
-                 // Wait, genai expects { role: 'user' | 'model', parts: [{text: ""}] }
-                 // Let's just build it
-                 reqContents.push({ role: msg.role, parts: [{ text: msg.text }] });
-              }
-          }
-      }
-      if (parts.length > 0) {
-          reqContents.push({ role: "user", parts });
+          reqContents.push({ role: "user", parts: fnParts });
       }
 
       const tools = [];
@@ -124,20 +127,80 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
                           },
                           required: ["testTitle"]
                       }
+                  },
+                  {
+                      name: "createQuizizz",
+                      description: "Berilgan mavzu bo'yicha yangi Quizizz testi doirasida savollar yaratish va saqlash.",
+                      parameters: {
+                          type: Type.OBJECT,
+                          properties: {
+                              title: { type: Type.STRING, description: "Quizning sarlavhasi / mavzusi." },
+                              context: { type: Type.STRING, description: "Quiz uchun qisqacha izoh yoki ko'rsatma." },
+                              count: { type: Type.INTEGER, description: "Savollar soni." }
+                          },
+                          required: ["title", "count"]
+                      }
+                  },
+                  {
+                      name: "createCourse",
+                      description: "Yangi dars kursini yoki fanni yaratish va tizimga qo'shish.",
+                      parameters: {
+                          type: Type.OBJECT,
+                          properties: {
+                              title: { type: Type.STRING, description: "Kursning nomi / sarlavhasi." },
+                              description: { type: Type.STRING, description: "Kurs haqida batafsil ma'lumot, o'rganiladigan mavzular." },
+                              category: { type: Type.STRING, description: "Kategoriya nomi: masalan, Dasturlash, Fizika, Matematika va b." }
+                          },
+                          required: ["title"]
+                      }
+                  },
+                  {
+                      name: "addSystemUser",
+                      description: "Yangi foydalanuvchini (talaba, o'qituvchi, xodim) tizimga qo'shish.",
+                      parameters: {
+                          type: Type.OBJECT,
+                          properties: {
+                              displayName: { type: Type.STRING, description: "Foydalanuvchining to'liq F.I.SH." },
+                              email: { type: Type.STRING, description: "Kirish emaili (masalan: farrux@student.uz)." },
+                              password: { type: Type.STRING, description: "Paroli." },
+                              role: { type: Type.STRING, description: "Roli: student, teacher, staff, admin." }
+                          },
+                          required: ["displayName", "email", "password", "role"]
+                      }
+                  },
+                  {
+                      name: "createSystemNotification",
+                      description: "Tizimda barcha uchun yangi e'lon yoki bildirishnoma yaratish (web appdagi foydalanuvchilarga ko'rinadi).",
+                      parameters: {
+                          type: Type.OBJECT,
+                          properties: {
+                              text: { type: Type.STRING, description: "E'lon yoki bildirishnomaning to'liq matni." }
+                          },
+                          required: ["text"]
+                      }
+                  },
+                  {
+                      name: "getCoursesList",
+                      description: "Tizimdagi barcha kurslar ro'yxatini va ularni qisqacha tavsiflarini olish.",
+                      parameters: { type: Type.OBJECT, properties: {} }
                   }
               ]
           });
       }
 
       const getResponse = async (contents) => {
-          return await ai.models.generateContent({
-            model: "gemini-2.0-flash-lite",
-            contents: contents,
-            config: {
-              systemInstruction,
-              tools: tools.length > 0 ? tools : undefined
-            }
-          });
+          try {
+             return await ai.models.generateContent({
+               model: "gemini-3.5-flash",
+               contents: contents,
+               config: {
+                 systemInstruction,
+                 tools: tools.length > 0 ? tools : undefined
+               }
+             });
+          } catch(err) {
+             throw err;
+          }
       };
 
       const response = await getResponse(reqContents);
@@ -162,12 +225,11 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
 
       res.json({ reply: replyText });
     } catch (error: any) {
-      console.error("Gemini API xatosi:", error);
       let errMsg = error.message || "Xatolik yuz berdi";
       if (errMsg.includes("API key not valid") || errMsg.includes("API_KEY_INVALID")) {
         errMsg = "API kaliti yaroqsiz. Iltimos, AI Studio sozlamalari orqali to'g'ri Gemini API kalitini o'rnating.";
       } else if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED")) {
-        errMsg = "Kechirasiz, sun'iy intellekt xizmatiga ayni vaqtda juda ko'p so'rov yuborildi (Kvota tugallangan). Iltimos, birozdan o'tib qayta urinib ko'ring.";
+        errMsg = "Hozirda aqlli yordamchimiz biroz band yoki tanaffusda ☕️. Iltimos, bir necha daqiqadan so'ng qayta so'rab ko'ring. Tez orada u sizga bajonidil yordam beradi!";
       }
       res.status(500).json({ error: errMsg });
     }

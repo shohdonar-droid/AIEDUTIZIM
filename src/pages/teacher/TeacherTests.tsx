@@ -195,7 +195,7 @@ nato'g'ri_variant`;
   const handleGenerateAI = async () => {
     if (!topic || !user) return;
     
-    const limit = user.aiTestLimit || 20;
+    const limit = user.aiTestLimit || 999999;
     if (testCount > limit) {
        alert(`Sizning imkoniyatingiz eng ko'pi bilan ${limit} ta test tuzib berishga ruxsat beradi.`);
        return;
@@ -228,6 +228,14 @@ nato'g'ri_variant`;
         creatorRole: user.role,
         createdAt: serverTimestamp()
       });
+      
+      try {
+         await addDoc(collection(db, 'admin_notifications'), {
+            text: `➕ Yangi test yaratildi:\n👤 Yaratuvchi: ${user.displayName}\n📚 Test nomi: ${topic}\n📝 Holati: ${publish ? 'Barchaga ochiq' : 'Yashirin'}`,
+            timestamp: serverTimestamp()
+         });
+      } catch (e) {}
+
       await loadTests(user.uid);
       alert(`Test muvaffaqiyatli saqlandi ${publish ? 'va saytga chiqarildi' : '(faqat bazaga)'}!`);
       setTestDepartmentIds([]);
@@ -345,6 +353,14 @@ nato'g'ri_variant`;
         creatorRole: user.role,
         createdAt: serverTimestamp()
       });
+      
+      try {
+         await addDoc(collection(db, 'admin_notifications'), {
+            text: `➕ Yangi imtihon yaratildi:\n👤 Yaratuvchi: ${user.displayName}\n📚 Imtihon nomi: ${examData.title}\n⏰ Boshlanish: ${new Date(examData.startTime).toLocaleString('uz-UZ')}`,
+            timestamp: serverTimestamp()
+         });
+      } catch (e) {}
+      
       await loadTests(user.uid);
       alert('Imtihon saqlandi!');
       setTestDepartmentIds([]);

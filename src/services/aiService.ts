@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-const MODEL_NAME = "gemini-2.0-flash-lite";
+const MODEL_NAME = "gemini-3.5-flash";
 
 export type ServiceType = 'course_work' | 'independent_work' | 'presentation' | 'test_builder' | 'article';
 
@@ -31,7 +31,6 @@ async function fetchWithRetry(prompt: string, retries = 3): Promise<string> {
       return text;
     } catch (error: any) {
       lastError = error;
-      console.error(`AI Generation attempt ${i + 1} failed:`, error);
       
       // Look for code: 500 in various places
       const errorCode = error?.code || error?.error?.code || error?.status || error?.error?.status;
@@ -111,7 +110,6 @@ export async function generateAIDocument({ type, topic, pages = 5, additionalTex
   try {
     return await fetchWithRetry(prompt);
   } catch (error) {
-    console.error("AI Generation Error:", error);
     throw error;
   }
 }

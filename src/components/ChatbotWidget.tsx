@@ -412,7 +412,8 @@ export function ChatbotWidget() {
                      history: historyForAI,
                      userName: user?.displayName || 'Mehmon',
                      isAdminMode: true,
-                     functionResponses: [{ name: call.name, response: callResult }]
+                     functionResponses: [{ name: call.name, response: callResult }],
+                     lastFunctionCall: call
                  })
                });
                if (secRes.ok) finalData = await secRes.json();
@@ -444,7 +445,7 @@ export function ChatbotWidget() {
          await addDoc(collection(db, 'messages'), {
             senderId: adminId,
             receiverId: chatId,
-            text: "Kechirasiz, tizimga ulanishda xatolik.",
+            text: "Kechirasiz, sun'iy intellekt tizimi bilan bog'lanishda xatolik yoki limit tugadi.",
             timestamp: Timestamp.now(),
             isRead: false
          });

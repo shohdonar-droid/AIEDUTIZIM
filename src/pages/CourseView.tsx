@@ -177,6 +177,15 @@ export default function CourseView() {
 
       await updateDoc(doc(db, 'enrollments', enrollment.id), updateData);
       setEnrollment({ ...enrollment, ...updateData });
+
+      if (isFinal && !enrollment.completed) {
+         try {
+            await addDoc(collection(db, 'admin_notifications'), {
+               text: `🎉 Kurs yakunlandi:\n👤 Talaba: ${user?.displayName || 'Noma\'lum'}\n📚 Kurs nomi: ${course.title}`,
+               timestamp: serverTimestamp()
+            });
+         } catch (e) {}
+      }
     }
   };
 

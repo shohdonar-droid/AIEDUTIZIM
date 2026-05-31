@@ -1,0 +1,101 @@
+480-              }
+481-           });
+482-           
+483-           ctx.reply("Asosiy menyu yangilandi:", {
+484-               reply_markup: { keyboard: await getKeyboard(role, userId, true), resize_keyboard: true }
+485-           });
+486-        } catch (e) {
+487-           const encodedCreds = encodeURIComponent(Buffer.from(`${email}:${password}`).toString('base64'));
+488-           const autoLoginUrl = `https://aiedutizim.vercel.app/login?auto=${encodedCreds}`;
+489-           
+490-           authedUsers.set(userId, { uid, displayName: email, role: 'student', email, docId: '' });
+491-           
+492-           ctx.reply(`✅ Akkauntingiz muvaffaqiyatli ulandi!\n\nEmail: ${email}\n\nEndi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tishingiz mumkin!`, {
+493-              reply_markup: {
+494-                  inline_keyboard: [
+495-                      [{ text: "📱 Tizimga kirish", web_app: { url: autoLoginUrl } }]
+496-                  ]
+497-              }
+498-           });
+499-           
+500-           ctx.reply("Asosiy menyu yangilandi:", {
+501-               reply_markup: { keyboard: await getKeyboard('student', userId, true), resize_keyboard: true }
+502-           });
+503-        }
+504-      } catch (err: any) {
+505-        ctx.reply("Xatolik yuz berdi: " + err.message);
+506-      }
+507-      return;
+508-    }
+509-  }
+510-
+511-  const lowered = userText.toLowerCase().trim();
+512-  if (authed && (authed.role === 'admin' || authed.role === 'teacher')) {
+513-      if (lowered === 'yordamchi' || lowered === 'shogird') {
+514-          return ctx.reply("Labbay, Ustoz! Sizga qanday yordam bera olaman?");
+515-      }
+516-  }
+517-
+518-  // Not in login flow, handle as AI chat prompt
+519-  try {
+520-     const uName = authed ? authed.displayName : (ctx.from.first_name || 'Foydalanuvchi');
+521-     const isAdmin = authed ? (authed.role === 'admin' || authed.role === 'teacher') : false;
+522-
+523-     let functionResponses: any[] = [];
+524-     let lastFunctionCall: any = null;
+525-     let loopCount = 0;
+526-     let finalReply = "";
+527-
+528-     while(loopCount < 3) {
+529-         loopCount++;
+530:         const res = await fetch('http://localhost:3000/api/chat', {
+531-            method: 'POST',
+532-            headers: { 'Content-Type': 'application/json' },
+533-            body: JSON.stringify({
+534-               prompt: loopCount === 1 ? userText : "", 
+535-               history: [],
+536-               userName: uName,
+537-               isAdminMode: isAdmin,
+538-               functionResponses: functionResponses.length > 0 ? functionResponses : undefined,
+539-               lastFunctionCall: lastFunctionCall || undefined
+540-            })
+541-         });
+542-
+543-         if (res.ok) {
+544-            const data = await res.json();
+545-            
+546-            if (data.isFunctionCall) {
+547-                const fnName = data.functionCall.name;
+548-                const fnArgs = data.functionCall.args;
+549-                lastFunctionCall = data.functionCall;
+550-                let executionResult = "";
+551-                
+552-                try {
+553-                    if (fnName === 'getSystemStats') {
+554-                        const usersSnap = await getDocs(collection(db, 'users'));
+555-                        executionResult = `Jami foydalanuvchilar: ${usersSnap.size} ta.`;
+556-                    } else if (fnName === 'getUsersList') {
+557-                        let q: any = collection(db, 'users');
+558-                        if (fnArgs.role) {
+559-                            q = query(q, where('role', '==', fnArgs.role));
+560-                        }
+561-                        const usersSnap = await getDocs(q);
+562-                        const list = usersSnap.docs.map(d => { const dt: any = d.data(); return dt.displayName + " (" + dt.role + ")"; }).join(", ");
+563-                        executionResult = `Topilgan foydalanuvchilar ro'yxati: ${list || 'Topilmadi'}`;
+564-                    } else if (fnName === 'checkBirthdays') {
+565-                        const todayStr = new Date().toISOString().split('T')[0].substring(5);
+566-                        const usersSnap = await getDocs(collection(db, 'users'));
+567-                        const p: any[] = usersSnap.docs.map(d => d.data()).filter((dt: any) => dt.birthDate && dt.birthDate.endsWith(todayStr));
+568-                        if (p.length > 0) {
+569-                            executionResult = "Bugun tug'ilgan kuni bo'lganlar: " + p.map(dt => dt.displayName).join(", ");
+570-                        } else {
+571-                            executionResult = "Bugun tug'ilgan kuni bo'lgan foydalanuvchilar topilmadi.";
+572-                        }
+573-                    } else if (fnName === 'publishTest') {
+574-                        const t = (fnArgs.testTitle || "").toLowerCase();
+575-                        const testsSnap = await getDocs(collection(db, 'tests'));
+576-                        const target = testsSnap.docs.find(d => {
+577-                            const ddata = d.data();
+578-                            return (ddata.title && ddata.title.toLowerCase().includes(t)) || (ddata.courseName && ddata.courseName.toLowerCase().includes(t));
+579-                        });
+580-                        if (target) {

@@ -191,7 +191,7 @@ export default function AdminUsers() {
             login: editingTeacher.login.trim(),
             password: editingTeacher.password,
             ball: Number(editingTeacher.ball) || 0,
-            aiTestLimit: Number(editingTeacher.aiTestLimit) || 20
+            aiTestLimit: Number(editingTeacher.aiTestLimit) || 999999
          });
       } else {
          const q = query(collection(db, 'users'), where('login', '==', editingTeacher.login.trim()));
@@ -412,7 +412,7 @@ export default function AdminUsers() {
                     </div>
                     <div className="space-y-2">
                        <label className="text-sm font-bold text-gray-700">Test generatsiyasi limiti</label>
-                       <input type="number" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl" value={editingTeacher.aiTestLimit || 20} onChange={e => setEditingTeacher({...editingTeacher, aiTestLimit: parseInt(e.target.value)})} />
+                       <input type="number" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl" value={editingTeacher.aiTestLimit || 999999} onChange={e => setEditingTeacher({...editingTeacher, aiTestLimit: parseInt(e.target.value)})} />
                     </div>
                     <div className="md:col-span-2 flex justify-end gap-2 mt-4 pt-4 border-t">
                        <button type="submit" disabled={teacherSaving} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold shadow hover:bg-blue-700 disabled:opacity-50">

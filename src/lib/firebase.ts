@@ -27,7 +27,7 @@ async function testConnection() {
     }
   }
 }
-testConnection();
+// testConnection(); // Commented out to prevent unnecessary startup errors if internet is slow
 
 export enum OperationType {
   CREATE = 'create',
