@@ -344,17 +344,86 @@ export function ChatbotWidget() {
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: textToSend, history: historyForAI, userName: user?.displayName || 'Mehmon' })
+          body: JSON.stringify({ 
+             prompt: textToSend, 
+             history: historyForAI, 
+             userName: user?.displayName || 'Mehmon',
+             isAdminMode: isAdmin && adminView === 'chat' && !selectedUser
+          })
         });
         
         let aiResponseText = "Kechirasiz, sun'iy intellekt xizmatida xatolik yuz berdi.";
+        let finalData = null;
+
         if (response.ok) {
-          const data = await response.json();
-          if (data.reply) aiResponseText = data.reply;
-          if (data.error) aiResponseText = data.error;
+           finalData = await response.json();
+
+           // Function Calling handling for Admin
+           if (finalData.isFunctionCall) {
+               const call = finalData.functionCall;
+               let callResult = "";
+               
+               try {
+                   if (call.name === 'getSystemStats') {
+                       const uSnap = await getDocs(collection(db, 'users'));
+                       callResult = "Jami foydalanuvchilar soni: " + uSnap.size;
+                   } else if (call.name === 'getUsersList') {
+                       let userQuery = query(collection(db, 'users'));
+                       if (call.args.role) {
+                           userQuery = query(collection(db, 'users'), where('role', '==', call.args.role));
+                       }
+                       const snap = await getDocs(userQuery);
+                       let list: string[] = [];
+                       snap.forEach(d => list.push(d.data().displayName || d.data().email));
+                       callResult = "Foydalanuvchilar: " + list.join(", ");
+                   } else if (call.name === 'checkBirthdays') {
+                       const today = new Date();
+                       const md = `${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                       const snap = await getDocs(collection(db, 'users'));
+                       let list: string[] = [];
+                       snap.forEach(d => {
+                           const bd = d.data().birthDate;
+                           if (bd && bd.endsWith(md)) list.push(d.data().displayName);
+                       });
+                       callResult = list.length > 0 ? "Tug'ilgan kun egalari: " + list.join(", ") : "Bugun hechkimi tug'ilgan kuni emas.";
+                   } else if (call.name === 'publishTest') {
+                       const snap = await getDocs(collection(db, 'tests'));
+                       let found = false;
+                       snap.forEach(t => {
+                           if (t.data().title?.toLowerCase().includes(call.args.testTitle?.toLowerCase())) {
+                               updateDoc(doc(db, 'tests', t.id), { isPublished: true });
+                               found = true;
+                           }
+                       });
+                       callResult = found ? "Test muvaffaqiyatli ishga tushirildi (faollashtirildi)." : "Bunday nomdagi test topilmadi.";
+                   } else {
+                       callResult = "Bunday funksiya mavjud emas.";
+                   }
+               } catch (err: any) {
+                   callResult = "Xatolik yuz berdi: " + err.message;
+               }
+
+               // 2nd request to API with function response
+               const secRes = await fetch('/api/chat', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     prompt: textToSend,
+                     history: historyForAI,
+                     userName: user?.displayName || 'Mehmon',
+                     isAdminMode: true,
+                     functionResponses: [{ name: call.name, response: callResult }]
+                 })
+               });
+               if (secRes.ok) finalData = await secRes.json();
+               else finalData = Object.assign(finalData, await secRes.json().catch(() => null));
+           }
+
+           if (finalData?.reply) aiResponseText = finalData.reply;
+           if (finalData?.error) aiResponseText = finalData.error;
         } else {
-          const data = await response.json().catch(() => null);
-          if (data && data.error) aiResponseText = data.error;
+           const data = await response.json().catch(() => null);
+           if (data && data.error) aiResponseText = data.error;
         }
 
         // Save AI response to DB from "Admin"
