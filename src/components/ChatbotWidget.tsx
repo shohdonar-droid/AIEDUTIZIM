@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Bot, User as UserIcon, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, onSnapshot, orderBy, Timestamp, setDoc, doc, limit, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, onSnapshot, orderBy, Timestamp, setDoc, doc, limit, updateDoc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 
 export function ChatbotWidget() {
@@ -21,6 +21,9 @@ export function ChatbotWidget() {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [adminChats, setAdminChats] = useState<any[]>([]);
   const [adminUnread, setAdminUnread] = useState(0);
+  const [cachedUsers, setCachedUsers] = useState<Record<string, any>>({});
+  const [activeUids, setActiveUids] = useState<string[]>([]);
+  const [lastTimeMapState, setLastTimeMapState] = useState<Record<string, number>>({});
 
   useEffect(() => {
     // Find an admin Id
@@ -180,13 +183,13 @@ export function ChatbotWidget() {
     return () => { unsubC(); unsubT(); unsubS(); };
   }, [user, adminId]);
 
-  // Load chats for Admin
+  // Load chats for Admin (optimized, doesn't query all users in a snapshot loop)
   useEffect(() => {
     if (!isAdmin || !adminId || adminId === 'SYSTEM_ADMIN') return;
     
     // We listen to messages where receiver is admin to find all people who texted the admin/bot
     const q1 = query(collection(db, 'messages'), where('receiverId', '==', adminId));
-    const unsub = onSnapshot(q1, async (snap) => {
+    const unsub = onSnapshot(q1, (snap) => {
        let unreadCount = 0;
        const senders = new Set<string>();
        const lastTimeMap: Record<string, number> = {};
@@ -206,35 +209,60 @@ export function ChatbotWidget() {
        });
        
        setAdminUnread(unreadCount);
-       
-       const uids = Array.from(senders);
-       if (uids.length === 0) {
-          setAdminChats([]);
-          return;
-       }
-       
-       const usersSnap = await getDocs(collection(db, 'users'));
-       const usersMap: Record<string, any> = {};
-       usersSnap.forEach(d => {
-          usersMap[d.id] = d.data();
-       });
-       
-       const chatsList = uids.map(uid => {
-          if (usersMap[uid]) {
-             return { uid, ...usersMap[uid] };
-          } else {
-             return { 
-                uid, 
-                displayName: uid.startsWith('anon_') ? 'Mehmon ' + uid.slice(-4) : "Noma'lum Foydalanuvchi",
-                role: 'inquiry'
-             };
-          }
-       });
-       chatsList.sort((a, b) => (lastTimeMap[b.uid] || 0) - (lastTimeMap[a.uid] || 0));
-       setAdminChats(chatsList);
+       setLastTimeMapState(lastTimeMap);
+       setActiveUids(Array.from(senders));
+    }, (error) => {
+       console.error("Snapshot error loading admin chats:", error);
     });
     return () => unsub();
   }, [isAdmin, adminId]);
+
+  // Handle background-fetching of any missing user objects from Firestore inside active chats
+  useEffect(() => {
+    if (activeUids.length === 0) return;
+    const missingUids = activeUids.filter(uid => !cachedUsers[uid]);
+    if (missingUids.length === 0) return;
+
+    // Fetch details for missing uids in parallel
+    Promise.all(missingUids.map(async (uid) => {
+       try {
+          if (uid.startsWith('anon_')) {
+             return { uid, data: { displayName: 'Mehmon ' + uid.slice(-4), role: 'inquiry' } };
+          }
+          const uDoc = await getDoc(doc(db, 'users', uid));
+          if (uDoc.exists()) {
+             return { uid, data: uDoc.data() };
+          }
+       } catch (err) {
+          console.error("Cached user load error:", err);
+       }
+       return { uid, data: { displayName: uid.startsWith('anon_') ? 'Mehmon ' + uid.slice(-4) : "Foydalanuvchi", role: 'inquiry' } };
+    })).then(results => {
+       setCachedUsers(prev => {
+          const updated = { ...prev };
+          results.forEach(r => {
+             updated[r.uid] = r.data;
+          });
+          return updated;
+       });
+    });
+  }, [activeUids, cachedUsers]);
+
+  // Combine and sort chat list when state lists or cachedUsers are resolved
+  useEffect(() => {
+     const chatsList = activeUids.map(uid => {
+        const uInfo = cachedUsers[uid];
+        return {
+           uid,
+           ...(uInfo || {
+              displayName: uid.startsWith('anon_') ? 'Mehmon ' + uid.slice(-4) : "Foydalanuvchi",
+              role: 'inquiry'
+           })
+        };
+     });
+     chatsList.sort((a, b) => (lastTimeMapState[b.uid] || 0) - (lastTimeMapState[a.uid] || 0));
+     setAdminChats(chatsList);
+  }, [activeUids, cachedUsers, lastTimeMapState]);
 
   useEffect(() => {
     if (!chatId || !isOpen) return;
@@ -244,10 +272,13 @@ export function ChatbotWidget() {
     const updateMessages = (newMsgs: any[]) => {
       newMsgs.forEach(m => messagesMap.set(m.id, m));
       const sorted = Array.from(messagesMap.values())
-        .filter((m: any) => 
-          (m.senderId === chatId && m.receiverId === adminId) || 
-          (m.senderId === adminId && m.receiverId === chatId)
-        )
+        .filter((m: any) => {
+          const isSenderMe = m.senderId === chatId;
+          const isReceiverMe = m.receiverId === chatId;
+          const isSenderAdmin = m.senderRole === 'admin' || m.senderRole === 'subadmin' || m.senderId === 'SYSTEM_ADMIN' || m.senderName?.toLowerCase().includes('admin') || m.senderId === adminId;
+          const isReceiverAdmin = m.receiverRole === 'admin' || m.receiverRole === 'subadmin' || m.receiverId === 'SYSTEM_ADMIN' || m.receiverName?.toLowerCase().includes('admin') || m.receiverId === adminId;
+          return (isSenderMe && isReceiverAdmin) || (isReceiverMe && isSenderAdmin);
+        })
         .sort((a, b) => {
           const t1 = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
           const t2 = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
@@ -269,8 +300,8 @@ export function ChatbotWidget() {
       }
     };
 
-    const q1 = query(collection(db, 'messages'), where('senderId', '==', chatId), where('receiverId', '==', adminId));
-    const q2 = query(collection(db, 'messages'), where('senderId', '==', adminId), where('receiverId', '==', chatId));
+    const q1 = query(collection(db, 'messages'), where('senderId', '==', chatId));
+    const q2 = query(collection(db, 'messages'), where('receiverId', '==', chatId));
 
     const unsub1 = onSnapshot(q1, snap => {
       updateMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -317,6 +348,8 @@ export function ChatbotWidget() {
         // Admin replying directly to a user
         await addDoc(collection(db, 'messages'), {
           senderId: adminId,         // Admin sends
+          senderName: user?.displayName || 'Admin',
+          senderRole: 'admin',
           receiverId: selectedUser.uid, // to User
           receiverRole: selectedUser.role || 'inquiry',
           text: textToSend,
@@ -327,112 +360,11 @@ export function ChatbotWidget() {
         // Normal user sending to Admin/Bot
         await addDoc(collection(db, 'messages'), {
           senderId: currentId,
-          receiverId: adminId,
+          senderName: user?.displayName || ('Mehmon ' + currentId.slice(-4)),
+          senderRole: user?.role || 'student',
+          receiverId: adminId || 'SYSTEM_ADMIN',
           receiverRole: 'admin',
           text: textToSend,
-          timestamp: Timestamp.now(),
-          isRead: false
-        });
-
-        // Format history for AI
-        const historyForAI = messages.map(m => ({
-          role: m.senderId === currentId ? 'user' : 'model',
-          text: m.text
-        }));
-
-        // Query Gemini API
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-             prompt: textToSend, 
-             history: historyForAI, 
-             userName: user?.displayName || 'Mehmon',
-             isAdminMode: isAdmin && adminView === 'chat' && !selectedUser
-          })
-        });
-        
-        let aiResponseText = "Kechirasiz, sun'iy intellekt xizmatida xatolik yuz berdi.";
-        let finalData = null;
-
-        if (response.ok) {
-           finalData = await response.json();
-
-           // Function Calling handling for Admin
-           if (finalData.isFunctionCall) {
-               const call = finalData.functionCall;
-               let callResult = "";
-               
-               try {
-                   if (call.name === 'getSystemStats') {
-                       const uSnap = await getDocs(collection(db, 'users'));
-                       callResult = "Jami foydalanuvchilar soni: " + uSnap.size;
-                   } else if (call.name === 'getUsersList') {
-                       let userQuery = query(collection(db, 'users'));
-                       if (call.args.role) {
-                           userQuery = query(collection(db, 'users'), where('role', '==', call.args.role));
-                       }
-                       const snap = await getDocs(userQuery);
-                       let list: string[] = [];
-                       snap.forEach(d => list.push(d.data().displayName || d.data().email));
-                       callResult = "Foydalanuvchilar: " + list.join(", ");
-                   } else if (call.name === 'checkBirthdays') {
-                       const today = new Date();
-                       const md = `${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-                       const snap = await getDocs(collection(db, 'users'));
-                       let list: string[] = [];
-                       snap.forEach(d => {
-                           const bd = d.data().birthDate;
-                           if (bd && bd.endsWith(md)) list.push(d.data().displayName);
-                       });
-                       callResult = list.length > 0 ? "Tug'ilgan kun egalari: " + list.join(", ") : "Bugun hechkimi tug'ilgan kuni emas.";
-                   } else if (call.name === 'publishTest') {
-                       const snap = await getDocs(collection(db, 'tests'));
-                       let found = false;
-                       snap.forEach(t => {
-                           if (t.data().title?.toLowerCase().includes(call.args.testTitle?.toLowerCase())) {
-                               updateDoc(doc(db, 'tests', t.id), { isPublished: true });
-                               found = true;
-                           }
-                       });
-                       callResult = found ? "Test muvaffaqiyatli ishga tushirildi (faollashtirildi)." : "Bunday nomdagi test topilmadi.";
-                   } else {
-                       callResult = "Bunday funksiya mavjud emas.";
-                   }
-               } catch (err: any) {
-                   callResult = "Xatolik yuz berdi: " + err.message;
-               }
-
-               // 2nd request to API with function response
-               const secRes = await fetch('/api/chat', {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({
-                     prompt: textToSend,
-                     history: historyForAI,
-                     userName: user?.displayName || 'Mehmon',
-                     isAdminMode: true,
-                     functionResponses: [{ name: call.name, response: callResult }],
-                     lastFunctionCall: call
-                 })
-               });
-               if (secRes.ok) finalData = await secRes.json();
-               else finalData = Object.assign(finalData, await secRes.json().catch(() => null));
-           }
-
-           if (finalData?.reply) aiResponseText = finalData.reply;
-           if (finalData?.error) aiResponseText = finalData.error;
-        } else {
-           const data = await response.json().catch(() => null);
-           if (data && data.error) aiResponseText = data.error;
-        }
-
-        // Save AI response to DB from "Admin"
-        await addDoc(collection(db, 'messages'), {
-          senderId: adminId,
-          receiverId: currentId,
-          receiverRole: user?.role || 'student',
-          text: aiResponseText,
           timestamp: Timestamp.now(),
           isRead: false
         });
@@ -440,16 +372,6 @@ export function ChatbotWidget() {
 
     } catch (error) {
       console.error("Chat error:", error);
-      // Fallback message
-      if (chatId) {
-         await addDoc(collection(db, 'messages'), {
-            senderId: adminId,
-            receiverId: chatId,
-            text: "Kechirasiz, sun'iy intellekt tizimi bilan bog'lanishda xatolik yoki limit tugadi.",
-            timestamp: Timestamp.now(),
-            isRead: false
-         });
-      }
     } finally {
       setLoading(false);
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -484,10 +406,10 @@ export function ChatbotWidget() {
                   )}
                   <div>
                     <h3 className="font-bold text-sm">
-                       {isAdmin && adminView === 'chat' && selectedUser ? selectedUser.displayName : (isAdmin && adminView === 'list' ? 'Suhbatdoshlar' : 'Aqlli Yordamchi')}
+                       {isAdmin && adminView === 'chat' && selectedUser ? selectedUser.displayName : (isAdmin && adminView === 'list' ? 'Suhbatdoshlar' : 'Onlayn Muloqot')}
                     </h3>
                     <p className="text-blue-100 text-[10px] uppercase tracking-widest">
-                       {isAdmin && adminView === 'chat' ? (selectedUser?.role === 'inquiry' ? 'Mehmon' : 'Foydalanuvchi') : 'Doim Onlayn'}
+                       {isAdmin && adminView === 'chat' ? (selectedUser?.role === 'inquiry' ? 'Mehmon' : 'Foydalanuvchi') : 'Admin bilan muloqot'}
                     </p>
                   </div>
                </div>
@@ -510,8 +432,8 @@ export function ChatbotWidget() {
                        <Bot className="w-5 h-5 relative z-10" />
                     </div>
                     <div className="flex-1 min-w-0">
-                       <h4 className="font-bold text-sm text-blue-900 truncate">Aqlli Yordamchi</h4>
-                       <p className="text-xs text-blue-600 truncate">Sun'iy intellekt bilan suhbat</p>
+                       <h4 className="font-bold text-sm text-blue-900 truncate">Suhbat testi</h4>
+                       <p className="text-xs text-blue-600 truncate">O'zi bilan suhbat</p>
                     </div>
                  </button>
                  
@@ -551,7 +473,7 @@ export function ChatbotWidget() {
                     {messages.length === 0 && (
                        <div className="flex-1 flex flex-col justify-center items-center text-center opacity-50">
                           <Bot className="w-12 h-12 mb-3 mt-10" />
-                          <p className="text-sm px-4">Salom! Men sizning aqlli yordamchingizman. Sizga qanday yordam bera olaman?</p>
+                          <p className="text-sm px-4">Assalomu alaykum! Savol va murojaatlaringizni shu yerda yozib qoldirishingiz mumkin. Xabaringiz to'g'ridan-to'g'ri administratorga yetkaziladi. Admin tez orada javob yozadi.</p>
                        </div>
                     )}
                     {messages.map((msg) => {

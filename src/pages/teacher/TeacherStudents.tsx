@@ -293,6 +293,7 @@ export default function TeacherStudents() {
         "№": i + 1,
         "F.I.SH": u.displayName,
         "Telefon raqam": u.phone || '-',
+        "E-pochta": u.email || '-',
         "Login": u.login || '-',
         "Parol": u.password || '-'
       };

@@ -354,6 +354,8 @@ export default function ChatSection() {
 
         await addDoc(collection(db, 'messages'), {
           senderId: user.uid,
+          senderName: user.displayName || 'Admin',
+          senderRole: user.role || 'admin',
           receiverId: selectedContactId,
           receiverRole: receiverRole,
           text: text.trim(),

@@ -21,7 +21,6 @@ export default function TeacherProfile() {
     try {
       await updateDoc(doc(db, 'users', user.uid), formData);
       alert('Ma\'lumotlar yangilandi!');
-      window.location.reload(); // Quick refresh to update context
     } catch (err) {
       console.error(err);
     } finally {
@@ -87,13 +86,13 @@ export default function TeacherProfile() {
               <div>
                 <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
                   <Mail className="h-4 w-4 text-gray-400" />
-                  Email
+                  Email (O'zgarmas)
                 </label>
                 <input
                   type="email"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                  disabled
+                  className="w-full px-4 py-3 rounded-xl border border-gray-100 bg-gray-50 text-gray-400 font-medium cursor-not-allowed select-all"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
               <div>

@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import { generateContentWithRotation, getGeminiKeysPool } from "./src/lib/gemini";
 import dotenv from "dotenv";
 import { launchBot } from "./telegram";
 
@@ -20,23 +21,190 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  app.post("/api/gemini", async (req, res) => {
+    try {
+      const { action, topic, count, context, docType, options } = req.body;
+      
+      const keysPool = getGeminiKeysPool();
+      if (keysPool.length === 0) {
+        return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda sozlanmagan)." });
+      }
+
+      const MODEL_NAME = "gemini-3.5-flash";
+
+      if (action === "generateDynamicTest") {
+        const prompt = context 
+          ? `Berilgan matn: "${context}". 
+             Mavzu: "${topic}".
+             Ushbu matn ichidan ${count || 10} ta o'zbek tilidagi test savollarini yarating. 
+             Savollar faqat berilgan matn asosida bo'lishi shart.
+             Har bir savol 4 ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (0-3) ko'rsatilishi kerak.`
+          : `Mavzu: "${topic}".
+             Ushbu mavzu asosida ${count || 10} ta o'zbek tilidagi umumiy bilimga asoslangan test savollarini yarating. 
+             Har bir savol 4 ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (0-3) ko'rsatilishi kerak.`;
+
+        const response = await generateContentWithRotation({
+          model: MODEL_NAME,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  text: { type: Type.STRING },
+                  options: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                  },
+                  correctIdx: { type: Type.NUMBER }
+                },
+                required: ["id", "text", "options", "correctIdx"]
+              }
+            }
+          }
+        });
+
+        const json = JSON.parse(response.text || "[]");
+        return res.json(json);
+
+      } else if (action === "generatePresentation") {
+        const prompt = `Mavzu: "${topic}". 
+          Ushbu mavzu bo'yicha ${count || 5} ta slayddan iborat mukammal taqdimot (presentation) rejasini va matnini o'zbek tilida yarating. 
+          Malumotlar 100% aniq va ilmiy bo'lishi kerak.
+          Har bir slayd uchun: sarlavha (title) va asosiy qism matni (content) bo'lishi kerak.
+          MATN UCHUN QOIDALAR:
+          1. Matematik formulalar va belgilarni Markdown dagi LaTeX yordamida yozing. In-line formulalar uchun $...$ va alohida qator formulalar uchun $$...$$ foydalaning (masalan, $\\pi$, $r^2$, $E=mc^2$). Kasrlar uchun $\\frac{a}{b}$ ishlating.
+          2. Slaydlar ichida mavzuga mos 1 ta AI grafik yoki rasm joylashtiring. Buning uchun Markdown rasm formatidan foydalanib, uning manbasini (URL) quyidagidek bering:
+             ![grafik nomi](https://image.pollinations.ai/prompt/{rasm_haqida_inglizcha_promtingiz}?width=800&height=600&nologo=true)
+          3. Agar qulay bo'lsa, ma'lumotlarni jadvallar (Markdown tables) ko'rinishida bering. 
+          Javob JSON formatida bo'lsin.`;
+
+        const response = await generateContentWithRotation({
+          model: MODEL_NAME,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  content: { type: Type.STRING, description: "Markdown formatida asosiy matn" }
+                },
+                required: ["title", "content"]
+              }
+            }
+          }
+        });
+
+        const json = JSON.parse(response.text || "[]");
+        return res.json(json);
+
+      } else if (action === "generateDocument") {
+        let prompt = '';
+        if (docType === 'kurs_ishi') {
+          prompt = `Mavzu: "${topic}". 
+     Ushbu mavzu bo'yicha mukammal va to'liq "Kurs ishi" (Coursework) tayyorlang. 
+     O'zbek tilida, ilmiy uslubda bo'lishi shart.
+     Varaqlar soni (taxminan): ${options?.pageCount || 20} varaq kabi juda keng qamrovli va batafsil bo'lsin.
+     Reja: Kirish, bir nechta boblar (har biri bir necha paragraflar bilan), Xulosa va Foydalanilgan adabiyotlar ruyxati bo'lishi kerak.
+     Matematik va fizik formulalarni LaTeX yordamida yozing.
+     Javob faqat JSON formatida bo'lsin.`;
+        } else if (docType === 'dars_ishlanma') {
+          prompt = `Mavzu: "${topic}". Ushbu mavzu bo'yicha maktab yoki universitet uchun 1 soatlik (45-80 min) batafsil "Dars ishlanmasi" (Lesson plan) tayyorlang. O'zbek tilida bo'lishi shart.
+     Darsning maqsadi, jihozlari, mavzu bayoni, o'qitish metodlari, mashqlar va uy vazifasi to'liq yozilsin.
+     Javob faqat JSON formatida bo'lsin.`;
+        } else if (docType === 'hisobot') {
+          prompt = `Mavzu: "${topic}". 
+     Birlamchi ma'lumotlar: "${options?.context || ''}".
+     Ushbu ma'lumotlar asosida mukammal va kengaytirilgan "Hisobot" (Report) tayyorlang. O'zbek tilida, rasmiy uslubda bo'lishi shart.
+     Berilgan qilingan/rejalashtirilgan ishlar haqidagi qisqa matnni professional va ilmiy darajaga ko'taring.
+     Javob faqat JSON formatida bo'lsin.`;
+        } else if (docType === 'maqola') {
+          prompt = `Mavzu: "${topic}". 
+     Jurnal turi: ${options?.journalType === 'international' ? 'Xalqaro' : 'O\'zbekiston (OAK)'}.
+     Ushbu mavzu bo'yicha ilmiy "Maqola" (Article) tayyorlang. O'zbek tilida bo'lishi shart.
+     Belgalangan jurnal turi uchun barcha standard talablarga (IMRAD va h.k.) javob bersin.
+     Javob faqat JSON formatida bo'lsin.`;
+        }
+
+        const response = await generateContentWithRotation({
+          model: MODEL_NAME,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                content: { type: Type.STRING, description: "Markdown formatida to'liq matn" }
+              },
+              required: ["title", "content"]
+            }
+          }
+        });
+
+        const json = JSON.parse(response.text || "{}");
+        return res.json(json);
+
+      } else if (action === "generateDynamicCourse") {
+        const prompt = `Mavzu: "${topic}".
+        Ushbu mavzu bo'yicha to'liq kurs rejasini va mazmunini o'zbek tilida yarating.
+        Kurs kamida 4 ta moduldan iborat bo'lsin.
+        Har bir modul uchun: sarlavha (title) va to'liq o'quv kontenti (Markdown formatida) bo'lsin.
+        Javob JSON formatida bo'lsin.`;
+
+        const response = await generateContentWithRotation({
+          model: MODEL_NAME,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                description: { type: Type.STRING },
+                modules: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      title: { type: Type.STRING },
+                      content: { type: Type.STRING }
+                    },
+                    required: ["title", "content"]
+                  }
+                }
+              },
+              required: ["title", "description", "modules"]
+            }
+          }
+        });
+
+        const json = JSON.parse(response.text || "{}");
+        return res.json(json);
+      } else {
+        return res.status(400).json({ error: "Noma'lum amal" });
+      }
+
+    } catch (error: any) {
+      console.error("[Backend Gemini API Error]:", error);
+      return res.status(500).json({ error: error.message || "Xatolik yuz berdi" });
+    }
+  });
+
   app.post("/api/chat", async (req, res) => {
     try {
       const { prompt, history, userName, isAdminMode, systemContext, functionResponses, lastFunctionCall } = req.body;
       
-      const apiKey = process.env.NEW_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-      if (!apiKey) {
+      const keysPool = getGeminiKeysPool();
+      if (keysPool.length === 0) {
         return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda sozlanmagan)." });
       }
-
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build'
-          }
-        }
-      });
 
       let systemInstruction = `Siz ushbu o'quv platformasining aqlli yordamchisisiz. Siz suhbatlashayotgan foydalanuvchining ismi: ${userName || 'Mehmon'}. Barcha savollarga aniq, to'g'ri va xushmuomalalik bilan o'zbek tilida javob bering, suhbatni boshida uning ismi bilan murojaat qiling.`;
 
@@ -45,9 +213,9 @@ async function startServer() {
 Sizda tizimdagi ma'lumotlarni o'qish va ma'lum amallarni bajarish (masalan, foydalanuvchilar sonini bilish, ularning ro'yxatini olish, tug'ilgan kuni bo'lganlarni ko'rish, testlarni faollashtirish, quizlar yaratish) uchun maxsus funksiyalar (tools) mavjud.
 Agar admin tizim haqida so'rasa, albatta ushbu funksiyalarni chaqiring yoki taqdim etilgan joriy tizim ma'lumotlaridan foydalaning. Funksiya natijasini olgach, o'zbek tilida chiroyli va aniq qilib adminga hisobot bering. Agar funksiya chaqiruvi so'ralsa, uni bajaring.`;
       } else {
-         systemInstruction += `\nSiz har qanday mavzudagi savollarga batafsil javob bera olasiz. Har qanday masala bo'yicha boshida qisqa va aniq ma'lumot bering. Agar foydalanuvchi ko'proq tafsilot so'rasa yoki chuqurroq tushuntirish so'rasa, kengroq va to'liqroq ma'lumotli qilib kengaytirib bering.
+         systemInstruction += `\nSiz platformaning aqlli virtual yordamchisisiz. Siz ham AIEDUTIZIM platformasi imkoniyatlari, kurslari va darslari haqidagi savollarga javob bera olasiz, ham foydalanuvchi qiziqqan istalgan boshqa mavzudagi (matematika, dasturlash, fizika, tarix, til o'rganish, umumiy savollar va h.k.) har qanday savollarga juda aqlli va foydali javob qaytara olasiz.
 
-Tizim haqida va tizim imkoniyatlari haqida ma'lumot so'ralsa, quyidagilarni aytib o'ting:
+Tizim imkoniyatlari haqida ma'lumot so'ralsa, quyidagilarni aytib o'ting:
 1. Kurslar: Foydalanuvchilar turli xil kurslarni ko'rishlari va o'rganishlari mumkin.
 2. Testlar va Quizizz: Bilimni sinab ko'rish uchun interaktiv testlar va Quizizz mashqlari mavjud.
 3. Jurnal va Baholar: Talabalar o'z baholarini va o'zlashtirishini kuzatib borishlari mumkin.
@@ -65,13 +233,25 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       if (history && Array.isArray(history)) {
           for (const msg of history) {
               if (msg.role === 'user' || msg.role === 'model') {
-                 reqContents.push({ role: msg.role, parts: [{ text: msg.text }] });
+                 let textVal = "";
+                 if (typeof msg.text === 'string' && msg.text.trim()) {
+                    textVal = msg.text.trim();
+                 } else if (msg.parts && Array.isArray(msg.parts) && msg.parts[0]) {
+                    if (typeof msg.parts[0] === 'string') {
+                       textVal = msg.parts[0];
+                    } else if (msg.parts[0].text) {
+                       textVal = msg.parts[0].text;
+                    }
+                 }
+                 if (textVal) {
+                    reqContents.push({ role: msg.role, parts: [{ text: textVal }] });
+                 }
               }
           }
       }
 
-      if (prompt) {
-          reqContents.push({ role: "user", parts: [{ text: prompt }] });
+      if (prompt && prompt.trim()) {
+          reqContents.push({ role: "user", parts: [{ text: prompt.trim() }] });
       }
 
       if (lastFunctionCall) {
@@ -190,7 +370,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
 
       const getResponse = async (contents) => {
           try {
-             return await ai.models.generateContent({
+             return await generateContentWithRotation({
                model: "gemini-3.5-flash",
                contents: contents,
                config: {

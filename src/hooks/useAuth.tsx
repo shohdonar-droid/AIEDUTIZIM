@@ -33,11 +33,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', targetUid));
       if (userDoc.exists()) {
         const udata = userDoc.data() as UserProfile;
+        const userWithUid = { ...udata, uid: userDoc.id };
         if (impId && udata.role === 'teacher') {
             // impersonated teacher
-            setUser({ ...udata, isImpersonated: true } as any);
+            setUser({ ...userWithUid, isImpersonated: true } as any);
         } else {
-            setUser(udata);
+            setUser(userWithUid);
         }
       } else {
         setUser(null);

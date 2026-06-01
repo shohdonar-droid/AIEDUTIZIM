@@ -26,8 +26,18 @@ export default function Login() {
             const email = decoded.slice(0, separatorIdx);
             const pass = decoded.slice(separatorIdx + 1);
             setLoading(true);
-            signInWithEmailAndPassword(auth, email, pass).then(res => {
-               // success, useAuth will handle redirect via the other useEffect
+            signInWithEmailAndPassword(auth, email, pass).then(async (res) => {
+               // Link Telegram ID if running inside Telegram Mini App (Web App)
+               try {
+                 const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+                 if (tgUser && tgUser.id) {
+                   await setDoc(doc(db, 'users', res.user.uid), {
+                     telegramId: Number(tgUser.id)
+                   }, { merge: true });
+                 }
+               } catch (tgErr) {
+                 console.error("Failed to link telegramId in auto login:", tgErr);
+               }
             }).catch(e => {
                setError("Avtomatik kirishda xatolik: " + e.message);
                setLoading(false);
@@ -40,8 +50,8 @@ export default function Login() {
   }, [user]);
 
   useEffect(() => {
-      if (user) {
-      if (user.role === 'admin') navigate('/admin');
+    if (user) {
+      if (user.role === 'admin' || user.role === 'subadmin') navigate('/admin');
       else if (user.role === 'teacher' || user.role === 'staff') navigate('/teacher');
       else navigate('/student');
     }
@@ -75,13 +85,27 @@ export default function Login() {
       } else if (trimmedLogin.includes('@')) {
         actualEmail = trimmedLogin.toLowerCase();
       } else {
-        // Derive based on role
-        if (activeRole === 'admin') {
-          actualEmail = ADMIN_EMAIL;
-        } else if (activeRole === 'teacher' || activeRole === 'staff') {
-          actualEmail = `${trimmedLogin.toLowerCase()}@teacher.uz`;
+        // Look up login field in Firestore users collection
+        const qLog = query(collection(db, 'users'), where('login', '==', trimmedLogin));
+        const qLogSnap = await getDocs(qLog);
+        if (!qLogSnap.empty) {
+          actualEmail = qLogSnap.docs[0].data().email;
         } else {
-          actualEmail = `${trimmedLogin.toLowerCase()}@student.uz`;
+          // If login stored is lowercase
+          const qLogLower = query(collection(db, 'users'), where('login', '==', trimmedLogin.toLowerCase()));
+          const qLogLowerSnap = await getDocs(qLogLower);
+          if (!qLogLowerSnap.empty) {
+            actualEmail = qLogLowerSnap.docs[0].data().email;
+          } else {
+            // Fallback derivation
+            if (activeRole === 'admin') {
+              actualEmail = `${trimmedLogin.toLowerCase()}@subadmin.uz`;
+            } else if (activeRole === 'teacher' || activeRole === 'staff') {
+              actualEmail = `${trimmedLogin.toLowerCase()}@teacher.uz`;
+            } else {
+              actualEmail = `${trimmedLogin.toLowerCase()}@student.uz`;
+            }
+          }
         }
       }
 
@@ -115,13 +139,27 @@ export default function Login() {
         if (userDoc.exists()) {
           const role = userDoc.data().role;
           
-          if (role !== activeRole) {
-             const rName = activeRole === 'admin' ? 'Admin' : activeRole === 'teacher' ? 'Tashkilot' : (activeRole === 'staff' ? 'Xodim' : 'Talaba');
-             const actualRoleName = role === 'admin' ? 'Admin' : role === 'teacher' ? 'Tashkilot' : (role === 'staff' ? 'Xodim' : 'Talaba');
+          const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin');
+          if (!isRoleMatch) {
+             const rName = activeRole === 'admin' ? 'Admin/Kichik Admin' : activeRole === 'teacher' ? 'Tashkilot' : (activeRole === 'staff' ? 'Xodim' : 'Talaba');
+             const actualRoleName = role === 'admin' ? 'Admin' : role === 'subadmin' ? 'Kichik Admin' : role === 'teacher' ? 'Tashkilot' : (role === 'staff' ? 'Xodim' : 'Talaba');
              setError(`Ushbu hisob ${rName} emas, balki ${actualRoleName} profili. Iltimos, tepadan tegishli bo'limni tanlang.`);
              setLoading(false);
              await auth.signOut();
              return;
+          }
+
+          // Link Telegram ID if running inside Telegram Mini App (Web App)
+          try {
+            const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+            if (tgUser && tgUser.id) {
+              await setDoc(doc(db, 'users', res.user.uid), {
+                telegramId: Number(tgUser.id)
+              }, { merge: true });
+              console.log("Linked Telegram ID:", tgUser.id, "to User:", res.user.uid);
+            }
+          } catch (tgErr) {
+            console.error("Failed to merge telegramId:", tgErr);
           }
 
           // Log activity
@@ -147,7 +185,7 @@ export default function Login() {
           } catch (e) {}
 
           await refreshUser();
-          const dest = role === 'admin' ? '/admin' : (role === 'teacher' || role === 'staff' ? '/teacher' : '/student');
+          const dest = (role === 'admin' || role === 'subadmin') ? '/admin' : (role === 'teacher' || role === 'staff' ? '/teacher' : '/student');
           navigate(dest);
         } else {
           setError('Profil hujjatlari topilmadi. Qaytadan ro\'yxatdan o\'ting.');

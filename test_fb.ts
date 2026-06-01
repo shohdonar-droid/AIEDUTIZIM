@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { initializeFirestore, collection, getDocs, query, where } from 'firebase/firestore';
 import fs from 'fs';
 
 const rawConfigPath = 'firebase-applet-config.json';
@@ -14,10 +14,12 @@ const db = initializeFirestore(app, { experimentalForceLongPolling: true }, fire
 
 async function run() {
     try {
-        const adminSnap = await getDocs(query(collection(db, 'users'), where('role', 'in', ['admin', 'teacher', 'organization'])));
-        console.log("Users found:", adminSnap.size);
-        adminSnap.forEach(d => {
-            console.log(d.id, d.data().role, d.data().telegramId);
+        const q = query(collection(db, 'users'), where('teacherId', '==', 'L3b2NjDOrIS4QnpjmnS7kQWOreE3'));
+        const snap = await getDocs(q);
+        console.log(`Matched users size: ${snap.size}`);
+        snap.forEach(d => {
+            const data = d.data();
+            console.log(`ID: ${d.id} | Name: ${data.displayName} | Email: ${data.email} | Login: ${data.login} | Role: ${data.role}`);
         });
         process.exit(0);
     } catch(e) {

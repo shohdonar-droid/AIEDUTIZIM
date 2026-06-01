@@ -57,7 +57,6 @@ export default function StudentProfile() {
         departmentName: deptName,
         groupName: grpName
       });
-      await refreshUser();
       
       try {
          await addDoc(collection(db, 'admin_notifications'), {

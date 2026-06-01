@@ -16,7 +16,9 @@ import {
   ChevronRight,
   MessageSquare,
   Wallet,
-  CheckCircle2
+  CheckCircle2,
+  User as UserIcon,
+  BrainCircuit
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { auth, db } from '../../lib/firebase';
@@ -39,6 +41,8 @@ import AdminServices from './AdminServices';
 import AdminSubjects from '../../components/SubjectsManager';
 import SubjectRead from '../SubjectRead';
 import ChatSection from '../ChatSection';
+import AdminProfile from './AdminProfile';
+import AdminAiAssistant from './AdminAiAssistant';
 import { motion } from 'motion/react';
 import { AlertCircle } from 'lucide-react';
 
@@ -85,6 +89,8 @@ export default function AdminDashboard() {
 
   const menuItems = [
     { name: 'Umumiy', path: '/admin', icon: LayoutDashboard },
+    { name: 'Profil', path: '/admin/profile', icon: UserIcon },
+    { name: 'AI Yordamchi', path: '/admin/ai-assistant', icon: BrainCircuit },
     { name: 'Banner', path: '/admin/banner', icon: ImageIcon },
     { name: 'Info', path: '/admin/info', icon: Info },
     { name: 'Kurslar', path: '/admin/courses', icon: BookOpen },
@@ -100,6 +106,11 @@ export default function AdminDashboard() {
     { name: 'Billing', path: '/admin/billing', icon: Wallet },
     { name: 'Chat', path: '/admin/chat', icon: MessageSquare, badge: unreadCount },
   ];
+
+  const allowedSubadminMenus = ['Profil', 'Kurslar', 'Testlar', 'Mavzular', "Yo'nalishlar", 'Foydalanuvchilar', 'Jurnal', 'Sertifikatlar', 'Billing'];
+  const filteredMenuItems = user?.role === 'subadmin' 
+    ? menuItems.filter(item => allowedSubadminMenus.includes(item.name))
+    : menuItems;
 
   const handleLogout = () => auth.signOut();
 
@@ -122,14 +133,16 @@ export default function AdminDashboard() {
           </div>
           {!isCollapsed && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden">
-              <p className="font-black text-gray-900 tracking-tight uppercase text-xs truncate">{user?.displayName || "Admin"}</p>
-              <p className="text-[9px] text-blue-600 font-black uppercase tracking-widest leading-none mt-1">Administrator</p>
+               <p className="font-black text-gray-900 tracking-tight uppercase text-xs truncate">{user?.displayName || "Admin"}</p>
+               <p className="text-[9px] text-blue-600 font-black uppercase tracking-widest leading-none mt-1">
+                 {user?.role === 'subadmin' ? "Kichik Admin" : "Administrator"}
+               </p>
             </motion.div>
           )}
         </div>
 
         <nav className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar pr-0">
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => {
             const active = location.pathname === item.path;
             const Icon = item.icon;
             return (
@@ -188,7 +201,7 @@ export default function AdminDashboard() {
       {/* Mobile Bottom Bar for Admin Dashboard */}
       <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-gray-200 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] md:hidden">
         <div className="flex overflow-x-auto scrollbar-hide items-center justify-start gap-1 p-2">
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => {
              const active = location.pathname === item.path;
              const Icon = item.icon;
              return (
@@ -217,6 +230,8 @@ export default function AdminDashboard() {
         <div className="max-w-6xl mx-auto">
           <Routes>
             <Route path="/" element={<AdminOverview />} />
+            <Route path="/profile" element={<AdminProfile />} />
+            <Route path="/ai-assistant" element={<AdminAiAssistant />} />
             <Route path="/banner" element={<AdminBanner />} />
             <Route path="/info" element={<AdminInfo />} />
             <Route path="/courses" element={<AdminCourses />} />

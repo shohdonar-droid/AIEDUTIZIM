@@ -58,8 +58,13 @@ export default function Contact() {
       if (user) {
         senderId = user.uid;
       } else {
-        // Create an anonymous user doc to show up in Admin Chat
-        senderId = 'anon_' + Date.now().toString(36);
+        const savedAnon = localStorage.getItem('ai_anon_id');
+        if (savedAnon) {
+          senderId = savedAnon;
+        } else {
+          senderId = 'anon_' + Date.now().toString(36);
+          localStorage.setItem('ai_anon_id', senderId);
+        }
         await setDoc(doc(db, 'users', senderId), {
           uid: senderId,
           displayName: formData.phone + ' (Saytdan)',

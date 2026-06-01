@@ -16,8 +16,10 @@ import {
   getDoc,
   runTransaction,
   limit,
+  orderBy,
 } from "firebase/firestore";
 import { GoogleGenAI, Type } from "@google/genai";
+import { generateContentWithRotation } from "./src/lib/gemini";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -69,9 +71,201 @@ const botToken =
   "8602426313:AAEnX9khyPLZYFWrvvVRJqP5PRANqbD7i-I";
 export const bot = new Telegraf(botToken);
 
+export let telegramUsersCount = 0;
+
+const adminIdsPath = path.join(process.cwd(), "admin_telegram_ids.json");
+
+export function getAdminIds(): number[] {
+  try {
+    if (fs.existsSync(adminIdsPath)) {
+      return JSON.parse(fs.readFileSync(adminIdsPath, "utf8"));
+    }
+  } catch (e) {}
+  return [];
+}
+
+export function registerAdminId(id: number) {
+  try {
+    const list = getAdminIds();
+    if (!list.includes(id)) {
+      list.push(id);
+      fs.writeFileSync(adminIdsPath, JSON.stringify(list), "utf8");
+      console.log("[Telegram] Registered admin Telegram ID:", id);
+    }
+  } catch (e) {}
+}
+
+export async function notifyAdminsDirectly(text: string, options: any = {}) {
+  const ids = getAdminIds();
+  console.log("[Telegram] Notifying admin Telegram IDs:", ids);
+  for (const adminId of ids) {
+    try {
+      const kb = await getKeyboard("admin", adminId, true);
+      const fullOptions = {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: kb,
+          resize_keyboard: true,
+          ...options?.reply_markup
+        },
+        ...options
+      };
+      await bot.telegram.sendMessage(adminId, text, fullOptions).catch((err) => {
+        console.error(`Direct notification failed for admin ${adminId}:`, err);
+      });
+    } catch (e) {}
+  }
+}
+
+export function isTodayBirthday(birthDateStr?: string | null): boolean {
+  if (!birthDateStr) return false;
+  try {
+    const today = new Date();
+    const tDay = today.getDate();
+    const tMonth = today.getMonth() + 1;
+    
+    let bDay = 0;
+    let bMonth = 0;
+    if (birthDateStr.includes("-")) {
+      const parts = birthDateStr.split("-");
+      bDay = parseInt(parts[2], 10);
+      bMonth = parseInt(parts[1], 10);
+    } else if (birthDateStr.includes(".")) {
+      const parts = birthDateStr.split(".");
+      bDay = parseInt(parts[0], 10);
+      bMonth = parseInt(parts[1], 10);
+    } else if (birthDateStr.includes("/")) {
+      const parts = birthDateStr.split("/");
+      bDay = parseInt(parts[1], 10);
+      bMonth = parseInt(parts[0], 10);
+    }
+    
+    return bDay === tDay && bMonth === tMonth;
+  } catch (e) {
+    return false;
+  }
+}
+
+export function formatProfileInfo(uData: any, role: string, displayName: string, email: string): string {
+  let profileMsg = "";
+  const normRole = (role || "").toLowerCase();
+
+  profileMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  if (normRole === "student") {
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Talaba</code>\n`;
+    profileMsg += `🏢 <b>Yo'nalishi:</b> <code>${uData?.departmentName || uData?.direction || "Kiritilmagan"}</code>\n`;
+    profileMsg += `👥 <b>Guruhi:</b> <code>${uData?.groupName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>\n`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+  } else if (normRole === "admin") {
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Administrator</code>\n`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+  } else if (normRole === "subadmin") {
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Kichik Administrator</code>\n`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+    if (uData?.phone) profileMsg += `📞 <b>Tel raqami:</b> <code>${uData.phone}</code>\n`;
+  } else if (normRole === "teacher") {
+    profileMsg += `🏫 <b>Tashkilot nomi:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Tashkilot</code>\n`;
+    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>\n`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+  } else if (normRole === "staff") {
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `🏫 <b>Qaysi tashkilotga tegishli:</b> <code>${uData?.teacherName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Xodim</code>\n`;
+    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>\n`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+  } else {
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>${normRole.toUpperCase()}</code>\n`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+    if (uData?.phone) profileMsg += `📞 <b>Tel raqami:</b> <code>${uData.phone}</code>\n`;
+  }
+  profileMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+  return profileMsg;
+}
+
+export async function fetchTelegramUsersCount() {
+  const tgUsersListPath = path.join(process.cwd(), "telegram_users_list.json");
+  let list: number[] = [];
+  try {
+    if (fs.existsSync(tgUsersListPath)) {
+      list = JSON.parse(fs.readFileSync(tgUsersListPath, "utf8"));
+    }
+  } catch (e) {}
+  
+  telegramUsersCount = list.length;
+
+  if (db) {
+    try {
+      const snap = await getDocs(collection(db, "telegram_users"));
+      snap.forEach((d) => {
+        const idNum = Number(d.id);
+        if (!isNaN(idNum) && idNum !== 0 && !list.includes(idNum)) {
+          list.push(idNum);
+        }
+      });
+      telegramUsersCount = list.length;
+      try {
+        fs.writeFileSync(tgUsersListPath, JSON.stringify(list), "utf8");
+      } catch (err) {}
+      console.log("[Telegram] Initialized telegramUsersCount from DB and cache:", telegramUsersCount);
+    } catch (e) {
+      console.error("[Telegram] Failed to fetch initial telegram users count from Firestore, using local count:", telegramUsersCount);
+    }
+  }
+}
+
+async function registerTelegramId(
+  targetRegisterId: number,
+  chatType: string = "private",
+  chatTitle: string = "",
+  fromData: any = {}
+) {
+  if (!targetRegisterId) return;
+  const tgUsersListPath = path.join(process.cwd(), "telegram_users_list.json");
+  let userList: number[] = [];
+  try {
+    if (fs.existsSync(tgUsersListPath)) {
+      userList = JSON.parse(fs.readFileSync(tgUsersListPath, "utf8"));
+    }
+  } catch (e) {}
+
+  if (!userList.includes(targetRegisterId)) {
+    userList.push(targetRegisterId);
+    try {
+      fs.writeFileSync(tgUsersListPath, JSON.stringify(userList), "utf8");
+    } catch (err) {}
+    telegramUsersCount = userList.length;
+    console.log(`[Telegram] Registered new chat target ID: ${targetRegisterId}. Total: ${telegramUsersCount}`);
+  }
+
+  if (db) {
+    try {
+      const docRef = doc(db, "telegram_users", String(targetRegisterId));
+      await setDoc(docRef, {
+        telegramId: targetRegisterId,
+        firstName: fromData?.first_name || "",
+        lastName: fromData?.last_name || "",
+        username: fromData?.username || "",
+        type: chatType || "private",
+        title: chatTitle || "",
+        lastActive: new Date().toISOString(),
+        isGroup: chatType === "group" || chatType === "supergroup" || targetRegisterId < 0
+      }, { merge: true }).catch(() => {});
+    } catch (e) {
+      console.error("Failed to auto-register sender in Firestore:", e);
+    }
+  }
+}
+
 const pendingLogins = new Map<
   number,
-  { step: string; email?: string; targetUserId?: string }
+  { step: string; email?: string; targetUserId?: string; targetMenu?: string }
 >();
 
 class PersistentMap<K, V> extends Map<K, V> {
@@ -139,6 +333,14 @@ const authedUsers = new PersistentMap<
   }
 >(path.join(process.cwd(), "telegram_local_cache.json"));
 
+const aiAssistantActiveUsers = new PersistentMap<number, boolean>(
+  path.join(process.cwd(), "telegram_ai_active.json")
+);
+
+const customMenuTexts = new PersistentMap<string, string>(
+  path.join(process.cwd(), "telegram_custom_menus.json")
+);
+
 const requestHistory = new Map<number, number[]>();
 
 // Rate limiting middleware: 20 requests per minute per user (exempts admins and teachers)
@@ -160,7 +362,7 @@ bot.use(async (ctx, next) => {
 
   // Retrieve authenticated state (including database check if needed)
   const authed = await getAuthedUser(userId);
-  if (authed && (authed.role === "admin" || authed.role === "teacher")) {
+  if (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "teacher")) {
     return next();
   }
 
@@ -183,31 +385,47 @@ async function getKeyboard(
   userId?: number,
   isAuthenticated: boolean = false,
 ) {
-  let rows = [];
-  if (role === "admin" || role === "teacher") {
-    if (isAuthenticated) {
-      rows.push([{ text: "👑 Admin profil" }, { text: "🚪 Tizimdan chiqish" }]);
-    } else {
-      rows.push([{ text: "🔑 Admin kirish" }]);
+  let authed = isAuthenticated;
+  let userRole = role;
+  if (userId) {
+    const user = await getAuthedUser(userId);
+    if (user) {
+      authed = true;
+      userRole = user.role || role;
     }
-    rows.push([{ text: "📊 Foydalanuvchilar va statistika" }]);
-    rows.push([{ text: "📢 Umumiy e'lon yuborish" }]);
-    rows.push([{ text: "💬 Kelgan murojaatlar" }, { text: "⚙️ Bot holati" }]);
-  } else {
-    if (isAuthenticated) {
-      rows.push([{ text: "🔑 Profil" }, { text: "🚪 Chiqish" }]);
-    } else {
-      rows.push([{ text: "🔑 Kirish" }]);
-    }
-    rows.push([{ text: "📨 Adminga murojaat qilish" }]);
   }
+
+  const rows: any[][] = [];
+  if (authed) {
+    if (userRole === "admin" || userRole === "subadmin") {
+      rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
+      rows.push([{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }]);
+      rows.push([{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }]);
+      rows.push([{ text: "🤖 AI yordamchi" }]);
+      return rows;
+    }
+    rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
+  } else {
+    rows.push([{ text: "🔑 Kirish" }]);
+  }
+
+  rows.push([{ text: "🤖 AIEDUTIZIM haqida" }, { text: "📚 Kurslar" }]);
+  rows.push([{ text: "🎮 Quizizz testlar" }, { text: "🏆 Sertifikatlar" }]);
+  rows.push([{ text: "💬 Adminga murojaat" }, { text: "❓ Yordam" }]);
+  rows.push([{ text: "🌐 Rasmiy sayt" }]);
+
   return rows;
 }
 
 async function getAuthedUser(userId: number) {
   if (authedUsers.has(userId)) {
     const cached = authedUsers.get(userId);
-    if (cached) return cached;
+    if (cached) {
+      if (cached.role === "admin" || cached.role === "subadmin") {
+        registerAdminId(userId);
+      }
+      return cached;
+    }
   }
   let authed = null;
   let queryAttempted = false;
@@ -231,8 +449,9 @@ async function getAuthedUser(userId: number) {
         const uData = uDoc.data();
         let derivedRole = uData.role || "student";
         const emailLower = (uData.email || "").toLowerCase().trim();
+        const loginLower = (uData.login || "").toLowerCase().trim();
         
-        if (emailLower === "elyorbek@admin.uz") {
+        if (emailLower === "elyorbek@admin.uz" || loginLower === "uy_admin" || loginLower === "admin") {
           derivedRole = "admin";
         }
 
@@ -249,13 +468,20 @@ async function getAuthedUser(userId: number) {
       console.error("DB check auth error:", e);
       // Fallback: If DB query fails (such as quota exceeded), return cached user if we have one
       if (authedUsers.has(userId)) {
-        return authedUsers.get(userId);
+        const cached = authedUsers.get(userId);
+        if (cached && (cached.role === "admin" || cached.role === "subadmin")) {
+          registerAdminId(userId);
+        }
+        return cached;
       }
     }
   }
   if (!queryAttempted || querySuccess) {
     if (authed) {
       authedUsers.set(userId, authed);
+      if (authed.role === "admin" || authed.role === "subadmin") {
+        registerAdminId(userId);
+      }
     } else {
       authedUsers.delete(userId);
     }
@@ -270,16 +496,45 @@ bot.start(async (ctx) => {
   pendingLogins.delete(userId);
   // Do not delete authedUsers so they remain logged in on /start as requested!
 
+  // Local cache file register for offline-first backup and real-time updates
+  let isNewUser = false;
+  const tgUsersListPath = path.join(process.cwd(), "telegram_users_list.json");
+  let userList: number[] = [];
+  try {
+    if (fs.existsSync(tgUsersListPath)) {
+      userList = JSON.parse(fs.readFileSync(tgUsersListPath, "utf8"));
+    }
+  } catch (e) {}
+
+  if (!userList.includes(userId)) {
+    userList.push(userId);
+    isNewUser = true;
+    try {
+      fs.writeFileSync(tgUsersListPath, JSON.stringify(userList), "utf8");
+    } catch (err) {}
+  }
+
+  telegramUsersCount = userList.length;
+
+  if (isNewUser) {
+    const textDesc = `🎉 <b>Yangi a'zo qo'shildi!</b>\n` +
+                     `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                     `👤 Ism: <b>${ctx.from.first_name || ""} ${ctx.from.last_name || ""}</b>\n` +
+                     `🔗 Username: @${ctx.from.username || "yo'q"}\n` +
+                     `🆔 Telegram ID: <code>${userId}</code>`;
+    await notifyAdminsDirectly(textDesc);
+  }
+
   // Save every user to telegram_users collection for broadcast purposes
   if (db) {
     try {
       const docRef = doc(db, "telegram_users", String(userId));
-      const snap = await getDoc(docRef);
-      if (!snap.exists()) {
-        addDoc(collection(db, "admin_notifications"), {
+      const snap = await getDoc(docRef).catch(() => null);
+      if (!snap || !snap.exists()) {
+        await addDoc(collection(db, "admin_notifications"), {
           text: `Yangi xabar: Botimizga yangi a'zo qo'shildi!\n👤 Ism: ${ctx.from.first_name || ""} ${ctx.from.last_name || ""}\n🔗 Username: @${ctx.from.username || "yoq"}\n🆔 ID: ${userId}`,
           timestamp: serverTimestamp(),
-        });
+        }).catch(() => {});
       }
       await setDoc(
         docRef,
@@ -291,36 +546,22 @@ bot.start(async (ctx) => {
           lastActive: new Date().toISOString(),
         },
         { merge: true },
-      );
+      ).catch(() => {});
     } catch (e) {
-      console.error("Failed to save telegram user", e);
+      console.error("Failed to save telegram user doc:", e);
     }
   }
 
   const authed = await getAuthedUser(userId);
   const role = authed ? authed.role : "student";
 
-  let greeting =
-    "Assalomu alaykum! AIEDUTIZIM platformasining telegram botiga xush kelibsiz! 👋\n\nQuyidagi menyulardan foydalanishingiz mumkin:\n🔑 KIRISH - Profilingizga kirish uchun\n🚪 CHIQISH - Profilingizdan chiqish uchun\n📨 Adminga murojaat qilish - Admin bilan bog'lanish uchun\n\n🤖 Shuningdek, sizni qiziqtirgan savollarni to'g'ridan-to'g'ri yuborishingiz mumkin. AI yordamida savolingizga tezkor javob berishga harakat qilaman!";
+  // Deactivate AI assistant mode when launching start command
+  aiAssistantActiveUsers.delete(userId);
 
-  if (authed) {
-    if (authed.role === "admin" || authed.role === "teacher") {
-      greeting =
-        `👑 <b>AIEDUTIZIM - TIZIM ADMINISTRATORI PANEL</b> 👑\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `Xush kelibsiz, <b>${authed.displayName}</b>! 👋\n` +
-        `Siz hozirda mutaxassis (<b>${authed.role.toUpperCase()}</b>) profilida turibsiz.\n\n` +
-        `🛡 Siz uchun quyidagi imkoniyatlar faollashtirildi:\n` +
-        `⚡️ <b>Cheksiz AI xizmati:</b> Daqiqalik limitlardan tashqarisiz!\n` +
-        `📢 <b>Umumiy E'lon yuborish:</b> Barcha a'zolarga xabar tarqatish!\n` +
-        `📊 <b>Stats & Tahlil:</b> Tizim foydalanuvchilarini real-vaqtda kuzatish!\n` +
-        `💬 <b>Murojaatlar boshqaruvi:</b> Foydalanuvchilarga javob berish!\n` +
-        `⚙️ <b>Bot tizim holati:</b> Texnik ko'rsatkichlarni ko'rish!\n\n` +
-        `🤖 <i>O'zingizni qiziqtirgan savol va buyruqlarni yuborishingiz mumkin!</i>`;
-    } else {
-      greeting = `Assalomu alaykum, ${authed.displayName}! 👋\nSiz hozirda ${authed.role.toUpperCase()} profilidasiz.\n\nAIEDUTIZIM platformasining telegram botiga xush kelibsiz!\n\n🤖 Shuningdek, sizni qiziqtirgan savollarni to'g'ridan-to'g'ri yuborishingiz mumkin. AI yordamida savolingizga tezkor javob berishga harakat qilaman!`;
-    }
-  }
+  const greeting =
+    `🤖 <b>Assalomu alaykum! AIEDUTIZIM Telegram botiga xush kelibsiz.</b>\n\n` +
+    `🎓 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Ta'lim Tizimi bo‘lib, talabalar, o‘qituvchilar va tashkilotlar uchun mo‘ljallangan zamonaviy raqamli ta'lim platformasidir.\n\n` +
+    `Kerakli bo‘limni tanlang.`;
 
   ctx.reply(greeting, {
     parse_mode: "HTML",
@@ -330,6 +571,125 @@ bot.start(async (ctx) => {
     },
   });
 });
+
+bot.command("unanswered", async (ctx) => {
+  await handleUnansweredRequest(ctx);
+});
+
+bot.command("javobsiz", async (ctx) => {
+  await handleUnansweredRequest(ctx);
+});
+
+async function handleUnansweredRequest(ctx: any) {
+  const userId = ctx.from.id;
+  const authed = await getAuthedUser(userId);
+  if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+    return ctx.reply("Sizda bu huquq yo'q.");
+  }
+  const loadingMsg = await ctx.reply("🔍 Javob berilmagan murojaatlar qidirilmoqda...");
+  try {
+    const qMessages = query(
+      collection(db, "messages"),
+      orderBy("timestamp", "desc"),
+      limit(300)
+    );
+    const msgSnap = await getDocs(qMessages);
+    const rawMsgs = msgSnap.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+    rawMsgs.sort((a: any, b: any) => {
+      const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
+      const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+      return tA - tB;
+    });
+
+    const latestConvMessage = new Map<string, any>();
+    const partnerNames = new Map<string, string>();
+
+    const isAdminMsg = (m: any) => 
+      m.senderId === "SYSTEM_ADMIN" || 
+      m.senderRole === "admin" || 
+      m.senderRole === "subadmin";
+
+    for (const m of rawMsgs) {
+      let partnerId = "";
+      let partnerName = "";
+      if (isAdminMsg(m)) {
+        partnerId = m.receiverId;
+        partnerName = m.receiverName || "Foydalanuvchi";
+      } else {
+        partnerId = m.senderId;
+        partnerName = m.senderName || "Foydalanuvchi";
+      }
+
+      if (partnerId && partnerId !== "SYSTEM_ADMIN") {
+        latestConvMessage.set(partnerId, m);
+        if (!isAdminMsg(m)) {
+          partnerNames.set(partnerId, partnerName);
+        } else if (partnerName && partnerName !== "Foydalanuvchi") {
+          partnerNames.set(partnerId, partnerName);
+        }
+      }
+    }
+
+    const unansweredList: { partnerId: string; partnerName: string; text: string; timeStr: string }[] = [];
+
+    for (const [partnerId, lastMsg] of latestConvMessage.entries()) {
+      if (!isAdminMsg(lastMsg)) {
+        const partnerName = partnerNames.get(partnerId) || "Foydalanuvchi";
+        const date = lastMsg.timestamp?.toDate ? lastMsg.timestamp.toDate() : new Date();
+        const timeStr = date.toLocaleDateString("uz-UZ") + " " + date.toLocaleTimeString("uz-UZ", { hour: '2-digit', minute: '2-digit' });
+        unansweredList.push({
+          partnerId,
+          partnerName,
+          text: lastMsg.text || "(Matnsiz)",
+          timeStr
+        });
+      }
+    }
+
+    await ctx.telegram.deleteMessage(ctx.chat!.id, loadingMsg.message_id).catch(() => {});
+
+    if (unansweredList.length === 0) {
+      return ctx.reply("🎉 <b>Ajoyib! Barcha murojaatlarga javob berilgan!</b>\n\nHech qanday javob berilmagan xabarlar topilmadi.", { parse_mode: "HTML" });
+    }
+
+    let text = `📥 <b>Javob berilmagan murojaatlar ro'yxati (${unansweredList.length} ta):</b>\n\n`;
+    for (let i = 0; i < unansweredList.length; i++) {
+      const item = unansweredList[i];
+      text += `${i + 1}. 👤 <b>${item.partnerName}</b> (ID: <code>${item.partnerId}</code>)\n`;
+      text += `🕒 <code>${item.timeStr}</code>\n`;
+      text += `💬 <i>"${item.text.substring(0, 100)}${item.text.length > 100 ? '...' : ''}"</i>\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    }
+    text += `\n✍️ Javob yozish uchun quyidagi ro'yxatdan foydalanuvchini tanlang:`;
+
+    const inline_keyboard: any[][] = [];
+    for (const item of unansweredList.slice(0, 10)) {
+      inline_keyboard.push([
+        {
+          text: `✍️ ${item.partnerName.substring(0, 25)}`,
+          callback_data: `reply_${item.partnerId}`,
+        }
+      ]);
+    }
+
+    if (unansweredList.length > 10) {
+      text += `\n\n📌 <i>Yana ${unansweredList.length - 10} ta javobsiz xabar bor, birinchi 10 tasi yuqorida ko'rsatilgan. To'liq ro'yxatni ko'rish yoki boshqa foydalanuvchi bilan yozishmalarni ko'rish uchun <code>/viewmsg_ID</code> ko'rinishida yuboring.</i>`;
+    }
+
+    return ctx.reply(text, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard
+      }
+    });
+  } catch (err) {
+    if (loadingMsg?.message_id) {
+      await ctx.telegram.deleteMessage(ctx.chat!.id, loadingMsg.message_id).catch(() => {});
+    }
+    console.error("Unanswered messages error:", err);
+    return ctx.reply("Xatolik yuz berdi: " + (err as any).message);
+  }
+}
 
 bot.command("login", (ctx) => {
   if (!db) return ctx.reply("Ma'lumotlar bazasi ulanmagan.");
@@ -355,9 +715,94 @@ bot.command("app", (ctx) => {
   );
 });
 
+bot.action("edit_menu_haqida", async (ctx) => {
+  const userId = ctx.from.id;
+  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "🤖 AIEDUTIZIM haqida" });
+  await ctx.reply("✏️ \"🤖 AIEDUTIZIM haqida\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action("edit_menu_kurslar", async (ctx) => {
+  const userId = ctx.from.id;
+  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "📚 Kurslar" });
+  await ctx.reply("✏️ \"📚 Kurslar\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action("edit_menu_quiz_test", async (ctx) => {
+  const userId = ctx.from.id;
+  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "🎮 Quizizz testlar" });
+  await ctx.reply("✏️ \"🎮 Quizizz testlar\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action("edit_menu_sertifikat", async (ctx) => {
+  const userId = ctx.from.id;
+  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "🏆 Sertifikatlar" });
+  await ctx.reply("✏️ \"🏆 Sertifikatlar\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action("edit_menu_murojaat", async (ctx) => {
+  const userId = ctx.from.id;
+  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "💬 Adminga murojaat" });
+  await ctx.reply("✏️ \"💬 Adminga murojaat\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action("edit_menu_yordam", async (ctx) => {
+  const userId = ctx.from.id;
+  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "❓ Yordam" });
+  await ctx.reply("✏️ \"❓ Yordam\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action("edit_menu_sayt", async (ctx) => {
+  const userId = ctx.from.id;
+  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "🌐 Rasmiy sayt" });
+  await ctx.reply("✏️ \"🌐 Rasmiy sayt\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action("logout", async (ctx) => {
+  const userId = ctx.from.id;
+  const authed = await getAuthedUser(userId);
+  pendingLogins.delete(userId);
+  if (authed && db) {
+    try {
+      const snap = await getDocs(
+        query(collection(db, "users"), where("telegramId", "==", userId)),
+      );
+      if (!snap.empty) {
+        await updateDoc(doc(db, "users", snap.docs[0].id), {
+          telegramId: deleteField(),
+        });
+      }
+    } catch (e) {
+      console.error("Logout error", e);
+    }
+  }
+  authedUsers.delete(userId);
+  aiAssistantActiveUsers.delete(userId);
+  await ctx.reply("✅ Siz tizimdan muvaffaqiyatli chiqdingiz.", {
+    reply_markup: {
+      keyboard: await getKeyboard(undefined, userId, false),
+      resize_keyboard: true,
+    },
+  });
+  try {
+    ctx.answerCbQuery();
+  } catch (e) {}
+});
+
 bot.action(/reply_(.+)/, (ctx) => {
   const targetUserId = ctx.match[1];
-  pendingLogins.set(ctx.from.id, { step: "reply_message", targetUserId });
+  pendingLogins.set(ctx.from.id, {
+    step: "reply_message",
+    targetUserId,
+    originalMessageId: ctx.callbackQuery?.message?.message_id,
+    originalChatId: ctx.callbackQuery?.message?.chat?.id,
+  } as any);
   ctx.reply(
     "Javob xabarini yuboring (bu unga Telegram va tizim orqali boradi):",
   );
@@ -519,8 +964,21 @@ ${coursesListText}`;
 
 bot.on("message", async (ctx) => {
   const userId = ctx.from.id;
+  const chatId = ctx.chat?.id;
+  const chatType = ctx.chat?.type;
   const pending = pendingLogins.get(userId);
   const authed = await getAuthedUser(userId);
+
+  // Auto-register current user or group chat to update telegramUsersCount and support broadcasts to groups
+  const targetRegisterId = chatId || userId;
+  if (targetRegisterId) {
+    await registerTelegramId(
+      targetRegisterId,
+      chatType || "private",
+      (ctx.chat as any)?.title || "",
+      ctx.from || {}
+    );
+  }
 
   let userText = "";
   if ("text" in ctx.message) {
@@ -535,7 +993,7 @@ bot.on("message", async (ctx) => {
   if (pending && pending.step === "broadcast_message") {
     pendingLogins.delete(userId);
     const m = ctx.message;
-    ctx.reply(`E'lon tarqatish tezkor tarzda boshlandi... Kuting.`);
+    ctx.reply(`E'lon tarqatish boshlandi (Guruhlar va shaxsiy foydalanuvchilarga)... Iltimos kuting.`);
 
     try {
       const tgUsersSnap = await getDocs(
@@ -544,12 +1002,35 @@ bot.on("message", async (ctx) => {
 
       (async () => {
         let count = 0;
+        
+        // Find all unique user/group IDs from Firestore + local fallback cache
+        const uniqueIds = new Set<number>();
+        
         for (const uDoc of tgUsersSnap.docs) {
           const uData = uDoc.data();
           const docIdNum = Number(uDoc.id);
-          const tgId = uData.telegramId ? Number(uData.telegramId) : (!isNaN(docIdNum) && docIdNum > 0 ? docIdNum : null);
+          const tgId = uData.telegramId ? Number(uData.telegramId) : (!isNaN(docIdNum) && docIdNum !== 0 ? docIdNum : null);
+          if (tgId) {
+            uniqueIds.add(tgId);
+          }
+        }
 
-          if (tgId && tgId > 0 && tgId !== userId) {
+        try {
+          const tgUsersListPath = path.join(process.cwd(), "telegram_users_list.json");
+          if (fs.existsSync(tgUsersListPath)) {
+            const localList = JSON.parse(fs.readFileSync(tgUsersListPath, "utf8"));
+            if (Array.isArray(localList)) {
+              localList.forEach(id => {
+                if (id) uniqueIds.add(Number(id));
+              });
+            }
+          }
+        } catch (e) {
+          console.error("[Broadcast] Local file fallback reading error:", e);
+        }
+
+        for (const tgId of uniqueIds) {
+          if (tgId && tgId !== userId) {
             try {
               if (m && m.message_id) {
                 await bot.telegram.copyMessage(tgId, ctx.chat.id, m.message_id);
@@ -559,14 +1040,15 @@ bot.on("message", async (ctx) => {
               console.error(`[Broadcast] Failed to send message to ${tgId}:`, copyErr?.message || copyErr);
             }
             // Delay to prevent being throttled by Telegram rate limits
-            await new Promise((r) => setTimeout(r, 60));
+            await new Promise((r) => setTimeout(r, 65));
           }
         }
+
         bot.telegram
           .sendMessage(
-            userId,
-            `Tayyor! E'lon yuborildi: jami ${count} ta foydalanuvchiga muvaffaqiyatli yetkazildi.`,
-          )
+              userId,
+              `📢 E'lon muvaffaqiyatli tarqatildi:\n\nJami ${count} ta foydalanuvchi/guruhga yuborildi.`,
+            )
           .catch((e) => console.error(e));
       })();
 
@@ -578,112 +1060,250 @@ bot.on("message", async (ctx) => {
 
   if (userText.startsWith("/")) return; // Ignore other commands
 
-  const normText = userText.trim().toLowerCase();
+  const normText = userText.trim();
+
   if (
-    normText === "🔑 kirish" ||
-    normText === "🔑 profil" ||
-    normText === "👑 admin profil" ||
-    normText === "🔑 admin kirish" ||
-    normText === "profil" ||
-    normText === "kirish" ||
-    normText === "admin profil" ||
-    normText === "admin kirish" ||
-    normText === "/profile" ||
-    normText === "/login"
+    normText === "📥 Javob berilmaganlar" ||
+    normText === "📥 Javob berilmagan murojaatlar" ||
+    normText.toLowerCase().includes("javob berilmaganlar")
   ) {
-    if (!db) return ctx.reply("Ma'lumotlar bazasi ulanmagan.");
-    if (authed) {
-      let dbDoc = null;
-      if (authed.docId) {
-        try {
-          const res = await getDoc(doc(db, "users", authed.docId));
-          if (res.exists()) dbDoc = res;
-        } catch (e) {}
-      }
-      if (!dbDoc) {
-        try {
-          const res = await getDoc(doc(db, "users", authed.uid));
-          if (res.exists()) dbDoc = res;
-        } catch (e) {}
-      }
-      if (!dbDoc) {
-        try {
-          const q = query(collection(db, "users"), where("uid", "==", authed.uid));
-          const qSnap = await getDocs(q);
-          if (!qSnap.empty) {
-            dbDoc = qSnap.docs[0];
+    await handleUnansweredRequest(ctx);
+    return;
+  }
+
+  if (
+    normText === "📊 Statistika" ||
+    normText.startsWith("📊 Statistika") ||
+    normText.toLowerCase().includes("statistika")
+  ) {
+    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+      return ctx.reply("Sizda bu huquq yo'q.");
+    }
+    const loadingMsg = await ctx.reply("📊 Statistika yuklanmoqda...");
+    try {
+      let totalDBUsers = 0;
+      const rolesCount: Record<string, number> = {
+        admin: 0,
+        subadmin: 0,
+        teacher: 0,
+        student: 0,
+        staff: 0,
+        guest: 0
+      };
+
+      if (db) {
+        const queryUsers = await getDocs(collection(db, "users"));
+        queryUsers.forEach((doc) => {
+          const u = doc.data();
+          let role = (u.role || "student").toLowerCase().trim();
+          const email = (u.email || "").toLowerCase().trim();
+          const login = (u.login || "").toLowerCase().trim();
+          
+          if (role === "admin") {
+            const isSuper = (email === "elyorbek@admin.uz" || login === "uy_admin" || login === "admin" || email === "elyorbek@gmail.com");
+            if (!isSuper) {
+              role = "subadmin";
+            }
           }
-        } catch (e) {}
+
+          if (rolesCount[role] !== undefined) {
+            rolesCount[role]++;
+          } else {
+            rolesCount[role] = 1;
+          }
+        });
+        totalDBUsers = (rolesCount.admin || 0) + (rolesCount.subadmin || 0) + (rolesCount.teacher || 0) + (rolesCount.student || 0) + (rolesCount.staff || 0) + (rolesCount.guest || 0);
       }
 
-      let pwd = "";
-      let profileMsg = `👤 <b>PROFIL MA'LUMOTLARI</b>\n`;
-      profileMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      if (dbDoc && dbDoc.exists()) {
-        const uData = dbDoc.data();
-        pwd = uData.password || "";
-        profileMsg += `📝 <b>Guruh/F.I.Sh:</b> <code>${uData.displayName || "Kiritilmagan"}</code>\n`;
-        if (uData.login) profileMsg += `👤 <b>Tizim login:</b> <code>${uData.login}</code>\n`;
-        profileMsg += `📧 <b>Email:</b> <code>${uData.email || "Kiritilmagan"}</code>\n`;
-        profileMsg += `🎭 <b>Roli:</b> <code>${authed.role.toUpperCase()}</code>\n`;
-        if (uData.phone) profileMsg += `📱 <b>Telefon raqam:</b> <code>${uData.phone}</code>\n`;
-        if (uData.address) profileMsg += `📍 <b>Doimiy manzil:</b> <code>${uData.address}</code>\n`;
-        if (uData.birthDate) profileMsg += `🎂 <b>Tug'ilgan sana:</b> <code>${uData.birthDate}</code>\n`;
-        if (uData.departmentName) profileMsg += `🏢 <b>Yo'nalish/Kafedra:</b> <code>${uData.departmentName}</code>\n`;
-        if (uData.groupName) profileMsg += `👥 <b>O'quv guruhi:</b> <code>${uData.groupName}</code>\n`;
-        if (uData.ball !== undefined) profileMsg += `💎 <b>Mavjud ballar:</b> <code>${uData.ball} ball</code>\n`;
-      } else {
-        profileMsg += `👤 <b>Sizning profilingiz:</b> <code>${authed.displayName}</code>\n`;
-        profileMsg += `🎭 <b>Roli:</b> <code>${authed.role.toUpperCase()}</code>\n`;
-        profileMsg += `📧 <b>Email:</b> <code>${authed.email || "Kiritilmagan"}</code>\n`;
-      }
-      profileMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-      profileMsg += `💡 <i>Tizimdan chiqish uchun "🚪 Chiqish" yoki "🚪 Tizimdan chiqish" tugmasini bosing.</i>\n\n`;
-      profileMsg += `📲 <b>MiniApp platformasiga login va parolsiz, bir marta bosish bilan kirish:</b>`;
+      await ctx.telegram.deleteMessage(ctx.chat!.id, loadingMsg.message_id);
 
-      const encodedCreds = encodeURIComponent(
-        Buffer.from(`${authed.email}:${pwd}`).toString("base64"),
+      let statsMsg = `📊 <b>Joriy vaqt uchun Bot va Tizim Statistika:</b>\n\n`;
+      statsMsg += `👥 <b>Tizimdagi jami foydalanuvchilar soni:</b> ${totalDBUsers}\n`;
+      statsMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      statsMsg += `👑 <b>Bosh Adminlar (Super Admin):</b> ${rolesCount.admin}\n`;
+      statsMsg += `🛡️ <b>Kichik Adminlar (Sub Admin):</b> ${rolesCount.subadmin}\n`;
+      statsMsg += `🏫 <b>Tashkilotlar (O'qituvchi):</b> ${rolesCount.teacher}\n`;
+      statsMsg += `🎓 <b>Talabalar:</b> ${rolesCount.student}\n`;
+      statsMsg += `💼 <b>Xodimlar:</b> ${rolesCount.staff}\n`;
+      if (rolesCount.guest > 0) {
+        statsMsg += `👤 <b>Mehmonlar:</b> ${rolesCount.guest}\n`;
+      }
+      statsMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      statsMsg += `🤖 <b>Telegram bot a'zolari:</b> ${telegramUsersCount}\n`;
+      statsMsg += `✨ <i>Barcha ma'lumotlar real vaqt rejimida ma'lumotlar bazasidan hisoblab chiqildi!</i>`;
+
+      return ctx.reply(statsMsg, { parse_mode: "HTML" });
+    } catch (err) {
+      console.error("Statistics error:", err);
+      return ctx.reply(
+        `📊 <b>Statistika (Kesh rejimida):</b>\n\nBot foydalanuvchilari soni: ${telegramUsersCount}\n\nUlanishda xatolik yuz bergani sababli rollar keshdan o'qildi.`,
+        { parse_mode: "HTML" }
       );
-      
-      const hostUrl = process.env.APP_URL || "https://aiedutizim.vercel.app";
-      const autoLoginUrl = `${hostUrl.replace(/\/$/, "")}/login?auto=${encodedCreds}`;
-      const prodAutoLoginUrl = `https://aiedutizim.vercel.app/login?auto=${encodedCreds}`;
+    }
+  }
 
-      const inlineButtons = [];
-      if (hostUrl && !hostUrl.includes("aiedutizim.vercel.app")) {
-        inlineButtons.push([
-          { text: "🚀 MiniApp (Kirish)", web_app: { url: autoLoginUrl } }
-        ]);
-        inlineButtons.push([
-          { text: "🌐 Asosiy (Vercel) Kirish", web_app: { url: prodAutoLoginUrl } }
-        ]);
-      } else {
-        inlineButtons.push([
-          { text: "🚀 MiniApp (Kirish)", web_app: { url: prodAutoLoginUrl } }
-        ]);
-      }
-
-      return ctx.reply(profileMsg, {
+  if (normText === "⚙️ Menyu sozlamalari") {
+    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+      return ctx.reply("Sizda bu huquq yo'q.");
+    }
+    return ctx.reply(
+      "⚙️ <b>Menyu sozlamalari bo'limiga xush kelibsiz!</b>\n\nTegishli menyuni tanlab, uning foydalanuvchilarga ko'rinadigan matnini o'zgartirishingiz mumkin:",
+      {
         parse_mode: "HTML",
         reply_markup: {
-          inline_keyboard: inlineButtons,
-        },
-      });
+          inline_keyboard: [
+            [{ text: "🤖 AIEDUTIZIM haqida", callback_data: "edit_menu_haqida" }],
+            [{ text: "📚 Kurslar", callback_data: "edit_menu_kurslar" }],
+            [{ text: "🎮 Quizizz testlar", callback_data: "edit_menu_quiz_test" }],
+            [{ text: "🏆 Sertifikatlar", callback_data: "edit_menu_sertifikat" }],
+            [{ text: "💬 Adminga murojaat", callback_data: "edit_menu_murojaat" }],
+            [{ text: "❓ Yordam", callback_data: "edit_menu_yordam" }],
+            [{ text: "🌐 Rasmiy sayt", callback_data: "edit_menu_sayt" }]
+          ]
+        }
+      }
+    );
+  }
+
+  // Static menus check:
+  if (normText === "🤖 AIEDUTIZIM haqida") {
+    aiAssistantActiveUsers.delete(userId);
+    const customText = customMenuTexts.get("🤖 AIEDUTIZIM haqida");
+    return ctx.reply(
+      customText || "AIEDUTIZIM — Sun'iy Intellekt Asosidagi Ta'lim Tizimi bo‘lib, talabalar, o‘qituvchilar va tashkilotlar uchun yaratilgan zamonaviy raqamli ta'lim platformasidir."
+    );
+  }
+
+  if (normText === "📚 Kurslar") {
+    aiAssistantActiveUsers.delete(userId);
+    const customText = customMenuTexts.get("📚 Kurslar");
+    return ctx.reply(
+      customText || "Platformada modulli kurslar mavjud. Talabalar kurs materiallarini o‘rganishlari, topshiriqlarni bajarishlari va natijalarini kuzatishlari mumkin."
+    );
+  }
+
+  if (normText === "🎮 Quizizz testlar") {
+    aiAssistantActiveUsers.delete(userId);
+    const customText = customMenuTexts.get("🎮 Quizizz testlar");
+    return ctx.reply(
+      customText || "Interaktiv va qiziqarli testlar orqali bilimlarni tekshirish imkoniyati mavjud. Eng yuqori natija ko‘rsatgan ishtirokchilar sertifikat bilan taqdirlanadi."
+    );
+  }
+
+  if (normText === "🏆 Sertifikatlar") {
+    aiAssistantActiveUsers.delete(userId);
+    const customText = customMenuTexts.get("🏆 Sertifikatlar");
+    return ctx.reply(
+      customText || "Barcha sertifikatlar QR-kod va unikal ID bilan himoyalangan. Sertifikat haqiqiyligini platforma orqali tekshirish mumkin."
+    );
+  }
+
+  if (normText === "❓ Yordam") {
+    aiAssistantActiveUsers.delete(userId);
+    const customText = customMenuTexts.get("❓ Yordam");
+    return ctx.reply(
+      customText || "Botdan foydalanish bo‘yicha ma'lumotlar va tez-tez beriladigan savollarga javoblar."
+    );
+  }
+
+  if (normText === "🌐 Rasmiy sayt") {
+    aiAssistantActiveUsers.delete(userId);
+    const customText = customMenuTexts.get("🌐 Rasmiy sayt");
+    return ctx.reply(
+      customText || "🔗 https://aiedutizim.vercel.app"
+    );
+  }
+
+  if (normText === "🤖 AI yordamchi") {
+    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+      return ctx.reply(
+        "⚠️ <b>Kechirasiz, sun'iy intellekt yordamchisi faqatgina Tizim Administratori profili uchun ochiq.</b>",
+        { parse_mode: "HTML" }
+      );
     }
+    aiAssistantActiveUsers.set(userId, true);
+    return ctx.reply(
+      "🤖 AI yordamchi faollashtirildi.\n\nEndi istalgan savolingizni yozishingiz mumkin. Men sun'iy intellekt yordamida javob beraman."
+    );
+  }
+
+  if (normText === "💬 Adminga murojaat") {
+    aiAssistantActiveUsers.delete(userId);
+    const customText = customMenuTexts.get("💬 Adminga murojaat");
+    pendingLogins.set(userId, { step: "admin_message" });
+    return ctx.reply(
+      customText || "Savol, taklif yoki muammolaringiz bo‘lsa xabaringizni yuboring. Administrator siz bilan tez orada bog‘lanadi."
+    );
+  }
+
+  if (normText === "🔑 Kirish" || normText === "Kirish") {
+    aiAssistantActiveUsers.delete(userId);
+    if (!db) return ctx.reply("Ma'lumotlar bazasi ulanmagan.");
     pendingLogins.set(userId, { step: "email" });
     return ctx.reply(
       "Profilga kirish uchun loginingizni yoki emailingizni kiriting:\n\n(Misol uchun: login nomi yoki to'liq email manzilni yuborishingiz mumkin)",
     );
   }
 
-  if (
-    userText.startsWith("👥 Foydalanuvchilar soni:") ||
-    userText.startsWith("📊 Foydalanuvchilar:")
-  ) {
-    return; // Ignore this button click
+  if (normText === "👤 Profil") {
+    aiAssistantActiveUsers.delete(userId);
+    if (!authed) {
+      return ctx.reply(
+        "❌ Siz tizimga kirmagansiz.\n\nIltimos, \"🔑 Kirish\" tugmasi orqali tizimga kiring."
+      );
+    }
+
+    let dbDoc = null;
+    if (authed.docId) {
+      try {
+        const res = await getDoc(doc(db, "users", authed.docId));
+        if (res.exists()) dbDoc = res;
+      } catch (e) {}
+    }
+    if (!dbDoc) {
+      try {
+        const res = await getDoc(doc(db, 'users', authed.uid));
+        if (res.exists()) dbDoc = res;
+      } catch (e) {}
+    }
+    if (!dbDoc && db) {
+      try {
+        const q = query(collection(db, "users"), where("uid", "==", authed.uid));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          dbDoc = qSnap.docs[0];
+        }
+      } catch (e) {}
+    }
+
+    let uData = dbDoc ? dbDoc.data() : null;
+    const roleText = uData?.role || authed.role || "student";
+    let roleDisplay = "Mehmon";
+    if (roleText === "admin") roleDisplay = "Administrator";
+    else if (roleText === "teacher") roleDisplay = "Tashkilot";
+    else if (roleText === "staff") roleDisplay = "Xodim";
+    else if (roleText === "student") roleDisplay = "Talaba";
+
+    let profileMsg = `👤 <b>Profil ma'lumotlari:</b>\n\n`;
+    profileMsg += `• <b>F.I.Sh.:</b> <code>${uData?.displayName || authed.displayName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `• <b>Email:</b> <code>${uData?.email || authed.email || "Kiritilmagan"}</code>\n`;
+    profileMsg += `• <b>Telefon:</b> <code>${uData?.phone || uData?.phoneNumber || "Kiritilmagan"}</code>\n`;
+    profileMsg += `• <b>Tashkilot:</b> <code>${uData?.teacherName || uData?.departmentName || "Kiritilmagan"}</code>\n`;
+    profileMsg += `• <b>Lavozim yoki rol:</b> <code>${roleDisplay}</code>\n`;
+    profileMsg += `• <b>Profil rasmi:</b> <code>${uData?.photoURL || uData?.avatar || "Kiritilmagan"}</code>`;
+
+    return ctx.reply(profileMsg, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "📱 Tizimga kirish", web_app: { url: "https://aiedutizim.vercel.app/login" } }],
+          [{ text: "🚪 Chiqish", callback_data: "logout" }]
+        ]
+      }
+    });
   }
 
-  if (userText === "🚪 Chiqish" || userText === "🚪 Tizimdan chiqish") {
+  if (normText === "🚪 Chiqish" || normText === "🚪 Tizimdan chiqish" || normText === "Chiqish") {
     pendingLogins.delete(userId);
     if (authed && db) {
       try {
@@ -700,158 +1320,17 @@ bot.on("message", async (ctx) => {
       }
     }
     authedUsers.delete(userId);
-    ctx.reply("Siz tizimdan chiqdingiz p(T_T)q.", {
+    aiAssistantActiveUsers.delete(userId);
+    return ctx.reply("✅ Siz tizimdan muvaffaqiyatli chiqdingiz.", {
       reply_markup: {
-        keyboard: await getKeyboard("student", userId),
+        keyboard: await getKeyboard(undefined, userId, false),
         resize_keyboard: true,
       },
     });
-    return;
   }
 
-  if (userText === "📊 Foydalanuvchilar va statistika" || userText === "📊 Foydalanuvchilar va Stats") {
-    if (!authed || (authed.role !== "admin" && authed.role !== "teacher")) {
-      return ctx.reply("Sizda bu huquq yo'q.");
-    }
-    let studentsCount = 0;
-    let teachersCount = 0;
-    let staffCount = 0;
-    let adminsCount = 0;
-    let tgUsersCount = 0;
-    let loadedFromCache = false;
-
-    const statsCachePath = path.join(process.cwd(), "telegram_stats_cache.json");
-
-    if (db) {
-      try {
-        const snapUsers = await getDocs(collection(db, "users"));
-        snapUsers.forEach((d) => {
-          const uData = d.data();
-          const r = uData.role;
-          const emailLower = (uData.email || "").toLowerCase().trim();
-          if (r === "admin" || emailLower === "elyorbek@admin.uz") {
-            adminsCount++;
-          } else if (r === "teacher") {
-            teachersCount++;
-          } else if (r === "staff") {
-            staffCount++;
-          } else if (r === "student") {
-            studentsCount++;
-          } else {
-            studentsCount++;
-          }
-        });
-        const snapTg = await getDocs(collection(db, "telegram_users"));
-        tgUsersCount = snapTg.size;
-
-        // Save successfully loaded stats to local file cache
-        try {
-          fs.writeFileSync(statsCachePath, JSON.stringify({
-            adminsCount,
-            teachersCount,
-            staffCount,
-            studentsCount,
-            tgUsersCount
-          }, null, 2), "utf8");
-        } catch (cacheErr) {
-          console.error("Failed to write stats cache file:", cacheErr);
-        }
-      } catch (e) {
-        console.error("Error reading statistics:", e);
-        // Attempt fallback from file cache
-        if (fs.existsSync(statsCachePath)) {
-          try {
-            const cachedStats = JSON.parse(fs.readFileSync(statsCachePath, "utf8"));
-            adminsCount = cachedStats.adminsCount || 0;
-            teachersCount = cachedStats.teachersCount || 0;
-            staffCount = cachedStats.staffCount || 0;
-            studentsCount = cachedStats.studentsCount || 0;
-            tgUsersCount = cachedStats.tgUsersCount || 0;
-            loadedFromCache = true;
-          } catch (readErr) {
-            console.error("Failed to read stats cache file:", readErr);
-          }
-        }
-      }
-    }
-
-    const report =
-      `📊 <b>TIZIM VA FOYDALANUVCHILAR STATISTIKASI</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `👥 <b>Tizim foydalanuvchilari (Bazada):</b>\n` +
-      `  👑 <b>Adminlar:</b> <code>${adminsCount} ta</code>\n` +
-      `  🏢 <b>Tashkilotlar:</b> <code>${teachersCount} ta</code>\n` +
-      `  💼 <b>Xodimlar:</b> <code>${staffCount} ta</code>\n` +
-      `  👨‍🎓 <b>Talabalar:</b> <code>${studentsCount} ta</code>\n\n` +
-      `  📈 <b>Jami foydalanuvchilar:</b> <b>${adminsCount + teachersCount + staffCount + studentsCount} ta</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `🤖 <b>Telegram bot faolligi:</b>\n` +
-      `  👥 <b>Bot foydalanuvchilari soni:</b> <b>${tgUsersCount} ta</b>\n` +
-      `  🟢 <b>Bot statusi:</b> <code>ONLINE (Faol)</code>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `💡 <i>Ma'lumotlar ${loadedFromCache ? "mahalliy kesh xotiradan (Firebase limiti sababli)" : "ma'lumotlar bazasidan (Firestore)"} real-vaqt rejimida olindi.</i>`;
-    return ctx.reply(report, { parse_mode: "HTML" });
-  }
-
-  if (userText === "💬 Kelgan murojaatlar") {
-    if (!authed || (authed.role !== "admin" && authed.role !== "teacher")) {
-      return ctx.reply("Sizda bu huquq yo'q.");
-    }
-    if (!db) return ctx.reply("Ma'lumotlar bazasi ulanmagan.");
-    try {
-      const snap = await getDocs(
-        query(
-          collection(db, "messages"),
-          where("receiverRole", "==", "admin"),
-          limit(15),
-        ),
-      );
-      const list: any[] = snap.docs.map(
-        (d) => ({ ...d.data(), id: d.id }) as any,
-      );
-      if (list.length === 0) {
-        return ctx.reply(
-          "📨 Kelgan yangi murojaatlar va xabarlar hozircha mavjud emas.",
-        );
-      }
-
-      let report = `📨 <b>SO'NGGI KELGAN MUROJAATLAR:</b>\n`;
-      report += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-
-      const inlineKeyboard: any[] = [];
-      const seen = new Set();
-
-      for (const msg of list) {
-        if (seen.has(msg.senderId)) continue;
-        seen.add(msg.senderId);
-        const truncatedText =
-          msg.text && msg.text.length > 50
-            ? msg.text.slice(0, 47) + "..."
-            : msg.text || "";
-        report += `👤 <b>${msg.senderName || "Foydalanuvchi"}:</b>\n💬 "${truncatedText}"\n\n`;
-        inlineKeyboard.push([
-          {
-            text: `✍️ ${msg.senderName || "User"}ga javob`,
-            callback_data: `reply_${msg.senderId}`,
-          },
-        ]);
-      }
-      report += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      report += `💡 Javob berish uchun tegishli tugmani bosing:`;
-
-      return ctx.reply(report, {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: inlineKeyboard,
-        },
-      });
-    } catch (e: any) {
-      return ctx.reply("Xatolik: " + e.message);
-    }
-  }
-
-  if (userText === "⚙️ Bot holati") {
-    if (!authed || (authed.role !== "admin" && authed.role !== "teacher")) {
+  if (normText === "⚙️ Bot holati") {
+    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin" && authed.role !== "teacher")) {
       return ctx.reply("Sizda bu huquq yo'q.");
     }
     const uptimeSec = Math.floor(process.uptime());
@@ -878,28 +1357,16 @@ bot.on("message", async (ctx) => {
   }
 
   if (
-    userText === "📢 E'lon berish" ||
-    userText === "📢 Umumiy e'lon yuborish"
+    normText === "📢 E'lon berish" ||
+    normText === "📢 Umumiy e'lon yuborish" ||
+    normText === "📢 E'lon yuborish" ||
+    normText === "E'lon yuborish"
   ) {
-    if (!authed || (authed.role !== "admin" && authed.role !== "teacher")) {
+    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin" && authed.role !== "teacher")) {
       return ctx.reply("Sizda bu huquq yo'q.");
     }
     pendingLogins.set(userId, { step: "broadcast_message" });
     return ctx.reply("Yuboriladigan e'lon matni, rasm yoki videoni yuboring:");
-  }
-
-  // deleted murojaatlarga javob berish
-
-  if (
-    userText === "📨 Adminga murojaat qilish" ||
-    userText === "📨 Adminga murojat qilish" ||
-    userText === "Adminga murojat qilish" ||
-    userText === "Adminga murojaat qilish"
-  ) {
-    pendingLogins.set(userId, { step: "admin_message" });
-    return ctx.reply(
-      "Taklif va savollaringizni bizga yuboring!\n✍️ Xabaringizni bitta matn ko‘rinishida yuboring.",
-    );
   }
 
   // Handle remaining logic
@@ -921,6 +1388,17 @@ bot.on("message", async (ctx) => {
           isRead: false,
           fromTelegram: true,
         });
+
+        const origMsgId = (pending as any).originalMessageId;
+        const origChatId = (pending as any).originalChatId;
+        if (origMsgId && origChatId) {
+          try {
+            await ctx.telegram.editMessageReplyMarkup(origChatId, origMsgId, undefined, { inline_keyboard: [] });
+          } catch (editErr) {
+            console.error("Failed to edit message reply markup:", editErr);
+          }
+        }
+
         return ctx.reply("Javobingiz muvaffaqiyatli yuborildi.");
       } catch (e) {
         return ctx.reply("Xatolik yuz berdi: " + (e as any).message);
@@ -997,6 +1475,20 @@ bot.on("message", async (ctx) => {
       pendingLogins.delete(userId);
       return ctx.reply(
         "Murojaatingiz imkon qadar tezroq ko‘rib chiqiladi va sizga javob beriladi.",
+      );
+    } else if (pending.step === "edit_menu_content") {
+      const targetMenu = (pending as any).targetMenu!;
+      pendingLogins.delete(userId);
+      customMenuTexts.set(targetMenu, userText);
+      return ctx.reply(
+        `✅ <b>"${targetMenu}"</b> menyusi matni muvaffaqiyatli va tezroq yangilandi!\n\nEndi foydalanuvchilar ushbu menyuni bosganda shu ma'lumotni olishadi.`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            keyboard: await getKeyboard("admin", userId, true),
+            resize_keyboard: true,
+          }
+        }
       );
     } else if (pending.step === "password") {
       let email = pending.email!;
@@ -1200,25 +1692,36 @@ bot.on("message", async (ctx) => {
           );
           const autoLoginUrl = `${APP_URL}/login?auto=${encodedCreds}`;
 
-          let replyMsg = `✅ Akkauntingiz muvaffaqiyatli ulandi!\n\n👤 F.I.SH: ${displayName}\n🛡 Profil: ${role.toUpperCase()}`;
-
-          if (role === "student") {
-            replyMsg += `\n🎓 Yo'nalishi: ${departmentName}\n👥 Guruhi: ${groupName}`;
-          }
+          let replyMsg = `✅ <b>Akkauntingiz muvaffaqiyatli ulandi!</b>\n\n`;
+          replyMsg += formatProfileInfo(uData, role, displayName, email);
 
           replyMsg += `\n\nEndi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tishingiz mumkin!`;
 
           authedUsers.set(userId, { uid, displayName, role, email, docId });
 
-          addDoc(collection(db, "admin_notifications"), {
+          const userBirthDate = uData ? uData.birthDate : null;
+          if (isTodayBirthday(userBirthDate)) {
+            const bdayGreetings = 
+              `🎉✨ <b>TUG'ILGAN KUNINGIZ BILAN TABRIKLAYMIZ!</b> ✨🎉\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `Hurmatli <b>${displayName}</b>! 🎂\n\n` +
+              `Sizni bugungi tavallud ayomingiz bilan chin qalbimizdan muborakbod etamiz! 🌸\n` +
+              `Sizga sihat-salomatlik, baxt-saodat, uzoq umr va o'qish hamda ish faoliyatingizda ulkan muvaffaqiyatlar tilaymiz! 🌟\n\n` +
+              `Tizimimiz siz bilan birga ekanligidan mamnun va faxrlanadi! 😊🎈\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━`;
+            ctx.reply(bdayGreetings, { parse_mode: "HTML" }).catch(() => {});
+          }
+
+          await addDoc(collection(db, "admin_notifications"), {
             text: `Yangi tizimga ulanish (Telegram orqali):\n👤 F.I.SH: ${displayName}\n🛡 Profil: ${role.toUpperCase()}\n📧 Email: ${email}`,
             timestamp: serverTimestamp(),
           });
 
           ctx.reply(replyMsg, {
+            parse_mode: "HTML",
             reply_markup: {
               inline_keyboard: [
-                [{ text: "📱 Tizimga kirish", web_app: { url: autoLoginUrl } }],
+                [{ text: "📱 Tizimga kirish", web_app: { url: "https://aiedutizim.vercel.app/login" } }],
               ],
             },
           });
@@ -1254,12 +1757,13 @@ bot.on("message", async (ctx) => {
           ctx.reply(
             `✅ Akkauntingiz muvaffaqiyatli ulandi!\n\n👤 Email: ${email}\n🛡 Profil: ${derivedRole.toUpperCase()}\n\nEndi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tishingiz mumkin!`,
             {
+              parse_mode: "HTML",
               reply_markup: {
                 inline_keyboard: [
                   [
                     {
                       text: "📱 Tizimga kirish",
-                      web_app: { url: autoLoginUrl },
+                      web_app: { url: "https://aiedutizim.vercel.app/login" },
                     },
                   ],
                 ],
@@ -1282,7 +1786,7 @@ bot.on("message", async (ctx) => {
   }
 
   const lowered = userText.toLowerCase().trim();
-  if (authed && (authed.role === "admin" || authed.role === "teacher")) {
+  if (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "teacher")) {
     if (lowered === "yordamchi" || lowered === "shogird") {
       return ctx.reply("Labbay, Ustoz! Sizga qanday yordam bera olaman?");
     }
@@ -1459,15 +1963,12 @@ bot.on("message", async (ctx) => {
 
               let questions: any[] = [];
 
-              const apiKey =
-                process.env.NEW_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-              if (apiKey) {
-                const ai = new GoogleGenAI({ apiKey });
+              try {
                 const pText = fnArgs.context
                   ? `Matn: ${fnArgs.context}. Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`
                   : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
 
-                const genRes = await ai.models.generateContent({
+                const genRes = await generateContentWithRotation({
                   model: "gemini-3.5-flash",
                   contents: [{ role: "user", parts: [{ text: pText }] }],
                   config: {
@@ -1484,7 +1985,7 @@ bot.on("message", async (ctx) => {
                     .trim();
                   questions = JSON.parse(txt);
                 } catch (e) {}
-              }
+              } catch (e) {}
 
               await addDoc(collection(db, "quiz_history"), {
                 teacherId: authed ? authed.uid : "ADMIN",
@@ -1599,7 +2100,50 @@ bot.on("message", async (ctx) => {
   }
 });
 
+bot.on("my_chat_member", async (ctx) => {
+  const chatId = ctx.chat?.id;
+  const chatType = ctx.chat?.type;
+  const chatTitle = (ctx.chat as any)?.title || "";
+  console.log(`[Telegram] Bot added to/updated in chat ${chatId} of type ${chatType}`);
+  if (chatId) {
+    await registerTelegramId(chatId, chatType, chatTitle, {
+      first_name: ctx.from?.first_name || "",
+      last_name: ctx.from?.last_name || "",
+      username: ctx.from?.username || "",
+    });
+  }
+});
+
+bot.on("new_chat_members", async (ctx) => {
+  const chatId = ctx.chat?.id;
+  const chatType = ctx.chat?.type;
+  const chatTitle = (ctx.chat as any)?.title || "";
+  console.log(`[Telegram] New members in chat ${chatId}`);
+  if (chatId) {
+    await registerTelegramId(chatId, chatType, chatTitle, {
+      first_name: ctx.from?.first_name || "",
+      last_name: ctx.from?.last_name || "",
+      username: ctx.from?.username || "",
+    });
+  }
+});
+
+bot.on("group_chat_created", async (ctx) => {
+  const chatId = ctx.chat?.id;
+  if (chatId) {
+    await registerTelegramId(chatId, "group", (ctx.chat as any)?.title || "", {});
+  }
+});
+
+bot.on("supergroup_chat_created", async (ctx) => {
+  const chatId = ctx.chat?.id;
+  if (chatId) {
+    await registerTelegramId(chatId, "supergroup", (ctx.chat as any)?.title || "", {});
+  }
+});
+
 export function launchBot() {
+  fetchTelegramUsersCount();
   bot.telegram
     .setMyDescription(
       "**Assalomu alaykum! AIEDUTIZIM platformasining telegram botiga xush kelibsiz!**\n\n🎓 AIEDUTIZIM — tashkilotlar, o‘qituvchilar va talabalar uchun mo‘ljallangan yagona markazlashgan raqamli ta'lim platformasi bo‘lib, zamonaviy ta'lim jarayonlarini samarali boshqarish imkonini beradi.",
@@ -1611,7 +2155,7 @@ export function launchBot() {
 
     // Listen for admin notifications
     let isAdminLogsInit = false;
-    onSnapshot(collection(db, "admin_notifications"), async (snapshot) => {
+    onSnapshot(query(collection(db, "admin_notifications"), orderBy("timestamp", "desc"), limit(10)), async (snapshot) => {
       if (!isAdminLogsInit) {
         isAdminLogsInit = true;
         return;
@@ -1662,7 +2206,7 @@ export function launchBot() {
 
     // Listen for new messages targeting tg users
     let isInit = false;
-    onSnapshot(collection(db, "messages"), async (snapshot) => {
+    onSnapshot(query(collection(db, "messages"), orderBy("timestamp", "desc"), limit(20)), async (snapshot) => {
       console.log(
         `TG onSnapshot triggered. isInit:`,
         isInit,
@@ -1698,11 +2242,30 @@ export function launchBot() {
             if (alreadyProcessed) continue;
 
             let recipients: any[] = [];
-            if (mData.receiverRole === "admin") {
-              const adminSnap = await getDocs(
-                query(collection(db, "users"), where("role", "==", "admin")),
-              );
-              adminSnap.forEach((d) => recipients.push(d.data()));
+            if (mData.receiverRole === "admin" || mData.receiverId === "SYSTEM_ADMIN") {
+              // Load from local file-based admin IDs cache for maximum resilience
+              const localAdminIds = getAdminIds();
+              for (const aId of localAdminIds) {
+                recipients.push({ telegramId: aId, role: "admin" });
+              }
+
+              // Try database snap as fallback/overlay if possible
+              try {
+                const adminSnap = await getDocs(
+                  query(collection(db, "users"), where("role", "==", "admin")),
+                );
+                adminSnap.forEach((d) => {
+                  const data = d.data();
+                  if (data.telegramId) {
+                    const idNum = Number(data.telegramId);
+                    if (!localAdminIds.includes(idNum) && !recipients.some(x => x.telegramId === idNum)) {
+                      recipients.push(data);
+                    }
+                  }
+                });
+              } catch (e) {
+                console.warn("[Telegram] users query error (using local fallback is fine):", e);
+              }
             } else if (
               mData.receiverId &&
               mData.receiverId !== "SYSTEM_ADMIN"
@@ -1760,7 +2323,7 @@ export function launchBot() {
 
     // Listen for new published tests
     let testIsInit = false;
-    onSnapshot(collection(db, "tests"), async (snapshot) => {
+    onSnapshot(query(collection(db, "tests"), orderBy("createdAt", "desc"), limit(10)), async (snapshot) => {
       if (!testIsInit) {
         testIsInit = true;
         return;
@@ -1816,7 +2379,7 @@ export function launchBot() {
 
     // Certificate listener
     let certIsInit = false;
-    onSnapshot(collection(db, "certificates"), async (snapshot) => {
+    onSnapshot(query(collection(db, "certificates"), orderBy("createdAt", "desc"), limit(10)), async (snapshot) => {
       if (!certIsInit) {
         certIsInit = true;
         return;
@@ -1895,8 +2458,8 @@ export function launchBot() {
         .setChatMenuButton({
           menuButton: {
             type: "web_app",
-            text: "📱 Open App",
-            web_app: { url: APP_URL },
+            text: "📱 Tizimga kirish",
+            web_app: { url: "https://aiedutizim.vercel.app/login" },
           },
         })
         .catch((e) => console.error("Could not set menu button", e));

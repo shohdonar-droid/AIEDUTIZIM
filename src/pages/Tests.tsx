@@ -37,7 +37,7 @@ export default function Tests() {
       return isGlobalAdminTest && t.isPublished !== false;
     }
 
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'subadmin') {
       return isAdminTest;
     }
 

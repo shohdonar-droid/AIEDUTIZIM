@@ -37,7 +37,7 @@ export default function Courses() {
       return isGlobalAdminCourse && c.isPublic !== false;
     }
 
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'subadmin') {
       return isAdminCourse;
     }
 

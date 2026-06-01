@@ -68,11 +68,12 @@ export default function Home() {
               return isGlobalAdminCourse && c.isPublic !== false;
            }
 
-           if (user.role === 'admin') return true;
+           if (user.role === 'admin' || user.role === 'subadmin') return true;
+
+           // Let teachers and staff also see global admin template courses
+           if (isGlobalAdminCourse) return true;
 
            if (user.role === 'student') {
-              if (isGlobalAdminCourse) return true;
-
               const hasGroupFilter = (c.groupIds?.length || 0) > 0;
               const hasDeptFilter = (c.departmentIds?.length || 0) > 0;
               const hasOrgFilter = (c.organizationIds?.length || 0) > 0;
@@ -81,10 +82,11 @@ export default function Home() {
               if (hasDeptFilter) return c.departmentIds?.includes(user.departmentId || '') || false;
               if (hasOrgFilter) return c.organizationIds?.includes(user.teacherId || '') || false;
 
-              if (c.creatorId === user.teacherId) return true;
+              if (c.creatorId === user.teacherId || c.teacherId === user.teacherId) return true;
            }
 
-           if (user.role === 'teacher' && c.creatorId === user.uid) return true;
+           if (user.role === 'teacher' && (c.creatorId === user.uid || c.teacherId === user.uid)) return true;
+           if (user.role === 'staff' && (c.creatorId === user.teacherId || c.teacherId === user.teacherId)) return true;
 
            return false;
         });

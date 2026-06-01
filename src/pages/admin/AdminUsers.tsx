@@ -15,12 +15,17 @@ export default function AdminUsers() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [staffUsers, setStaffUsers] = useState<UserProfile[]>([]);
+  const [subadmins, setSubadmins] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDept, setFilterDept] = useState('');
   const [filterGrp, setFilterGrp] = useState('');
   const [filterOrg, setFilterOrg] = useState('');
-  const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'staff'>('teachers');
+  const [activeTab, setActiveTab] = useState<'students' | 'teachers' | 'staff' | 'subadmins'>('teachers');
+
+  // Sub-admin Creation
+  const [editingSubadmin, setEditingSubadmin] = useState<Partial<UserProfile> | null>(null);
+  const [subadminSaving, setSubadminSaving] = useState(false);
 
   // Student Creation
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -142,10 +147,16 @@ export default function AdminUsers() {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setStaffUsers(dbUsers);
-      setLoading(false);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (staff)'));
 
-    return () => { unsubDepts(); unsubGroups(); unsubStudents(); unsubTeachers(); unsubStaff(); };
+    const unsubSubadmins = onSnapshot(query(collection(db, 'users'), where('role', '==', 'subadmin')), (snap) => {
+      const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
+      dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
+      setSubadmins(dbUsers);
+      setLoading(false);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (subadmin)'));
+
+    return () => { unsubDepts(); unsubGroups(); unsubStudents(); unsubTeachers(); unsubStaff(); unsubSubadmins(); };
   }, []);
 
   const resetPassword = async (uid: string) => {
@@ -216,6 +227,51 @@ export default function AdminUsers() {
     } catch (err: any) { alert(err.message); } finally { setTeacherSaving(false); }
   };
 
+  const saveSubadmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSubadmin?.displayName || !editingSubadmin?.login || !editingSubadmin?.password) {
+       alert("Barcha maydonlarni to'ldiring."); return;
+    }
+    setSubadminSaving(true);
+    try {
+      if (editingSubadmin.uid) {
+         const email = `${editingSubadmin.login.trim().toLowerCase()}@subadmin.uz`;
+         await updateDoc(doc(db, 'users', editingSubadmin.uid), {
+            displayName: editingSubadmin.displayName,
+            phone: editingSubadmin.phone || '',
+            login: editingSubadmin.login.trim(),
+            email: email,
+            password: editingSubadmin.password
+         });
+      } else {
+         const q = query(collection(db, 'users'), where('login', '==', editingSubadmin.login.trim()));
+         const qSnap = await getDocs(q);
+         if (!qSnap.empty) { alert("Login band!"); setSubadminSaving(false); return; }
+
+         const email = `${editingSubadmin.login.trim().toLowerCase()}@subadmin.uz`;
+         const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
+           method: 'POST', headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ email, password: editingSubadmin.password, returnSecureToken: false })
+         });
+         if (!response.ok) throw new Error("Yaratishda xatolik");
+         const data = await response.json();
+         const uid = data.localId;
+
+         await setDoc(doc(db, 'users', uid), {
+             uid: uid, 
+             displayName: editingSubadmin.displayName, 
+             phone: editingSubadmin.phone || '', 
+             login: editingSubadmin.login.trim(),
+             password: editingSubadmin.password, 
+             role: 'subadmin', 
+             email: email, 
+             createdAt: serverTimestamp()
+         });
+      }
+      setEditingSubadmin(null);
+    } catch (err: any) { alert(err.message); } finally { setSubadminSaving(false); }
+  };
+
   const impersonateTeacher = (uid: string) => {
     localStorage.setItem('impersonateUserId', uid);
     window.location.href = '/teacher';
@@ -248,8 +304,76 @@ export default function AdminUsers() {
     } catch (err: any) { alert(err.message); } finally { setStudentCreating(false); }
   };
 
-  const exportToCSV = () => { /* basic placeholder logic */ alert("Eksport qilinmoqda..."); };
-  const exportTeachersCSV = () => { /* basic placeholder logic */ alert("Eksport qilinmoqda..."); };
+  const exportToCSV = () => {
+    if (filteredUsers.length === 0) {
+      alert("Yuklash uchun talabalar mavjud emas.");
+      return;
+    }
+    const dataToExport = filteredUsers.map((u, i) => {
+      const org = teachers.find(t => t.uid === u.teacherId);
+      return {
+        "№": i + 1,
+        "F.I.SH (Talaba)": u.displayName || "-",
+        "Tashkilot": org?.displayName || u.teacherName || "-",
+        "Telefon": u.phone || "-",
+        "E-pochta": u.email || "-",
+        "Yo'nalish": u.departmentName || "-",
+        "Guruh": u.groupName || "-",
+        "Login": u.login || "-",
+        "Parol": u.password || "-"
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Talabalar");
+    XLSX.writeFile(workbook, "Talabalar_Ro'yxati.xlsx");
+  };
+
+  const exportTeachersCSV = () => {
+    if (filteredTeachers.length === 0) {
+      alert("Yuklash uchun tashkilotlar mavjud emas.");
+      return;
+    }
+    const dataToExport = filteredTeachers.map((t, i) => ({
+      "№": i + 1,
+      "Tashkilot nomi": t.displayName || "-",
+      "Telefon": t.phone || "-",
+      "E-pochta": t.email || "-",
+      "Login": t.login || "-",
+      "Parol": t.password || "-",
+      "Test Limiti": t.aiTestLimit || 999999
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tashkilotlar");
+    XLSX.writeFile(workbook, "Tashkilotlar_Ro'yxati.xlsx");
+  };
+
+  const exportStaffXLSX = () => {
+    if (filteredStaff.length === 0) {
+      alert("Yuklash uchun xodimlar mavjud emas.");
+      return;
+    }
+    const dataToExport = filteredStaff.map((s, i) => {
+      const org = teachers.find(t => t.uid === s.teacherId);
+      return {
+        "№": i + 1,
+        "F.I.SH (Xodim)": s.displayName || "-",
+        "Tashkilot": org?.displayName || s.teacherName || "-",
+        "Telefon": s.phone || "-",
+        "E-pochta": s.email || "-",
+        "Login": s.login || "-",
+        "Parol": s.password || "-"
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Xodimlar");
+    XLSX.writeFile(workbook, "Xodimlar_Ro'yxati.xlsx");
+  };
 
   const saveStudentEdit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,6 +395,7 @@ export default function AdminUsers() {
   const filteredUsers = users.filter(u => u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredTeachers = teachers.filter(u => u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredStaff = staffUsers.filter(u => u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredSubadmins = subadmins.filter(u => u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const availableGroups = groups.filter(g => !filterDept || g.departmentId === filterDept);
 
@@ -301,6 +426,12 @@ export default function AdminUsers() {
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'students' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-gray-600'}`}
           >
             Talabalar ({users.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('subadmins')}
+            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'subadmins' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            Kichik Adminlar ({subadmins.length})
           </button>
         </div>
       </header>
@@ -484,15 +615,20 @@ export default function AdminUsers() {
 
        {activeTab === 'staff' && (
         <div className="space-y-6">
-           <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center">
-             <div className="relative w-full md:w-80 flex-shrink-0">
-               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-               <input type="text" className="w-full pl-12 pr-6 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-blue-600" placeholder="Qidirish..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+           <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+             <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto">
+               <div className="relative w-full md:w-80 flex-shrink-0">
+                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                 <input type="text" className="w-full pl-12 pr-6 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-blue-600" placeholder="Qidirish..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+               </div>
+               <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-blue-600 w-full md:w-auto outline-none focus:ring-2 focus:ring-blue-600">
+                 <option value="">Barcha tashkilotlar</option>
+                 {teachers.map(t => <option key={t.uid} value={t.uid}>{t.displayName}</option>)}
+               </select>
              </div>
-             <select value={filterOrg} onChange={e => setFilterOrg(e.target.value)} className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-blue-600 w-full md:w-auto outline-none focus:ring-2 focus:ring-blue-600">
-               <option value="">Barcha tashkilotlar</option>
-               {teachers.map(t => <option key={t.uid} value={t.uid}>{t.displayName}</option>)}
-             </select>
+             <button onClick={exportStaffXLSX} className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all">
+                <Download className="w-5 h-5" /> YUKLAB OLISH
+             </button>
            </div>
 
            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
@@ -699,6 +835,100 @@ export default function AdminUsers() {
           </div>
         </div>
       )}
+
+      {activeTab === 'subadmins' && (
+         <div className="space-y-6">
+            {editingSubadmin ? (
+               <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-xl max-w-3xl animate-in fade-in duration-300">
+                  <div className="flex justify-between items-center mb-6">
+                     <h2 className="text-2xl font-black text-gray-900">{editingSubadmin.uid ? "Kichik adminni tahrirlash" : "Yangi Kichik admin"}</h2>
+                     <button onClick={() => setEditingSubadmin(null)} className="text-gray-400 hover:bg-gray-100 p-2 rounded-lg"><X /></button>
+                  </div>
+                  <form onSubmit={saveSubadmin} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-700">FISh (To'liq ism)</label>
+                        <input type="text" required className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium" placeholder="To'liq ismi" value={editingSubadmin.displayName || ''} onChange={e => setEditingSubadmin({...editingSubadmin, displayName: e.target.value})} />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-700">Telefon raqam</label>
+                        <input type="text" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium" placeholder="+998" value={editingSubadmin.phone || ''} onChange={e => setEditingSubadmin({...editingSubadmin, phone: e.target.value})} />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-700">Login (Kirish u-n)</label>
+                        <input type="text" required className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium disabled:opacity-55" placeholder="Login kiriting" value={editingSubadmin.login || ''} onChange={e => setEditingSubadmin({...editingSubadmin, login: e.target.value})} disabled={!!editingSubadmin.uid} />
+                        {editingSubadmin.uid && <p className="text-xs text-orange-500 mt-1">Loginni o'zgartirib bo'lmaydi</p>}
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-700">Parol</label>
+                        <input type="text" required className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium" placeholder="Kamida 6 xonali" value={editingSubadmin.password || ''} onChange={e => setEditingSubadmin({...editingSubadmin, password: e.target.value})} />
+                     </div>
+                     <div className="md:col-span-2 flex justify-end gap-2 mt-4 pt-4 border-t">
+                        <button type="submit" disabled={subadminSaving} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold shadow hover:bg-blue-700 disabled:opacity-50">
+                           {subadminSaving ? <Loader2 className="animate-spin w-5 h-5"/> : <Save className="w-5 h-5" />} SAQLASH
+                        </button>
+                     </div>
+                  </form>
+               </div>
+            ) : (
+               <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                  <div className="relative w-full md:w-96 flex-shrink-0">
+                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                     <input type="text" className="w-full pl-12 pr-6 py-3 rounded-xl bg-gray-50 border border-gray-100 placeholder:text-gray-400 text-sm font-medium" placeholder="Qidirish..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  </div>
+                  <div className="flex gap-2 w-full md:w-auto">
+                     <button onClick={() => setEditingSubadmin({ displayName: '', login: '', password: '', phone: '' })} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all text-xs uppercase tracking-wider">
+                        <Plus className="w-5 h-5" /> YANGI KICHIK ADMIN
+                     </button>
+                  </div>
+               </div>
+            )}
+
+            {!editingSubadmin && (
+               <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+                 <table className="w-full border-collapse">
+                   <thead>
+                     <tr className="bg-gray-50/50 border-b border-gray-50">
+                       <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">№</th>
+                       <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">Kichik admin ismi</th>
+                       <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">Tel raqam</th>
+                       <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">Login</th>
+                       <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">Parol</th>
+                       <th className="px-6 py-4 text-right text-xs font-black text-gray-400 uppercase tracking-widest">Amallar</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-gray-50">
+                     {filteredSubadmins.map((t, i) => (
+                       <tr key={t.uid} className="hover:bg-gray-50/30 group transition">
+                         <td className="px-6 py-4 font-bold text-gray-400 whitespace-nowrap">{i+1}</td>
+                         <td className="px-6 py-4 font-black text-sm uppercase text-gray-800">{t.displayName}</td>
+                         <td className="px-6 py-4 text-xs font-medium text-gray-500">{t.phone || '-'}</td>
+                         <td className="px-6 py-4 text-sm font-bold text-blue-600">
+                           <span className="bg-blue-50 text-blue-700 px-2 rounded-md">{t.login || '-'}</span>
+                         </td>
+                         <td className="px-6 py-4 text-sm font-mono text-gray-400">{t.password || '-'}</td>
+                         <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                               <button onClick={() => setEditingSubadmin(t)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm">
+                                  <Edit className="w-4 h-4" />
+                               </button>
+                               <button onClick={() => deleteSingleUser(t.uid)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shadow-sm">
+                                  <Trash2 className="w-4 h-4" />
+                               </button>
+                            </div>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+                 {filteredSubadmins.length === 0 && (
+                    <div className="p-16 text-center text-gray-400 font-bold italic opacity-40">
+                      Hech qanday Kichik admin topilmadi. Yaratish tugmasi orqali yangisini qo'shing.
+                    </div>
+                 )}
+               </div>
+            )}
+         </div>
+       )}
     </div>
   );
 }

@@ -27,7 +27,7 @@ import TeacherDashboard from './pages/teacher/TeacherDashboard';
 
 import Quizizz from './pages/Quizizz';
 
-function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 'admin' | 'student' | 'teacher' | 'staff' }) {
+function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 'admin' | 'subadmin' | 'student' | 'teacher' | 'staff' }) {
   const { user, loading } = useAuth();
 
   if (loading) return (
@@ -38,10 +38,17 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 
 
   if (!user) return <Navigate to="/login" />;
   if (role) {
+    let allowed = false;
     if (role === 'teacher' && (user.role === 'teacher' || user.role === 'staff')) {
-       // Allow both organization (teacher) and staff to access teacher routes
-    } else if (user.role !== role) {
-       return <Navigate to="/" />;
+      allowed = true;
+    } else if (role === 'admin' && (user.role === 'admin' || user.role === 'subadmin')) {
+      allowed = true;
+    } else if (user.role === role) {
+      allowed = true;
+    }
+    
+    if (!allowed) {
+      return <Navigate to="/" />;
     }
   }
 
