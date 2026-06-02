@@ -24,6 +24,7 @@ import { db } from '../lib/firebase';
 import { SiteContent } from '../types';
 
 import { handleFirestoreError, OperationType } from '../lib/firebase';
+import { makeDirectImageUrl } from '../lib/helpers';
 
 export default function Navbar() {
   const { user, isAdmin } = useAuth();
@@ -101,7 +102,7 @@ export default function Navbar() {
             <div className="flex items-center">
               <Link to="/" className="flex items-center gap-2">
                 {headerConfig?.logoUrl ? (
-                  <img src={headerConfig.logoUrl || null} alt="Logo" className="h-8 object-contain" />
+                  <img src={makeDirectImageUrl(headerConfig.logoUrl || null)} referrerPolicy="no-referrer" alt="Logo" className="h-8 object-contain" />
                 ) : (
                   <div className="rounded-xl bg-[#007aff] p-1.5 shadow-sm">
                     <BrainCircuit className="h-6 w-6 text-white" />
@@ -113,7 +114,7 @@ export default function Navbar() {
                   </span>
                 ) : (
                   <span className={`text-xl font-bold tracking-tight hidden sm:block ${textClass}`}>
-                    EDU<span className="text-[#007aff]">AI</span>
+                    AIEDU<span className="text-[#007aff]">TIZIM</span>
                   </span>
                 )}
               </Link>

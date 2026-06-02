@@ -78,32 +78,48 @@ export default function AdminInfo() {
   };
 
   useEffect(() => {
-    async function load() {
-      const snap = await getDoc(doc(db, 'siteContent', 'main'));
-      let data: SiteContent;
-      if (snap.exists()) {
-        data = snap.data() as SiteContent;
-      } else {
-        data = {
-          hero: { rightImage: '', rightText: '', rightBadge: 'Yangilik', detailHtml: '', detailFiles: [], infoSections: [] },
-          banners: [],
-          footer: { top: '', bottom: '' }
-        };
-      }
-
-      // Ensure defaults and initial sections
-      if (!data.hero.infoSections) data.hero.infoSections = [];
-      
-      const sections = data.hero.infoSections;
-      if (!sections.some(s => s.id === 'general')) {
-        sections.push({ id: 'general', name: 'Umumiy', content: 'Umumiy ma\'lumotlar...', files: [], images: [] });
-      }
-      if (!sections.some(s => s.id === 'my_docs')) {
-        sections.push({ id: 'my_docs', name: 'Hujjatlarim', isProtected: true, content: 'Maxfiy hujjatlar...', files: [], images: [] });
-      }
-      
+    // Load from cache first
+    const cached = localStorage.getItem('site_content_main_cache');
+    if (cached) {
+      const data = JSON.parse(cached);
       setContent(data);
-      if (sections.length > 0) setActiveTab(sections[0].id);
+      if (data.hero.infoSections?.length > 0) setActiveTab(data.hero.infoSections[0].id);
+    }
+
+    async function load() {
+      try {
+        const snap = await getDoc(doc(db, 'siteContent', 'main'));
+        let data: SiteContent;
+        if (snap.exists()) {
+          data = snap.data() as SiteContent;
+        } else {
+          data = {
+            hero: { rightImage: '', rightText: '', rightBadge: 'Yangilik', detailHtml: '', detailFiles: [], infoSections: [] },
+            banners: [],
+            footer: { top: '', bottom: '' }
+          };
+        }
+
+        // Ensure defaults and initial sections
+        if (!data.hero.infoSections) data.hero.infoSections = [];
+        
+        const sections = data.hero.infoSections;
+        if (!sections.some(s => s.id === 'general')) {
+          sections.push({ id: 'general', name: 'Umumiy', content: 'Umumiy ma\'lumotlar...', files: [], images: [] });
+        }
+        if (!sections.some(s => s.id === 'my_docs')) {
+          sections.push({ id: 'my_docs', name: 'Hujjatlarim', isProtected: true, content: 'Maxfiy hujjatlar...', files: [], images: [] });
+        }
+        
+        setContent(data);
+        localStorage.setItem('site_content_main_cache', JSON.stringify(data));
+        if (sections.length > 0 && !activeTab) setActiveTab(sections[0].id);
+      } catch (err: any) {
+        console.error("Info load error:", err);
+        if (err.message?.includes('Quota')) {
+          console.warn("Quota limit hit in AdminInfo. Using cache.");
+        }
+      }
     }
     load();
   }, []);

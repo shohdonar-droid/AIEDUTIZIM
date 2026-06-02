@@ -11,6 +11,12 @@ export default function AdminOverview() {
   const [logs, setLogs] = useState<any[]>([]);
 
   useEffect(() => {
+    // Load from cache first
+    const cachedStats = localStorage.getItem('admin_stats_cache');
+    const cachedLogs = localStorage.getItem('admin_logs_cache');
+    if (cachedStats) setStats(JSON.parse(cachedStats));
+    if (cachedLogs) setLogs(JSON.parse(cachedLogs));
+
     async function loadStats() {
       try {
         const allUsersSnap = await getDocs(collection(db, 'users'));
@@ -32,14 +38,7 @@ export default function AdminOverview() {
         const teachersCount = users.filter(u => u.role === 'teacher').length;
         const staffCount = users.filter(u => u.role === 'staff').length;
 
-        try {
-          const logsSnap = await getDocs(query(collection(db, 'activityLogs'), orderBy('loginTime', 'desc'), limit(500)));
-          setLogs(logsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch(e) {
-          console.error("Error loading activity logs", e);
-        }
-        
-        setStats({
+        const newStats = {
           users: studentsCount,
           courses: cSnap.size,
           tests: tSnap.size,
@@ -48,11 +47,23 @@ export default function AdminOverview() {
           staff: staffCount,
           totalBalls: totalActiveBalls,
           spentBalls: totalSpentBalls
-        });
+        };
+
+        setStats(newStats);
+        localStorage.setItem('admin_stats_cache', JSON.stringify(newStats));
+
+        try {
+          const logsSnap = await getDocs(query(collection(db, 'activityLogs'), orderBy('loginTime', 'desc'), limit(500)));
+          const newLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          setLogs(newLogs);
+          localStorage.setItem('admin_logs_cache', JSON.stringify(newLogs));
+        } catch(e) {
+          console.error("Error loading activity logs", e);
+        }
       } catch (err: any) {
-        if (err.message && err.message.includes('OperationType')) {
-           // It's already handled/thrown by handleFirestoreError somewhere
-           console.error("Stats loading error:", err);
+        console.error("Stats loading error:", err);
+        if (err.message && err.message.includes('Quota')) {
+           console.warn("Firebase Quota exceeded. Using cached data.");
         } else {
            handleFirestoreError(err, OperationType.LIST, 'admin-overview-stats');
         }

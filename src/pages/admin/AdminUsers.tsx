@@ -124,38 +124,64 @@ export default function AdminUsers() {
   }, []);
 
   useEffect(() => {
+    // Load from cache first
+    const cacheKeys = ['depts', 'groups', 'students', 'teachers', 'staff', 'subadmins'];
+    cacheKeys.forEach(k => {
+      const cached = localStorage.getItem(`admin_users_${k}_cache`);
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (k === 'depts') setDepartments(data);
+        else if (k === 'groups') setGroups(data);
+        else if (k === 'students') setUsers(data);
+        else if (k === 'teachers') setTeachers(data);
+        else if (k === 'staff') setStaffUsers(data);
+        else if (k === 'subadmins') setSubadmins(data);
+      }
+    });
+
     const unsubDepts = safeOnSnapshot(collection(db, 'departments'), (snap) => {
-      setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
+      setDepartments(data);
+      localStorage.setItem('admin_users_depts_cache', JSON.stringify(data));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'departments'));
     
     const unsubGroups = safeOnSnapshot(collection(db, 'groups'), (snap) => {
-      setGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group));
+      setGroups(data);
+      localStorage.setItem('admin_users_groups_cache', JSON.stringify(data));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'groups'));
 
     const unsubStudents = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'student')), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setUsers(dbUsers);
+      localStorage.setItem('admin_users_students_cache', JSON.stringify(dbUsers));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (student)'));
 
     const unsubTeachers = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'teacher')), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setTeachers(dbUsers);
+      localStorage.setItem('admin_users_teachers_cache', JSON.stringify(dbUsers));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (teacher)'));
 
     const unsubStaff = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'staff')), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setStaffUsers(dbUsers);
+      localStorage.setItem('admin_users_staff_cache', JSON.stringify(dbUsers));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (staff)'));
 
     const unsubSubadmins = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'subadmin')), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setSubadmins(dbUsers);
+      localStorage.setItem('admin_users_subadmins_cache', JSON.stringify(dbUsers));
       setLoading(false);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (subadmin)'));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'users (subadmin)');
+      setLoading(false);
+    });
 
     return () => { unsubDepts(); unsubGroups(); unsubStudents(); unsubTeachers(); unsubStaff(); unsubSubadmins(); };
   }, []);

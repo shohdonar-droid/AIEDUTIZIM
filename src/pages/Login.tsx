@@ -85,27 +85,29 @@ export default function Login() {
       } else if (trimmedLogin.includes('@')) {
         actualEmail = trimmedLogin.toLowerCase();
       } else {
-        // Look up login field in Firestore users collection
-        const qLog = query(collection(db, 'users'), where('login', '==', trimmedLogin));
-        const qLogSnap = await getDocs(qLog);
-        if (!qLogSnap.empty) {
-          actualEmail = qLogSnap.docs[0].data().email;
-        } else {
-          // If login stored is lowercase
-          const qLogLower = query(collection(db, 'users'), where('login', '==', trimmedLogin.toLowerCase()));
-          const qLogLowerSnap = await getDocs(qLogLower);
-          if (!qLogLowerSnap.empty) {
-            actualEmail = qLogLowerSnap.docs[0].data().email;
+        // Attempt Look up login field in Firestore users collection
+        try {
+          const qLog = query(collection(db, 'users'), where('login', '==', trimmedLogin));
+          const qLogSnap = await getDocs(qLog);
+          if (!qLogSnap.empty) {
+            actualEmail = qLogSnap.docs[0].data().email;
           } else {
-            // Fallback derivation
-            if (activeRole === 'admin') {
-              actualEmail = `${trimmedLogin.toLowerCase()}@subadmin.uz`;
-            } else if (activeRole === 'teacher' || activeRole === 'staff') {
-              actualEmail = `${trimmedLogin.toLowerCase()}@teacher.uz`;
+            const qLogLower = query(collection(db, 'users'), where('login', '==', trimmedLogin.toLowerCase()));
+            const qLogLowerSnap = await getDocs(qLogLower);
+            if (!qLogLowerSnap.empty) {
+              actualEmail = qLogLowerSnap.docs[0].data().email;
             } else {
-              actualEmail = `${trimmedLogin.toLowerCase()}@student.uz`;
+              // Deterministic fallback if not found
+              if (activeRole === 'admin') actualEmail = `${trimmedLogin.toLowerCase()}@subadmin.uz`;
+              else if (activeRole === 'teacher' || activeRole === 'staff') actualEmail = `${trimmedLogin.toLowerCase()}@teacher.uz`;
+              else actualEmail = `${trimmedLogin.toLowerCase()}@student.uz`;
             }
           }
+        } catch (quotaErr: any) {
+           console.warn("Login lookup failed (likely quota). Using deterministic fallback.", quotaErr);
+           if (activeRole === 'admin') actualEmail = `${trimmedLogin.toLowerCase()}@subadmin.uz`;
+           else if (activeRole === 'teacher' || activeRole === 'staff') actualEmail = `${trimmedLogin.toLowerCase()}@teacher.uz`;
+           else actualEmail = `${trimmedLogin.toLowerCase()}@student.uz`;
         }
       }
 
@@ -118,10 +120,25 @@ export default function Login() {
 
       try {
         const res = await signInWithEmailAndPassword(auth, actualEmail, loginPass);
-        let userDoc = await getDoc(doc(db, 'users', res.user.uid));
+        let userDocData: any = null;
+        let docExists = false;
+
+        try {
+          const userDoc = await getDoc(doc(db, 'users', res.user.uid));
+          if (userDoc.exists()) {
+             userDocData = userDoc.data();
+             docExists = true;
+          }
+        } catch (docErr: any) {
+          console.warn("User profile fetch failed during login (quota?):", docErr);
+          if (trimmedLogin.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
+             userDocData = { role: 'admin', displayName: 'Elyorbek (Admin)', login: ADMIN_LOGIN };
+             docExists = true;
+          }
+        }
         
         // Agar hardcoded admin bo'lsa va doc yo'q bo'lsa -> SEAMLESS yaratamiz
-        if (!userDoc.exists() && trimmedLogin.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
+        if (!docExists && trimmedLogin.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
           const userDocParams = {
             uid: res.user.uid,
             displayName: `Elyorbek (Admin)`,
@@ -132,12 +149,13 @@ export default function Login() {
             role: 'admin',
             createdAt: serverTimestamp(),
           };
-          await setDoc(doc(db, 'users', res.user.uid), userDocParams);
-          userDoc = await getDoc(doc(db, 'users', res.user.uid));
+          try { await setDoc(doc(db, 'users', res.user.uid), userDocParams); } catch(e) {}
+          userDocData = userDocParams;
+          docExists = true;
         }
 
-        if (userDoc.exists()) {
-          const role = userDoc.data().role;
+        if (docExists) {
+          const role = userDocData.role;
           
           const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin');
           if (!isRoleMatch) {
@@ -156,17 +174,14 @@ export default function Login() {
               await setDoc(doc(db, 'users', res.user.uid), {
                 telegramId: Number(tgUser.id)
               }, { merge: true });
-              console.log("Linked Telegram ID:", tgUser.id, "to User:", res.user.uid);
             }
-          } catch (tgErr) {
-            console.error("Failed to merge telegramId:", tgErr);
-          }
+          } catch (tgErr) {}
 
           // Log activity
           try {
             const sessionRef = await addDoc(collection(db, 'activityLogs'), {
               userId: res.user.uid,
-              userDisplayName: userDoc.data().displayName,
+              userDisplayName: userDocData.displayName,
               role: role,
               loginTime: Date.now(),
               logoutTime: null,
@@ -175,11 +190,11 @@ export default function Login() {
             localStorage.setItem('sessionId', sessionRef.id);
             localStorage.setItem('sessionStart', Date.now().toString());
             localStorage.setItem('lastActivityTime', Date.now().toString());
-            localStorage.removeItem('impersonateUserId'); // Clear any impersonation
+            localStorage.removeItem('impersonateUserId'); 
             
             // Notify admins
             addDoc(collection(db, 'admin_notifications'), {
-               text: `Yangi tizimga ulanish (Web):\n👤 F.I.SH: ${userDoc.data().displayName}\n🛡 Profil: ${role.toUpperCase()}`,
+               text: `Yangi tizimga ulanish (Web):\n👤 F.I.SH: ${userDocData.displayName}\n🛡 Profil: ${role.toUpperCase()}`,
                timestamp: serverTimestamp()
             });
           } catch (e) {}

@@ -107,10 +107,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.removeItem('cached_user_profile');
           }
           setLoading(false);
-        }, (err) => {
+        }, (err: any) => {
           console.error("User snapshot error:", err);
-          // If we had a cached user, we already set loading to false. 
-          // If not, we must set it to false now to avoid infinite loading.
+          if (err?.message?.includes('Quota')) {
+            const cached = localStorage.getItem('cached_user_profile');
+            if (cached) {
+               setUser(JSON.parse(cached));
+            } else {
+               // Deterministic fallback based on firebaseUser email
+               const email = firebaseUser.email || '';
+               let role: any = 'student';
+               if (email.endsWith('@admin.uz')) role = 'admin';
+               else if (email.endsWith('@subadmin.uz')) role = 'subadmin';
+               else if (email.endsWith('@teacher.uz')) role = 'teacher';
+               
+               setUser({
+                 uid: firebaseUser.uid,
+                 email: firebaseUser.email,
+                 displayName: firebaseUser.displayName || 'User',
+                 role: role
+               } as any);
+            }
+          }
           setLoading(false);
         });
       } else {
