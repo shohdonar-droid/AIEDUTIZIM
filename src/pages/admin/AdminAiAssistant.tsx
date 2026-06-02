@@ -128,7 +128,7 @@ Tizimdagi barcha ma'lumotlar, foydalanuvchilar, darslar va sertifikatlar bo'yich
       const aiMessage: ChatMessage = {
         id: String(Date.now() + 1),
         sender: 'ai',
-        text: data.text || "Uzr, menda javob tayyorlashda muammo bo'ldi.",
+        text: data.reply || "Uzr, menda javob tayyorlashda muammo bo'ldi.",
         timestamp: new Date()
       };
 

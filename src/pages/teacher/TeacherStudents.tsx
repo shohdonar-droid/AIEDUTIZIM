@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, getDocs, doc, deleteDoc, query, where, onSnapshot, updateDoc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, query, where, updateDoc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { UserProfile, Department, Group } from '../../types';
 import { Search, Trash2, Filter, Key, Plus, X, Save, Loader2, Download, Edit } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -216,7 +217,7 @@ export default function TeacherStudents() {
           where('role', '==', activeTab), 
           where('teacherId', '==', orgId)
         );
-        const unsub = onSnapshot(q, (snap) => {
+        const unsub = safeOnSnapshot(q, (snap) => {
           const dbUsers = snap.docs.map(doc => ({ ...doc.data() } as UserProfile));
           dbUsers.sort((a, b) => a.displayName.localeCompare(b.displayName, 'uz-UZ'));
           setUsers(dbUsers);

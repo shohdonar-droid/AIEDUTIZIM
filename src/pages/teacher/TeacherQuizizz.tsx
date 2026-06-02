@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, setDoc, runTransaction } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download, BarChart2, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { generateDynamicTest } from '../../services/geminiService';
@@ -38,7 +39,7 @@ export default function TeacherQuizizz() {
     if (!user) return;
     const orgId = user.role === 'staff' ? user.teacherId || user.uid : user.uid;
     
-    const unsub = onSnapshot(query(collection(db, 'quiz_history'), where('teacherId', '==', orgId)), (snap) => {
+    const unsub = safeOnSnapshot(query(collection(db, 'quiz_history'), where('teacherId', '==', orgId)), (snap) => {
        const qs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
        qs.sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
        setQuizzes(qs);
@@ -153,7 +154,7 @@ export default function TeacherQuizizz() {
   // Monitor Active Session
   useEffect(() => {
      if (!activeSession) return;
-     const unsubSession = onSnapshot(doc(db, 'quiz_sessions', activeSession.id), (snap) => {
+     const unsubSession = safeOnSnapshot(doc(db, 'quiz_sessions', activeSession.id), (snap) => {
         console.log("Session snapshot fired! exists:", snap.exists(), "data:", snap.data(), "hasPendingWrites:", snap.metadata.hasPendingWrites);
         if (snap.exists()) {
            setActiveSession(prev => ({ ...prev, id: snap.id, ...snap.data() }));
@@ -162,7 +163,7 @@ export default function TeacherQuizizz() {
         console.error("Session snapshot error:", err);
      });
      
-     const unsubParticipants = onSnapshot(query(collection(db, 'quiz_participants'), where('sessionId', '==', activeSession.id)), (snap) => {
+     const unsubParticipants = safeOnSnapshot(query(collection(db, 'quiz_participants'), where('sessionId', '==', activeSession.id)), (snap) => {
         const p = snap.docs.map(d => ({ pId: d.id, ...d.data() }));
         setParticipants(p);
      }, (err) => {

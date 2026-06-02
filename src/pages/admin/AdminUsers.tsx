@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, doc, updateDoc, setDoc, query, where, onSnapshot, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc, query, where, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import { UserProfile, Department, Group } from '../../types';
 import { Search, Download, Trash2, Key, Filter, Edit, Plus, Users, LayoutDashboard, Loader2, Save, X } from 'lucide-react';
@@ -123,33 +124,33 @@ export default function AdminUsers() {
   }, []);
 
   useEffect(() => {
-    const unsubDepts = onSnapshot(collection(db, 'departments'), (snap) => {
+    const unsubDepts = safeOnSnapshot(collection(db, 'departments'), (snap) => {
       setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'departments'));
     
-    const unsubGroups = onSnapshot(collection(db, 'groups'), (snap) => {
+    const unsubGroups = safeOnSnapshot(collection(db, 'groups'), (snap) => {
       setGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'groups'));
 
-    const unsubStudents = onSnapshot(query(collection(db, 'users'), where('role', '==', 'student')), (snap) => {
+    const unsubStudents = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'student')), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setUsers(dbUsers);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (student)'));
 
-    const unsubTeachers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'teacher')), (snap) => {
+    const unsubTeachers = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'teacher')), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setTeachers(dbUsers);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (teacher)'));
 
-    const unsubStaff = onSnapshot(query(collection(db, 'users'), where('role', '==', 'staff')), (snap) => {
+    const unsubStaff = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'staff')), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setStaffUsers(dbUsers);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'users (staff)'));
 
-    const unsubSubadmins = onSnapshot(query(collection(db, 'users'), where('role', '==', 'subadmin')), (snap) => {
+    const unsubSubadmins = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'subadmin')), (snap) => {
       const dbUsers = snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       dbUsers.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'uz-UZ'));
       setSubadmins(dbUsers);

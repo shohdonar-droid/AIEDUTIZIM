@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, onSnapshot, query, deleteDoc, doc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { collection, addDoc, query, deleteDoc, doc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Department, Group } from '../../types';
 import { Plus, Trash2, Layers, Users } from 'lucide-react';
 
@@ -13,13 +14,13 @@ export default function AdminDepartments() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubDept = onSnapshot(query(collection(db, 'departments')), (snap) => {
+    const unsubDept = safeOnSnapshot(query(collection(db, 'departments')), (snap) => {
       const d = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
       d.sort((a, b) => a.name.localeCompare(b.name, 'uz-UZ'));
       setDepartments(d);
     }, (err) => console.error(err));
 
-    const unsubGroup = onSnapshot(query(collection(db, 'groups')), (snap) => {
+    const unsubGroup = safeOnSnapshot(query(collection(db, 'groups')), (snap) => {
       const g = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group));
       g.sort((a, b) => a.name.localeCompare(b.name, 'uz-UZ'));
       setGroups(g);

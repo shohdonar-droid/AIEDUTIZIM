@@ -3,7 +3,8 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { User, GraduationCap, Award, MessageSquare, LogOut, ChevronRight, Home, LayoutDashboard, Loader2, FileText, BrainCircuit } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { auth, db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, query, onSnapshot, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import StudentProfile from './StudentProfile';
 import StudentGrades from './StudentGrades';
 import StudentCourses from './StudentCourses';
@@ -28,7 +29,7 @@ export default function StudentDashboard() {
       where('receiverId', '==', user.uid),
       where('isRead', '==', false)
     );
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = safeOnSnapshot(q, (snap) => {
       setUnreadCount(snap.docs.length);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'messages (unread count)'));
     return unsub;

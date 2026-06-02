@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Test } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { Award, PlayCircle, Clock, Loader2 } from 'lucide-react';
@@ -19,7 +20,7 @@ export default function StudentTests() {
       where('isPublished', '==', true)
     );
 
-    const unsubscribe = onSnapshot(q, (snap) => {
+    const unsubscribe = safeOnSnapshot(q, (snap) => {
       const allTests = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Test));
 
       // Filter by user department and group

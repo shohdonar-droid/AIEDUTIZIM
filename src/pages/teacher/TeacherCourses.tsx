@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, getDoc, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, onSnapshot, limit } from 'firebase/firestore';
+import { collection, getDoc, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, limit } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Course, Module, Department, Group } from '../../types';
 import { MultiSelectDropdown } from '../../components/MultiSelectDropdown';
 import { Plus, Edit, Trash2, Loader2, Layout, Save, X, Sparkles, BookOpen } from 'lucide-react';
@@ -26,7 +27,7 @@ export default function TeacherCourses() {
     if (!orgId) return;
 
     // Listen to all changes in courses
-    const unsubCourses = onSnapshot(collection(db, 'courses'), (snap) => {
+    const unsubCourses = safeOnSnapshot(collection(db, 'courses'), (snap) => {
       const allList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
       
       const myLocalCourses = allList.filter(c => c.teacherId === orgId);
@@ -37,11 +38,11 @@ export default function TeacherCourses() {
       setLoading(false);
     });
 
-    const unsubDepts = onSnapshot(query(collection(db, 'departments'), where('teacherId', '==', orgId)), (snap) => {
+    const unsubDepts = safeOnSnapshot(query(collection(db, 'departments'), where('teacherId', '==', orgId)), (snap) => {
       setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
     });
 
-    const unsubGroups = onSnapshot(query(collection(db, 'groups'), where('teacherId', '==', orgId)), (snap) => {
+    const unsubGroups = safeOnSnapshot(query(collection(db, 'groups'), where('teacherId', '==', orgId)), (snap) => {
        setGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
     });
 

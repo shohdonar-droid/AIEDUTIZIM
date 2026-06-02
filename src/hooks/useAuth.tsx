@@ -1,7 +1,8 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import safeOnSnapshot from '../lib/safeSnapshot';
 import { UserProfile } from '../types';
 
 interface AuthContextType {
@@ -69,7 +70,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let userUnsub: (() => void) | null = null;
-    let actualUserUnsub: (() => void) | null = null;
+
+    // Try to load cached user immediately to speed up UI
+    const cachedUser = localStorage.getItem('cached_user_profile');
+    if (cachedUser) {
+      try {
+        setUser(JSON.parse(cachedUser));
+        setLoading(false);
+      } catch (e) {}
+    }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (userUnsub) {
@@ -81,26 +90,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const impId = localStorage.getItem('impersonateUserId');
         const targetUid = impId || firebaseUser.uid;
         
-        userUnsub = onSnapshot(doc(db, 'users', targetUid), (snap) => {
+        userUnsub = safeOnSnapshot(doc(db, 'users', targetUid), (snap) => {
           if (snap.exists()) {
             const udata = snap.data() as UserProfile;
             const userWithUid = { ...udata, uid: snap.id };
             
+            let finalUser = userWithUid;
             if (impId && udata.role === 'teacher') {
-              setUser({ ...userWithUid, isImpersonated: true } as any);
-            } else {
-              setUser(userWithUid);
+              finalUser = { ...userWithUid, isImpersonated: true } as any;
             }
+            
+            setUser(finalUser);
+            localStorage.setItem('cached_user_profile', JSON.stringify(finalUser));
           } else {
             setUser(null);
+            localStorage.removeItem('cached_user_profile');
           }
           setLoading(false);
         }, (err) => {
           console.error("User snapshot error:", err);
+          // If we had a cached user, we already set loading to false. 
+          // If not, we must set it to false now to avoid infinite loading.
           setLoading(false);
         });
       } else {
         setUser(null);
+        localStorage.removeItem('cached_user_profile');
         setLoading(false);
       }
     });

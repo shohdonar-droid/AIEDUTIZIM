@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../lib/firebase';
-import { collection, query, where, orderBy, getDocs, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, limit, getDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, doc, updateDoc, limit, getDoc } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Message, UserProfile } from '../../types';
 import { Send, User as UserIcon } from 'lucide-react';
 
@@ -118,7 +119,7 @@ export default function TeacherChat() {
 
     const extractTime = (d: any) => d.timestamp?.toMillis ? d.timestamp.toMillis() : (d.timestamp?.seconds ? d.timestamp.seconds * 1000 : 0);
 
-    const unsub1 = onSnapshot(q1, (snap) => {
+    const unsub1 = safeOnSnapshot(q1, (snap) => {
       const counts: Record<string, number> = {};
       const t: Record<string, number> = {};
       snap.docs.forEach(doc => {
@@ -137,7 +138,7 @@ export default function TeacherChat() {
       console.error("TeacherChat Unread Snapshot Error:", err);
     });
 
-    const unsub3 = onSnapshot(q3, (snap) => {
+    const unsub3 = safeOnSnapshot(q3, (snap) => {
        const t: Record<string, number> = {};
        snap.docs.forEach(doc => {
           const d = doc.data() as Message;
@@ -166,7 +167,7 @@ export default function TeacherChat() {
     
     let msgs: Message[] = [];
     
-    const unsub1 = onSnapshot(q1, (snap) => {
+    const unsub1 = safeOnSnapshot(q1, (snap) => {
       const m1 = snap.docs.map(d => ({ ...d.data(), id: d.id } as Message));
       msgs = [...m1, ...msgs.filter(m => m.senderId !== user.uid)];
       msgs.sort((a,b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
@@ -175,7 +176,7 @@ export default function TeacherChat() {
       console.error("TeacherChat msg1 Snapshot Error:", err);
     });
 
-    const unsub2 = onSnapshot(q2, (snap) => {
+    const unsub2 = safeOnSnapshot(q2, (snap) => {
       const m2 = snap.docs.map(d => ({ ...d.data(), id: d.id } as Message));
       msgs = [...msgs.filter(m => m.senderId !== selectedContact.uid), ...m2];
       msgs.sort((a,b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));

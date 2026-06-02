@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, addDoc, query, orderBy, onSnapshot, where, Timestamp, limit, getDocs, or, and, writeBatch, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, where, Timestamp, limit, getDocs, or, and, writeBatch, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import safeOnSnapshot from '../lib/safeSnapshot';
 import { Message, UserProfile } from '../types';
 import { Send, Loader2, User as UserIcon, Bell, MessageSquare, X, Reply, MoreVertical, Edit2, Trash2, Copy } from 'lucide-react';
 import { format } from 'date-fns';
@@ -54,7 +55,7 @@ export default function ChatSection() {
     if (isAdmin) {
       // Admin sees everyone
       const q = query(collection(db, 'users'));
-      const unsub = onSnapshot(q, (snap) => {
+      const unsub = safeOnSnapshot(q, (snap) => {
         const users = snap.docs.map(d => ({ uid: d.id, ...d.data() } as any));
         // Filter out self and only show relevant roles for tabs
         const filtered = users.filter(u => u.uid !== user.uid && (u.role === 'teacher' || u.role === 'student' || u.role === 'staff' || u.isAnonymousContact));
@@ -201,7 +202,7 @@ export default function ChatSection() {
 
       const extractTime = (d: any) => d.timestamp?.toMillis ? d.timestamp.toMillis() : (d.timestamp?.seconds ? d.timestamp.seconds * 1000 : 0);
 
-      const unsub1 = onSnapshot(q1, (snap) => {
+      const unsub1 = safeOnSnapshot(q1, (snap) => {
         const counts: Record<string, number> = {};
         const t: Record<string, number> = {};
         snap.docs.forEach(doc => {
@@ -220,7 +221,7 @@ export default function ChatSection() {
 
       let unsub2 = () => {};
       if (q2) {
-         unsub2 = onSnapshot(q2, (snap) => {
+         unsub2 = safeOnSnapshot(q2, (snap) => {
            const counts: Record<string, number> = {};
            const t: Record<string, number> = {};
            snap.docs.forEach(doc => {
@@ -238,7 +239,7 @@ export default function ChatSection() {
          }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-counts-times-2'));
       }
 
-      const unsub3 = onSnapshot(q3, (snap) => {
+      const unsub3 = safeOnSnapshot(q3, (snap) => {
          const t: Record<string, number> = {};
          snap.docs.forEach(doc => {
             const d = doc.data();
@@ -311,7 +312,7 @@ export default function ChatSection() {
       where('receiverId', '==', selectedContactId)
     );
 
-    const unsub1 = onSnapshot(q1, (snap) => {
+    const unsub1 = safeOnSnapshot(q1, (snap) => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
       // For non-admins, filter to only show messages where we are the receiver
       // For admins, show messages where they are the receiver or it's an admin message
@@ -321,7 +322,7 @@ export default function ChatSection() {
       updateMessages(filtered);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-messages-1'));
 
-    const unsub2 = onSnapshot(q2, (snap) => {
+    const unsub2 = safeOnSnapshot(q2, (snap) => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
       // For non-admins, filter to only show messages where we are the sender
       // For admins, show messages sent by ANY admin if it's a conversation with this contact

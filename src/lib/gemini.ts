@@ -23,22 +23,12 @@ export function getGeminiKeysPool(): string[] {
   }
 
   // 2. Individual key variables
-  const varsToQuery = [
-    "NEW_GEMINI_API_KEY",
-    "GEMINI_API_KEY",
-    "GEMINI_API_KEY_1",
-    "GEMINI_API_KEY_2",
-    "GEMINI_API_KEY_3",
-    "GEMINI_API_KEY_4",
-    "GEMINI_API_KEY_5",
-    "VITE_GEMINI_API_KEY",
-    "VITE_API_KEY",
-  ];
-
-  varsToQuery.forEach((v) => {
-    const val = process.env[v];
-    if (val && val.trim().length > 0) {
-      keys.add(val.trim());
+  Object.keys(process.env).forEach((v) => {
+    if (v.includes("GEMINI_API_KEY") || v === "VITE_API_KEY") {
+      const val = process.env[v];
+      if (val && val.trim().length > 0) {
+        keys.add(val.trim());
+      }
     }
   });
 
@@ -129,13 +119,22 @@ export async function generateContentWithRotation(
       console.warn(
         `[Gemini Rotator] Attempt ${attempts} failed with key index ${keyIndex}. Error: ${errMsg}.`
       );
-
-      // Rotate immediate pointer for the next parallel/subsequent start
-      rotateKeyIndex(pool.length);
-
-      // If it's a fatal validation error or key isn't active/invalid, we keep going to try other keys
+      
+      // Do not retry on 400 Bad Request / Invalid Argument as the payload itself is wrong
+      if (
+         error?.status === 400 || 
+         error?.status === "INVALID_ARGUMENT" || 
+         errMsg.includes("INVALID_ARGUMENT") || 
+         errMsg.includes('code":400') ||
+         errMsg.includes('code": 400')
+      ) {
+         throw error;
+      }
     }
   }
 
+  if (pool.length > 1) {
+    currentKeyIndex = (currentKeyIndex + 1) % pool.length;
+  }
   throw lastError || new Error("Failed to generate content after trying available rotational keys.");
 }

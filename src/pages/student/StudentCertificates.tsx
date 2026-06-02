@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Enrollment } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { Award, ShieldCheck, Star, Loader2, Eye, Download } from 'lucide-react';
@@ -29,14 +30,14 @@ export default function StudentCertificates() {
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, 'enrollments'), where('userId', '==', user.uid), where('completed', '==', true));
-    const unsubCourse = onSnapshot(q, (snap) => {
+    const unsubCourse = safeOnSnapshot(q, (snap) => {
       setCerts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Enrollment)));
       setLoading(false);
     }, (err) => console.error(err));
     
     // subject certs
     const qSub = query(collection(db, 'testResults'), where('userId', '==', user.uid), where('testType', '==', 'subject'));
-    const unsubSub = onSnapshot(qSub, (snap) => {
+    const unsubSub = safeOnSnapshot(qSub, (snap) => {
       const allSubResults = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       // Filter >= 90%
       const passed = allSubResults.filter((r: any) => r.score >= 90);

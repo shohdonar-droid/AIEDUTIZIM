@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { doc, getDoc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import safeOnSnapshot from '../lib/safeSnapshot';
 import { Loader2, User } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -16,7 +17,7 @@ export default function Quizizz() {
 
   useEffect(() => {
     if (!session || !session.id) return;
-    const unsub = onSnapshot(doc(db, 'quiz_sessions', session.id), (snap) => {
+    const unsub = safeOnSnapshot(doc(db, 'quiz_sessions', session.id), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setSession({ id: snap.id, ...data });

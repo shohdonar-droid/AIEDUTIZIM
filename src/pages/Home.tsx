@@ -33,23 +33,34 @@ export default function Home() {
         }
       };
 
+      // Load from cache first
+      const cachedContent = localStorage.getItem('cache_site_content');
+      const cachedCourses = localStorage.getItem('cache_courses');
+      const cachedStats = localStorage.getItem('cache_stats');
+
+      if (cachedContent) setContent(JSON.parse(cachedContent));
+      if (cachedCourses) setCourses(JSON.parse(cachedCourses));
+      if (cachedStats) setStats(JSON.parse(cachedStats));
+
       try {
         const contentDoc = await getDoc(doc(db, 'siteContent', 'main'));
         if (contentDoc.exists()) {
           const data = contentDoc.data() as SiteContent;
-          setContent({
+          const merged = {
             ...defaultContent,
             ...data,
             hero: { ...defaultContent.hero, ...(data.hero || {}) },
             banners: data.banners || defaultContent.banners,
             footer: { ...defaultContent.footer, ...(data.footer || {}) },
-          });
+          };
+          setContent(merged);
+          localStorage.setItem('cache_site_content', JSON.stringify(merged));
         } else {
           setContent(defaultContent);
         }
-      } catch (err) {
-        console.error('Failed to load site content:', err);
-        setContent(defaultContent);
+      } catch (err: any) {
+        console.error('Content fetch error:', err);
+        if (!content) setContent(defaultContent);
       }
 
       try {
@@ -69,8 +80,6 @@ export default function Home() {
            }
 
            if (user.role === 'admin' || user.role === 'subadmin') return true;
-
-           // Let teachers and staff also see global admin template courses
            if (isGlobalAdminCourse) return true;
 
            if (user.role === 'student') {
@@ -91,20 +100,18 @@ export default function Home() {
            return false;
         });
 
-        setCourses(coursesData.length > 0 ? coursesData.slice(0, 6) : [
+        const finalCourses = coursesData.length > 0 ? coursesData.slice(0, 6) : [
           { id: '1', title: 'Python Asoslari', thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=400', description: 'Sun\'iy intellekt uchun asosiy tilni o\'rganing.', modules: [], createdAt: null },
           { id: '2', title: 'Machine Learning', thumbnail: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?auto=format&fit=crop&q=80&w=400', description: 'Ma\'lumotlar tahlili va bashoratlash.', modules: [], createdAt: null },
           { id: '3', title: 'Frontend Development', thumbnail: 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?auto=format&fit=crop&q=80&w=400', description: 'Zamonaviy web interfeyslar.', modules: [], createdAt: null },
           { id: '4', title: 'Backend Development', thumbnail: 'https://images.unsplash.com/photo-1623479322729-28b25c16b011?auto=format&fit=crop&q=80&w=400', description: 'Node.js va ma\'lumotlar bazalari.', modules: [], createdAt: null },
           { id: '5', title: 'Data Science', thumbnail: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=400', description: 'Katta hajmdagi ma\'lumotlarni ishlash.', modules: [], createdAt: null },
           { id: '6', title: 'Mobile Development', thumbnail: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=400', description: 'Zamonaviy mobil ilovalar yaratish.', modules: [], createdAt: null }
-        ]);
-      } catch (e) {
-        console.error('Failed to load courses:', e);
-        setCourses([
-          { id: '1', title: 'Python Asoslari', thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=400', description: 'Sun\'iy intellekt uchun asosiy tilni o\'rganing.', modules: [], createdAt: null },
-          { id: '2', title: 'Machine Learning', thumbnail: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?auto=format&fit=crop&q=80&w=400', description: 'Ma\'lumotlar tahlili va bashoratlash.', modules: [], createdAt: null }
-        ]);
+        ];
+        setCourses(finalCourses);
+        localStorage.setItem('cache_courses', JSON.stringify(finalCourses));
+      } catch (e: any) {
+        console.error('Courses fetch error:', e);
       }
 
       try {
@@ -114,15 +121,17 @@ export default function Home() {
         const teacherSnap = await getCountFromServer(query(collection(db, 'users'), where('role', '==', 'teacher')));
         const certSnap = await getCountFromServer(query(collection(db, 'enrollments'), where('completed', '==', true)));
         
-        setStats({ 
+        const newStats = { 
           courses: cSnap.data().count,
           users: uSnap.data().count,
           tests: tSnap.data().count,
           results: certSnap.data().count,
           teachers: teacherSnap.data().count
-        });
-      } catch (e) {
-        console.error(e);
+        };
+        setStats(newStats);
+        localStorage.setItem('cache_stats', JSON.stringify(newStats));
+      } catch (e: any) {
+        console.error('Stats fetch error:', e);
       }
     }
     fetchData();
@@ -138,23 +147,30 @@ export default function Home() {
   }, [content]);
 
   const features = [
-    { title: "Interaktiv quizizz va test tizimi", desc: "Tashkilotlar va talabalar uchun vaqt rejimida real-time musobaqalar uyushtirish. Bilimlarni geymifikatsiya orqali mustahkamlash.", icon: LayoutGrid },
-    { title: "Sun'iy intellekt bilan test yaratish", desc: "O'qituvchilar uchun AI orqali mavzuga oid savollarni avtomatik shakllantirish, o'quv jarayonini sezilarli darajada tezlashtirish.", icon: FileText },
-    { title: "Avtomatik sertifikatlar", desc: "Kurslar yoki testlardan muvaffaqiyatli o'tganlarga (shuningdek, Quizizz g'oliblariga) real vaqtda QR kodli sertifikat taqdim etish.", icon: Award },
-    { title: "Zamonaviy modulli ta'lim", desc: "Talabalarning kurs doirasidagi barcha qadamlarini interaktiv modullar orqali kuzatish va ilg'or o'zlashtirish statistikasi.", icon: BarChart3 },
-    { title: "Xavfsizlik va avtomatlashgan jurnal", desc: "Baholar, sertifikatlar haqqoniyligi va ishtirokchilar tarixi mutlaqo xavfsiz va tizimli kataloglanadi.", icon: CheckCircle2 },
-    { title: "O'zaro muloqot va chat", desc: "Tashkilotlar, talabalar va adminlar o'rtasida to'g'ridan-to'g'ri integratsiyalashgan, guruhli muloqot va ijtimoiy muhit.", icon: Users },
+    { title: "Interaktiv Quizizz va Test Tizimi", desc: "Tashkilotlar va talabalar uchun real-vaqt rejimida musobaqalar uyushtirish. Bilimlarni geymifikatsiya orqali mustahkamlash.", icon: LayoutGrid, color: "bg-blue-50", iconColor: "text-blue-600" },
+    { title: "Sun'iy Intellekt Bilan Test Yaratish", desc: "O'qituvchilar uchun AI orqali mavzuga oid savollarni avtomatik shakllantirish, o'quv jarayonini sezilarli darajada tezlashtirish.", icon: FileText, color: "bg-purple-50", iconColor: "text-purple-600" },
+    { title: "Avtomatik Sertifikatlar", desc: "Kurslar yoki testlardan muvaffaqiyatli o'tganlarga real vaqtda QR kodli va himoyalangan sertifikat taqdim etish.", icon: Award, color: "bg-orange-50", iconColor: "text-orange-600" },
+    { title: "Zamonaviy Modulli Ta'lim", desc: "Talabalarning kurs doirasidagi barcha qadamlarini interaktiv modullar orqali kuzatish va ilg'or o'zlashtirish statistikasi.", icon: BarChart3, color: "bg-green-50", iconColor: "text-green-600" },
+    { title: "Xavfsizlik va Avtomat Jurnal", desc: "Baholar, sertifikatlar haqqoniyligi va ishtirokchilar tarixi mutlaqo xavfsiz va tizimli kataloglanadi.", icon: CheckCircle2, color: "bg-red-50", iconColor: "text-red-600" },
+    { title: "Smart Chat va Muloqot", desc: "Tashkilotlar, talabalar va adminlar o'rtasida to'g'ridan-to'g'ri integratsiyalashgan ijtimoiy ta'lim muhiti.", icon: Users, color: "bg-indigo-50", iconColor: "text-indigo-600" },
   ];
 
-  if (!content) return null;
+  if (!content) return (
+    <div className="flex h-screen items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <BrainCircuit className="h-12 w-12 text-[#007aff] animate-pulse" />
+        <p className="text-gray-400 font-medium animate-pulse">Yuklanmoqda...</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col gap-16 pb-20 pt-8">
+    <div className="flex flex-col gap-16 pb-20 pt-8 bg-[#fbfbfd]">
       {/* Hero Section */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[450px]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-[500px]">
            {/* Banner Slider */}
-          <div className={`${content.hero.showInfoSection === false ? 'lg:col-span-3' : 'lg:col-span-2'} relative mac-window overflow-hidden group`}>
+          <div className={`${content.hero.showInfoSection === false ? 'lg:col-span-3' : 'lg:col-span-2'} relative rounded-[2.5rem] overflow-hidden group shadow-2xl shadow-blue-100`}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentBanner}
@@ -291,16 +307,42 @@ export default function Home() {
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">PLATFORMAMIZ IMKONIYATLARI</h2>
           <p className="mt-3 text-gray-500 font-medium text-sm max-w-lg mx-auto">Tizim platformamiz eng so'nggi ta'lim yechimlari bilan boyitilgan imkoniyatlarni taqdim etadi.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((f, i) => (
-            <div key={i} className="p-8 mac-window bg-white hover:-translate-y-1 transition-transform">
-              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-6">
-                <f.icon className="h-6 w-6 text-[#007aff]" />
+            <div key={i} className="p-8 rounded-[2rem] bg-white border border-gray-100 hover:shadow-2xl hover:shadow-blue-100 hover:-translate-y-2 transition-all duration-500 group">
+              <div className={`w-14 h-14 ${f.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
+                <f.icon className={`h-7 w-7 ${f.iconColor}`} />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">{f.title}</h3>
-              <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">{f.title}</h3>
+              <p className="text-gray-500 text-sm leading-relaxed font-medium">{f.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* How it works Section */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full py-16">
+        <div className="mac-window bg-white overflow-hidden p-12 relative">
+          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+             <BrainCircuit className="h-64 w-64" />
+          </div>
+          <div className="relative z-10">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 mb-12">LOYIHA QANDAY ISHLAYDI?</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              {[
+                { step: "01", title: "Ro'yxatdan o'tish", desc: "Tizimda o'z profilingizni yarating va kerakli guruhga a'zo bo'ling." },
+                { step: "02", title: "Kursni tanlash", desc: "Sizga yoqqan yo'nalishdagi modulli kursni yoki testni tanlang." },
+                { step: "03", title: "Bilim olish", desc: "Interaktiv darslar va AI-testlar yordamida bilimingizni oshiring." },
+                { step: "04", title: "Natijani olish", desc: "Sinovlardan o'ting va QR-kodli rasmiy sertifikatga ega bo'ling." }
+              ].map((s, i) => (
+                <div key={i} className="flex flex-col gap-4">
+                  <span className="text-5xl font-black text-gray-100 group-hover:text-blue-50 transition-colors">{s.step}</span>
+                  <h4 className="text-lg font-bold text-gray-900">{s.title}</h4>
+                  <p className="text-gray-500 text-sm font-medium leading-relaxed">{s.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

@@ -1,8 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-
-const MODEL_NAME = "gemini-3.5-flash";
+const MODEL_NAME = "gemini-2.5-flash-lite";
 
 export type ServiceType = 'course_work' | 'independent_work' | 'presentation' | 'test_builder' | 'article';
 
@@ -17,26 +13,29 @@ async function fetchWithRetry(prompt: string, retries = 3): Promise<string> {
   let lastError: any;
 
   for (let i = 0; i < retries; i++) {
+    let response: Response | undefined;
     try {
-      const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: prompt,
+      response = await fetch('/api/raw-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, model: MODEL_NAME })
       });
 
-      const text = response.text;
-
-      if (!text) {
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Bo'sh javob qaytdi yoki barcha kalitlar limiti tugagan.");
+      }
+      if (!data.text) {
         throw new Error("Bo'sh javob qaytdi.");
       }
-      return text;
+      return data.text;
     } catch (error: any) {
       lastError = error;
       
-      // Look for code: 500 in various places
-      const errorCode = error?.code || error?.error?.code || error?.status || error?.error?.status;
-      const errorMessage = (error?.message || error?.error?.message || '').toLowerCase();
+      const errorMessage = (error?.message || '').toLowerCase();
       
-      const isRetryable = errorCode === 500 || 
+      const isRetryable = response?.status === 500 || 
                          errorMessage.includes('xhr error') ||
                          errorMessage.includes('fetch failed') ||
                          errorMessage.includes('network error') ||

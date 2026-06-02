@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, onSnapshot, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Enrollment, Course } from '../../types';
 import { Trophy, Clock, BookOpen, ChevronRight, GraduationCap } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -17,7 +18,7 @@ export default function StudentGrades() {
     const q = query(collection(db, 'enrollments'), where('userId', '==', user.uid));
     
     // Subscribe to enrollments
-    const unsubE = onSnapshot(q, async (snapshot) => {
+    const unsubE = safeOnSnapshot(q, async (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Enrollment));
       
       const enriched = await Promise.all(data.map(async (en) => {
@@ -35,7 +36,7 @@ export default function StudentGrades() {
 
     // Fetch test results
     const qT = query(collection(db, 'testResults'), where('userId', '==', user.uid));
-    const unsubT = onSnapshot(qT, (snapshot) => {
+    const unsubT = safeOnSnapshot(qT, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       // Sort desc by time
       data.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));

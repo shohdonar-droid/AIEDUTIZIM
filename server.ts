@@ -18,6 +18,33 @@ async function startServer() {
   app.use(express.json());
 
   app.get("/api/health", (req, res) => {
+    // Log for debugging
+    const keys = Object.keys(process.env).filter(k => k.includes("GEMINI") || k.includes("API"));
+    res.json({ status: "ok", keysFound: keys, poolSize: getGeminiKeysPool().length });
+  });
+
+  // Payment integration placeholder (Click/Payme)
+  app.post("/api/payment/prepare", async (req, res) => {
+    const { amount, userId, provider } = req.body;
+    // This is where you would call Click/Payme API to get a payment link or prepare a transaction
+    console.log(`Preparing ${provider} payment for user ${userId}: ${amount} UZS`);
+    
+    // For now, return a mock success response
+    res.json({
+      status: "success",
+      paymentUrl: `https://aiedutizim.vercel.app/profile`,
+      message: "To'lov tayyorlandi. Iltimos, profil sahifasida to'lovni yakunlang."
+    });
+  });
+
+  app.post("/api/payment/callback/:provider", async (req, res) => {
+    const { provider } = req.params;
+    const body = req.body;
+    console.log(`Received ${provider} payment callback:`, body);
+    
+    // Verify signature, check transaction status, and update user balance in Firestore
+    // This endpoint should be accessible by Click/Payme servers
+    
     res.json({ status: "ok" });
   });
 
@@ -30,7 +57,7 @@ async function startServer() {
         return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda sozlanmagan)." });
       }
 
-      const MODEL_NAME = "gemini-3.5-flash";
+      const MODEL_NAME = "gemini-2.5-flash-lite";
 
       if (action === "generateDynamicTest") {
         const prompt = context 
@@ -130,6 +157,16 @@ async function startServer() {
      Ushbu mavzu bo'yicha ilmiy "Maqola" (Article) tayyorlang. O'zbek tilida bo'lishi shart.
      Belgalangan jurnal turi uchun barcha standard talablarga (IMRAD va h.k.) javob bersin.
      Javob faqat JSON formatida bo'lsin.`;
+        } else if (docType === 'tezis') {
+          prompt = `Mavzu: "${topic}". 
+     Ushbu mavzu bo'yicha ilmiy "Tezis" (Thesis/Abstract) tayyorlang. O'zbek tilida bo'lishi shart.
+     Tezis qisqa, lo'nda va ilmiy bo'lsin (Imlo qoidalari, maqsad, uslublar, natijalar va xulosa).
+     Javob faqat JSON formatida bo'lsin.`;
+        } else if (docType === 'tarjimon') {
+          prompt = `Matn: "${topic}". 
+     Ushbu matnni o'zbek tiliga (agar boshqa tilda bo'lsa) yoki o'zbek tilidan ingliz/rus tillariga (agar o'zbekchada bo'lsa) tarjima qiling. 
+     Professional tarjima bo'lsin.
+     Javob faqat JSON formatida bo'lsin.`;
         }
 
         const response = await generateContentWithRotation({
@@ -197,9 +234,29 @@ async function startServer() {
     }
   });
 
+  app.post("/api/raw-gemini", async (req, res) => {
+    try {
+      const { prompt, model } = req.body;
+      const keysPool = getGeminiKeysPool();
+      if (keysPool.length === 0) {
+        return res.status(500).json({ error: "Gemini API kalitlari topilmadi." });
+      }
+
+      const response = await generateContentWithRotation({
+        model: model || "gemini-2.5-flash-lite",
+        contents: prompt
+      });
+
+      return res.json({ text: response.text });
+    } catch (error: any) {
+      console.error("[Backend Raw Gemini API Error]:", error);
+      return res.status(500).json({ error: error.message || "Barcha kalitlar limiti tugagan bo'lishi mumkin" });
+    }
+  });
+
   app.post("/api/chat", async (req, res) => {
     try {
-      const { prompt, history, userName, isAdminMode, systemContext, functionResponses, lastFunctionCall } = req.body;
+      const { prompt, history, userName, isAdminMode, systemContext, functionResponses, lastFunctionCall, lastModelParts } = req.body;
       
       const keysPool = getGeminiKeysPool();
       if (keysPool.length === 0) {
@@ -211,7 +268,7 @@ async function startServer() {
       if (isAdminMode) {
          systemInstruction = `Siz tizim administratorining bosh yordamchisisiz. Administrator ismi: ${userName}. 
 Sizda tizimdagi ma'lumotlarni o'qish va ma'lum amallarni bajarish (masalan, foydalanuvchilar sonini bilish, ularning ro'yxatini olish, tug'ilgan kuni bo'lganlarni ko'rish, testlarni faollashtirish, quizlar yaratish) uchun maxsus funksiyalar (tools) mavjud.
-Agar admin tizim haqida so'rasa, albatta ushbu funksiyalarni chaqiring yoki taqdim etilgan joriy tizim ma'lumotlaridan foydalaning. Funksiya natijasini olgach, o'zbek tilida chiroyli va aniq qilib adminga hisobot bering. Agar funksiya chaqiruvi so'ralsa, uni bajaring.`;
+Agar admin tizim yoki boshqa har qanday mavzudagi savol bilan yuzlansa, albatta ushbu savollarga AI orqali eng to'g'ri, to'liq va aniq javoblarni taqdim eting. Bundan tashqari tizim ma'lumotlarini taqdim etishda kerakli funksiyalardan va kontekst ma'lumotlaridan foydalaning. Muloqotda erkin va har xil sohalarda savollarga javob bera olasiz.`;
       } else {
          systemInstruction += `\nSiz platformaning aqlli virtual yordamchisisiz. Siz ham AIEDUTIZIM platformasi imkoniyatlari, kurslari va darslari haqidagi savollarga javob bera olasiz, ham foydalanuvchi qiziqqan istalgan boshqa mavzudagi (matematika, dasturlash, fizika, tarix, til o'rganish, umumiy savollar va h.k.) har qanday savollarga juda aqlli va foydali javob qaytara olasiz.
 
@@ -254,7 +311,9 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
           reqContents.push({ role: "user", parts: [{ text: prompt.trim() }] });
       }
 
-      if (lastFunctionCall) {
+      if (lastModelParts && Array.isArray(lastModelParts)) {
+          reqContents.push({ role: "model", parts: lastModelParts });
+      } else if (lastFunctionCall) {
           reqContents.push({ role: "model", parts: [{ functionCall: lastFunctionCall }] });
       }
 
@@ -371,7 +430,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-3.5-flash",
+               model: "gemini-2.5-flash-lite",
                contents: contents,
                config: {
                  systemInstruction,
@@ -390,7 +449,8 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
           const call = response.functionCalls[0];
           return res.json({ 
               isFunctionCall: true,
-              functionCall: { name: call.name, args: call.args }
+              functionCall: { name: call.name, args: call.args },
+              modelParts: response.candidates?.[0]?.content?.parts || [{ functionCall: { name: call.name, args: call.args } }]
           });
       }
 

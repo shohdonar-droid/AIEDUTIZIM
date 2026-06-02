@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { auth, db } from '../../lib/firebase';
-import { collection, query, onSnapshot, where, or, and } from 'firebase/firestore';
+import { collection, query, where, or, and } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import AdminOverview from './AdminOverview';
 import AdminBanner from './AdminBanner';
@@ -71,12 +72,12 @@ export default function AdminDashboard() {
       where('receiverRole', '==', 'admin')
     );
 
-    const unsub1 = onSnapshot(q1, (snap) => {
+    const unsub1 = safeOnSnapshot(q1, (snap) => {
       count1 = snap.docs.length;
       setUnreadCount(count1 + count2);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'messages (unread count 1)'));
 
-    const unsub2 = onSnapshot(q2, (snap) => {
+    const unsub2 = safeOnSnapshot(q2, (snap) => {
       count2 = snap.docs.length;
       setUnreadCount(count1 + count2);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'messages (unread count 2)'));

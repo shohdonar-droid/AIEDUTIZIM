@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, onSnapshot, query, deleteDoc, doc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { collection, addDoc, query, deleteDoc, doc, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Department, Group } from '../../types';
 import { Plus, Trash2, Layers, Users } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -18,14 +19,14 @@ export default function TeacherDepartments() {
     if (!user) return;
     
     // Only fetch departments created by this teacher
-    const unsubDept = onSnapshot(query(collection(db, 'departments'), where('creatorId', '==', user.uid)), (snap) => {
+    const unsubDept = safeOnSnapshot(query(collection(db, 'departments'), where('creatorId', '==', user.uid)), (snap) => {
       const d = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
       d.sort((a, b) => a.name.localeCompare(b.name, 'uz-UZ'));
       setDepartments(d);
     }, (err) => console.error(err));
 
     // Only fetch groups created by this teacher
-    const unsubGroup = onSnapshot(query(collection(db, 'groups'), where('creatorId', '==', user.uid)), (snap) => {
+    const unsubGroup = safeOnSnapshot(query(collection(db, 'groups'), where('creatorId', '==', user.uid)), (snap) => {
       const g = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group));
       g.sort((a, b) => a.name.localeCompare(b.name, 'uz-UZ'));
       setGroups(g);

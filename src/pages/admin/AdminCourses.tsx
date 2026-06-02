@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Course, Module, Department, Group, UserProfile } from '../../types';
 import { MultiSelectDropdown } from '../../components/MultiSelectDropdown';
 import { Plus, Edit, Trash2, Loader2, Book, Layout, Save, X, Database, PlayCircle } from 'lucide-react';
@@ -22,21 +23,21 @@ export default function AdminCourses() {
   const [activeTab, setActiveTab] = useState<TabType>('base');
 
   useEffect(() => {
-    const unsubCourses = onSnapshot(collection(db, 'courses'), (snap) => {
+    const unsubCourses = safeOnSnapshot(collection(db, 'courses'), (snap) => {
       setCourses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course)));
       setLoading(false);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'courses'));
     
     // Fetch all depts, groups and teachers (organizations)
-    const unsubDepts = onSnapshot(collection(db, 'departments'), (snap) => {
+    const unsubDepts = safeOnSnapshot(collection(db, 'departments'), (snap) => {
       setDepartments(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'departments'));
 
-    const unsubGroups = onSnapshot(collection(db, 'groups'), (snap) => {
+    const unsubGroups = safeOnSnapshot(collection(db, 'groups'), (snap) => {
       setGroups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'groups'));
 
-    const unsubTeachers = onSnapshot(query(collection(db, 'users'), where('role', '==', 'teacher')), (snap) => {
+    const unsubTeachers = safeOnSnapshot(query(collection(db, 'users'), where('role', '==', 'teacher')), (snap) => {
       const teachers = snap.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
       setTeachers(teachers);
       setTeachersList(teachers);

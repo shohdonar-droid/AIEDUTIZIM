@@ -17,7 +17,8 @@ import SubjectRead from '../SubjectRead';
 import TeacherQuizizz from './TeacherQuizizz';
 
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, getDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 
 export default function TeacherDashboard() {
@@ -48,7 +49,7 @@ export default function TeacherDashboard() {
       where('receiverId', '==', user.uid),
       where('isRead', '==', false)
     );
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = safeOnSnapshot(q, (snap) => {
       setUnreadCount(snap.docs.length);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'messages (unread count)'));
     return unsub;

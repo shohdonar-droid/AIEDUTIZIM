@@ -14,9 +14,35 @@ export default function Courses() {
 
   useEffect(() => {
     async function load() {
-      const snap = await getDocs(collection(db, 'courses'));
-      setCourses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course)));
-      setLoading(false);
+      // Load from cache or default
+      const cached = localStorage.getItem('cache_courses_list');
+      if (cached) {
+         setCourses(JSON.parse(cached));
+         setLoading(false);
+      }
+
+      try {
+        const snap = await getDocs(collection(db, 'courses'));
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
+        setCourses(data);
+        localStorage.setItem('cache_courses_list', JSON.stringify(data));
+      } catch (err: any) {
+        console.error('Courses fetch error:', err);
+        // If not in cache, fallback to defaults
+        if (!courses.length) {
+          const defaults = [
+            { id: '1', title: 'Python Asoslari', thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&q=80&w=400', description: 'Sun\'iy intellekt uchun asosiy tilni o\'rganing.', modules: [], createdAt: null },
+            { id: '2', title: 'Machine Learning', thumbnail: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?auto=format&fit=crop&q=80&w=400', description: 'Ma\'lumotlar tahlili va bashoratlash.', modules: [], createdAt: null },
+            { id: '3', title: 'Frontend Development', thumbnail: 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?auto=format&fit=crop&q=80&w=400', description: 'Zamonaviy web interfeyslar.', modules: [], createdAt: null },
+            { id: '4', title: 'Backend Development', thumbnail: 'https://images.unsplash.com/photo-1623479322729-28b25c16b011?auto=format&fit=crop&q=80&w=400', description: 'Node.js va ma\'lumotlar bazalari.', modules: [], createdAt: null },
+            { id: '5', title: 'Data Science', thumbnail: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=400', description: 'Katta hajmdagi ma\'lumotlarni ishlash.', modules: [], createdAt: null },
+            { id: '6', title: 'Mobile Development', thumbnail: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=400', description: 'Zamonaviy mobil ilovalar yaratish.', modules: [], createdAt: null }
+          ] as any;
+          setCourses(defaults);
+        }
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);

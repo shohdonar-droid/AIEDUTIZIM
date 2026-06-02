@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, setDoc, runTransaction } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download, BarChart2, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { generateDynamicTest } from '../../services/geminiService';
@@ -38,7 +39,7 @@ export default function AdminQuizizz() {
     if (!user) return;
     const orgId = user.role === 'staff' ? user.teacherId || user.uid : user.uid;
     
-    const unsub = onSnapshot(collection(db, 'quiz_history'), async (snap) => {
+    const unsub = safeOnSnapshot(collection(db, 'quiz_history'), async (snap) => {
        try {
            const uSnap = await getDocs(collection(db, 'users'));
            const usersMap: any = {};
@@ -176,7 +177,7 @@ export default function AdminQuizizz() {
   // Monitor Active Session
   useEffect(() => {
      if (!activeSession) return;
-     const unsubSession = onSnapshot(doc(db, 'quiz_sessions', activeSession.id), (snap) => {
+     const unsubSession = safeOnSnapshot(doc(db, 'quiz_sessions', activeSession.id), (snap) => {
         console.log("Session snapshot fired! exists:", snap.exists(), "data:", snap.data(), "hasPendingWrites:", snap.metadata.hasPendingWrites);
         if (snap.exists()) {
            setActiveSession(prev => ({ ...prev, id: snap.id, ...snap.data() }));
@@ -185,7 +186,7 @@ export default function AdminQuizizz() {
         console.error("Session snapshot error:", err);
      });
      
-     const unsubParticipants = onSnapshot(query(collection(db, 'quiz_participants'), where('sessionId', '==', activeSession.id)), (snap) => {
+     const unsubParticipants = safeOnSnapshot(query(collection(db, 'quiz_participants'), where('sessionId', '==', activeSession.id)), (snap) => {
         const p = snap.docs.map(d => ({ pId: d.id, ...d.data() }));
         setParticipants(p);
      }, (err) => {

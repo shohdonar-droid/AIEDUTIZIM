@@ -214,8 +214,12 @@ export async function fetchTelegramUsersCount() {
         fs.writeFileSync(tgUsersListPath, JSON.stringify(list), "utf8");
       } catch (err) {}
       console.log("[Telegram] Initialized telegramUsersCount from DB and cache:", telegramUsersCount);
-    } catch (e) {
-      console.error("[Telegram] Failed to fetch initial telegram users count from Firestore, using local count:", telegramUsersCount);
+    } catch (e: any) {
+      if (e?.message?.includes("Quota")) {
+         console.log("[Telegram] Quota exceeded fetching tg users. Using local count.", telegramUsersCount);
+      } else {
+         console.log("[Telegram] Failed to fetch initial telegram users count from Firestore, using local count:", telegramUsersCount);
+      }
     }
   }
 }
@@ -265,7 +269,17 @@ async function registerTelegramId(
 
 const pendingLogins = new Map<
   number,
-  { step: string; email?: string; targetUserId?: string; targetMenu?: string }
+  { 
+    step: string; 
+    email?: string; 
+    targetUserId?: string; 
+    targetMenu?: string;
+    buttonName?: string;
+    oldName?: string;
+    targetButton?: string;
+    password?: string;
+    targetPaymentUserId?: number;
+  }
 >();
 
 class PersistentMap<K, V> extends Map<K, V> {
@@ -337,9 +351,22 @@ const aiAssistantActiveUsers = new PersistentMap<number, boolean>(
   path.join(process.cwd(), "telegram_ai_active.json")
 );
 
+const aiServiceStates = new Map<number, string>(); // Temporary state for multi-step AI tasks
+
 const customMenuTexts = new PersistentMap<string, string>(
   path.join(process.cwd(), "telegram_custom_menus.json")
 );
+
+const AI_COSTS: Record<string, number> = {
+  "📊 Slayd yaratish": 5,
+  "📄 Kurs ishi yaratish": 10,
+  "🎓 Tezis yaratish": 7,
+  "📑 Maqola yaratish": 5,
+  "📝 Dars ishlanma yaratish": 5,
+  "🌐 Tarjimon": 2,
+  "📋 Test yaratish": 3,
+  "💬 Savol-javob": 1
+};
 
 const requestHistory = new Map<number, number[]>();
 
@@ -389,10 +416,42 @@ async function getKeyboard(
   let userRole = role;
   if (userId) {
     const user = await getAuthedUser(userId);
+    const adminIds = getAdminIds();
     if (user) {
       authed = true;
       userRole = user.role || role;
+    } else if (adminIds.includes(userId)) {
+      authed = true;
+      userRole = "admin";
     }
+  }
+
+  // Check for dynamic menu in Firestore
+  try {
+    const menuDoc = await getDoc(doc(db, "botConfig", "mainMenu"));
+    if (menuDoc.exists()) {
+      const data = menuDoc.data();
+      if (data.keyboard) {
+        let kb = [...data.keyboard];
+        
+        // Filter out user-specific buttons for admins
+        if (authed && (userRole === "admin" || userRole === "subadmin")) {
+          const excludeForAdmin = ["💰 Balans", "💳 Balansni to'ldirish", "🎁 Bepul olish", "💬 Adminga murojaat", "👥 Do'stlarni taklif qilish"];
+          kb = kb.map(row => row.filter((btn: any) => !excludeForAdmin.includes(btn.text))).filter(row => row.length > 0);
+
+          const adminHeader = [
+            [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
+            [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
+            [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }],
+            [{ text: "ℹ️ Tizim haqida" }]
+          ];
+          return [...adminHeader, ...kb];
+        }
+        return kb;
+      }
+    }
+  } catch (e) {
+    console.error("Dynamic menu load error:", e);
   }
 
   const rows: any[][] = [];
@@ -402,6 +461,10 @@ async function getKeyboard(
       rows.push([{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }]);
       rows.push([{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }]);
       rows.push([{ text: "🤖 AI yordamchi" }]);
+      rows.push([{ text: "ℹ️ Tizim haqida" }, { text: "💰 Balans" }]);
+      rows.push([{ text: "💳 Balansni to'ldirish" }, { text: "🎁 Bepul olish" }]);
+      rows.push([{ text: "👥 Do'stlarni taklif qilish" }, { text: "💬 Adminga murojaat" }]);
+      rows.push([{ text: "🌐 Rasmiy sayt" }]);
       return rows;
     }
     rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
@@ -409,12 +472,50 @@ async function getKeyboard(
     rows.push([{ text: "🔑 Kirish" }]);
   }
 
-  rows.push([{ text: "🤖 AIEDUTIZIM haqida" }, { text: "📚 Kurslar" }]);
-  rows.push([{ text: "🎮 Quizizz testlar" }, { text: "🏆 Sertifikatlar" }]);
-  rows.push([{ text: "💬 Adminga murojaat" }, { text: "❓ Yordam" }]);
+  rows.push([{ text: "🤖 AI yordamchi" }]);
+  rows.push([{ text: "ℹ️ Tizim haqida" }, { text: "💰 Balans" }]);
+  rows.push([{ text: "💳 Balansni to'ldirish" }, { text: "🎁 Bepul olish" }]);
+  rows.push([{ text: "👥 Do'stlarni taklif qilish" }, { text: "💬 Adminga murojaat" }]);
   rows.push([{ text: "🌐 Rasmiy sayt" }]);
 
   return rows;
+}
+
+async function getAiAssistantKeyboard(userId?: number) {
+  return [
+    [{ text: "📊 Slayd yaratish" }, { text: "📄 Kurs ishi yaratish" }],
+    [{ text: "🎓 Tezis yaratish" }, { text: "📑 Maqola yaratish" }],
+    [{ text: "📝 Dars ishlanma yaratish" }, { text: "🌐 Tarjimon" }],
+    [{ text: "📋 Test yaratish" }, { text: "💬 Savol-javob" }],
+    [{ text: "🔙 Asosiy Menyu" }]
+  ];
+}
+
+async function checkAndDeductBalance(userId: number, cost: number): Promise<boolean> {
+  const authed = await getAuthedUser(userId);
+  if (!authed) return false;
+  if (authed.role === 'admin' || authed.role === 'subadmin') return true; 
+
+  try {
+    const userDocRef = doc(db, "users", authed.docId || authed.uid);
+    const userSnap = await getDoc(userDocRef);
+    if (!userSnap.exists()) return false;
+    
+    const userData = userSnap.data();
+    const currentBall = userData.ball || 0;
+    const spentBalls = userData.spentBalls || 0;
+    const available = currentBall - spentBalls;
+    
+    if (available < cost) return false;
+    
+    await updateDoc(userDocRef, {
+      spentBalls: spentBalls + cost
+    });
+    return true;
+  } catch (e) {
+    console.error("Balance check error:", e);
+    return false;
+  }
 }
 
 async function getAuthedUser(userId: number) {
@@ -491,10 +592,43 @@ async function getAuthedUser(userId: number) {
 
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
+  const startPayload = ctx.startPayload; // Deep link payload (e.g. ref_12345)
 
   // Clear any pending actions to "reload" bot state cleanly
   pendingLogins.delete(userId);
-  // Do not delete authedUsers so they remain logged in on /start as requested!
+  aiAssistantActiveUsers.delete(userId);
+  aiServiceStates.delete(userId);
+
+  // Automatic Telegram Profile Creation in 'users' collection
+  if (db) {
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("telegramId", "==", userId));
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        // Create new user if not exists
+        await addDoc(usersRef, {
+          telegramId: userId,
+          uid: `tg_${userId}`,
+          displayName: `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim(),
+          name: ctx.from.first_name || "Foydalanuvchi",
+          username: ctx.from.username || "",
+          role: "student",
+          ball: 0,
+          balance: 0,
+          spentBalls: 0,
+          referralCount: 0,
+          referrals: 0,
+          createdAt: serverTimestamp(),
+          isTelegramUser: true
+        });
+        console.log(`[Telegram] Auto-created user profile for ${userId}`);
+      }
+    } catch (e) {
+      console.error("Auto-registration error:", e);
+    }
+  }
 
   // Local cache file register for offline-first backup and real-time updates
   let isNewUser = false;
@@ -512,6 +646,51 @@ bot.start(async (ctx) => {
     try {
       fs.writeFileSync(tgUsersListPath, JSON.stringify(userList), "utf8");
     } catch (err) {}
+
+    // Referral system handling
+    if (startPayload && startPayload.startsWith("ref_")) {
+      const referrerId = startPayload.replace("ref_", "");
+      if (referrerId !== String(userId)) {
+        try {
+          const referrerDocRef = doc(db, "telegram_users", referrerId);
+          const referrerSnap = await getDoc(referrerDocRef);
+          if (referrerSnap.exists()) {
+            const referrerData = referrerSnap.data();
+            const currentRefs = (referrerData.referrals || []).concat(userId);
+            
+            // Increment referral list in bot-specific collection
+            await updateDoc(referrerDocRef, {
+              referrals: currentRefs,
+              referralCount: currentRefs.length
+            });
+
+            // Update main users collection for balance/stats
+            const usersRef = collection(db, "users");
+            const rq = query(usersRef, where("telegramId", "==", Number(referrerId)));
+            const rSnap = await getDocs(rq);
+            if (!rSnap.empty) {
+              const rDoc = rSnap.docs[0];
+              const rData = rDoc.data();
+              const newRefCount = (rData.referralCount || 0) + 1;
+              const updates: any = { 
+                referralCount: newRefCount,
+                referrals: (rData.referrals || 0) + 1 
+              };
+              
+              // Every 5th referral bonus (3000 ball)
+              if (newRefCount % 5 === 0) {
+                updates.ball = (rData.ball || 0) + 3000;
+                updates.balance = (rData.balance || 0) + 3000;
+                await bot.telegram.sendMessage(Number(referrerId), `🎁 <b>Tabriklaymiz!</b> Siz 5 ta do'stingizni taklif qildingiz va balansingizga <b>3000 ball</b> qo'shildi!`, { parse_mode: "HTML" }).catch(() => {});
+              }
+              await updateDoc(doc(db, "users", rDoc.id), updates);
+            }
+          }
+        } catch (e) {
+          console.error("Referral process error:", e);
+        }
+      }
+    }
   }
 
   telegramUsersCount = userList.length;
@@ -529,13 +708,6 @@ bot.start(async (ctx) => {
   if (db) {
     try {
       const docRef = doc(db, "telegram_users", String(userId));
-      const snap = await getDoc(docRef).catch(() => null);
-      if (!snap || !snap.exists()) {
-        await addDoc(collection(db, "admin_notifications"), {
-          text: `Yangi xabar: Botimizga yangi a'zo qo'shildi!\n👤 Ism: ${ctx.from.first_name || ""} ${ctx.from.last_name || ""}\n🔗 Username: @${ctx.from.username || "yoq"}\n🆔 ID: ${userId}`,
-          timestamp: serverTimestamp(),
-        }).catch(() => {});
-      }
       await setDoc(
         docRef,
         {
@@ -555,9 +727,6 @@ bot.start(async (ctx) => {
   const authed = await getAuthedUser(userId);
   const role = authed ? authed.role : "student";
 
-  // Deactivate AI assistant mode when launching start command
-  aiAssistantActiveUsers.delete(userId);
-
   const greeting =
     `🤖 <b>Assalomu alaykum! AIEDUTIZIM Telegram botiga xush kelibsiz.</b>\n\n` +
     `🎓 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Ta'lim Tizimi bo‘lib, talabalar, o‘qituvchilar va tashkilotlar uchun mo‘ljallangan zamonaviy raqamli ta'lim platformasidir.\n\n` +
@@ -572,8 +741,55 @@ bot.start(async (ctx) => {
   });
 });
 
+
 bot.command("unanswered", async (ctx) => {
   await handleUnansweredRequest(ctx);
+});
+
+bot.command("addbalance", async (ctx) => {
+  const userId = ctx.from.id;
+  const authed = await getAuthedUser(userId);
+  if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+    return ctx.reply("Sizda bu huquq yo'q.");
+  }
+
+  const args = ctx.message.text.split(" ");
+  if (args.length < 3) {
+    return ctx.reply("Format: /addbalance <telegramId> <amount>");
+  }
+
+  const targetTgId = Number(args[1]);
+  const amount = Number(args[2]);
+
+  if (isNaN(targetTgId) || isNaN(amount)) {
+    return ctx.reply("Iltimos, to'g'ri ID va miqdorni kiriting.");
+  }
+
+  try {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("telegramId", "==", targetTgId));
+    const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        const userDoc = snap.docs[0];
+        const userData = userDoc.data();
+        const currentBall = userData.ball || 0;
+        const currentBalance = userData.balance || 0;
+        await updateDoc(doc(db, "users", userDoc.id), {
+          ball: currentBall + amount,
+          balance: currentBalance + amount,
+          updatedAt: serverTimestamp()
+        });
+
+        await ctx.reply(`✅ Foydalanuvchi (ID: ${targetTgId}) balansiga ${amount} ball qo'shildi.`);
+        await bot.telegram.sendMessage(targetTgId, `💰 <b>Sizning balansingizga ${amount} ball qo'shildi!</b>`, { parse_mode: "HTML" }).catch(() => {});
+      } else {
+      return ctx.reply("❌ Bunday ID ga ega foydalanuvchi topilmadi.");
+    }
+  } catch (e) {
+    console.error("Add balance error:", e);
+    return ctx.reply("❌ Xatolik yuz berdi.");
+  }
 });
 
 bot.command("javobsiz", async (ctx) => {
@@ -697,6 +913,31 @@ bot.command("login", (ctx) => {
   ctx.reply("Profilga kirish uchun loginingizni yoki emailingizni kiriting:");
 });
 
+bot.command("tizimhaqida", async (ctx) => {
+  const userId = ctx.from.id;
+  const authed = await getAuthedUser(userId);
+  if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+    return ctx.reply("❌ Bu buyruq faqat adminlar uchun.");
+  }
+
+  const text = ctx.message.text.replace("/tizimhaqida", "").trim();
+  if (!text) {
+    return ctx.reply("✍️ Tizim haqida matnni yangilash uchun: \n`/tizimhaqida MATN` ko'rinishida yuboring.", { parse_mode: "Markdown" });
+  }
+
+  try {
+    await setDoc(doc(db, "siteContent", "system_about"), { 
+      content: text,
+      updatedAt: serverTimestamp(),
+      updatedBy: authed.displayName || userId
+    }, { merge: true });
+    return ctx.reply("✅ Tizim haqida matni muvaffaqiyatli yangilandi!");
+  } catch (e) {
+    console.error("Update systemInfo error:", e);
+    return ctx.reply("❌ Matnni saqlashda xatolik yuz berdi.");
+  }
+});
+
 bot.command("app", (ctx) => {
   ctx.reply(
     `AI Edu platformasini Telegram ichidan chiqmasdan to'liq ishlatish uchun quyidagi tugmani bosing va Miniapp-ga kiring:`,
@@ -715,52 +956,135 @@ bot.command("app", (ctx) => {
   );
 });
 
-bot.action("edit_menu_haqida", async (ctx) => {
+bot.action("admin_edit_menu_main", async (ctx) => {
   const userId = ctx.from.id;
-  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "🤖 AIEDUTIZIM haqida" });
-  await ctx.reply("✏️ \"🤖 AIEDUTIZIM haqida\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  const menuDoc = await getDoc(doc(db, "botConfig", "mainMenu"));
+  let kb = [];
+  if (menuDoc.exists()) kb = menuDoc.data().keyboard || [];
+  
+  let msg = "📝 <b>Joriy asosiy menyu:</b>\n\n";
+  if (kb.length === 0) msg += "<i>Standart menyu ishlatilmoqda.</i>";
+  else {
+    kb.forEach((row: any[], i: number) => {
+      msg += `${i+1}-qator: ${row.map(b => `[${b.text}]`).join(" ")}\n`;
+    });
+  }
+  
+  await ctx.reply(msg, { parse_mode: "HTML" });
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
-bot.action("edit_menu_kurslar", async (ctx) => {
-  const userId = ctx.from.id;
-  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "📚 Kurslar" });
-  await ctx.reply("✏️ \"📚 Kurslar\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+bot.action("admin_add_button", async (ctx) => {
+  pendingLogins.set(ctx.from.id, { step: "admin_add_button_name" });
+  await ctx.reply("➕ Yangi tugma nomini kiriting:");
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
-bot.action("edit_menu_quiz_test", async (ctx) => {
-  const userId = ctx.from.id;
-  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "🎮 Quizizz testlar" });
-  await ctx.reply("✏️ \"🎮 Quizizz testlar\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+bot.action("admin_delete_button", async (ctx) => {
+  const menuDoc = await getDoc(doc(db, "botConfig", "mainMenu"));
+  let kb = [];
+  if (menuDoc.exists()) kb = menuDoc.data().keyboard || [];
+  
+  if (kb.length === 0) return ctx.reply("O'chirish uchun tugmalar topilmadi (standart menyu ishlatilmoqda).");
+  
+  const buttons: any[] = [];
+  kb.forEach((row: any[], rIdx: number) => {
+    row.forEach((btn: any, bIdx: number) => {
+      buttons.push([{ text: `❌ ${btn.text}`, callback_data: `admin_delbtn_${rIdx}_${bIdx}` }]);
+    });
+  });
+  
+  await ctx.reply("O'chirmoqchi bo'lgan tugmani tanlang:", {
+    reply_markup: { inline_keyboard: buttons }
+  });
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
-bot.action("edit_menu_sertifikat", async (ctx) => {
-  const userId = ctx.from.id;
-  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "🏆 Sertifikatlar" });
-  await ctx.reply("✏️ \"🏆 Sertifikatlar\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+bot.action(/admin_delbtn_(\d+)_(\d+)/, async (ctx) => {
+  const rIdx = parseInt(ctx.match[1]);
+  const bIdx = parseInt(ctx.match[2]);
+  
+  const menuDoc = await getDoc(doc(db, "botConfig", "mainMenu"));
+  if (menuDoc.exists()) {
+    let kb = menuDoc.data().keyboard || [];
+    if (kb[rIdx]) {
+      const deleted = kb[rIdx].splice(bIdx, 1);
+      if (kb[rIdx].length === 0) kb.splice(rIdx, 1);
+      await setDoc(doc(db, "botConfig", "mainMenu"), { keyboard: kb }, { merge: true });
+      await ctx.reply(`✅ "${deleted[0].text}" tugmasi o'chirildi.`);
+    }
+  }
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
-bot.action("edit_menu_murojaat", async (ctx) => {
-  const userId = ctx.from.id;
-  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "💬 Adminga murojaat" });
-  await ctx.reply("✏️ \"💬 Adminga murojaat\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+bot.action("admin_rename_button", async (ctx) => {
+  pendingLogins.set(ctx.from.id, { step: "admin_rename_button_select" });
+  await ctx.reply("✏️ Nomini o'zgartirmoqchi bo'lgan tugmaning AMALDAGI nomini kiriting:");
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
-bot.action("edit_menu_yordam", async (ctx) => {
-  const userId = ctx.from.id;
-  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "❓ Yordam" });
-  await ctx.reply("✏️ \"❓ Yordam\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+bot.action("admin_edit_msg_text", async (ctx) => {
+  pendingLogins.set(ctx.from.id, { step: "admin_edit_msg_select" });
+  await ctx.reply("📄 Qaysi tugma bosilganda chiqadigan matnni o'zgartirmoqchisiz? Tugma nomini kiriting:");
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
-bot.action("edit_menu_sayt", async (ctx) => {
+bot.action("admin_edit_system_about", async (ctx) => {
+  pendingLogins.set(ctx.from.id, { step: "admin_edit_system_about" });
+  await ctx.reply("ℹ️ 'Tizim haqida' bo'limi uchun yangi matnni yuboring:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action("admin_reorder_button", async (ctx) => {
+  pendingLogins.set(ctx.from.id, { step: "admin_reorder_button_select" });
+  await ctx.reply("🔢 Qaysi tugmaning tartibini o'zgartirmoqchisiz? Tugma nomini kiriting:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action(/admin_approve_pay_(\d+)/, async (ctx) => {
+  const targetId = parseInt(ctx.match[1]);
+  pendingLogins.set(ctx.from.id, { 
+    step: "admin_payment_amount", 
+    targetPaymentUserId: targetId 
+  });
+  
+  // Try to find user name for context
+  let uName = "Foydalanuvchi";
+  try {
+    const q = query(collection(db, "users"), where("telegramId", "==", targetId));
+    const s = await getDocs(q);
+    if (!s.empty) uName = s.docs[0].data().name || s.docs[0].data().displayName || uName;
+  } catch (e) {}
+
+  await ctx.reply(`👤 <b>${uName}</b> uchun qancha ball qo'shmoqchisiz? Faqat son kiriting:`, { parse_mode: "HTML" });
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action(/admin_reject_pay_(\d+)/, async (ctx) => {
+  const targetId = parseInt(ctx.match[1]);
   const userId = ctx.from.id;
-  pendingLogins.set(userId, { step: "edit_menu_content", targetMenu: "🌐 Rasmiy sayt" });
-  await ctx.reply("✏️ \"🌐 Rasmiy sayt\" menyusi uchun yangi matn yoki ma'lumotni yuboring:");
+  
+  await bot.telegram.sendMessage(targetId, `❌ <b>To'lov chekingiz rad etildi.</b> Iltimos, administrator bilan bog'laning.`, { parse_mode: "HTML" }).catch(() => {});
+  
+  // Update payment status in Firestore
+  try {
+    const pQuery = query(collection(db, "payments"), 
+      where("userId", "==", targetId), 
+      where("status", "==", "pending"),
+      orderBy("timestamp", "desc"),
+      limit(1)
+    );
+    const pSnap = await getDocs(pQuery);
+    if (!pSnap.empty) {
+      await updateDoc(doc(db, "payments", pSnap.docs[0].id), {
+        status: "rejected",
+        processedAt: serverTimestamp(),
+        processedBy: userId
+      });
+    }
+  } catch (e) {}
+
+  await ctx.reply("❌ To'lov rad etildi va foydalanuvchiga xabar yuborildi.");
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
@@ -920,8 +1244,12 @@ async function getSystemContextInfo(): Promise<string> {
           tgUsersCount
         }, null, 2), "utf8");
       } catch (err) {}
-    } catch (e) {
-      console.error("[ContextStats] Error reading statistics for context:", e);
+    } catch (e: any) {
+      if (e?.message?.includes("Quota limit exceeded")) {
+         console.log("[ContextStats] Firebase Quota limit exceeded for stats.");
+      } else {
+         console.log("[ContextStats] Error reading statistics for context:", e);
+      }
       // fallback from cache
       const statsCachePath = path.join(process.cwd(), "telegram_stats_cache.json");
       if (fs.existsSync(statsCachePath)) {
@@ -944,8 +1272,13 @@ async function getSystemContextInfo(): Promise<string> {
           return `- ${c.title} (${c.category || "Dasturlash"}): ${c.description || "Tavsif yo'q"}`;
         }).join("\n");
       }
-    } catch (e) {
-      console.error("[ContextCourses] Error reading courses for context:", e);
+    } catch (e: any) {
+      if (e?.message?.includes("Quota limit exceeded")) {
+        // Suppress quota noise in logs
+        console.log("[ContextCourses] Firebase Quota limit exceeded. Unable to read courses.");
+      } else {
+        console.log("[ContextCourses] Error reading courses for context:", e);
+      }
     }
   }
 
@@ -968,6 +1301,21 @@ bot.on("message", async (ctx) => {
   const chatType = ctx.chat?.type;
   const pending = pendingLogins.get(userId);
   const authed = await getAuthedUser(userId);
+  
+  function aiModeDeactivate() {
+    aiAssistantActiveUsers.delete(userId);
+    aiServiceStates.delete(userId);
+  }
+
+  let userText = "";
+  if ("text" in ctx.message) {
+    userText = ctx.message.text;
+  } else if ("caption" in ctx.message) {
+    userText = ctx.message.caption || "[Media yuborildi]";
+  } else {
+    userText = "[Media yuborildi]";
+  }
+  const normText = userText.trim();
 
   // Auto-register current user or group chat to update telegramUsersCount and support broadcasts to groups
   const targetRegisterId = chatId || userId;
@@ -980,13 +1328,73 @@ bot.on("message", async (ctx) => {
     );
   }
 
-  let userText = "";
-  if ("text" in ctx.message) {
-    userText = ctx.message.text;
-  } else if ("caption" in ctx.message) {
-    userText = ctx.message.caption || "[Media yuborildi]";
-  } else {
-    userText = "[Media yuborildi]";
+  // AI and Menu section exit check
+  const menuButtons = [
+    "🤖 AI yordamchi", "ℹ️ Tizim haqida", "💰 Balans", "💳 Balansni to'ldirish",
+    "🎁 Bepul olish", "👥 Do'stlarni taklif qilish", "💬 Adminga murojaat", "🌐 Rasmiy sayt",
+    "🔙 Asosiy Menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish"
+  ];
+  
+  if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu") {
+    if (normText !== "🤖 AI yordamchi" && !AI_COSTS[normText]) {
+      // If user clicks a menu that is not AI or sub-AI service, disable AI mode
+      aiAssistantActiveUsers.delete(userId);
+      aiServiceStates.delete(userId);
+    }
+  }
+
+  // Photo or Text (cheque) forwarding to admin
+  const isCheque = ("photo" in ctx.message) || 
+    (userText.length > 15 && (userText.includes("8600") || userText.includes("9860") || userText.includes("4444"))); // Heuristic for text cheque with common prefixes
+  
+  if (isCheque && !aiAssistantActiveUsers.get(userId) && !pending) {
+    const adminIds = getAdminIds();
+    if (adminIds.length > 0) {
+      const caption = `🧾 <b>Yangi to'lov cheki!</b>\n\n` +
+                      `👤 Ism: <b>${ctx.from.first_name || ""} ${ctx.from.last_name || ""}</b>\n` +
+                      `🆔 ID: <code>${userId}</code>\n` +
+                      `🔗 Username: @${ctx.from.username || "yo'q"}\n` +
+                      `💰 Status: <b>Tekshiruvda</b>`;
+      
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "➕ Ball qo'shish", callback_data: `admin_approve_pay_${userId}` },
+            { text: "❌ Rad etish", callback_data: `admin_reject_pay_${userId}` }
+          ]
+        ]
+      };
+
+      for (const aId of adminIds) {
+        if ("photo" in ctx.message) {
+          const photo = ctx.message.photo[ctx.message.photo.length - 1];
+          await bot.telegram.sendPhoto(aId, photo.file_id, { 
+            caption, 
+            parse_mode: "HTML",
+            reply_markup: keyboard
+          }).catch(() => {});
+        } else {
+          await bot.telegram.sendMessage(aId, caption + `\n\n📝 <b>Chek matni:</b>\n${userText}`, {
+            parse_mode: "HTML",
+            reply_markup: keyboard
+          }).catch(() => {});
+        }
+      }
+      
+      // Save payment intent to Firestore (optional but good for tracking)
+      try {
+        await addDoc(collection(db, "payments"), {
+          userId,
+          userName: `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim(),
+          status: "pending",
+          timestamp: serverTimestamp(),
+          type: "photo" in ctx.message ? "image" : "text",
+          content: "photo" in ctx.message ? ctx.message.photo[ctx.message.photo.length - 1].file_id : userText
+        });
+      } catch (e) {}
+
+      return ctx.reply("✅ Chekingiz adminga yuborildi. Tez orada tekshirilib, javobi yuboriladi.");
+    }
   }
 
   // Broadcast step
@@ -1058,9 +1466,160 @@ bot.on("message", async (ctx) => {
     }
   }
 
+  // AI Assistant handling
+  if (aiAssistantActiveUsers.get(userId)) {
+    const currentState = aiServiceStates.get(userId);
+    
+    if (!currentState && AI_COSTS[normText]) {
+      const cost = AI_COSTS[normText];
+      const hasBalance = await checkAndDeductBalance(userId, cost);
+      
+      if (!hasBalance) {
+        return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost} ball.\nSizning balansingizda mablag' yetarli emas.`, {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "💰 Balansni to'ldirish", url: `${APP_URL}/profile` }]
+            ]
+          }
+        });
+      }
+
+      if (normText === "💬 Savol-javob") {
+        aiServiceStates.set(userId, "chat");
+        return ctx.reply("💬 <b>Savol-javob rejimi faollashdi.</b>\n\nIstalgan savolingizni yozing:", { parse_mode: "HTML" });
+      }
+
+      aiServiceStates.set(userId, normText);
+      let promptText = "Iltimos, mavzuni kiriting:";
+      if (normText === "🌐 Tarjimon") promptText = "Tarjima qilinishi kerak bo'lgan matnni yuboring:";
+      return ctx.reply(`✨ <b>${normText}</b> tanlandi.\n\n${promptText}`, { parse_mode: "HTML" });
+    }
+
+    if (currentState) {
+      if (currentState === "chat") {
+        // Continue with normal AI chat logic below or handle here
+      } else {
+        const loadingMsg = await ctx.reply(`⏳ <b>${currentState} tayyorlanmoqda...</b>\n\nIltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
+        try {
+          let action = "generateDocument";
+          let docType = "";
+          let apiTopic = userText;
+
+          if (currentState === "📊 Slayd yaratish") {
+            action = "generatePresentation";
+          } else if (currentState === "📄 Kurs ishi yaratish") {
+            docType = "kurs_ishi";
+          } else if (currentState === "🎓 Tezis yaratish") {
+            docType = "tezis";
+          } else if (currentState === "📑 Maqola yaratish") {
+            docType = "maqola";
+          } else if (currentState === "📝 Dars ishlanma yaratish") {
+            docType = "dars_ishlanma";
+          } else if (currentState === "🌐 Tarjimon") {
+            docType = "tarjimon";
+          } else if (currentState === "📋 Test yaratish") {
+            action = "generateDynamicTest";
+          }
+
+          const res = await fetch("http://localhost:3000/api/gemini", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action,
+              topic: apiTopic,
+              docType,
+              count: action === "generatePresentation" ? 7 : 10
+            })
+          });
+
+          await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+
+          if (res.ok) {
+            const data = await res.json();
+            aiServiceStates.delete(userId);
+
+            if (action === "generatePresentation") {
+              let text = `📊 <b>${apiTopic} mavzusida taqdimot rejasi:</b>\n\n`;
+              data.forEach((s: any, i: number) => {
+                text += `<b>${i + 1}-slayd: ${s.title}</b>\n${s.content}\n\n`;
+              });
+              return ctx.reply(mdToHtml(text), { parse_mode: "HTML" });
+            } else if (action === "generateDynamicTest") {
+              let text = `📋 <b>${apiTopic} mavzusida testlar:</b>\n\n`;
+              data.forEach((t: any, i: number) => {
+                text += `${i + 1}. ${t.text}\n`;
+                t.options.forEach((o: string, j: number) => {
+                  text += `${String.fromCharCode(65 + j)}) ${o}${j === t.correctIdx ? " ✅" : ""}\n`;
+                });
+                text += "\n";
+              });
+              return ctx.reply(mdToHtml(text), { parse_mode: "HTML" });
+            } else {
+              let text = `📄 <b>${data.title}</b>\n\n${data.content}`;
+              if (text.length > 4000) {
+                // Split if too long
+                await ctx.reply(mdToHtml(text.substring(0, 4000)), { parse_mode: "HTML" });
+                return ctx.reply(mdToHtml(text.substring(4000)), { parse_mode: "HTML" });
+              }
+              return ctx.reply(mdToHtml(text), { parse_mode: "HTML" });
+            }
+          } else {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.error || "API xatosi");
+          }
+        } catch (err: any) {
+          await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+          console.error("AI Service error:", err);
+          return ctx.reply(`❌ <b>Xatolik yuz berdi:</b> ${err.message || "Keyinroq urinib ko'ring."}`, { parse_mode: "HTML" });
+        }
+      }
+    }
+
+    // Default chat logic if currentState is "chat" or no service matched
+    if (currentState === "chat" || !AI_COSTS[normText]) {
+      if (aiAssistantActiveUsers.get(userId)) {
+        const loadingMsg = await ctx.reply("🤖 <i>AI o'ylamoqda...</i>", { parse_mode: "HTML" });
+        try {
+          let prompt = userText;
+          let imagePart: any = null;
+
+          // Handle photos if present
+          if ("photo" in ctx.message) {
+            const photo = ctx.message.photo[ctx.message.photo.length - 1];
+            const link = await bot.telegram.getFileLink(photo.file_id);
+            const response = await fetch(link.href);
+            const buffer = await response.arrayBuffer();
+            imagePart = {
+              inlineData: {
+                data: Buffer.from(buffer).toString("base64"),
+                mimeType: "image/jpeg"
+              }
+            };
+          }
+
+          const systemCtx = await getSystemContextInfo();
+          const aiResponse = await generateContentWithRotation({
+            model: imagePart ? "gemini-2.0-flash" : "gemini-2.0-flash-lite", // lite is enough for text
+            contents: [
+              { role: "user", parts: [{ text: `Siz AIEDUTIZIM botining aqlli yordamchisiz. Foydalanuvchi ismi: ${authed?.displayName || ctx.from?.first_name || "Foydalanuvchi"}. \n\n${systemCtx}\n\nFoydalanuvchi xabari: ${prompt}` }, ...(imagePart ? [imagePart] : [])] }
+            ]
+          });
+
+          await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+          return ctx.reply(aiResponse.text || "Kechirasiz, javob olib bo'lmadi.", { parse_mode: "HTML" });
+        } catch (err: any) {
+          await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+          console.error("AI Assistant error:", err);
+          return ctx.reply("❌ AI bilan bog'lanishda xatolik yuz berdi. Iltimos keyinroq urinib ko'ring.");
+        }
+      }
+    }
+  }
+
   if (userText.startsWith("/")) return; // Ignore other commands
 
-  const normText = userText.trim();
+  // Processing text messages
 
   if (
     normText === "📥 Javob berilmaganlar" ||
@@ -1143,74 +1702,211 @@ bot.on("message", async (ctx) => {
   }
 
   if (normText === "⚙️ Menyu sozlamalari") {
-    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+    const adminIds = getAdminIds();
+    const isHardAdmin = adminIds.includes(userId);
+    if (!isHardAdmin && (!authed || (authed.role !== "admin" && authed.role !== "subadmin"))) {
       return ctx.reply("Sizda bu huquq yo'q.");
     }
     return ctx.reply(
-      "⚙️ <b>Menyu sozlamalari bo'limiga xush kelibsiz!</b>\n\nTegishli menyuni tanlab, uning foydalanuvchilarga ko'rinadigan matnini o'zgartirishingiz mumkin:",
+      "⚙️ <b>Menyu sozlamalari</b>\n\nQuyidagi amallardan birini tanlang:",
       {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🤖 AIEDUTIZIM haqida", callback_data: "edit_menu_haqida" }],
-            [{ text: "📚 Kurslar", callback_data: "edit_menu_kurslar" }],
-            [{ text: "🎮 Quizizz testlar", callback_data: "edit_menu_quiz_test" }],
-            [{ text: "🏆 Sertifikatlar", callback_data: "edit_menu_sertifikat" }],
-            [{ text: "💬 Adminga murojaat", callback_data: "edit_menu_murojaat" }],
-            [{ text: "❓ Yordam", callback_data: "edit_menu_yordam" }],
-            [{ text: "🌐 Rasmiy sayt", callback_data: "edit_menu_sayt" }]
+            [{ text: "📝 Asosiy menyuni tahrirlash", callback_data: "admin_edit_menu_main" }],
+            [{ text: "➕ Tugma qo'shish", callback_data: "admin_add_button" }, { text: "❌ Tugma o'chirish", callback_data: "admin_delete_button" }],
+            [{ text: "✏️ Nomini o'zgartirish", callback_data: "admin_rename_button" }, { text: "🔢 Tartibini o'zgartirish", callback_data: "admin_reorder_button" }],
+            [{ text: "📄 Xabar matnini tahrirlash", callback_data: "admin_edit_msg_text" }],
+            [{ text: "ℹ️ 'Tizim haqida' matnini tahrirlash", callback_data: "admin_edit_system_about" }]
           ]
         }
       }
     );
   }
 
+  if (normText === "🤖 AI yordamchi") {
+    aiAssistantActiveUsers.set(userId, true);
+    aiServiceStates.set(userId, "chat");
+    return ctx.reply("🤖 <b>AI Yordamchi bo'limiga xush kelibsiz!</b>\n\nMen sizga dars ishlari, taqdimotlar va turli hujjatlar yaratishda yordam bera olaman. Kerakli xizmatni tanlang:", { 
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: await getAiAssistantKeyboard(userId),
+        resize_keyboard: true
+      }
+    });
+  }
+
+  if (normText === "🔙 Asosiy Menyu") {
+    aiModeDeactivate();
+    const authed = await getAuthedUser(userId);
+    return ctx.reply("Asosiy menyuga qaytildi:", {
+      reply_markup: {
+        keyboard: await getKeyboard(authed?.role, userId, !!authed),
+        resize_keyboard: true
+      }
+    });
+  }
+
+  // Dynamic button response check
+  try {
+    const textSnap = await getDoc(doc(db, "botConfig", "buttonTexts"));
+    if (textSnap.exists()) {
+      const customTexts = textSnap.data();
+      if (customTexts[normText]) {
+        aiAssistantActiveUsers.delete(userId);
+        return ctx.reply(customTexts[normText], { parse_mode: "HTML" });
+      }
+    }
+  } catch (e) {}
+
   // Static menus check:
-  if (normText === "🤖 AIEDUTIZIM haqida") {
+  if (normText === "ℹ️ Tizim haqida") {
+    aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
-    const customText = customMenuTexts.get("🤖 AIEDUTIZIM haqida");
+    try {
+      const snap = await getDoc(doc(db, "siteContent", "system_about"));
+      if (snap.exists()) {
+        return ctx.reply(snap.data().content, { parse_mode: "HTML" });
+      }
+    } catch (e) {}
     return ctx.reply(
-      customText || "AIEDUTIZIM — Sun'iy Intellekt Asosidagi Ta'lim Tizimi bo‘lib, talabalar, o‘qituvchilar va tashkilotlar uchun yaratilgan zamonaviy raqamli ta'lim platformasidir."
+      "🚀 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Zamonaviy Ta'lim Tizimi.\n\n" +
+      "Platformamiz talabalar, o'qituvchilar va tashkilotlar uchun quyidagi imkoniyatlarni taqdim etadi:\n\n" +
+      "✅ <b>AI-Test Tizimi:</b> Sun'iy intellekt yordamida mavzuga oid savollarni avtomatik shakllantirish.\n" +
+      "✅ <b>Modulli Ta'lim:</b> Interaktiv darslar va o'quv jarayonini bosqichma-bosqich kuzatish.\n" +
+      "✅ <b>Avtomatik Sertifikatlar:</b> QR-kodli rasmiy sertifikatlarni darhol yuklab olish.\n" +
+      "✅ <b>Quizizz va Musobaqalar:</b> Real-vaqt rejimida bilimlar musobaqasini o'tkazish.\n" +
+      "✅ <b>Smart Jurnal:</b> Barcha natijalar va statistikani xavfsiz kataloglash.\n\n" +
+      "🌐 Batafsil: " + APP_URL,
+      { parse_mode: "HTML" }
     );
   }
 
-  if (normText === "📚 Kurslar") {
+  if (normText === "💰 Balans") {
+    aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
-    const customText = customMenuTexts.get("📚 Kurslar");
-    return ctx.reply(
-      customText || "Platformada modulli kurslar mavjud. Talabalar kurs materiallarini o‘rganishlari, topshiriqlarni bajarishlari va natijalarini kuzatishlari mumkin."
-    );
+    
+    console.log(`[Balance] Request from user ${userId} (${ctx.from.first_name})`);
+    
+    try {
+      if (!db) throw new Error("Firestore DB not initialized");
+
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("telegramId", "==", userId));
+      const snap = await getDocs(q);
+      
+      let userData: any = null;
+      let userDocId: string | null = null;
+
+      if (!snap || snap.empty) {
+        console.log(`[Balance] User ${userId} not found in 'users' collection. Creating fallback...`);
+        // Auto-create if not found (fallback)
+        userData = {
+          telegramId: userId,
+          uid: `tg_${userId}`,
+          displayName: ctx.from.first_name || "Foydalanuvchi",
+          name: ctx.from.first_name || "Foydalanuvchi",
+          username: ctx.from.username || "",
+          role: "student",
+          ball: 0,
+          balance: 0,
+          spentBalls: 0,
+          referralCount: 0,
+          referrals: 0,
+          createdAt: serverTimestamp(),
+          isTelegramUser: true
+        };
+        const newRef = await addDoc(usersRef, userData);
+        userDocId = newRef.id;
+        console.log(`[Balance] Fallback profile created: ${userDocId}`);
+      } else {
+        userData = snap.docs[0].data();
+        userDocId = snap.docs[0].id;
+        console.log(`[Balance] User data found for ${userId}`);
+      }
+
+      if (!userData) {
+        throw new Error("Unable to resolve userData after retrieval/creation");
+      }
+      
+      // Use balance or ball (compatibility)
+      const bal = userData.balance !== undefined ? userData.balance : (userData.ball || 0);
+      const spent = userData.spentBalls || 0;
+      const displayBalance = bal - spent;
+      
+      return ctx.reply(`💰 <b>Sizning balansingiz:</b>\n\n` +
+                       `💎 Umumiy ballar: <b>${bal}</b>\n` +
+                       `📉 Ishlatilgan: <b>${spent}</b>\n` +
+                       `━━━━━━\n` +
+                       `✅ Mavjud balans: <b>${displayBalance} ball</b>`, { parse_mode: "HTML" });
+    } catch (e: any) {
+      console.error("[Balance] CRITICAL ERROR:", e);
+      // Absolute fallback - don't show error message, show 0 balance and log
+      return ctx.reply(`💰 <b>Sizning balansingiz</b>\n\n` +
+                       `👤 Ism: <b>${ctx.from.first_name || "Foydalanuvchi"}</b>\n` +
+                       `🆔 Telegram ID: <code>${userId}</code>\n` +
+                       `💎 Ball: <b>0</b>\n\n` +
+                       `<i>⚠️ Ma'lumotlarni yangilashda texnik uzilish. Tez orada tuzatiladi.</i>`, { parse_mode: "HTML" });
+    }
   }
 
-  if (normText === "🎮 Quizizz testlar") {
+  if (normText === "💳 Balansni to'ldirish") {
+    aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
-    const customText = customMenuTexts.get("🎮 Quizizz testlar");
-    return ctx.reply(
-      customText || "Interaktiv va qiziqarli testlar orqali bilimlarni tekshirish imkoniyati mavjud. Eng yuqori natija ko‘rsatgan ishtirokchilar sertifikat bilan taqdirlanadi."
-    );
+    return ctx.reply(`💳 <b>Balansni to'ldirish yo'riqnomasi:</b>\n\n` +
+                     `1. Saytga kiring: ${APP_URL}/profile\n` +
+                     `2. "To'ldirish" bo'limini tanlang.\n` +
+                     `3. Click yoki Payme orqali to'lovni amalga oshiring.\n\n` +
+                     `Yoki quyidagi karta raqamiga o'tkazma qiling va adminga skrinshot yuboring:\n` +
+                     `💳 <code>8600 0000 0000 0000</code>\n` +
+                     `👤 <b>AIEDUTIZIM Admin</b>`, { parse_mode: "HTML" });
   }
 
-  if (normText === "🏆 Sertifikatlar") {
+  if (normText === "🎁 Bepul olish") {
+    aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
-    const customText = customMenuTexts.get("🏆 Sertifikatlar");
-    return ctx.reply(
-      customText || "Barcha sertifikatlar QR-kod va unikal ID bilan himoyalangan. Sertifikat haqiqiyligini platforma orqali tekshirish mumkin."
-    );
+    return ctx.reply(`🎁 <b>Bepul ballar olish:</b>\n\n` +
+                     `Siz har 5 ta taklif qilgan va botga qo'shilgan do'stingiz uchun <b>3000 ball</b> bonus olishingiz mumkin!\n\n` +
+                     `👥 Buning uchun "Do'stlarni taklif qilish" tugmasini bosing va o'zingizning maxsus havolangizni do'stlaringizga yuboring.`, { parse_mode: "HTML" });
   }
 
-  if (normText === "❓ Yordam") {
+  if (normText === "👥 Do'stlarni taklif qilish") {
+    aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
-    const customText = customMenuTexts.get("❓ Yordam");
-    return ctx.reply(
-      customText || "Botdan foydalanish bo‘yicha ma'lumotlar va tez-tez beriladigan savollarga javoblar."
-    );
+    const refLink = `https://t.me/AieduTizim_bot?start=ref_${userId}`;
+    
+    let refCount = 0;
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("telegramId", "==", userId));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        refCount = snap.docs[0].data().referralCount || 0;
+      } else {
+        const tgSnap = await getDoc(doc(db, "telegram_users", String(userId)));
+        if (tgSnap.exists()) {
+          refCount = tgSnap.data().referralCount || (tgSnap.data().referrals?.length || 0);
+        }
+      }
+    } catch (e) {}
+
+    return ctx.reply(`👥 <b>Do'stlarni taklif qiling va bonus oling!</b>\n\n` +
+                     `Sizning maxsus havolangiz:\n<code>${refLink}</code>\n\n` +
+                     `📊 Siz taklif qilganlar: <b>${refCount} ta</b>\n` +
+                     `🎁 Keyingi bonusgacha: <b>${5 - (refCount % 5)} ta</b> qoldi.`, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "📤 Do'stlarga ulashish", url: `https://t.me/share/url?url=${refLink}&text=AIEDUTIZIM - Sun'iy intellekt asosidagi ta'lim platformasi botiga qo'shiling!` }]
+        ]
+      }
+    });
   }
 
   if (normText === "🌐 Rasmiy sayt") {
     aiAssistantActiveUsers.delete(userId);
-    const customText = customMenuTexts.get("🌐 Rasmiy sayt");
     return ctx.reply(
-      customText || "🔗 https://aiedutizim.vercel.app"
+      `🔗 <a href="${APP_URL}">Rasmiy saytga o'tish</a>`, { parse_mode: "HTML" }
     );
   }
 
@@ -1371,6 +2067,174 @@ bot.on("message", async (ctx) => {
 
   // Handle remaining logic
   if (pending) {
+    if (pending.step === "admin_add_button_name") {
+      pending.buttonName = userText;
+      pending.step = "admin_add_button_row";
+      return ctx.reply(`"${userText}" tugmasi nechanchi qatorga qo'shilsin? (Raqam yuboring, masalan: 1)`);
+    } else if (pending.step === "admin_add_button_row") {
+      const row = parseInt(userText) - 1;
+      if (isNaN(row) || row < 0) return ctx.reply("Iltimos, to'g'ri raqam yuboring.");
+      
+      const menuDoc = await getDoc(doc(db, "botConfig", "mainMenu"));
+      let kb = menuDoc.exists() ? (menuDoc.data().keyboard || []) : [];
+      if (!kb[row]) kb[row] = [];
+      kb[row].push({ text: pending.buttonName });
+      
+      await setDoc(doc(db, "botConfig", "mainMenu"), { keyboard: kb }, { merge: true });
+      pendingLogins.delete(userId);
+      return ctx.reply(`✅ "${pending.buttonName}" tugmasi ${row + 1}-qatorga qo'shildi.`);
+    } else if (pending.step === "admin_rename_button_select") {
+      pending.oldName = userText;
+      pending.step = "admin_rename_button_new";
+      return ctx.reply(`"${userText}" tugmasi uchun yangi nomni kiriting:`);
+    } else if (pending.step === "admin_rename_button_new") {
+      const menuDoc = await getDoc(doc(db, "botConfig", "mainMenu"));
+      if (menuDoc.exists()) {
+        let kb = menuDoc.data().keyboard || [];
+        let found = false;
+        kb = kb.map((row: any[]) => row.map(btn => {
+          if (btn.text === pending.oldName) {
+            found = true;
+            return { ...btn, text: userText };
+          }
+          return btn;
+        }));
+        if (found) {
+          await setDoc(doc(db, "botConfig", "mainMenu"), { keyboard: kb }, { merge: true });
+          pendingLogins.delete(userId);
+          return ctx.reply(`✅ Tugma nomi "${pending.oldName}" dan "${userText}" ga o'zgartirildi.`);
+        }
+      }
+      return ctx.reply("❌ Amaldagi nomli tugma topilmadi.");
+    } else if (pending.step === "admin_edit_msg_select") {
+      pending.targetButton = userText;
+      pending.step = "admin_edit_msg_new";
+      return ctx.reply(`"${userText}" tugmasi bosilganda chiqadigan yangi matnni yuboring:`);
+    } else if (pending.step === "admin_edit_msg_new") {
+      await setDoc(doc(db, "botConfig", "buttonTexts"), { [pending.targetButton]: userText }, { merge: true });
+      pendingLogins.delete(userId);
+      return ctx.reply(`✅ "${pending.targetButton}" tugmasi uchun xabar matni yangilandi.`);
+    } else if (pending.step === "admin_edit_system_about") {
+      await setDoc(doc(db, "siteContent", "system_about"), { 
+        content: userText,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      pendingLogins.delete(userId);
+      return ctx.reply("✅ 'Tizim haqida' matni muvaffaqiyatli yangilandi.");
+    } else if (pending.step === "admin_payment_amount") {
+      const amount = parseInt(userText);
+      if (isNaN(amount) || amount <= 0) {
+        return ctx.reply("❌ Faqat musbat son kiriting.");
+      }
+
+      const targetId = pending.targetPaymentUserId;
+      if (!targetId) {
+        pendingLogins.delete(userId);
+        return ctx.reply("❌ Ma'lumotlarda xatolik. Iltimos qaytadan urinib ko'ring.");
+      }
+
+      try {
+        console.log(`[Payment] Admin ${userId} adding ${amount} to user ${targetId}`);
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("telegramId", "==", Number(targetId)));
+        const snap = await getDocs(q);
+
+        if (!snap.empty) {
+          const userDoc = snap.docs[0];
+          const userData = userDoc.data();
+          const currentBall = userData.ball || 0;
+          const currentBalance = userData.balance || 0;
+          
+          const newBall = currentBall + amount;
+          const newBalance = currentBalance + amount;
+
+          await updateDoc(doc(db, "users", userDoc.id), {
+            ball: newBall,
+            balance: newBalance,
+            updatedAt: serverTimestamp()
+          });
+
+          pendingLogins.delete(userId);
+
+          const uName = userData.name || userData.displayName || "Foydalanuvchi";
+          
+          // Notify user
+          await bot.telegram.sendMessage(Number(targetId), 
+            `✅ <b>To'lov tasdiqlandi!</b>\n\n` +
+            `👤 <b>${uName}</b>\n` +
+            `💰 Sizga <b>${amount} ball</b> qo'shildi.\n` +
+            `📊 Yangi balans: <b>${newBalance}</b>`, 
+            { parse_mode: "HTML" }
+          ).catch((e) => {
+             console.error(`Notify user ${targetId} failed:`, e);
+          });
+
+          // Update payment status in Firestore
+          try {
+            const pQuery = query(collection(db, "payments"), 
+              where("userId", "==", Number(targetId)), 
+              where("status", "==", "pending"),
+              orderBy("timestamp", "desc"),
+              limit(1)
+            );
+            const pSnap = await getDocs(pQuery);
+            if (!pSnap.empty) {
+              await updateDoc(doc(db, "payments", pSnap.docs[0].id), {
+                status: "approved",
+                amount: amount,
+                processedAt: serverTimestamp(),
+                processedBy: userId
+              });
+            }
+          } catch (e) {
+            console.error("Firestore payment status update fail:", e);
+          }
+
+          return ctx.reply(`✅ <b>Muvaffaqiyatli!</b>\n\n👤 ${uName} (ID: ${targetId}) balansiga ${amount} ball qo'shildi.\n📊 Yangi balans: ${newBalance}`);
+        } else {
+          pendingLogins.delete(userId);
+          return ctx.reply(`❌ Foydalanuvchi (ID: ${targetId}) bazadan topilmadi.`);
+        }
+      } catch (e) {
+        console.error("Payment approval error:", e);
+        pendingLogins.delete(userId);
+        return ctx.reply("❌ Balansni yangilashda xatolik yuz berdi. Iltimos keyinroq urinib ko'ring.");
+      }
+    } else if (pending.step === "admin_reorder_button_select") {
+      pending.targetButton = userText;
+      pending.step = "admin_reorder_button_newpos";
+      return ctx.reply(`"${userText}" tugmasi nechanchi qatorga ko'chirilsin? (Raqam yuboring)`);
+    } else if (pending.step === "admin_reorder_button_newpos") {
+      const row = parseInt(userText) - 1;
+      if (isNaN(row) || row < 0) return ctx.reply("Iltimos, to'g'ri raqam yuboring.");
+      const menuDoc = await getDoc(doc(db, "botConfig", "mainMenu"));
+      if (menuDoc.exists()) {
+        let kb = menuDoc.data().keyboard || [];
+        let item: any = null;
+        // Find and remove
+        for (let i = 0; i < kb.length; i++) {
+          const res = kb[i].filter((btn: any) => btn.text === pending.targetButton);
+          if (res.length > 0) {
+            item = res[0];
+            kb[i] = kb[i].filter((btn: any) => btn.text !== pending.targetButton);
+            if (kb[i].length === 0) {
+              kb.splice(i, 1);
+            }
+            break;
+          }
+        }
+        
+        if (item) {
+          if (!kb[row]) kb[row] = [];
+          kb[row].push(item);
+          await setDoc(doc(db, "botConfig", "mainMenu"), { keyboard: kb }, { merge: true });
+          pendingLogins.delete(userId);
+          return ctx.reply(`✅ "${pending.targetButton}" tugmasi ${row + 1}-qatorga ko'chirildi.`);
+        }
+      }
+      return ctx.reply("❌ Tugma topilmadi.");
+    }
+
     if (pending.step === "reply_message") {
       const uName = authed ? authed.displayName : "Admin";
       const senderId = authed ? authed.uid : "SYSTEM_ADMIN";
@@ -1793,312 +2657,323 @@ bot.on("message", async (ctx) => {
   }
 
   // Not in login flow, handle as AI chat prompt
-  let promptMsg: any = null;
-  let intervalId: any = null;
-  try {
+  if (aiAssistantActiveUsers.get(userId)) {
+    let promptMsg: any = null;
+    let intervalId: any = null;
     try {
-      promptMsg = await ctx.reply("Bajarilmoqda...");
-    } catch (e) {}
+      try {
+        promptMsg = await ctx.reply("Bajarilmoqda...");
+      } catch (e) {}
 
-    let dotCount = 3;
-    if (promptMsg) {
-      intervalId = setInterval(async () => {
-        dotCount = (dotCount % 3) + 1; // 1, 2, 3
-        const dots = ".".repeat(dotCount);
-        try {
-          await ctx.telegram.editMessageText(
-            ctx.chat.id,
-            promptMsg.message_id,
-            undefined,
-            `Bajarilmoqda${dots}`,
-          );
-        } catch (e) {}
-      }, 1000);
-    }
-
-    const uName = authed
-      ? authed.displayName
-      : ctx.from.first_name || "Foydalanuvchi";
-    const isAdmin = authed
-      ? authed.role === "admin" || authed.role === "teacher"
-      : false;
-
-    // Get system statistics and courses to embed contextually
-    const sysContext = await getSystemContextInfo();
-
-    let functionResponses: any[] = [];
-    let lastFunctionCall: any = null;
-    let loopCount = 0;
-    let finalReply = "";
-
-    while (loopCount < 3) {
-      loopCount++;
-      const res = await fetch("http://localhost:3000/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: loopCount === 1 ? userText : "",
-          history: [],
-          userName: uName,
-          isAdminMode: isAdmin,
-          systemContext: sysContext,
-          functionResponses:
-            functionResponses.length > 0 ? functionResponses : undefined,
-          lastFunctionCall: lastFunctionCall || undefined,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-
-        if (data.isFunctionCall) {
-          const fnName = data.functionCall.name;
-          const fnArgs = data.functionCall.args;
-          lastFunctionCall = data.functionCall;
-          let executionResult = "";
-
+      let dotCount = 3;
+      if (promptMsg) {
+        intervalId = setInterval(async () => {
+          dotCount = (dotCount % 3) + 1; // 1, 2, 3
+          const dots = ".".repeat(dotCount);
           try {
-            if (fnName === "getSystemStats") {
-              let studentsCount = 0;
-              let teachersCount = 0;
-              let staffCount = 0;
-              let adminsCount = 0;
-              let tgUsersCount = 0;
-              try {
-                const snapUsers = await getDocs(collection(db, "users"));
-                snapUsers.forEach((d) => {
-                  const uData = d.data();
-                  const r = uData.role;
-                  const emailLower = (uData.email || "").toLowerCase().trim();
-                  if (r === "admin" || emailLower === "elyorbek@admin.uz") {
-                    adminsCount++;
-                  } else if (r === "teacher") {
-                    teachersCount++;
-                  } else if (r === "staff") {
-                    staffCount++;
-                  } else if (r === "student") {
-                    studentsCount++;
-                  } else {
-                    studentsCount++;
-                  }
-                });
-                const snapTg = await getDocs(collection(db, "telegram_users"));
-                tgUsersCount = snapTg.size;
-              } catch (e) {
-                const statsCachePath = path.join(process.cwd(), "telegram_stats_cache.json");
-                if (fs.existsSync(statsCachePath)) {
-                  try {
-                    const cachedStats = JSON.parse(fs.readFileSync(statsCachePath, "utf8"));
-                    adminsCount = cachedStats.adminsCount || 0;
-                    teachersCount = cachedStats.teachersCount || 0;
-                    staffCount = cachedStats.staffCount || 0;
-                    studentsCount = cachedStats.studentsCount || 0;
-                    tgUsersCount = cachedStats.tgUsersCount || 0;
-                  } catch (err) {}
-                }
-              }
-              const totalUsers = adminsCount + teachersCount + staffCount + studentsCount;
-              executionResult = `Tizim foydalanuvchilari statistikasi (Bazada):\n` +
-                `- Adminlar: ${adminsCount} ta\n` +
-                `- Tashkilotlar: ${teachersCount} ta\n` +
-                `- Xodimlar: ${staffCount} ta\n` +
-                `- Talabalar: ${studentsCount} ta\n` +
-                `- Jami foydalanuvchilar: ${totalUsers} ta\n\n` +
-                `- Telegram bot faol foydalanuvchilari (start bosganlar): ${tgUsersCount} ta.`;
-            } else if (fnName === "getUsersList") {
-              let q: any = collection(db, "users");
-              if (fnArgs.role) {
-                q = query(q, where("role", "==", fnArgs.role));
-              }
-              const usersSnap = await getDocs(q);
-              const list = usersSnap.docs
-                .map((d) => {
-                  const dt: any = d.data();
-                  return dt.displayName + " (" + dt.role + ")";
-                })
-                .join(", ");
-              executionResult = `Topilgan foydalanuvchilar ro'yxati: ${list || "Topilmadi"}`;
-            } else if (fnName === "checkBirthdays") {
-              const todayStr = new Date()
-                .toISOString()
-                .split("T")[0]
-                .substring(5);
-              const usersSnap = await getDocs(collection(db, "users"));
-              const p: any[] = usersSnap.docs
-                .map((d) => d.data())
-                .filter(
-                  (dt: any) => dt.birthDate && dt.birthDate.endsWith(todayStr),
-                );
-              if (p.length > 0) {
-                executionResult =
-                  "Bugun tug'ilgan kuni bo'lganlar: " +
-                  p.map((dt) => dt.displayName).join(", ");
-              } else {
-                executionResult =
-                  "Bugun tug'ilgan kuni bo'lgan foydalanuvchilar topilmadi.";
-              }
-            } else if (fnName === "publishTest") {
-              const t = (fnArgs.testTitle || "").toLowerCase();
-              const testsSnap = await getDocs(collection(db, "tests"));
-              const target = testsSnap.docs.find((d) => {
-                const ddata = d.data();
-                return (
-                  (ddata.title && ddata.title.toLowerCase().includes(t)) ||
-                  (ddata.courseName &&
-                    ddata.courseName.toLowerCase().includes(t))
-                );
-              });
-              if (target) {
-                await updateDoc(doc(db, "tests", target.id), {
-                  isPublished: true,
-                });
-                executionResult = `"${target.data().title}" nomli test muvaffaqiyatli publish qilindi!`;
-              } else {
-                executionResult = `"${fnArgs.testTitle}" mavzusidagi test topilmadi.`;
-              }
-            } else if (fnName === "createQuizizz") {
-              const pin = Math.floor(
-                100000 + Math.random() * 900000,
-              ).toString();
+            await ctx.telegram.editMessageText(
+              ctx.chat.id,
+              promptMsg.message_id,
+              undefined,
+              `Bajarilmoqda${dots}`,
+            );
+          } catch (e) {}
+        }, 1000);
+      }
 
-              let questions: any[] = [];
+      const uName = authed
+        ? authed.displayName
+        : ctx.from.first_name || "Foydalanuvchi";
+      const isAdmin = authed
+        ? authed.role === "admin" || authed.role === "teacher"
+        : false;
 
-              try {
-                const pText = fnArgs.context
-                  ? `Matn: ${fnArgs.context}. Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`
-                  : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
+      // Get system statistics and courses to embed contextually
+      const sysContext = await getSystemContextInfo();
 
-                const genRes = await generateContentWithRotation({
-                  model: "gemini-3.5-flash",
-                  contents: [{ role: "user", parts: [{ text: pText }] }],
-                  config: {
-                    systemInstruction:
-                      'Faqat JSON formatda array qaytar:\n[{ "question": "savol", "options": ["A","B","C","D"], "correctAnswer": "To\'g\'ri javob matni" }]. Boshqa text qo\'shma.',
-                    temperature: 0.7,
-                  },
-                });
+      let functionResponses: any[] = [];
+      let lastFunctionCall: any = null;
+      let lastModelParts: any = null;
+      let loopCount = 0;
+      let finalReply = "";
+
+      while (loopCount < 3) {
+        loopCount++;
+        const res = await fetch("http://localhost:3000/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: userText,
+            history: [],
+            userName: uName,
+            isAdminMode: isAdmin,
+            systemContext: sysContext,
+            functionResponses:
+              functionResponses.length > 0 ? functionResponses : undefined,
+            lastFunctionCall: lastFunctionCall || undefined,
+            lastModelParts: lastModelParts || undefined,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+
+          if (data.isFunctionCall) {
+            const fnName = data.functionCall.name;
+            const fnArgs = data.functionCall.args;
+            lastFunctionCall = data.functionCall;
+            lastModelParts = data.modelParts;
+            let executionResult = "";
+
+            try {
+              if (fnName === "getSystemStats") {
+                let studentsCount = 0;
+                let teachersCount = 0;
+                let staffCount = 0;
+                let adminsCount = 0;
+                let tgUsersCount = 0;
                 try {
-                  let txt = genRes.text || "[]";
-                  txt = txt
-                    .replace(/```json/g, "")
-                    .replace(/```/g, "")
-                    .trim();
-                  questions = JSON.parse(txt);
-                } catch (e) {}
-              } catch (e) {}
-
-              await addDoc(collection(db, "quiz_history"), {
-                teacherId: authed ? authed.uid : "ADMIN",
-                pin,
-                title: fnArgs.title,
-                context: fnArgs.context || "",
-                questions,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-              });
-              executionResult = `"${fnArgs.title}" mavzusida PIN: ${pin} va ${questions.length} ta savol bo'lgan quiz yaratildi.`;
-            } else if (fnName === "createCourse") {
-              const courseRef = await addDoc(collection(db, "courses"), {
-                title: fnArgs.title,
-                description: fnArgs.description || "Ushbu fan bo'yicha darslar va materiallar turkumi.",
-                category: fnArgs.category || "Dasturlash",
-                createdAt: serverTimestamp(),
-                creatorId: authed ? authed.uid : "ADMIN",
-                lessons: [],
-                quizzes: []
-              });
-              executionResult = `"${fnArgs.title}" nomli yangi kurs/fan muvaffaqiyatli yaratildi. Hujjat ID: ${courseRef.id}`;
-            } else if (fnName === "addSystemUser") {
-              const genUid = "ai_" + Math.floor(100000 + Math.random() * 900000).toString();
-              await setDoc(doc(db, "users", genUid), {
-                uid: genUid,
-                displayName: fnArgs.displayName,
-                email: fnArgs.email,
-                password: fnArgs.password,
-                role: fnArgs.role || "student",
-                createdAt: serverTimestamp(),
-              });
-              executionResult = `Yangi foydalanuvchi muvaffaqiyatli qo'shildi!\n👤 Ismi: ${fnArgs.displayName}\n📧 Emaili: ${fnArgs.email}\n🔑 Paroli: ${fnArgs.password}\n🛡 Roli: ${(fnArgs.role || "student").toUpperCase()}`;
-            } else if (fnName === "createSystemNotification") {
-              const uSnap = await getDocs(collection(db, "users"));
-              let sentCount = 0;
-              for (const uDoc of uSnap.docs) {
-                await addDoc(collection(db, "messages"), {
-                  text: fnArgs.text,
-                  senderId: "SYSTEM_ADMIN",
-                  senderName: "Tizim ma'muriyati",
-                  receiverId: uDoc.id,
-                  createdAt: serverTimestamp(),
-                  isRead: false
+                  const snapUsers = await getDocs(collection(db, "users"));
+                  snapUsers.forEach((d) => {
+                    const uData = d.data();
+                    const r = uData.role;
+                    const emailLower = (uData.email || "").toLowerCase().trim();
+                    if (r === "admin" || emailLower === "elyorbek@admin.uz") {
+                      adminsCount++;
+                    } else if (r === "teacher") {
+                      teachersCount++;
+                    } else if (r === "staff") {
+                      staffCount++;
+                    } else if (r === "student") {
+                      studentsCount++;
+                    } else {
+                      studentsCount++;
+                    }
+                  });
+                  const snapTg = await getDocs(collection(db, "telegram_users"));
+                  tgUsersCount = snapTg.size;
+                } catch (e) {
+                  const statsCachePath = path.join(process.cwd(), "telegram_stats_cache.json");
+                  if (fs.existsSync(statsCachePath)) {
+                    try {
+                      const cachedStats = JSON.parse(fs.readFileSync(statsCachePath, "utf8"));
+                      adminsCount = cachedStats.adminsCount || 0;
+                      teachersCount = cachedStats.teachersCount || 0;
+                      staffCount = cachedStats.staffCount || 0;
+                      studentsCount = cachedStats.studentsCount || 0;
+                      tgUsersCount = cachedStats.tgUsersCount || 0;
+                    } catch (err) {}
+                  }
+                }
+                const totalUsers = adminsCount + teachersCount + staffCount + studentsCount;
+                executionResult = `Tizim foydalanuvchilari statistikasi (Bazada):\n` +
+                  `- Adminlar: ${adminsCount} ta\n` +
+                  `- Tashkilotlar: ${teachersCount} ta\n` +
+                  `- Xodimlar: ${staffCount} ta\n` +
+                  `- Talabalar: ${studentsCount} ta\n` +
+                  `- Jami foydalanuvchilar: ${totalUsers} ta\n\n` +
+                  `- Telegram bot faol foydalanuvchilari (start bosganlar): ${tgUsersCount} ta.`;
+              } else if (fnName === "getUsersList") {
+                let q: any = collection(db, "users");
+                if (fnArgs.role) {
+                  q = query(q, where("role", "==", fnArgs.role));
+                }
+                const usersSnap = await getDocs(q);
+                const list = usersSnap.docs
+                  .map((d) => {
+                    const dt: any = d.data();
+                    return dt.displayName + " (" + dt.role + ")";
+                  })
+                  .join(", ");
+                executionResult = `Topilgan foydalanuvchilar ro'yxati: ${list || "Topilmadi"}`;
+              } else if (fnName === "checkBirthdays") {
+                const todayStr = new Date()
+                  .toISOString()
+                  .split("T")[0]
+                  .substring(5);
+                const usersSnap = await getDocs(collection(db, "users"));
+                const p: any[] = usersSnap.docs
+                  .map((d) => d.data())
+                  .filter(
+                    (dt: any) => dt.birthDate && dt.birthDate.endsWith(todayStr),
+                  );
+                if (p.length > 0) {
+                  executionResult =
+                    "Bugun tug'ilgan kuni bo'lganlar: " +
+                    p.map((dt) => dt.displayName).join(", ");
+                } else {
+                  executionResult =
+                    "Bugun tug'ilgan kuni bo'lgan foydalanuvchilar topilmadi.";
+                }
+              } else if (fnName === "publishTest") {
+                const t = (fnArgs.testTitle || "").toLowerCase();
+                const testsSnap = await getDocs(collection(db, "tests"));
+                const target = testsSnap.docs.find((d) => {
+                  const ddata = d.data();
+                  return (
+                    (ddata.title && ddata.title.toLowerCase().includes(t)) ||
+                    (ddata.courseName &&
+                      ddata.courseName.toLowerCase().includes(t))
+                  );
                 });
-                sentCount++;
-              }
-              await addDoc(collection(db, "admin_notifications"), {
-                text: `Tizimda e'lon tarqatildi: "${fnArgs.text}" (${sentCount} ta foydalanuvchiga)`,
-                timestamp: serverTimestamp()
-              });
-              executionResult = `Barcha ${sentCount} ta foydalanuvchiga "${fnArgs.text}" mavzusidagi e'lon muvaffaqiyatli yuborildi.`;
-            } else if (fnName === "getCoursesList") {
-              const cSnap = await getDocs(collection(db, "courses"));
-              const list = cSnap.docs.map(d => {
-                const c: any = d.data();
-                return `- **${c.title}** (${c.category || "Boshqa"}): ${c.description || "Tavsif yo'q"}`;
-              }).join("\n");
-              executionResult = `Platformadagi darslar/kurslar ro'yxati:\n${list || "Hozircha fanlar kiritilmagan."}`;
-            } else {
-              executionResult = "Noma'lum funksiya chaqirildi.";
-            }
-          } catch (e: any) {
-            executionResult = "Funksiya bajarilishida xatolik: " + e.message;
-          }
+                if (target) {
+                  await updateDoc(doc(db, "tests", target.id), {
+                    isPublished: true,
+                  });
+                  executionResult = `"${target.data().title}" nomli test muvaffaqiyatli publish qilindi!`;
+                } else {
+                  executionResult = `"${fnArgs.testTitle}" mavzusidagi test topilmadi.`;
+                }
+              } else if (fnName === "createQuizizz") {
+                const pin = Math.floor(
+                  100000 + Math.random() * 900000,
+                ).toString();
 
-          functionResponses = [{ name: fnName, response: executionResult }];
-          continue; // proceed next
+                let questions: any[] = [];
+
+                try {
+                  const pText = fnArgs.context
+                    ? `Matn: ${fnArgs.context}. Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`
+                    : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
+
+                  const genRes = await generateContentWithRotation({
+                    model: "gemini-2.5-flash-lite",
+                    contents: [{ role: "user", parts: [{ text: pText }] }],
+                    config: {
+                      systemInstruction:
+                        'Faqat JSON formatda array qaytar:\n[{ "question": "savol", "options": ["A","B","C","D"], "correctAnswer": "To\'g\'ri javob matni" }]. Boshqa text qo\'shma.',
+                      temperature: 0.7,
+                    },
+                  });
+                  try {
+                    let txt = genRes.text || "[]";
+                    txt = txt
+                      .replace(/```json/g, "")
+                      .replace(/```/g, "")
+                      .trim();
+                    questions = JSON.parse(txt);
+                  } catch (e) {}
+                } catch (e) {}
+
+                await addDoc(collection(db, "quiz_history"), {
+                  teacherId: authed ? authed.uid : "ADMIN",
+                  pin,
+                  title: fnArgs.title,
+                  context: fnArgs.context || "",
+                  questions,
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                });
+                executionResult = `"${fnArgs.title}" mavzusida PIN: ${pin} va ${questions.length} ta savol bo'lgan quiz yaratildi.`;
+              } else if (fnName === "createCourse") {
+                const courseRef = await addDoc(collection(db, "courses"), {
+                  title: fnArgs.title,
+                  description: fnArgs.description || "Ushbu fan bo'yicha darslar va materiallar turkumi.",
+                  category: fnArgs.category || "Dasturlash",
+                  createdAt: serverTimestamp(),
+                  creatorId: authed ? authed.uid : "ADMIN",
+                  lessons: [],
+                  quizzes: []
+                });
+                executionResult = `"${fnArgs.title}" nomli yangi kurs/fan muvaffaqiyatli yaratildi. Hujjat ID: ${courseRef.id}`;
+              } else if (fnName === "addSystemUser") {
+                const genUid = "ai_" + Math.floor(100000 + Math.random() * 900000).toString();
+                await setDoc(doc(db, "users", genUid), {
+                  uid: genUid,
+                  displayName: fnArgs.displayName,
+                  email: fnArgs.email,
+                  password: fnArgs.password,
+                  role: fnArgs.role || "student",
+                  createdAt: serverTimestamp(),
+                });
+                executionResult = `Yangi foydalanuvchi muvaffaqiyatli qo'shildi!\n👤 Ismi: ${fnArgs.displayName}\n📧 Emaili: ${fnArgs.email}\n🔑 Paroli: ${fnArgs.password}\n🛡 Roli: ${(fnArgs.role || "student").toUpperCase()}`;
+              } else if (fnName === "createSystemNotification") {
+                const uSnap = await getDocs(collection(db, "users"));
+                let sentCount = 0;
+                for (const uDoc of uSnap.docs) {
+                  await addDoc(collection(db, "messages"), {
+                    text: fnArgs.text,
+                    senderId: "SYSTEM_ADMIN",
+                    senderName: "Tizim ma'muriyati",
+                    receiverId: uDoc.id,
+                    createdAt: serverTimestamp(),
+                    isRead: false
+                  });
+                  sentCount++;
+                }
+                await addDoc(collection(db, "admin_notifications"), {
+                  text: `Tizimda e'lon tarqatildi: "${fnArgs.text}" (${sentCount} ta foydalanuvchiga)`,
+                  timestamp: serverTimestamp()
+                });
+                executionResult = `Barcha ${sentCount} ta foydalanuvchiga "${fnArgs.text}" mavzusidagi e'lon muvaffaqiyatli yuborildi.`;
+              } else if (fnName === "getCoursesList") {
+                const cSnap = await getDocs(collection(db, "courses"));
+                const list = cSnap.docs.map(d => {
+                  const c: any = d.data();
+                  return `- **${c.title}** (${c.category || "Boshqa"}): ${c.description || "Tavsif yo'q"}`;
+                }).join("\n");
+                executionResult = `Platformadagi darslar/kurslar ro'yxati:\n${list || "Hozircha fanlar kiritilmagan."}`;
+              } else {
+                executionResult = "Noma'lum funksiya chaqirildi.";
+              }
+            } catch (e: any) {
+              executionResult = "Funksiya bajarilishida xatolik: " + e.message;
+            }
+
+            functionResponses = [{ name: fnName, response: executionResult }];
+            continue; // proceed next
+          } else {
+            finalReply = data.reply;
+            break;
+          }
         } else {
-          finalReply = data.reply;
+          const data = await res.json().catch(() => null);
+          finalReply = data?.error || "AI javob qaytara olmadi.";
           break;
         }
-      } else {
-        const data = await res.json().catch(() => null);
-        finalReply = data?.error || "AI javob qaytara olmadi.";
-        break;
       }
-    }
 
-    if (intervalId) {
-      clearInterval(intervalId);
-    }
-    if (promptMsg) {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, promptMsg.message_id);
-      } catch (e) {}
-    }
-
-    if (finalReply) {
-      if (isAdmin) {
-        const borderReply =
-          `👑 <b>USTOZ - ADMIN TIZIMI AI YORDAMCHISI</b>\n` +
-          `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `${mdToHtml(finalReply)}\n` +
-          `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `💡 <i>Tizim administratorlari uchun cheksiz AI xizmati faollashtirilgan.</i>`;
-        await ctx.reply(borderReply, { parse_mode: "HTML" });
-      } else {
-        await ctx.reply(mdToHtml(finalReply), { parse_mode: "HTML" });
+      if (intervalId) {
+        clearInterval(intervalId);
       }
+      if (promptMsg) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, promptMsg.message_id);
+        } catch (e) {}
+      }
+
+      if (finalReply) {
+        if (isAdmin) {
+          const borderReply =
+            `👑 <b>USTOZ - ADMIN TIZIMI AI YORDAMCHISI</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `${mdToHtml(finalReply)}\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `💡 <i>Tizim administratorlari uchun cheksiz AI xizmati faollashtirilgan.</i>`;
+          await ctx.reply(borderReply, { parse_mode: "HTML" });
+        } else {
+          await ctx.reply(mdToHtml(finalReply), { parse_mode: "HTML" });
+        }
+      }
+    } catch (e) {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      if (promptMsg) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, promptMsg.message_id);
+        } catch (e) {}
+      }
+      ctx.reply("Server bilan bog'lanishda xatolik yuz berdi.");
     }
-  } catch (e) {
-    if (intervalId) {
-      clearInterval(intervalId);
+  } else {
+    // If text is sent and AI mode is off, and no previous handler caught it
+    if (!userText.startsWith("/")) {
+      return ctx.reply("⚠️ Kerakli bo'limni menyudan tanlang.");
     }
-    if (promptMsg) {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, promptMsg.message_id);
-      } catch (e) {}
-    }
-    ctx.reply("Server bilan bog'lanishda xatolik yuz berdi.");
   }
 });
+
 
 bot.on("my_chat_member", async (ctx) => {
   const chatId = ctx.chat?.id;
@@ -2200,8 +3075,9 @@ export function launchBot() {
           });
         } catch (e) {}
       }
-    }, (error) => {
-      console.warn("[Telegram] admin_notifications snapshot listener error (quota/network):", error.message || error);
+    }, (error: any) => {
+      if (error?.message?.includes("Quota")) return;
+      console.log("[Telegram] admin_notifications snapshot listener error (quota/network):", error.message || error);
     });
 
     // Listen for new messages targeting tg users
@@ -2317,8 +3193,9 @@ export function launchBot() {
           }
         }
       }
-    }, (error) => {
-      console.warn("[Telegram] messages snapshot listener error (quota/network):", error.message || error);
+    }, (error: any) => {
+      if (error?.message?.includes("Quota")) return;
+      console.log("[Telegram] messages snapshot listener error (quota/network):", error.message || error);
     });
 
     // Listen for new published tests
@@ -2373,8 +3250,9 @@ export function launchBot() {
           }
         }
       }
-    }, (error) => {
-      console.warn("[Telegram] tests snapshot listener error (quota/network):", error.message || error);
+    }, (error: any) => {
+      if (error?.message?.includes("Quota")) return;
+      console.log("[Telegram] tests snapshot listener error (quota/network):", error.message || error);
     });
 
     // Certificate listener
@@ -2415,8 +3293,9 @@ export function launchBot() {
           } catch (err) {}
         }
       }
-    }, (error) => {
-      console.warn("[Telegram] certificates snapshot listener error (quota/network):", error.message || error);
+    }, (error: any) => {
+      if (error?.message?.includes("Quota")) return;
+      console.log("[Telegram] certificates snapshot listener error (quota/network):", error.message || error);
     });
 
     // Birthday auto-check once every 24h
@@ -2473,13 +3352,13 @@ export function launchBot() {
               console.log(`[Broadcast] Found ${snap.size} telegram users to notify about the new restart and version.`);
               const userDocs = snap.docs;
               const broadcastText =
-                `🚀 <b>YANGI VERSIYA ISHGA TUSHIRILDI!</b>\n\n` +
-                `AIEDUTIZIM platformasining Telegram boti muvaffaqiyatli tarzda qayta ishga tushirildi va eng so'nggi yangilanishlar bilan yangi versiyasi foydalanishga topshirildi.\n\n` +
-                `🤖 <b>Nimalar o'zgardi va yaxshilandi?</b>\n` +
-                `• ⚡️ <b>Eng so'nggi Sun'iy Intellekt (AI):</b> Endilikda bot barcha foydalanuvchilarning tizim haqidagi hamda o'zlari qiziqtirgan istalgan savollariga ham eng aqlli <b>Gemini 3.5-Flash</b> modeli yordamida tezkor va mukammal javob qaytaradi!\n` +
-                `• 👑 <b>Admin buyruqlari kengaytirildi:</b> Tizim ma'murlari (Adminlar va O'qituvchilar) endilikda bot orqali bevosita yangi dars/kurs yaratish (<i>createCourse</i>), yangi xodimlarni va talabalarni qo'shish (<i>addSystemUser</i>) va hamda barcha foydalanuvchilarga bildirishnoma tarqatish kabi tizim boshqaruvi buyruqlarini bevosita botning o'ziga yuklangan admin imkoniyatlari orqali bajara oladi!\n` +
-                `• 📊 <b>Statistika va Barqarorlik:</b> Ma'lumotlar bazasi yuklamasini kamaytiruvchi va limitlar tugaganda ham barqaror ishlashni ta'minlovchi mustahkam kesh & xizmat algoritmi integratsiya qilindi.\n\n` +
-                `💡 <i>Yangi versiyani faollashtirish va menyularingizni yangilash uchun hoziroq /start buyrug'ini yuboring!</i>`;
+                `🚀 <b>AI YORDAMCHI ISHGA TUSHIRILDI!</b>\n\n` +
+                `AIEDUTIZIM platformasining Telegram boti yanada aqllashdi! Endilikda menyularingizda yangi <b>🤖 AI Yordamchi</b> bo'limi paydo bo'ldi.\n\n` +
+                `🤖 <b>Yangi imkoniyatlar:</b>\n` +
+                `• 💬 <b>Har qanday savolga javob:</b> Matematika, dasturlash, tarix yoki til o'rganish — istalgan mavzuda savol bering va AI yordamida aniq javob oling.\n` +
+                `• 🖼 <b>Rasm va fayllar tahlili:</b> Menga rasm yoki fayl yuboring, men uni ko'rib chiqaman va savollaringizga javob beraman.\n` +
+                `• 🌐 <b>Saytda ham mavjud:</b> Endi platforma saytidagi chat-widget orqali ham ham Admin bilan, ham AI yordamchi bilan alohida muloqot qilishingiz mumkin.\n\n` +
+                `💡 <i>Yangi menyuni ko'rish uchun /start buyrug'ini yuboring va "🤖 AI yordamchi" tugmasini bosing!</i>`;
 
               for (let i = 0; i < userDocs.length; i++) {
                 const uDoc = userDocs[i];

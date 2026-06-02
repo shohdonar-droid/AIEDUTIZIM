@@ -33,12 +33,17 @@ export default function Navbar() {
 
   useEffect(() => {
     async function fetchConfig() {
+      // Load from cache
+      const cached = localStorage.getItem('cache_header_config');
+      if (cached) setHeaderConfig(JSON.parse(cached));
+
       try {
         const snap = await getDoc(doc(db, 'siteContent', 'main'));
         if (snap.exists()) {
           const data = snap.data() as SiteContent;
           if (data.header) {
             setHeaderConfig(data.header);
+            localStorage.setItem('cache_header_config', JSON.stringify(data.header));
           }
         }
       } catch (err) {

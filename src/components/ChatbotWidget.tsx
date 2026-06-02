@@ -1,17 +1,78 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Bot, User as UserIcon, ArrowLeft } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User as UserIcon, ArrowLeft, Image as ImageIcon, Presentation, FileText, GraduationCap, Layout, Languages, ClipboardList } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, onSnapshot, orderBy, Timestamp, setDoc, doc, limit, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, orderBy, Timestamp, setDoc, doc, limit, updateDoc, getDoc } from 'firebase/firestore';
+import safeOnSnapshot from '../lib/safeSnapshot';
 import { useAuth } from '../hooks/useAuth';
 
 export function ChatbotWidget() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
+  const [aiMessages, setAiMessages] = useState<any[]>([
+    { id: 'welcome', role: 'assistant', text: 'Assalomu alaykum! Men AI yordamchiman. Sizga qanday yordam bera olaman?' }
+  ]);
+  const [activeTab, setActiveTab] = useState<'ai' | 'admin'>('ai');
   const [inputText, setInputText] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const aiServices = [
+    { id: 'slayda', label: 'Slayd yaratish', icon: Presentation, cost: 5, action: 'generatePresentation' },
+    { id: 'kurs_ishi', label: 'Kurs ishi yaratish', icon: FileText, cost: 10, action: 'generateDocument', docType: 'kurs_ishi' },
+    { id: 'tezis', label: 'Tezis yaratish', icon: GraduationCap, cost: 7, action: 'generateDocument', docType: 'tezis' },
+    { id: 'maqola', label: 'Maqola yaratish', icon: Layout, cost: 5, action: 'generateDocument', docType: 'maqola' },
+    { id: 'dars_ishlanma', label: 'Dars ishlanma yaratish', icon: FileText, cost: 5, action: 'generateDocument', docType: 'dars_ishlanma' },
+    { id: 'tarjimon', label: 'Tarjimon', icon: Languages, cost: 2, action: 'generateDocument', docType: 'tarjimon' },
+    { id: 'test', label: 'Test yaratish', icon: ClipboardList, cost: 3, action: 'generateDynamicTest' },
+  ];
+
+  const [selectedService, setSelectedService] = useState<any>(null);
+
+  const checkBalance = async (cost: number) => {
+    if (!user) return false;
+    if (user.role === 'admin' || user.role === 'subadmin') return true;
+    
+    try {
+      const uSnap = await getDoc(doc(db, 'users', user.uid));
+      if (!uSnap.exists()) return false;
+      const uData = uSnap.data();
+      const available = (uData.ball || 0) - (uData.spentBalls || 0);
+      return available >= cost;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const deductBalance = async (cost: number) => {
+    if (!user || user.role === 'admin' || user.role === 'subadmin') return;
+    const uSnap = await getDoc(doc(db, 'users', user.uid));
+    if (uSnap.exists()) {
+      await updateDoc(doc(db, 'users', user.uid), {
+        spentBalls: (uSnap.data().spentBalls || 0) + cost
+      });
+    }
+  };
+
+  const handleServiceClick = async (service: any) => {
+    const hasBalance = await checkBalance(service.cost);
+    if (!hasBalance) {
+      setAiMessages(prev => [...prev, { 
+        id: Date.now().toString(), 
+        role: 'assistant', 
+        text: `❌ Balansingiz yetarli emas! Ushbu xizmat narxi ${service.cost} ball. Iltimos, balansingizni to'ldiring.` 
+      }]);
+      return;
+    }
+    setSelectedService(service);
+    setAiMessages(prev => [...prev, { 
+      id: Date.now().toString(), 
+      role: 'assistant', 
+      text: `✨ ${service.label} tanlandi. Iltimos, mavzuni kiriting:` 
+    }]);
+  };
   
   const [chatId, setChatId] = useState<string | null>(null);
   const [adminId, setAdminId] = useState<string>('SYSTEM_ADMIN');
@@ -38,8 +99,12 @@ export function ChatbotWidget() {
           const fallbackSnap = await getDocs(query(collection(db, 'users'), where('email', 'in', ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com']), limit(1)));
           if (!fallbackSnap.empty) setAdminId(fallbackSnap.docs[0].id);
         }
-      } catch (e) {
-        console.error("Adminni topishda xatolik:", e);
+      } catch (e: any) {
+        if (e?.message?.includes('Quota limit exceeded')) {
+           console.log("Adminni topishda xatolik: (Quota limit exceeded)");
+        } else {
+           console.error("Adminni topishda xatolik:", e);
+        }
       }
     };
     findAdmin();
@@ -92,7 +157,7 @@ export function ChatbotWidget() {
     if (!user || !user.uid || !adminId || adminId === 'SYSTEM_ADMIN') return;
 
     const q = query(collection(db, 'certificates'), where('studentId', '==', user.uid));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = safeOnSnapshot(q, (snap) => {
        snap.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
              const cert = change.doc.data();
@@ -166,17 +231,17 @@ export function ChatbotWidget() {
         localStorage.setItem(key, '1');
     };
 
-    const unsubC = onSnapshot(query(collection(db, 'courses'), orderBy('createdAt', 'desc'), limit(10)), snap => {
+    const unsubC = safeOnSnapshot(query(collection(db, 'courses'), orderBy('createdAt', 'desc'), limit(10)), snap => {
        snap.docChanges().forEach(c => { if (c.type === 'added') processAdded(c, 'kurs'); });
     });
 
-    const unsubT = onSnapshot(query(collection(db, 'tests'), orderBy('createdAt', 'desc'), limit(10)), snap => {
+    const unsubT = safeOnSnapshot(query(collection(db, 'tests'), orderBy('createdAt', 'desc'), limit(10)), snap => {
        snap.docChanges().forEach(c => { 
            if (c.type === 'added') processAdded(c, c.doc.data().type === 'exam' ? 'imtihon' : 'test'); 
        });
     });
 
-    const unsubS = onSnapshot(query(collection(db, 'subjects'), orderBy('createdAt', 'desc'), limit(10)), snap => {
+    const unsubS = safeOnSnapshot(query(collection(db, 'subjects'), orderBy('createdAt', 'desc'), limit(10)), snap => {
        snap.docChanges().forEach(c => { if (c.type === 'added') processAdded(c, 'mavzu'); });
     });
 
@@ -189,7 +254,7 @@ export function ChatbotWidget() {
     
     // We listen to messages where receiver is admin to find all people who texted the admin/bot
     const q1 = query(collection(db, 'messages'), where('receiverId', '==', adminId));
-    const unsub = onSnapshot(q1, (snap) => {
+    const unsub = safeOnSnapshot(q1, (snap) => {
        let unreadCount = 0;
        const senders = new Set<string>();
        const lastTimeMap: Record<string, number> = {};
@@ -303,11 +368,11 @@ export function ChatbotWidget() {
     const q1 = query(collection(db, 'messages'), where('senderId', '==', chatId));
     const q2 = query(collection(db, 'messages'), where('receiverId', '==', chatId));
 
-    const unsub1 = onSnapshot(q1, snap => {
+    const unsub1 = safeOnSnapshot(q1, snap => {
       updateMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const unsub2 = onSnapshot(q2, snap => {
+    const unsub2 = safeOnSnapshot(q2, snap => {
       updateMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
@@ -320,6 +385,11 @@ export function ChatbotWidget() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || loading) return;
+
+    if (activeTab === 'ai') {
+      await handleAiSend();
+      return;
+    }
 
     const textToSend = inputText.trim();
     setInputText('');
@@ -378,6 +448,105 @@ export function ChatbotWidget() {
     }
   };
 
+  const handleAiSend = async () => {
+    const textToSend = inputText.trim();
+    if (!textToSend && !selectedFile && !selectedService) return;
+
+    if (selectedService) {
+      await handleSpecializedService(textToSend);
+      return;
+    }
+
+    const newUserMsg = { id: Date.now().toString(), role: 'user', text: textToSend || (selectedFile ? "[Rasm yuborildi]" : "") };
+    setAiMessages(prev => [...prev, newUserMsg]);
+    setInputText('');
+    setLoading(true);
+
+    try {
+      let imageBase64 = null;
+      if (selectedFile) {
+        imageBase64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result?.toString().split(',')[1]);
+          reader.readAsDataURL(selectedFile);
+        });
+      }
+      setSelectedFile(null);
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: textToSend || "Ushbu rasmni tahlil qiling va foydalanuvchiga javob bering.",
+          history: aiMessages.filter(m => m.id !== 'welcome' && !m.isServicePreview).map(m => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.text }]
+          })),
+          imageBase64: imageBase64,
+          userName: user?.displayName || 'Foydalanuvchi',
+          systemContext: 'Siz AIEDUTIZIM platformasining aqlli yordamchisiz. Har qanday mavzudagi savolga aniq va muloyim javob bering.'
+        })
+      });
+
+      const data = await response.json();
+      if (data.reply) {
+        setAiMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', text: data.reply }]);
+      } else {
+        throw new Error("Bo'sh javob");
+      }
+    } catch (err) {
+      console.error("AI chat error:", err);
+      setAiMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', text: "Kechirasiz, hozirda AI bilan bog'lanib bo'lmadi. Iltimos keyinroq urinib ko'ring." }]);
+    } finally {
+      setLoading(false);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  };
+
+  const handleSpecializedService = async (topic: string) => {
+    const service = selectedService;
+    if (!service) return;
+    
+    setAiMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: topic }]);
+    setInputText('');
+    setLoading(true);
+    
+    try {
+      await deductBalance(service.cost);
+      
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: service.action,
+          topic: topic,
+          docType: service.docType,
+          count: service.action === 'generatePresentation' ? 7 : 10
+        })
+      });
+      
+      const data = await res.json();
+      setSelectedService(null);
+      
+      let replyText = "";
+      if (service.action === 'generatePresentation') {
+        replyText = data.map((s: any, i: number) => `### ${i+1}. ${s.title}\n${s.content}`).join('\n\n');
+      } else if (service.action === 'generateDynamicTest') {
+        replyText = data.map((t: any, i: number) => `${i+1}. ${t.text}\n${t.options.map((o, j) => `${String.fromCharCode(65+j)}) ${o}${j === t.correctIdx ? ' ✅' : ''}`).join('\n')}`).join('\n\n');
+      } else {
+        replyText = `# ${data.title}\n\n${data.content}`;
+      }
+      
+      setAiMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: replyText }]);
+    } catch (err) {
+      console.error("Specialized service error:", err);
+      setAiMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: "Kechirasiz, yaratishda xatolik yuz berdi." }]);
+    } finally {
+      setLoading(false);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  };
+
   return (
     <>
       <AnimatePresence>
@@ -389,33 +558,53 @@ export function ChatbotWidget() {
             className="fixed bottom-24 right-6 w-80 sm:w-96 h-[500px] max-h-[80vh] bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden z-50 flex-shrink-0"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white flex justify-between items-center shrink-0">
-               <div className="flex items-center gap-3">
-                  {isAdmin && adminView === 'chat' ? (
-                     <button onClick={() => {
-                        setAdminView('list');
-                        setSelectedUser(null);
-                        setChatId(`chatbot_admin_${user.uid}`);
-                     }} className="p-2 -ml-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
-                        <ArrowLeft className="w-5 h-5 text-white" />
-                     </button>
-                  ) : (
-                     <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                        <Bot className="w-6 h-6 text-white" />
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white flex flex-col shrink-0 gap-2">
+               <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                     {isAdmin && adminView === 'chat' ? (
+                        <button onClick={() => {
+                           setAdminView('list');
+                           setSelectedUser(null);
+                           setChatId(`chatbot_admin_${user.uid}`);
+                        }} className="p-2 -ml-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+                           <ArrowLeft className="w-5 h-5 text-white" />
+                        </button>
+                     ) : (
+                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                           <Bot className="w-6 h-6 text-white" />
+                        </div>
+                     )}
+                     <div>
+                       <h3 className="font-bold text-sm">
+                          {isAdmin && adminView === 'chat' && selectedUser ? selectedUser.displayName : (isAdmin && adminView === 'list' ? 'Suhbatdoshlar' : 'Muloqot')}
+                       </h3>
+                       <p className="text-blue-100 text-[10px] uppercase tracking-widest">
+                          {activeTab === 'ai' ? 'AI Yordamchi' : (isAdmin && adminView === 'chat' ? (selectedUser?.role === 'inquiry' ? 'Mehmon' : 'Foydalanuvchi') : 'Admin bilan muloqot')}
+                       </p>
                      </div>
-                  )}
-                  <div>
-                    <h3 className="font-bold text-sm">
-                       {isAdmin && adminView === 'chat' && selectedUser ? selectedUser.displayName : (isAdmin && adminView === 'list' ? 'Suhbatdoshlar' : 'Onlayn Muloqot')}
-                    </h3>
-                    <p className="text-blue-100 text-[10px] uppercase tracking-widest">
-                       {isAdmin && adminView === 'chat' ? (selectedUser?.role === 'inquiry' ? 'Mehmon' : 'Foydalanuvchi') : 'Admin bilan muloqot'}
-                    </p>
                   </div>
+                  <button onClick={() => setIsOpen(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+                     <X className="w-5 h-5 text-white" />
+                  </button>
                </div>
-               <button onClick={() => setIsOpen(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
-                  <X className="w-5 h-5 text-white" />
-               </button>
+               
+               {/* Tabs */}
+               {!isAdmin && (
+                 <div className="flex p-1 bg-black/10 rounded-xl">
+                   <button 
+                     onClick={() => setActiveTab('ai')}
+                     className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${activeTab === 'ai' ? 'bg-white text-blue-600 shadow-sm' : 'text-white/80 hover:text-white'}`}
+                   >
+                     AI Yordamchi
+                   </button>
+                   <button 
+                     onClick={() => setActiveTab('admin')}
+                     className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${activeTab === 'admin' ? 'bg-white text-blue-600 shadow-sm' : 'text-white/80 hover:text-white'}`}
+                   >
+                     Admin
+                   </button>
+                 </div>
+               )}
             </div>
 
             {isAdmin && adminView === 'list' ? (
@@ -432,8 +621,8 @@ export function ChatbotWidget() {
                        <Bot className="w-5 h-5 relative z-10" />
                     </div>
                     <div className="flex-1 min-w-0">
-                       <h4 className="font-bold text-sm text-blue-900 truncate">Suhbat testi</h4>
-                       <p className="text-xs text-blue-600 truncate">O'zi bilan suhbat</p>
+                       <h4 className="font-bold text-sm text-blue-900 truncate">AI Yordamchi (O'zingiz uchun)</h4>
+                       <p className="text-xs text-blue-600 truncate">AI bilan sinov suhbati</p>
                     </div>
                  </button>
                  
@@ -470,22 +659,49 @@ export function ChatbotWidget() {
                <>
                  {/* Chat Area */}
                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 flex flex-col min-h-0 custom-scrollbar">
-                    {messages.length === 0 && (
-                       <div className="flex-1 flex flex-col justify-center items-center text-center opacity-50">
-                          <Bot className="w-12 h-12 mb-3 mt-10" />
-                          <p className="text-sm px-4">Assalomu alaykum! Savol va murojaatlaringizni shu yerda yozib qoldirishingiz mumkin. Xabaringiz to'g'ridan-to'g'ri administratorga yetkaziladi. Admin tez orada javob yozadi.</p>
-                       </div>
+                    {activeTab === 'ai' ? (
+                       <>
+                         <div className="grid grid-cols-2 gap-2 mb-4 shrink-0 px-1">
+                            {aiServices.map(s => (
+                              <button 
+                                key={s.id} 
+                                onClick={() => handleServiceClick(s)}
+                                className="flex flex-col items-center justify-center p-2 bg-white border border-gray-100 rounded-xl hover:shadow-md transition-all group"
+                              >
+                                <s.icon className="w-4 h-4 text-blue-600 mb-1 group-hover:scale-110 transition-transform" />
+                                <span className="text-[10px] font-medium text-gray-700 text-center">{s.label}</span>
+                                <span className="text-[9px] text-gray-400 mt-0.5">{s.cost} ball</span>
+                              </button>
+                            ))}
+                         </div>
+                         {aiMessages.map((msg) => (
+                            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm'}`}>
+                                {msg.text}
+                              </div>
+                            </div>
+                         ))}
+                       </>
+                    ) : (
+                       <>
+                         {messages.length === 0 && (
+                            <div className="flex-1 flex flex-col justify-center items-center text-center opacity-50">
+                               <Bot className="w-12 h-12 mb-3 mt-10" />
+                               <p className="text-sm px-4">Assalomu alaykum! Savol va murojaatlaringizni shu yerda yozib qoldirishingiz mumkin. Xabaringiz to'g'ridan-to'g'ri administratorga yetkaziladi. Admin tez orada javob yozadi.</p>
+                            </div>
+                         )}
+                         {messages.map((msg) => {
+                           const isMe = msg.senderId === (isAdmin && adminView === 'chat' && selectedUser ? adminId : chatId);
+                           return (
+                             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                               <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm'}`}>
+                                 {msg.text}
+                               </div>
+                             </div>
+                           );
+                         })}
+                       </>
                     )}
-                    {messages.map((msg) => {
-                      const isMe = msg.senderId === (isAdmin && adminView === 'chat' && selectedUser ? adminId : chatId);
-                      return (
-                        <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm'}`}>
-                            {msg.text}
-                          </div>
-                        </div>
-                      );
-                    })}
                     {loading && (
                       <div className="flex justify-start">
                         <div className="max-w-[80%] rounded-2xl p-4 bg-white border border-gray-100 rounded-bl-sm shadow-sm flex items-center gap-2">
