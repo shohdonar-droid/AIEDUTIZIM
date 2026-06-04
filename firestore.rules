@@ -43,6 +43,7 @@ service cloud.firestore {
     }
 
     // --- Core Content Collections ---
+    match /botConfig/{id} { allow read: if true; allow write: if isAdmin(); }
     match /courses/{id} { allow read: if true; allow write: if isTeacher(); }
     match /departments/{id} { allow read: if true; allow write: if isTeacher(); }
     match /groups/{id} { allow read: if true; allow write: if isTeacher(); }
@@ -84,6 +85,14 @@ service cloud.firestore {
     }
 
     match /telegram_users/{id} {
+      allow read, write: if true;
+    }
+
+    match /telegram_user_states/{id} {
+      allow read, write: if true;
+    }
+
+    match /payments/{id} {
       allow read, write: if true;
     }
 

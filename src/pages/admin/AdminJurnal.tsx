@@ -198,11 +198,7 @@ export default function AdminJurnal() {
               org: users[d.userId]?.teacherId,
             };
           })
-          .filter(
-            (r) =>
-              users[r.userId] &&
-              users[r.userId].role === "student",
-          );
+          .filter((r) => users[r.userId] && users[r.userId].role === "student");
         setTestResults(results);
 
         // Fetch quiz_history
@@ -459,8 +455,8 @@ export default function AdminJurnal() {
                 className="w-full sm:w-auto px-4 py-3 bg-white border border-gray-200 rounded-2xl font-bold focus:ring-2 focus:ring-blue-600"
               >
                 <option value="">Barcha tashkilotlar</option>
-                {organizations.map((o) => (
-                  <option key={o.uid} value={o.uid}>
+                {organizations.map((o, idx) => (
+                  <option key={`${o.uid || "org"}_${idx}`} value={o.uid}>
                     {o.name}
                   </option>
                 ))}
@@ -649,8 +645,8 @@ export default function AdminJurnal() {
                 className="w-full sm:w-auto px-4 py-3 bg-white border border-gray-200 rounded-2xl font-bold focus:ring-2 focus:ring-blue-600"
               >
                 <option value="">Barcha tashkilotlar</option>
-                {organizations.map((o) => (
-                  <option key={o.uid} value={o.uid}>
+                {organizations.map((o, idx) => (
+                  <option key={`${o.uid || "org"}_${idx}`} value={o.uid}>
                     {o.name}
                   </option>
                 ))}

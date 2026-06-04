@@ -6,6 +6,17 @@ import { generateContentWithRotation, getGeminiKeysPool } from "./src/lib/gemini
 import dotenv from "dotenv";
 import { launchBot } from "./telegram";
 
+function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
+  if (!text) return defaultOutput;
+  try {
+    const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("JSON parse error:", e);
+    return defaultOutput;
+  }
+}
+
 dotenv.config();
 
 async function startServer() {
@@ -57,7 +68,7 @@ async function startServer() {
         return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda sozlanmagan)." });
       }
 
-      const MODEL_NAME = "gemini-2.5-flash-lite";
+      const MODEL_NAME = "gemini-2.5-flash"; // More stable version
 
       if (action === "generateDynamicTest") {
         const prompt = context 
@@ -94,20 +105,35 @@ async function startServer() {
           }
         });
 
-        const json = JSON.parse(response.text || "[]");
+        const json = parseJSONResponse(response.text, []);
         return res.json(json);
 
       } else if (action === "generatePresentation") {
-        const prompt = `Mavzu: "${topic}". 
-          Ushbu mavzu bo'yicha ${count || 5} ta slayddan iborat mukammal taqdimot (presentation) rejasini va matnini o'zbek tilida yarating. 
-          Malumotlar 100% aniq va ilmiy bo'lishi kerak.
-          Har bir slayd uchun: sarlavha (title) va asosiy qism matni (content) bo'lishi kerak.
-          MATN UCHUN QOIDALAR:
-          1. Matematik formulalar va belgilarni Markdown dagi LaTeX yordamida yozing. In-line formulalar uchun $...$ va alohida qator formulalar uchun $$...$$ foydalaning (masalan, $\\pi$, $r^2$, $E=mc^2$). Kasrlar uchun $\\frac{a}{b}$ ishlating.
-          2. Slaydlar ichida mavzuga mos 1 ta AI grafik yoki rasm joylashtiring. Buning uchun Markdown rasm formatidan foydalanib, uning manbasini (URL) quyidagidek bering:
-             ![grafik nomi](https://image.pollinations.ai/prompt/{rasm_haqida_inglizcha_promtingiz}?width=800&height=600&nologo=true)
-          3. Agar qulay bo'lsa, ma'lumotlarni jadvallar (Markdown tables) ko'rinishida bering. 
-          Javob JSON formatida bo'lsin.`;
+        const prompt = `Mavzu: "${topic}".
+          Ushbu mavzu bo'yicha doimiy 15 ta slide-dan iborat o'ta professional, zamonaviy va mukammal taqdimot (presentation) rejasini va matnini o'zbek tilida tayyorlang.
+          
+          AVVAL TAQDIMOT REJASI VA QAYSIDIR SHABLONGA MOSLIGINI ANIQLAB OLING.
+          Siz quyidagi 5 ta Premium taqdimot shablonidan eng mos keladiganini tanlashingiz va buttun taqdimotni shu uslubda yaratishingiz kerak:
+          1. "Business" - Chuqur ko'k va tilla tuslar, moliyaviy, biznes va rasmiy taqdimotlar uchun maqbul.
+          2. "Education" - Yashil, jigarrang va qum ranglari, ta'lim, darslik, seminar va ilm-fan mavzulari uchun juda mos.
+          3. "Minimal" - Oq va to'q kulrang, klassik Shvetsariya (Vite) dizayni, nafislik va chuqur minimalizm shinavandalari uchun.
+          4. "Modern" - To'q koinot kuli fonida yaltiroq binafsharang va havorang neon tuslari, IT, SaaS va startaplar uchun.
+          5. "Creative" - Shaftoli guli, malina va to'q sarg'ish tuslar, san'at, ijod, marketing va dizayn taqdimotlari uchun.
+
+          AI oddiy matnli slaydlar yaratmasin. Har bir slayd professional dizayn (layouts) bilan turlicha va estetik boy bo'lishi kerak.
+          Hech qanday "Rasm uchun joy" yoki placeholder matnlari bo'lmasin. Slaydga mos keladigan yuqori aniqlikdagi rasm yoki infografika uchun Inglizcha so'z turkumlarida qidirish kalit so'zlarini (imageKeyword) bering!
+
+          Slayd turlari (layouts) unumli foydalanilsin:
+          - "cover" - Titul sahifasi (Taqdimot boshlanishi, asosan birinchi slayd uchun)
+          - "agenda" - Mundarija sahifasi (asosan ikkinchi slayd uchun)
+          - "content" - Oddiy ma'lumotli sahifa (sarlovha, subtitli, qisqa paragraflar va bullet points)
+          - "image-left" - Chap tomonda rasm/grafik va o'ng tomonda matn
+          - "image-right" - O'ng tomonda rasm/grafik va chap tomonda matn
+          - "cards" - Infografik kartochkalar (kamida 3-4 ta elementli qisqa kartalar shaklida ma'lumot)
+          - "summary" - Xulosa / Yakunlash sahifasi, o'ta tushunarli vizual ko'rinishda.
+          
+          Statistik ma'lumotlar bo'lsa diagrammalar (chartData) qaytarilsin.
+          Qaytariladigan JSON tarkibida "template" (yuqoridagilardan biri), "designPlan" (rang palitrasi va uslub tushuntirishi) va 15 ta elementdan iborat "slides" ro'yxati qaytarilsin. Javob faqat JSON formatida bo'lsin.`;
 
         const response = await generateContentWithRotation({
           model: MODEL_NAME,
@@ -115,32 +141,132 @@ async function startServer() {
           config: {
             responseMimeType: "application/json",
             responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  content: { type: Type.STRING, description: "Markdown formatida asosiy matn" }
+              type: Type.OBJECT,
+              properties: {
+                template: { 
+                  type: Type.STRING, 
+                  description: "Presentation template choice: 'Business', 'Education', 'Minimal', 'Modern', 'Creative'" 
                 },
-                required: ["title", "content"]
-              }
+                designPlan: { 
+                  type: Type.STRING, 
+                  description: "Design and color planning brief description" 
+                },
+                slides: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      layout: { 
+                        type: Type.STRING, 
+                        description: "Slide layout: cover, agenda, content, image-left, image-right, cards, summary" 
+                      },
+                      title: { type: Type.STRING },
+                      subtitle: { type: Type.STRING },
+                      content: { type: Type.STRING, description: "Qisqa, aniq va lo'nda tahrirbop ilmiy-ommabop matn" },
+                      bulletPoints: { 
+                        type: Type.ARRAY, 
+                        items: { type: Type.STRING },
+                        description: "Asosiy nuqtalar, cards tarkibi yoki timeline etaplari uchun 3-4 ta gap"
+                      },
+                      imageKeyword: { 
+                        type: Type.STRING, 
+                        description: "Slayd sarlavhasiga mos vizual Inglizcha qidiruv so'zi (placeholder emas!), masalan: 'abstract financial chart blue background', 'students coding in university classroom'" 
+                      },
+                      iconType: {
+                        type: Type.STRING,
+                        description: "Slaydga mos keluvchi mavhum ikonka nomi: 'growth', 'idea', 'connection', 'book', 'globe', 'people', 'team', 'doc', 'trophy'"
+                      },
+                      chartData: {
+                        type: Type.ARRAY,
+                        items: {
+                          type: Type.OBJECT,
+                          properties: {
+                            label: { type: Type.STRING },
+                            value: { type: Type.NUMBER }
+                          },
+                          required: ["label", "value"]
+                        },
+                        description: "Statistik malumotlar uchun oddiy diagramma ma'lumotlari shakllantirilsa"
+                      }
+                    },
+                    required: ["layout", "title"]
+                  }
+                }
+              },
+              required: ["template", "slides"]
             }
           }
         });
 
-        const json = JSON.parse(response.text || "[]");
+        const json = parseJSONResponse(response.text, { template: "Modern", slides: [] });
         return res.json(json);
 
       } else if (action === "generateDocument") {
         let prompt = '';
-        if (docType === 'kurs_ishi') {
-          prompt = `Mavzu: "${topic}". 
-     Ushbu mavzu bo'yicha mukammal va to'liq "Kurs ishi" (Coursework) tayyorlang. 
-     O'zbek tilida, ilmiy uslubda bo'lishi shart.
-     Varaqlar soni (taxminan): ${options?.pageCount || 20} varaq kabi juda keng qamrovli va batafsil bo'lsin.
-     Reja: Kirish, bir nechta boblar (har biri bir necha paragraflar bilan), Xulosa va Foydalanilgan adabiyotlar ruyxati bo'lishi kerak.
-     Matematik va fizik formulalarni LaTeX yordamida yozing.
-     Javob faqat JSON formatida bo'lsin.`;
+        if (docType === "kurs_ishi") {
+          prompt = `Ma'lumotlar: "${topic}". 
+     Ushbu ma'lumotlar/mavzu asosida juda mukammal, to'liq, mazmun jihatdan doimiy 25-30 sahifalik ilmiy-tadqiqot darajasidagi "Kurs ishi" (Coursework) tayyorlang. O'zbek tilida, rasmiy akademik uslubda yozilishi shart.
+     
+     TARKIBIY QISMI QUYIDAGI TARTIBDA BO'LSIN:
+     1. TITUL VARAQ (NAMUNA):
+        OTM NOMI: [Oliy ta'lim muassasasi nomi]
+        FAKULTET: [Fakultet nomi]
+        KAFEDRA: [Kafedra nomi]
+        KURS ISHI MAVZUSI: "${topic.toUpperCase()}"
+        BAJARDI: [Talaba F.I.Sh.]
+        ILMIY RAHBAR: [Ilmiy rahbar F.I.Sh., ilmiy darajasi]
+        SHAHAR VA YIL: [Shahar] - 2026 (Foydalanuvchi bularni o'zi osongina tahrirlab to'g'irlab olishi mumkin)
+     2. MUNDARIJA (Mavzu darsliklariga mos keladigan rejalar)
+     3. KIRISH (Mavzuning dolzarbligi, obyekti, predmeti, metodlari, maqsad va vazifalari to'liq va keng yoritilgan)
+     4. ASOSIY BOBLAR (Kamida 2-3 ta bob, har bir bobda 1.1, 1.2, 2.1, 2.2 kabi kamida 2 tadan mukammal yozilgan kichik bo'limlar bo'lishi va har biri juda uzun, tahlillar, formulalar, muammolar va yechimlarga boy bo'lishi shart)
+     5. XULOSA VA TAVSIYALAR (Tadqiqot natijalari tahlili asosidagi mustaqil xulosalar)
+     6. FOYDALANILGAN ADABIYOTLAR RO'YXATI (Kamida 10-15 ta ilmiy, rasmiy va zamonaviy adabiyotlar to'liq bibliografik me'yorlarda ro'yxati)
+     
+     Har bir bob va bo'limni o'ta batafsil va batafsil tushuntirishlar bilan, doimiy 25-30 listli (sahifali) akademik hajmga to'liq javob beradigan darajada nihoyatda uzun va qiziqarli yozing.`;
+        } else if (docType === "tezis") {
+          prompt = `Ma'lumotlar: "${topic}". 
+          Ushbu mavzu/ma'lumotlar asosida mukammal va professional Ilmiy Tezis (Thesis/Abstract) tayyorlang. O'zbek tilida, ilmiy uslubda.
+          Tarkibi:
+          1. Sarlavha (Mavzu nomi)
+          2. Muallif(lar) va Ilmiy rahbar haqida ma'lumot (namuna sifatida kiritiladi, foydalanuvchi keyinchalik o'zgartirishi mumkin)
+          3. Annotatsiya (O'zbek va Ingliz tillarida qisqacha ma'lumot)
+          4. Kalit so'zlar (5-8 ta asosiy ilmiy atama)
+          5. Kirish va O'rganilganlik darajasi
+          6. Asosiy Qism (Metodlar, amaliy natijalar, tahlillar)
+          7. Xulosa (Tadqiqot yakuniy natijalari)
+          8. Foydalanilgan Adabiyotlar ro'yxati (Kamida 3-5 ta asosiy manba)
+          Tezis to'liq va barcha ilmiy me'yorlarga javob beradigan professional darajada yozilsin.`;
+        } else if (docType === "maqola") {
+          prompt = `Ma'lumotlar: "${topic}". 
+          Ushbu mavzu/ma'lumotlar asosida nufuzli ilmiy jurnallar (OAK yoki xalqaro Scopus/Web of Science) talablariga mos keladigan professional darajadagi nufuzli ilmiy Maqola yarating. O'zbek tilida, rasmiy va yuqori ilmiy uslubda.
+          Tarkibi:
+          1. Maqola Sarlavha (Mavzu nomi)
+          2. Muallif(lar) va ishlash/o'qish joyi (Namuna sifatida kiritiladi)
+          3. Annotatsiya (O'zbek tilida) va Abstract (Ingliz tilida, mukammal grammatika bilan)
+          4. Kalit so'zlar / Keywords
+          5. Kirish (Introduction) - Mavzuning dolzarbligi, qo'yilgan masala
+          6. Metodologiya (Research Methodology) - Qo'llanilgan ilmiy uslublar
+          7. Natijalar (Results) - Tadqiqot davomida olingan yangi ilmiy natijalar
+          8. Tahlil va Muhokama (Discussion) - Olingan natijalarning qiyosiy tahlili
+          9. Xulosa (Conclusion) - Yakuniy xulosalar va kelajakdagi tadqiqot yo'nalishlari
+          10. Foydalanilgan Adabiyotlar (References) - Kamida 10 ta xalqaro va milliy ilmiy manbalar
+          Maqola juda batafsil, ilmiy g'oyalarga boy va yuqori saviyada yozilsin.`;
+        } else if (docType === "dars_ishlanma") {
+          prompt = `Ma'lumotlar: "${topic}". 
+          Ushbu ma'lumotlar asosida zamonaviy dars berish metodlari va ilg'or pedagogik texnologiyalar asosida tayyorlangan mukammal va to'liq "Dars ishlanmasi" (Lesson Plan) tayyorlang. O'zbek tilida va pedagogik qoidalarga mos holda yozilishi shart.
+          Tarkibi:
+          1. Umumiy ma'lumotlar (Fan, Mavzu, Sinf yoki Kurs, Dars turi, Dars davomiyligi - Namuna sifatida to'ldirilgan)
+          2. Darsning maqsadi (Ta'limiy, Tarbiyaviy, Rivojlantiruvchi maqsadlar batafsil ko'rsatiladi)
+          3. Kompetensiyalar (Mavzuga doir tayanch va fanga oid kompetensiyalar)
+          4. Jihozlar va Dars metodlari (Ko'rgazmali qurollar, AKT, interaktiv uslublar)
+          5. Darsning borishi / Dars bosqichlari (Tashkiliy qism, o'tilgan mavzuni mustahkamlash, yangi mavzu bayoni - batafsil yondashuv bilan, mustahkamlash bosqichlari)
+          6. Mustahkamlash partiyasi (Mavzu yuzasidan interaktiv savollar, topshiriqlar va keyslar)
+          7. Baholash va Rag'batlantirish (Mezonlar asosida)
+          8. Uyga vazifa (Ijodiy va amaliy topshiriqlar)
+          Dars o'qituvchi va talabalar uchun to'liq yo'riqnoma vazifasini o'taydigan darajada batafsil yozilsin.`;
+        } else if (docType === "tarjimon") {
+          prompt = `Matn: "${topic}".
+          Ushbu matnni xalqaro tarjimonlik darajasida tarjima qilib bering. Matn qay tilida ekanligini o'zingiz aniqlab ushbu matnni O'zbek tiliga erkin tarjima qiling (yoki agar matn O'zbekcha bo'lsa Ingliz tiliga tarjima qilib ber).`;
         } else if (docType === 'dars_ishlanma') {
           prompt = `Mavzu: "${topic}". Ushbu mavzu bo'yicha maktab yoki universitet uchun 1 soatlik (45-80 min) batafsil "Dars ishlanmasi" (Lesson plan) tayyorlang. O'zbek tilida bo'lishi shart.
      Darsning maqsadi, jihozlari, mavzu bayoni, o'qitish metodlari, mashqlar va uy vazifasi to'liq yozilsin.
@@ -185,7 +311,7 @@ async function startServer() {
           }
         });
 
-        const json = JSON.parse(response.text || "{}");
+        const json = parseJSONResponse(response.text, {});
         return res.json(json);
 
       } else if (action === "generateDynamicCourse") {
@@ -222,7 +348,7 @@ async function startServer() {
           }
         });
 
-        const json = JSON.parse(response.text || "{}");
+        const json = parseJSONResponse(response.text, {});
         return res.json(json);
       } else {
         return res.status(400).json({ error: "Noma'lum amal" });
@@ -243,7 +369,7 @@ async function startServer() {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-2.5-flash-lite",
+        model: model || "gemini-2.5-flash",
         contents: prompt
       });
 
@@ -430,7 +556,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-2.5-flash-lite",
+               model: "gemini-2.5-flash",
                contents: contents,
                config: {
                  systemInstruction,

@@ -381,7 +381,9 @@ export default function TeacherJurnal() {
           "Jami test soni": r.totalQuestions || 0,
           "Foiz (%)": pct + "%",
           Baho: getResultGrade(pct),
-          Sana: r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString("uz-UZ") : "-",
+          Sana: r.createdAt?.toDate
+            ? r.createdAt.toDate().toLocaleString("uz-UZ")
+            : "-",
         };
       });
     }
@@ -689,7 +691,7 @@ export default function TeacherJurnal() {
                       teacherGroups.find((x) => x.id === student.groupId)
                         ?.name || "-";
                     return (
-                      <tr key={student.uid}>
+                      <tr key={`${student.uid || "student"}_exam_${i}`}>
                         <td className="px-6 py-4 font-bold text-gray-400">
                           {i + 1}
                         </td>
@@ -804,7 +806,7 @@ export default function TeacherJurnal() {
                       teacherGroups.find((x) => x.id === student.groupId)
                         ?.name || "-";
                     return (
-                      <tr key={student.uid}>
+                      <tr key={`${student.uid || "student"}_test_${i}`}>
                         <td className="px-6 py-4 font-bold text-gray-400">
                           {i + 1}
                         </td>

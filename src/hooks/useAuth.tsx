@@ -52,7 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
      localStorage.removeItem('impersonateUserId');
-     await auth.signOut();
+     localStorage.removeItem('offline_user_profile');
+     localStorage.removeItem('cached_user_profile');
+     try {
+       await auth.signOut();
+     } catch (e) {}
      window.location.href = '/login';
   };
 
@@ -132,8 +136,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         });
       } else {
-        setUser(null);
-        localStorage.removeItem('cached_user_profile');
+        const offlineProfile = localStorage.getItem('offline_user_profile');
+        if (offlineProfile) {
+          try {
+            setUser(JSON.parse(offlineProfile));
+          } catch (e) {
+            setUser(null);
+            localStorage.removeItem('cached_user_profile');
+          }
+        } else {
+          setUser(null);
+          localStorage.removeItem('cached_user_profile');
+        }
         setLoading(false);
       }
     });

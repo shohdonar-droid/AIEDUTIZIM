@@ -141,7 +141,7 @@ export default function TeacherCertificates() {
                     onChange={(e) => setSelectedStudent(e.target.value)}
                   >
                     <option value="">Tanlash...</option>
-                    {students.map(s => <option key={s.uid} value={s.uid}>{s.displayName}</option>)}
+                    {students.map((s, idx) => <option key={`${s.uid || 'student'}_${idx}`} value={s.uid}>{s.displayName}</option>)}
                   </select>
                 </div>
 

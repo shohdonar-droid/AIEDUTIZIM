@@ -583,7 +583,7 @@ export default function TeacherStudents() {
                  </tr>
               )}
               {filteredUsers.map((u, i) => (
-                <tr key={u.uid} className="hover:bg-gray-50/50">
+                <tr key={`${u.uid || 'user'}_${i}`} className="hover:bg-gray-50/50">
                   <td className="px-6 py-4 font-bold text-gray-400">{i + 1}</td>
                   <td className="px-6 py-4 font-black">{u.displayName}</td>
                   <td className="px-6 py-4 font-medium text-sm text-gray-500">{u.phone || '-'}</td>
