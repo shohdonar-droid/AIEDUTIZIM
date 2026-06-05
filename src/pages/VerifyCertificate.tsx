@@ -47,8 +47,10 @@ export default function VerifyCertificate() {
             const cSnap = await getDoc(doc(db, 'courses', data.courseId));
             studentName = uSnap.exists() ? uSnap.data().displayName : 'Talaba';
             courseTitle = cSnap.exists() ? cSnap.data().title : 'Kurs';
-          } catch (e) {
-            console.error("Meta fetch error:", e);
+          } catch (e: any) {
+            if (!e?.message?.includes("Quota")) {
+              console.error("Meta fetch error:", e);
+            }
           }
           
           setCert({

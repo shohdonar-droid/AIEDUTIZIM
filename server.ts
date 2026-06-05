@@ -5,6 +5,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { generateContentWithRotation, getGeminiKeysPool } from "./src/lib/gemini";
 import dotenv from "dotenv";
 import { launchBot } from "./telegram";
+import { initPostgres } from "./src/lib/postgres";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
   if (!text) return defaultOutput;
@@ -17,11 +18,113 @@ function parseJSONResponse(text: string | null | undefined, defaultOutput: any):
   }
 }
 
+function validateKursIshi(
+  content: string,
+  university?: string,
+  faculty?: string,
+  studentName?: string,
+  advisor?: string,
+  topic?: string
+): { isValid: boolean; reason?: string; cleanContent: string } {
+  let text = content || "";
+
+  const universityVal = university || "O'zbekiston Milliy Universiteti";
+  const facultyVal = faculty || "Amaliy matematika va intellektual texnologiyalar fakulteti";
+  const studentVal = studentName || "Toshpo'latov F.H.";
+  const advisorVal = advisor || "Dots. Karimov S.A.";
+  const topicVal = topic || "Zamonaviy sun'iy intellekt tizimlari";
+  const shaharVal = "Toshkent";
+
+  // Replace common placeholders
+  text = text
+    .replace(/\[Oliy ta'lim muassasasi nomi\]/gi, universityVal)
+    .replace(/\[OTM nomi\]/gi, universityVal)
+    .replace(/\[OTM\]/gi, universityVal)
+    .replace(/\[Fakultet nomi\]/gi, facultyVal)
+    .replace(/\[Fakultet\]/gi, facultyVal)
+    .replace(/\[Kafedra nomi\]/gi, "Axborot texnologiyalari kafedrasi")
+    .replace(/\[Kafedra\]/gi, "Axborot texnologiyalari kafedrasi")
+    .replace(/\[Talaba F\.I\.Sh\.\]/gi, studentVal)
+    .replace(/\[Talaba\]/gi, studentVal)
+    .replace(/\[Ilmiy rahbar F\.I\.Sh\., ilmiy darajasi\]/gi, advisorVal)
+    .replace(/\[Ilmiy rahbar F\.I\.Sh\.\]/gi, advisorVal)
+    .replace(/\[Ilmiy rahbar\]/gi, advisorVal)
+    .replace(/\[Shahar\]/gi, shaharVal)
+    .replace(/\[Mavzu\]/gi, topicVal)
+    .replace(/\[Yil\]/gi, "2026")
+    .replace(/\[Ism Sharif\]/gi, studentVal)
+    .replace(/\[F\.I\.Sh\.\]/gi, studentVal)
+    .replace(/\[Kafedra mudiri F\.I\.Sh\.\]/gi, "Prof. Alimov A.B.");
+
+  // General unresolved bracket regex check for generic words inside square brackets e.g. [Nomi], but not standard markdown literature links [1]
+  const bracketPlaceholderRegex = /\[([^\]\d]{3,50})\]/g;
+  text = text.replace(bracketPlaceholderRegex, (match, p1) => {
+    const p1Lower = p1.toLowerCase();
+    if (p1Lower.includes("otm") || p1Lower.includes("universitet") || p1Lower.includes("institut") || p1Lower.includes("muassasa")) return universityVal;
+    if (p1Lower.includes("fakultet")) return facultyVal;
+    if (p1Lower.includes("talaba") || p1Lower.includes("talabasi") || p1Lower.includes("bajaruvchi") || p1Lower.includes("f.i.sh")) return studentVal;
+    if (p1Lower.includes("rahbar") || p1Lower.includes("maslahatchi") || p1Lower.includes("advisor")) return advisorVal;
+    if (p1Lower.includes("shahar") || p1Lower.includes("manzil")) return shaharVal;
+    if (p1Lower.includes("mavzu")) return topicVal;
+    if (p1Lower.includes("yil") || p1Lower.includes("sana")) return "2026";
+    return p1;
+  });
+
+  // Ensure scientific style on certain colloquial expressions if any sneaked in
+  text = text
+    .replace(/Menimcha /gi, "Tadqiqotlar shuni ko'rsatadiki, ")
+    .replace(/Mening fikrimcha /gi, "Tahlillar natijasida aniqlandiki, ")
+    .replace(/buning uchun /gi, "mazkur maqsadga erishish uchun ")
+    .replace(/Bu juda qiziqarli mavzu/gi, "Mazkur ilmiy mavzu bugungi kunda dolzarb hisoblanadi")
+    .replace(/Ushbu mavzu juda qiziqarli/gi, "Mazkur mavzuning dolzarbligi shundaki")
+    .replace(/Bu yaxshi usul/gi, "Mazkur yondashuvning samaradorligi yuqori");
+
+  // Structural checks
+  const hasMundarija = /mundarija|reja|content|index/i.test(text);
+  const hasKirish = /kirish|introduction/i.test(text);
+  const hasXulosa = /xulosa|conclusion/i.test(text);
+  const hasAdabiyotlar = /adabiyotlar|adabiyot|bibliography|references|manbalar/i.test(text);
+  const hasBoblari = /bob|chapter|1-bob|i bob|i-bob|ii-bob|1\./i.test(text);
+
+  let isValid = true;
+  let reason = "";
+
+  if (!hasMundarija) {
+    isValid = false;
+    reason += "Mundarija bo'limi aniqlanmadi (reja yo'q). ";
+  }
+  if (!hasKirish) {
+    isValid = false;
+    reason += "Kirish bo'limi aniqlanmadi (dolzarbligi, maqsadi, obyekti, predmeti kerak). ";
+  }
+  if (!hasXulosa) {
+    isValid = false;
+    reason += "Xulosa bo'limi aniqlanmadi. ";
+  }
+  if (!hasAdabiyotlar) {
+    isValid = false;
+    reason += "Foydalanilgan adabiyotlar ro'yxati topilmadi (kamida 10-20 ta GOST manbalari). ";
+  }
+  if (!hasBoblari) {
+    isValid = false;
+    reason += "Asosiy boblar tuzilishi (Boblar va paragraflar) aniqlanmadi. ";
+  }
+
+  return { isValid, reason, cleanContent: text };
+}
+
 dotenv.config();
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Initialize PostgreSQL and restore cached states from cloud database
+  try {
+    await initPostgres();
+  } catch (pgError) {
+    console.error("[PostgreSQL] Failed during startup init:", pgError);
+  }
 
   // Launch the Telegram bot silently in the background
   launchBot();
@@ -68,7 +171,7 @@ async function startServer() {
         return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda sozlanmagan)." });
       }
 
-      const MODEL_NAME = "gemini-2.5-flash"; // More stable version
+      const MODEL_NAME = "gemini-3.5-flash";
 
       if (action === "generateDynamicTest") {
         const prompt = context 
@@ -110,30 +213,34 @@ async function startServer() {
 
       } else if (action === "generatePresentation") {
         const prompt = `Mavzu: "${topic}".
-          Ushbu mavzu bo'yicha doimiy 15 ta slide-dan iborat o'ta professional, zamonaviy va mukammal taqdimot (presentation) rejasini va matnini o'zbek tilida tayyorlang.
+          Siz o'ta professional, premium darajadagi (Canva Premium, Beautiful.ai kabi) taqdimot (presentation) ustasisiz. 
+          Ushbu mavzu bo'yicha ${count || 15} ta slide-dan iborat o'ta vizual, infografikali va mukammal taqdimot rejasini va qisqa, tushunarli matnini o'zbek tilida tayyorlang.
           
-          AVVAL TAQDIMOT REJASI VA QAYSIDIR SHABLONGA MOSLIGINI ANIQLAB OLING.
-          Siz quyidagi 5 ta Premium taqdimot shablonidan eng mos keladiganini tanlashingiz va buttun taqdimotni shu uslubda yaratishingiz kerak:
-          1. "Business" - Chuqur ko'k va tilla tuslar, moliyaviy, biznes va rasmiy taqdimotlar uchun maqbul.
-          2. "Education" - Yashil, jigarrang va qum ranglari, ta'lim, darslik, seminar va ilm-fan mavzulari uchun juda mos.
-          3. "Minimal" - Oq va to'q kulrang, klassik Shvetsariya (Vite) dizayni, nafislik va chuqur minimalizm shinavandalari uchun.
-          4. "Modern" - To'q koinot kuli fonida yaltiroq binafsharang va havorang neon tuslari, IT, SaaS va startaplar uchun.
-          5. "Creative" - Shaftoli guli, malina va to'q sarg'ish tuslar, san'at, ijod, marketing va dizayn taqdimotlari uchun.
+          QOIDALAR:
+          1. 30% matn, 70% vizual bo'lishi shart. Katta slayd matnga to'lib ketmasin.
+          2. Bir slaydda 5 tadan ortiq bullet point bo'lmasin. Muhim fikrlar qisqa yozilsin.
+          3. Hech qanday "Rasm uchun joy" degan matn bo'lmasin. 
+          4. AI mavzuni chuqur tahlil qilsin va (SWOT, Diagramma, Arxitektura kabi) o'ziga xos vizual bo'limlarni ham mustaqil qo'shib yuborsin.
 
-          AI oddiy matnli slaydlar yaratmasin. Har bir slayd professional dizayn (layouts) bilan turlicha va estetik boy bo'lishi kerak.
-          Hech qanday "Rasm uchun joy" yoki placeholder matnlari bo'lmasin. Slaydga mos keladigan yuqori aniqlikdagi rasm yoki infografika uchun Inglizcha so'z turkumlarida qidirish kalit so'zlarini (imageKeyword) bering!
-
-          Slayd turlari (layouts) unumli foydalanilsin:
-          - "cover" - Titul sahifasi (Taqdimot boshlanishi, asosan birinchi slayd uchun)
-          - "agenda" - Mundarija sahifasi (asosan ikkinchi slayd uchun)
-          - "content" - Oddiy ma'lumotli sahifa (sarlovha, subtitli, qisqa paragraflar va bullet points)
-          - "image-left" - Chap tomonda rasm/grafik va o'ng tomonda matn
-          - "image-right" - O'ng tomonda rasm/grafik va chap tomonda matn
-          - "cards" - Infografik kartochkalar (kamida 3-4 ta elementli qisqa kartalar shaklida ma'lumot)
-          - "summary" - Xulosa / Yakunlash sahifasi, o'ta tushunarli vizual ko'rinishda.
+          TUZILMA:
+          Taqdimot quyidagi qoliplarga asoslanishi kerak: Titul, Mundarija, Kirish, Asosiy qism, Tahlil, Diagrammalar, Statistikalar, Xulosa, Rahmat.
           
-          Statistik ma'lumotlar bo'lsa diagrammalar (chartData) qaytarilsin.
-          Qaytariladigan JSON tarkibida "template" (yuqoridagilardan biri), "designPlan" (rang palitrasi va uslub tushuntirishi) va 15 ta elementdan iborat "slides" ro'yxati qaytarilsin. Javob faqat JSON formatida bo'lsin.`;
+          DIZAYN VA LAYOUTLAR:
+          Mavjud layout turlari:
+          - "cover" - Titul sahifasi (Asosiy sarlavha, fon)
+          - "agenda" - Mundarija
+          - "content" - Qisqa matn va ikonka
+          - "image-left" - Rasm chapda, matn o'ngda
+          - "image-right" - Rasm o'ngda, matn chapda
+          - "cards" - Infografika / SmartArt kartochkalari (maqsadlar, etaplar). 3-4 element.
+          - "chart" - QuickChart orqali statistika (Pie, Bar, Line, Radar, Donut).
+          - "summary" - Yakuniy xulosa va rahmat.
+
+          Slaydga kiritiladigan Icon nomlari ("iconType") Inglizcha (masalan: mdi:rocket, mdi:chart-bar, mdi:cogs, mdi:account-group) formatda bo'lsin.
+          Agar layout "chart" bo'lsa, "chartType" ("pie", "bar", "line", "radar", "doughnut") va "chartData" obyekti berilsin.
+          Agar layout vizual rasm bo'lsa, "imageKeyword" qidiruviga aniq inglizcha rasm qidirish tushunchasi berilsin.
+
+          Qaytariladigan JSON tarkibida "template" ("Akademik", "Zamonaviy", "Minimalistik", "Korporativ" - kelganida shulardan asosiy designni yozing) va ${count || 15} ta elementdan iborat "slides" ro'yxati qaytarilsin. Javob faqat JSON formatida bo'lsin yopiq (markdown code block ni ishlatmasdan).`;
 
         const response = await generateContentWithRotation({
           model: MODEL_NAME,
@@ -145,7 +252,7 @@ async function startServer() {
               properties: {
                 template: { 
                   type: Type.STRING, 
-                  description: "Presentation template choice: 'Business', 'Education', 'Minimal', 'Modern', 'Creative'" 
+                  description: "Design template" 
                 },
                 designPlan: { 
                   type: Type.STRING, 
@@ -158,23 +265,27 @@ async function startServer() {
                     properties: {
                       layout: { 
                         type: Type.STRING, 
-                        description: "Slide layout: cover, agenda, content, image-left, image-right, cards, summary" 
+                        description: "Slide layout: cover, agenda, content, image-left, image-right, cards, chart, summary" 
                       },
                       title: { type: Type.STRING },
                       subtitle: { type: Type.STRING },
-                      content: { type: Type.STRING, description: "Qisqa, aniq va lo'nda tahrirbop ilmiy-ommabop matn" },
+                      content: { type: Type.STRING, description: "Qisqa, lo'nda 30% matnli ilmiy-ommabop tushuntirish" },
                       bulletPoints: { 
                         type: Type.ARRAY, 
                         items: { type: Type.STRING },
-                        description: "Asosiy nuqtalar, cards tarkibi yoki timeline etaplari uchun 3-4 ta gap"
+                        description: "Maksimal 5 ta nuqta."
                       },
                       imageKeyword: { 
                         type: Type.STRING, 
-                        description: "Slayd sarlavhasiga mos vizual Inglizcha qidiruv so'zi (placeholder emas!), masalan: 'abstract financial chart blue background', 'students coding in university classroom'" 
+                        description: "Inglizcha qidiruv so'zi, masalan: 'server architecture 3d rendering'" 
                       },
                       iconType: {
                         type: Type.STRING,
-                        description: "Slaydga mos keluvchi mavhum ikonka nomi: 'growth', 'idea', 'connection', 'book', 'globe', 'people', 'team', 'doc', 'trophy'"
+                        description: "Slaydga mos keluvchi Iconify icon nomi: masalan 'mdi:rocket', 'mdi:server', 'mdi:brain'"
+                      },
+                      chartType: {
+                        type: Type.STRING,
+                        description: "Faqat layout='chart' bo'lganda: 'pie', 'bar', 'line', 'radar', yoki 'doughnut'"
                       },
                       chartData: {
                         type: Type.ARRAY,
@@ -186,7 +297,7 @@ async function startServer() {
                           },
                           required: ["label", "value"]
                         },
-                        description: "Statistik malumotlar uchun oddiy diagramma ma'lumotlari shakllantirilsa"
+                        description: "Statistik malumotlar uchun oddiy diagramma ma'lumotlari"
                       }
                     },
                     required: ["layout", "title"]
@@ -198,12 +309,70 @@ async function startServer() {
           }
         });
 
-        const json = parseJSONResponse(response.text, { template: "Modern", slides: [] });
+        const json = parseJSONResponse(response.text, { template: "Zamonaviy", slides: [] });
         return res.json(json);
 
       } else if (action === "generateDocument") {
         let prompt = '';
         if (docType === "kurs_ishi") {
+          const university = options?.university || "O'zbekiston Milliy Universiteti";
+          const faculty = options?.faculty || "Amaliy matematika va intellektual texnologiyalar fakulteti";
+          const department = options?.department || "Axborot texnologiyalari kafedrasi";
+          const direction = options?.direction || "Sun'iy intellekt va dasturlash yo'nalishi";
+          const studentName = options?.studentName || "Toshpo'latov F.H.";
+          const advisor = options?.advisor || "Dots. Karimov S.A.";
+          const pageCount = options?.pageCount || "25-30";
+
+          prompt = `Siz O'zbekiston oliy ta'lim muassasalari standartlari bo'yicha yuqori saviyadagi, mukammal va akademik "Kurs ishi" (Coursework / Term Paper) tayyorlab beruvchi professional ilmiy ekspert-tizimsiz.
+          
+      Mavzu: "${topic}". 
+      Tashkiliy ma'lumotlar:
+      - OTM nomi: ${university}
+      - Fakultet nomi: ${faculty}
+      - Kafedra nomi: ${department}
+      - Yo'nalish: ${direction}
+      - Talaba: ${studentName}
+      - Ilmiy rahbar: ${advisor}
+      - Kutilayotgan umumiy hajm: ${pageCount} sahifa
+
+      Ushbu kurs ishi oddiy referat, blog kabi maqolalar yoki sun'iy intellekt tomonidan yuzaki yozilgan umumiy matn ko'rinishida bo'lmasin!
+
+      QUYIDAGI AKADEMIK VA METODIK STANDARTLARGA QAT'IY RIOYA QILING:
+
+      1. ILMIY USLUB:
+         - To'liq ilmiy va rasmiy uslubda, muassasalar tomonidan qabul qilingan akademik atamalar va chuqur tahlillar bilan yozilsin.
+         - Matnda hech qachon "Menimcha", "Mening fikrimcha", "Ushbu mavzu juda qiziqarli", "Bu yaxshi usul", "Men ko'rib chiqdim" kabi noakademik va shaxsiy qarashlarni bildiruvchi yengil iboralar ishlatilmasin!
+         - Buning o'rniga faqat akademik jurnallarga xos iboralardan keng foydalaning:
+           * "Tahlillar natijasida aniqlandiki..."
+           * "Tadqiqotlar shuni ko'rsatadiki..."
+           * "Mazkur yondashuvning afzalligi..."
+           * "Ilmiy manbalar asosida..."
+           * "Tajribalar va nazariy qarashlar qiyosiy tahlil qilinganda..."
+           * "Zaruriy xulosa va hisoblar ko'rsatadiki..."
+
+      2. MUKAMMAL AKADEMIK STRUKTURA (Matn har bir bo'lim va sarlavhalarni o'z ichiga olishi shart):
+         - MUNDARIJA: Mavzuga mos mantiqiy boblar va rejani o'z ichiga oladi.
+         - KIRISH: Quyidagi elementlar albatta alohida bandlar ko'rinishida chuqur tahlil qilinib keng yoritilsin:
+           * Mavzuning dolzarbligi (Dolzarblik qismi kamida 2-3 ta pishiq va uzun paragraf bo'lsin)
+           * Tadqiqot maqsadi
+           * Tadqiqot vazifalari
+           * Tadqiqot obyekti
+           * Tadqiqot predmeti
+           * Tadqiqot metodlari
+           * Tadqiqotning amaliy ahamiyati
+         - I BOB: NAZARIY VA METODOLOGIK ASOSLARI. Kamida 2-3 ta paragrafdan iborat bo'lsin. Mavzuning mohiyati, nazariy tushunchalari, ilmiy izohlar va dunyo tajribasi batafsil tahlil qilinsin.
+         - II BOB: AMALIY TAHLIL VA EKSPERIMENTAL NATIJALAR. Kamida 2-3 ta paragrafdan iborat bo'lsin. Amaliy sohadagi muammolar, tahlillar va olingan natijalar to'laqonli yoritilsin.
+         - III BOB: MAZKUR SOHANING RIVOJLANISH ISTIQBOLLARI. Kamida 2 ta paragraf bo'lib, olingan natijalarning kelajakdagi tatbiqi va takomillashtirish yechimlari yozilsin.
+         - XULOSA: Ilmiy jihatdan mustahkam asoslangan, amaliy tavsiyalar bilan pishiq yakunlovchi umumiy xulosa.
+         - FOYDALANILGAN ADABIYOTLAR: Kamida 10 tadan 20 tagacha mukammal davlat tili va xorijiy tillardagi kitoblar, OAK jurnallari va rasmiy ilmiy manbalar ro'yxati (GOST yoki OTM me'yoriga to'liq mos: Muallif, kitob nomi, nashriyot, yil, masalan: 'Karimov A.B. Sun'iy intellekt asoslari. - Toshkent: Fan, 2023. - 128 b.').
+         - ILOVALAR (agar kerak bo'lsa): Amaliy hisob-kitob, kichik dasturiy kod yoki jadval ko'rinishidagi ilova namunasi.
+
+      3. PLACEHOLDER VA FORMAT CHECK:
+         - Matnda "[OTM]", "[Fakultet]", "[Talaba]", "[Shahar]", "[Mavzu]" kabi to'rtburchak qavsli placeholderlar mutlaqo qoldirilmasin! Ularning o'rniga yuqoridagi haqiqiy ma'lumotlarni ishlating.
+         - Foydalanuvchi ma'lumotlarini matn tarkibiga to'la integratsiya qiling.
+
+      Matnni nihoyatda pishiq, akademik jihatdan eng yuqori baho oladigan darajada, boy va kengaytiruvchi darsliklar hamda mustaqil nazariyaga asoslangan mukammal ilmiy bo'limlar bilan tayyorlang.`;
+        } else if (false) {
           prompt = `Ma'lumotlar: "${topic}". 
      Ushbu ma'lumotlar/mavzu asosida juda mukammal, to'liq, mazmun jihatdan doimiy 25-30 sahifalik ilmiy-tadqiqot darajasidagi "Kurs ishi" (Coursework) tayyorlang. O'zbek tilida, rasmiy akademik uslubda yozilishi shart.
      
@@ -265,8 +434,9 @@ async function startServer() {
           8. Uyga vazifa (Ijodiy va amaliy topshiriqlar)
           Dars o'qituvchi va talabalar uchun to'liq yo'riqnoma vazifasini o'taydigan darajada batafsil yozilsin.`;
         } else if (docType === "tarjimon") {
-          prompt = `Matn: "${topic}".
-          Ushbu matnni xalqaro tarjimonlik darajasida tarjima qilib bering. Matn qay tilida ekanligini o'zingiz aniqlab ushbu matnni O'zbek tiliga erkin tarjima qiling (yoki agar matn O'zbekcha bo'lsa Ingliz tiliga tarjima qilib ber).`;
+          prompt = `Ma'lumotlar: "${topic}".
+          Yuqoridagi ma'lumotlarda "Target Language" (Tarjima qilinadigan til) berilgan. 
+          Iltimos, berilgan matnni xalqaro tarjimonlik darajasida, grammatik qoidalarga rioya qilgan holda faqatgina ko'rsatilgan maqsadli tilga tarjima qiling. Qavslarsiz, to'g'ridan to'g'ri tarjimani bering.`;
         } else if (docType === 'dars_ishlanma') {
           prompt = `Mavzu: "${topic}". Ushbu mavzu bo'yicha maktab yoki universitet uchun 1 soatlik (45-80 min) batafsil "Dars ishlanmasi" (Lesson plan) tayyorlang. O'zbek tilida bo'lishi shart.
      Darsning maqsadi, jihozlari, mavzu bayoni, o'qitish metodlari, mashqlar va uy vazifasi to'liq yozilsin.
@@ -295,24 +465,74 @@ async function startServer() {
      Javob faqat JSON formatida bo'lsin.`;
         }
 
-        const response = await generateContentWithRotation({
-          model: MODEL_NAME,
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                content: { type: Type.STRING, description: "Markdown formatida to'liq matn" }
-              },
-              required: ["title", "content"]
+        let finalJson: any = {};
+        if (docType === "kurs_ishi") {
+          let attempts = 0;
+          let isFullyValid = false;
+          let currentPrompt = prompt;
+
+          while (attempts < 2 && !isFullyValid) {
+            console.log(`[Kurs Ishi Generation] Attempt ${attempts + 1} starting...`);
+            const response = await generateContentWithRotation({
+              model: "gemini-3.1-pro-preview",
+              contents: currentPrompt,
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    content: { type: Type.STRING, description: "Markdown formatida to'liq matn" }
+                  },
+                  required: ["title", "content"]
+                }
+              }
+            });
+
+            finalJson = parseJSONResponse(response.text, {});
+            const validation = validateKursIshi(
+              finalJson.content,
+              options?.university,
+              options?.faculty,
+              options?.studentName,
+              options?.advisor,
+              topic
+            );
+
+            if (validation.isValid) {
+              isFullyValid = true;
+              finalJson.content = validation.cleanContent;
+              console.log("[Kurs Ishi Generation] Successfully validated and cleared placeholders!");
+            } else {
+              attempts++;
+              console.warn(`[Kurs Ishi Generation Failed Validation] Attempt ${attempts}: ${validation.reason}`);
+              if (attempts >= 2) {
+                finalJson.content = validation.cleanContent;
+                break;
+              }
+              currentPrompt = `${prompt}\n\n⚠️ OLDINGI URINISHDA XATOLAR ANIQLANDI. ILTIMOS QUYIDAGI MUAMMOLARNI TO'LIQ TUZATIB GENERATSIYA QILING:\n${validation.reason}\nSiz taqdim etayotgan kurs ishi barcha talablarga (Mundarija, Kirish, I BOB, II BOB, Xulosa, Foydalanilgan adabiyotlar) javob bersin va hech qanday to'rtburchak qavsli placeholderlar qolib ketmasin!`;
             }
           }
-        });
+        } else {
+          const response = await generateContentWithRotation({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  content: { type: Type.STRING, description: "Markdown formatida to'liq matn" }
+                },
+                required: ["title", "content"]
+              }
+            }
+          });
+          finalJson = parseJSONResponse(response.text, {});
+        }
 
-        const json = parseJSONResponse(response.text, {});
-        return res.json(json);
+        return res.json(finalJson);
 
       } else if (action === "generateDynamicCourse") {
         const prompt = `Mavzu: "${topic}".
@@ -369,7 +589,7 @@ async function startServer() {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-2.5-flash",
+        model: model || "gemini-3.5-flash",
         contents: prompt
       });
 
@@ -556,7 +776,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-2.5-flash",
+               model: "gemini-3.5-flash",
                contents: contents,
                config: {
                  systemInstruction,
@@ -591,13 +811,25 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
 
       res.json({ reply: replyText });
     } catch (error: any) {
-      let errMsg = error.message || "Xatolik yuz berdi";
+      let errMsg = "";
+      if (error && error.message) {
+        errMsg = error.message;
+      } else if (typeof error === 'string') {
+        errMsg = error;
+      } else {
+        errMsg = "Noma'lum xato";
+      }
+      
+      console.error("[Gemini API Endpoint Error]", req.body?.action || 'unknown', errMsg, error);
+      
       if (errMsg.includes("API key not valid") || errMsg.includes("API_KEY_INVALID")) {
         errMsg = "API kaliti yaroqsiz. Iltimos, AI Studio sozlamalari orqali to'g'ri Gemini API kalitini o'rnating.";
       } else if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED")) {
         errMsg = "Hozirda aqlli yordamchimiz biroz band yoki tanaffusda ☕️. Iltimos, bir necha daqiqadan so'ng qayta so'rab ko'ring. Tez orada u sizga bajonidil yordam beradi!";
+      } else if (errMsg.includes("503") || errMsg.includes("504")) {
+        errMsg = "Tarmoq xatosi yoki server o'ta band (API 503). Qayta urinib ko'ring.";
       }
-      res.status(500).json({ error: errMsg });
+      res.status(500).json({ error: errMsg, rawError: error ? error.toString() : "No details" });
     }
   });
 

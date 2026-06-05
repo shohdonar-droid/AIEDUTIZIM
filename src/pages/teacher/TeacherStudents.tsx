@@ -222,9 +222,11 @@ export default function TeacherStudents() {
           dbUsers.sort((a, b) => a.displayName.localeCompare(b.displayName, 'uz-UZ'));
           setUsers(dbUsers);
           setLoading(false);
-        }, (err) => {
-          console.error("TeacherStudents Snapshot Error:", err);
-          handleFirestoreError(err, OperationType.LIST, `users (activeTab: ${activeTab})`);
+        }, (err: any) => {
+          if (!err?.message?.includes("Quota")) {
+            console.error("TeacherStudents Snapshot Error:", err);
+            handleFirestoreError(err, OperationType.LIST, `users (activeTab: ${activeTab})`);
+          }
           setLoading(false);
         });
 

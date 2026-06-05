@@ -22,7 +22,9 @@ function safeOnSnapshot(
     } else if (typeof observerOrOnNextOrOnError === 'function') {
        observerOrOnNextOrOnError(err);
     } else {
-       console.error('Snapshot Error:', err);
+       if (!err?.message?.includes('Quota')) {
+         console.error('Snapshot Error:', err);
+       }
     }
   };
 

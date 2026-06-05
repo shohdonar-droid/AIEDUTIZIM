@@ -59,7 +59,9 @@ export default function Home() {
           setContent(defaultContent);
         }
       } catch (err: any) {
-        console.error('Content fetch error:', err);
+        if (!err?.message?.includes("Quota")) {
+          console.error('Content fetch error:', err);
+        }
         if (!content) setContent(defaultContent);
       }
 
@@ -111,7 +113,9 @@ export default function Home() {
         setCourses(finalCourses);
         localStorage.setItem('cache_courses', JSON.stringify(finalCourses));
       } catch (e: any) {
-        console.error('Courses fetch error:', e);
+        if (!e?.message?.includes("Quota")) {
+          console.error('Courses fetch error:', e);
+        }
       }
 
       try {
@@ -131,7 +135,9 @@ export default function Home() {
         setStats(newStats);
         localStorage.setItem('cache_stats', JSON.stringify(newStats));
       } catch (e: any) {
-        console.error('Stats fetch error:', e);
+        if (!e?.message?.includes("Quota")) {
+          console.error('Stats fetch error:', e);
+        }
       }
     }
     fetchData();

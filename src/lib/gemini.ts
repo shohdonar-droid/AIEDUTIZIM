@@ -92,7 +92,7 @@ export async function generateContentWithRotation(
   }
 ): Promise<any> {
   const pool = getGeminiKeysPool();
-  const maxAttempts = Math.max(2, pool.length);
+  const maxAttempts = Math.max(4, pool.length * 2);
 
   let attempts = 0;
   let lastError: any = null;
@@ -101,10 +101,17 @@ export async function generateContentWithRotation(
     const activeIndex = (currentKeyIndex + attempts) % (pool.length || 1);
     const { client, keyIndex } = getRotationalClient(activeIndex);
 
+    // Fall back to highly available, resilient gemini-3.5-flash if pro or other models fail due to overloading (e.g. 503/429)
+    let modelToUse = params.model;
+    if (attempts >= 1 && params.model !== "gemini-3.5-flash") {
+      modelToUse = "gemini-3.5-flash";
+      console.log(`[Gemini Rotator] Attempt ${attempts + 1}: Falling back to highly-available "gemini-3.5-flash" (original model: "${params.model}") due to load/rate limits.`);
+    }
+
     try {
-      console.log(`[Gemini Rotator] Attempting generation using key index ${keyIndex}/${pool.length || 1} with model ${params.model}`);
+      console.log(`[Gemini Rotator] Attempting generation using key index ${keyIndex}/${pool.length || 1} with model ${modelToUse}`);
       const response = await client.models.generateContent({
-        model: params.model,
+        model: modelToUse,
         contents: params.contents,
         config: params.config,
       });
@@ -116,9 +123,11 @@ export async function generateContentWithRotation(
       attempts++;
       lastError = error;
       const errMsg = error.message || "";
-      console.warn(
-        `[Gemini Rotator] Attempt ${attempts} failed with key index ${keyIndex}. Error: ${errMsg}.`
-      );
+      if (!errMsg.includes("Quota") && !errMsg.includes("quota") && !errMsg.includes("429")) {
+        console.warn(
+          `[Gemini Rotator] Attempt ${attempts} failed with key index ${keyIndex}. Error: ${errMsg}.`
+        );
+      }
       
       // Do not retry on 400 Bad Request / Invalid Argument as the payload itself is wrong
       if (
@@ -129,6 +138,11 @@ export async function generateContentWithRotation(
          errMsg.includes('code": 400')
       ) {
          throw error;
+      }
+      
+      // Add a backoff delay for 503/429 errors before retrying
+      if (errMsg.includes("503") || errMsg.includes("429") || errMsg.includes("quota")) {
+         await new Promise((resolve) => setTimeout(resolve, 2000 * attempts));
       }
     }
   }

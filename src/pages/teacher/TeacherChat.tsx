@@ -203,8 +203,10 @@ export default function TeacherChat() {
         times1 = t;
         updateAllCountsAndTimes();
       },
-      (err) => {
-        console.error("TeacherChat Unread Snapshot Error:", err);
+      (err: any) => {
+        if (!err?.message?.includes("Quota")) {
+          console.error("TeacherChat Unread Snapshot Error:", err);
+        }
       },
     );
 
@@ -221,8 +223,10 @@ export default function TeacherChat() {
         times3 = t;
         updateAllCountsAndTimes();
       },
-      (err) => {
-        console.error("TeacherChat msg3 Snapshot Error:", err);
+      (err: any) => {
+        if (!err?.message?.includes("Quota")) {
+          console.error("TeacherChat msg3 Snapshot Error:", err);
+        }
       },
     );
 
@@ -260,8 +264,10 @@ export default function TeacherChat() {
         );
         setMessages([...msgs]);
       },
-      (err) => {
-        console.error("TeacherChat msg1 Snapshot Error:", err);
+      (err: any) => {
+        if (!err?.message?.includes("Quota")) {
+          console.error("TeacherChat msg1 Snapshot Error:", err);
+        }
       },
     );
 
@@ -286,8 +292,10 @@ export default function TeacherChat() {
           }
         });
       },
-      (err) => {
-        console.error("TeacherChat msg2 Snapshot Error:", err);
+      (err: any) => {
+        if (!err?.message?.includes("Quota")) {
+          console.error("TeacherChat msg2 Snapshot Error:", err);
+        }
       },
     );
 

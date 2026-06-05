@@ -8,8 +8,9 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.get('email', '') in ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'] ||
-        getUserRole() == 'admin'
+        (request.auth.token.email != null && (request.auth.token.email == 'shohdonar@gmail.com' || request.auth.token.email == 'elyorbek@admin.uz' || request.auth.token.email == 'elyorbek@gmail.com')) ||
+        getUserRole() == 'admin' ||
+        getUserRole() == 'subadmin'
       );
     }
 

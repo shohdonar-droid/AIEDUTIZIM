@@ -424,8 +424,10 @@ export function ChatbotWidget() {
         setLastTimeMapState(lastTimeMap);
         setActiveUids(Array.from(senders));
       },
-      (error) => {
-        console.error("Snapshot error loading admin chats:", error);
+      (error: any) => {
+        if (!error?.message?.includes("Quota")) {
+          console.error("Snapshot error loading admin chats:", error);
+        }
       },
     );
     return () => unsub();

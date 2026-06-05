@@ -27,7 +27,9 @@ export default function Courses() {
         setCourses(data);
         localStorage.setItem('cache_courses_list', JSON.stringify(data));
       } catch (err: any) {
-        console.error('Courses fetch error:', err);
+        if (!err?.message?.includes("Quota")) {
+          console.error('Courses fetch error:', err);
+        }
         // If not in cache, fallback to defaults
         if (!courses.length) {
           const defaults = [

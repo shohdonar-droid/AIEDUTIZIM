@@ -21,6 +21,7 @@ import {
 } from "firebase/firestore";
 import { GoogleGenAI, Type } from "@google/genai";
 import { generateContentWithRotation } from "./src/lib/gemini";
+import { saveToPostgres } from "./src/lib/postgres";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -171,7 +172,8 @@ if (db) {
     } else {
       setDoc(doc(db, "settings", "bot_settings"), { isPaused: false, status: "active", adminTelegramId: "", adminTelegramIds: [] }).catch(() => {});
     }
-  }, (err) => {
+  }, (err: any) => {
+    if (err?.message?.includes("Quota")) return;
     console.error("[Telegram Runtime] Error listening to bot_settings:", err);
   });
 }
@@ -187,7 +189,7 @@ interface GlobalTelegram {
 const globalT = globalThis as unknown as GlobalTelegram;
 
 if (!globalT.bot) {
-  globalT.bot = new Telegraf(botToken);
+  globalT.bot = new Telegraf(botToken, { handlerTimeout: 9_000_000 });
 }
 export const bot = globalT.bot;
 
@@ -218,7 +220,9 @@ export function registerAdminId(id: number) {
     const list = getAdminIds();
     if (!list.includes(id)) {
       list.push(id);
-      fs.writeFileSync(adminIdsPath, JSON.stringify(list), "utf8");
+      const contentStr = JSON.stringify(list);
+      fs.writeFileSync(adminIdsPath, contentStr, "utf8");
+      saveToPostgres(adminIdsPath, contentStr).catch(() => {});
       console.log("[Telegram] Registered admin Telegram ID:", id);
     }
   } catch (e) {}
@@ -340,7 +344,9 @@ export async function fetchTelegramUsersCount() {
       });
       telegramUsersCount = list.length;
       try {
-        fs.writeFileSync(tgUsersListPath, JSON.stringify(list), "utf8");
+        const contentStr = JSON.stringify(list);
+        fs.writeFileSync(tgUsersListPath, contentStr, "utf8");
+        saveToPostgres(tgUsersListPath, contentStr).catch(() => {});
       } catch (err) {}
       console.log("[Telegram] Initialized telegramUsersCount from DB and cache:", telegramUsersCount);
     } catch (e: any) {
@@ -371,7 +377,9 @@ async function registerTelegramId(
   if (!userList.includes(targetRegisterId)) {
     userList.push(targetRegisterId);
     try {
-      fs.writeFileSync(tgUsersListPath, JSON.stringify(userList), "utf8");
+      const contentStr = JSON.stringify(userList);
+      fs.writeFileSync(tgUsersListPath, contentStr, "utf8");
+      saveToPostgres(tgUsersListPath, contentStr).catch(() => {});
     } catch (err) {}
     telegramUsersCount = userList.length;
     console.log(`[Telegram] Registered new chat target ID: ${targetRegisterId}. Total: ${telegramUsersCount}`);
@@ -454,7 +462,9 @@ class PersistentMap<K, V> extends Map<K, V> {
   private save(keyToUpdate?: K, valueToUpdate?: V, isDelete: boolean = false) {
     try {
       const data = Array.from(this.entries());
-      fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2), "utf8");
+      const contentStr = JSON.stringify(data, null, 2);
+      fs.writeFileSync(this.filePath, contentStr, "utf8");
+      saveToPostgres(this.filePath, contentStr).catch(() => {});
 
       if (db && this.syncToFirestoreKey && keyToUpdate) {
         const docId = String(keyToUpdate);
@@ -488,7 +498,9 @@ class PersistentMap<K, V> extends Map<K, V> {
   clear() {
     super.clear();
     try {
-      fs.writeFileSync(this.filePath, JSON.stringify([], null, 2), "utf8");
+      const contentStr = JSON.stringify([], null, 2);
+      fs.writeFileSync(this.filePath, contentStr, "utf8");
+      saveToPostgres(this.filePath, contentStr).catch(() => {});
     } catch (e) {}
   }
 }
@@ -555,7 +567,8 @@ export async function trackTelegramUserActivity(userId: number, from: any, role:
         };
         activeTgSessions.set(userId, session);
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message?.includes("Quota")) return;
       console.error("Error checking open TG session in DB:", err);
     }
   }
@@ -571,8 +584,8 @@ export async function trackTelegramUserActivity(userId: number, from: any, role:
           durationMinutes: duration
         });
         console.log(`[TG Session] Closed stale session ${session.sessionId} for tg_${userId}`);
-      } catch (err) {
-        console.error("Error closing stale TG session:", err);
+      } catch (err: any) {
+        if (!err?.message?.includes("Quota")) console.error("Error closing stale TG session:", err);
       }
       
       // Open fresh session
@@ -594,8 +607,8 @@ export async function trackTelegramUserActivity(userId: number, from: any, role:
           loginTime: now
         });
         console.log(`[TG Session] Created fresh session ${docRef.id} for tg_${userId}`);
-      } catch (err) {
-        console.error("Error creating fresh TG session:", err);
+      } catch (err: any) {
+        if (!err?.message?.includes("Quota")) console.error("Error creating fresh TG session:", err);
       }
     } else {
       // Within 2 minutes, update heartbeat
@@ -604,8 +617,8 @@ export async function trackTelegramUserActivity(userId: number, from: any, role:
         await updateDoc(doc(db, "activityLogs", session.sessionId), {
           lastActiveTime: now
         });
-      } catch (err) {
-        console.error("Error updating TG session heartbeat:", err);
+      } catch (err: any) {
+        if (!err?.message?.includes("Quota")) console.error("Error updating TG session heartbeat:", err);
       }
     }
   } else {
@@ -628,8 +641,8 @@ export async function trackTelegramUserActivity(userId: number, from: any, role:
         loginTime: now
       });
       console.log(`[TG Session] Spawning brand new session ${docRef.id} for tg_${userId}`);
-    } catch (err) {
-      console.error("Error spawning brand new TG session:", err);
+    } catch (err: any) {
+      if (!err?.message?.includes("Quota")) console.error("Error spawning brand new TG session:", err);
     }
   }
 }
@@ -666,7 +679,8 @@ export async function sweepInactiveSessions() {
         console.log(`[Sweeper] Closed inactive session ${d.id} for ${data.userId} (Idle: ${Math.round(idleTime/1000)}s)`);
       }
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.includes("Quota")) return;
     console.error("[Sweeper] Error sweeping inactive sessions:", err);
   }
 }
@@ -815,8 +829,10 @@ async function getKeyboard(
         }
       }
     }
-  } catch (e) {
-    console.error("Dynamic menu load error:", e);
+  } catch (e: any) {
+    if (!e?.message?.includes("Quota")) {
+      console.error("Dynamic menu load error:", e);
+    }
   }
 
   const rows: any[][] = [];
@@ -1061,7 +1077,9 @@ bot.start(async (ctx) => {
     userList.push(userId);
     isNewUser = true;
     try {
-      fs.writeFileSync(tgUsersListPath, JSON.stringify(userList), "utf8");
+      const contentStr = JSON.stringify(userList);
+      fs.writeFileSync(tgUsersListPath, contentStr, "utf8");
+      saveToPostgres(tgUsersListPath, contentStr).catch(() => {});
     } catch (err) {}
 
     // Referral system handling
@@ -1738,9 +1756,11 @@ ${coursesListText}`;
   // Persist to file for app restarts
   const statsCachePath = path.join(process.cwd(), "telegram_stats_cache.json");
   try {
-    fs.writeFileSync(statsCachePath, JSON.stringify({
+    const contentStr = JSON.stringify({
       adminsCount, teachersCount, staffCount, studentsCount, tgUsersCount
-    }), "utf8");
+    });
+    fs.writeFileSync(statsCachePath, contentStr, "utf8");
+    saveToPostgres(statsCachePath, contentStr).catch(() => {});
   } catch (err) {}
 
   return result;
@@ -1786,97 +1806,71 @@ async function runPresentationGeneration(ctx: any, data: any) {
       const slidesList = Array.isArray(respData.slides) ? respData.slides : (Array.isArray(respData) ? respData : []);
 
       const stylesMap: Record<string, any> = {
-        Business: {
-          bg: "F8FAFC",
-          coverBg: "0F172A",
-          titleColor: "FFFFFF",
-          contentTitleColor: "0F172A",
-          contentSub: "3B82F6",
-          contentBody: "1E293B",
-          primaryAccent: "3B82F6",
-          secondaryAccent: "10B981",
-          accentLight: "EFF6FF",
-          bannerFill: "0F172A"
+        Zamonaviy: {
+          bg: "F8FAFC", coverBg: "0F172A", titleColor: "FFFFFF", contentTitleColor: "0F172A",
+          contentSub: "2563EB", contentBody: "1E293B", primaryAccent: "2563EB", secondaryAccent: "7C3AED",
+          accentLight: "EFF6FF", bannerFill: "0F172A"
         },
-        Education: {
-          bg: "FAF8F5",
-          coverBg: "065F46",
-          titleColor: "FFFFFF",
-          contentTitleColor: "065F46",
-          contentSub: "B45309",
-          contentBody: "1F2937",
-          primaryAccent: "15803D",
-          secondaryAccent: "FBBF24",
-          accentLight: "F0FDF4",
-          bannerFill: "065F46"
+        Akademik: {
+          bg: "FAF8F5", coverBg: "1E40AF", titleColor: "FFFFFF", contentTitleColor: "1E3A8A",
+          contentSub: "10B981", contentBody: "1F2937", primaryAccent: "1E40AF", secondaryAccent: "F59E0B",
+          accentLight: "EFF6FF", bannerFill: "1E40AF"
         },
-        Minimal: {
-          bg: "FAFAFA",
-          coverBg: "171717",
-          titleColor: "FFFFFF",
-          contentTitleColor: "000000",
-          contentSub: "E11D48",
-          contentBody: "262626",
-          primaryAccent: "000000",
-          secondaryAccent: "D4D4D4",
-          accentLight: "F5F5F5",
-          bannerFill: "171717"
+        Minimalistik: {
+          bg: "FFFFFF", coverBg: "171717", titleColor: "FFFFFF", contentTitleColor: "000000",
+          contentSub: "2563EB", contentBody: "262626", primaryAccent: "000000", secondaryAccent: "7C3AED",
+          accentLight: "F5F5F5", bannerFill: "171717"
         },
-        Modern: {
-          bg: "0F172A",
-          coverBg: "0B0F19",
-          titleColor: "FFFFFF",
-          contentTitleColor: "FFFFFF",
-          contentSub: "A855F7",
-          contentBody: "CBD5E1",
-          primaryAccent: "8B5CF6",
-          secondaryAccent: "06B6D4",
-          accentLight: "1E293B",
-          bannerFill: "0F172A"
-        },
-        Creative: {
-          bg: "FFF1F2",
-          coverBg: "4C0519",
-          titleColor: "FFFFFF",
-          contentTitleColor: "4C0519",
-          contentSub: "F43F5E",
-          contentBody: "3F2021",
-          primaryAccent: "F43F5E",
-          secondaryAccent: "F97316",
-          accentLight: "FFE4E6",
-          bannerFill: "4C0519"
+        Korporativ: {
+          bg: "F1F5F9", coverBg: "0B0F19", titleColor: "FFFFFF", contentTitleColor: "0B0F19",
+          contentSub: "EF4444", contentBody: "334155", primaryAccent: "2563EB", secondaryAccent: "10B981",
+          accentLight: "E2E8F0", bannerFill: "0B0F19"
         }
       };
 
-      const selectedStyle = stylesMap[templateName] || stylesMap.Modern;
+      const selectedStyle = stylesMap[templateName] || stylesMap.Zamonaviy || stylesMap.Modern;
 
       const getSlideImage = (query: string) => {
         return `https://image.pollinations.ai/prompt/${encodeURIComponent(query)}?width=800&height=600&nologo=true&seed=${Math.floor(Math.random()*1000)}`;
       };
       
       const getIconUrl = (iconName: string) => {
-        return `https://api.iconify.design/${iconName || 'mdi:star'}.svg?width=128&height=128`;
+        let cleanName = iconName;
+        if (!cleanName.includes(':')) cleanName = `mdi:${cleanName}`;
+        return `https://api.iconify.design/${cleanName}.svg?width=128&height=128&color=%23${selectedStyle.primaryAccent}`;
       };
       
-      const getChartUrl = (chartData: any[]) => {
+      const getChartUrl = (chartData: any[], chartType: string = 'bar') => {
         const labels = chartData.map(d => d.label);
-        const data = chartData.map(d => d.value);
+        const data = chartData.map(d => Number(d.value));
         const chartConfig = {
-          type: 'bar',
+          type: chartType,
           data: {
             labels: labels,
-            datasets: [{ label: 'Data', data: data, backgroundColor: '#3B82F6' }]
+            datasets: [{ 
+               label: 'Data', 
+               data: data, 
+               backgroundColor: ['#2563EB', '#7C3AED', '#10B981', '#F59E0B', '#EF4444', '#3B82F6']
+            }]
+          },
+          options: {
+            plugins: { legend: { display: chartType !== 'bar' } }
           }
         };
-        return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
+        return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}&w=600&h=400&bkg=white`;
       };
 
       slidesList.forEach((s: any, idx: number) => {
         const layout = s.layout || (idx === 0 ? "cover" : "content");
         const slide = pptx.addSlide();
         
-        if (s.iconType) {
-            slide.addImage({ path: getIconUrl(s.iconType), x: 0.2, y: 0.2, w: 0.6, h: 0.6 });
+        // @ts-ignore
+        slide.transition = { type: "morph" };
+
+        if (s.iconType && layout !== "cover" && layout !== "image-left" && layout !== "image-right" && layout !== "chart") {
+            try {
+              slide.addImage({ path: getIconUrl(s.iconType), x: 8.5, y: 0.15, w: 0.7, h: 0.7 });
+            } catch (e) {}
         }
         
         if (layout === "cover") {
@@ -1984,6 +1978,33 @@ async function runPresentationGeneration(ctx: any, data: any) {
                 slide.addText(s.bulletPoints[i], { x: startX + 0.1, y: 2.4, w: cWidth - 0.2, h: 2.4, fontSize: 12, color: selectedStyle.contentBody, align: "center", valign: "top" });
             }
             
+        } else if (layout === "chart" && s.chartData && s.chartData.length > 0) {
+            slide.background = { fill: selectedStyle.bg };
+            slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 10, h: 1.0, fill: { color: selectedStyle.bannerFill } });
+            slide.addText(s.title || "Tahliliy Diagramma", { x: 0.8, y: 0.1, w: 8.4, h: 0.8, fontSize: 26, bold: true, color: "FFFFFF", valign: "middle" });
+            
+            try {
+              const cImgUrl = getChartUrl(s.chartData, s.chartType || "bar");
+              slide.addImage({ path: cImgUrl, x: 0.5, y: 1.3, w: 5.0, h: 3.6 });
+            } catch (e) {
+              // fallback native chart
+              const labels = s.chartData.map((d: any) => String(d.label || "A"));
+              const values = s.chartData.map((d: any) => Number(d.value || 0));
+              slide.addChart(pptx.ChartType.bar, [{ name: "Ma'lumot", labels: labels, values: values }], { x: 0.5, y: 1.3, w: 5.0, h: 3.6 });
+            }
+            
+            slide.addShape(pptx.ShapeType.rect, { x: 5.8, y: 1.3, w: 3.8, h: 3.6, fill: { color: "FFFFFF" }, line: { color: selectedStyle.secondaryAccent, width: 1 } });
+            if (s.subtitle) {
+               slide.addText(s.subtitle, { x: 6.0, y: 1.5, w: 3.4, h: 0.5, fontSize: 16, bold: true, color: selectedStyle.contentTitleColor });
+            }
+            if (s.content) {
+               slide.addText(s.content, { x: 6.0, y: 2.1, w: 3.4, h: 1.5, fontSize: 13, color: selectedStyle.contentBody, lineSpacing: 18 });
+            }
+            if (s.bulletPoints && s.bulletPoints.length > 0) {
+               const bulletTxt = s.bulletPoints.map((bp: string) => `✦  ${bp}`).join("\n");
+               slide.addText(bulletTxt, { x: 6.0, y: 3.0, w: 3.4, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
+            }
+            
         } else {
             slide.background = { fill: selectedStyle.bg };
             slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 10, h: 1.0, fill: { color: selectedStyle.bannerFill } });
@@ -2029,7 +2050,17 @@ async function runPresentationGeneration(ctx: any, data: any) {
         { caption: `📊 "${data.topic}" mavzusida premium ${templateName} taqdimoti tayyor!\n🎨 Dizayn uslubi: ${designPlanText}` }
       );
     } else {
-      return ctx.reply("❌ Taqdimot ma'lumotlarini yuklashda xato yuz berdi.");
+      let errText = "...";
+      let errMsg = "";
+      try {
+        const errorJson = await res.json();
+        errMsg = errorJson.error || "Noma'lum xato";
+      } catch (e) {
+        errText = await res.text().catch(() => "Noma'lum xato");
+        errMsg = errText.substring(0, 100);
+      }
+      console.error("Presentation API Error:", res.status, errMsg);
+      return ctx.reply(`❌ Taqdimot ma'lumotlarini yuklashda xato yuz berdi:\n\n💬 Sabab: ${errMsg}\n\nIltimos, keyinroq qayta urinib ko'ring yoki Slaydlar sonini biroz kamaytirib tekshiring.`);
     }
   } catch (err: any) {
     console.error("Presentation generation err:", err);
@@ -2045,7 +2076,15 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
   try {
     let topicStr = data.topic;
     if (docType === "kurs_ishi") {
-      topicStr = `Mavzu: ${data.topic}. Fan: ${data.subject}. OTM: ${data.university}. Fakultet: ${data.faculty}. Kafedra: ${data.department}. Yo'nalish: ${data.direction}. Talaba: ${data.studentName}. Rahbar: ${data.advisor}. Sahifalar: ${data.pageCount}`;
+      topicStr = `Mavzu: ${data.topic || ""}. Fan: ${data.subject || ""}. OTM: ${data.university || ""}. Fakultet: ${data.faculty || ""}. Kafedra: ${data.department || ""}. Yo'nalish: ${data.direction || ""}. Talaba: ${data.studentName || ""}. Rahbar: ${data.advisor || ""}. Sahifalar: ${data.pageCount || ""}`;
+    } else if (docType === "tezis") {
+      topicStr = `Mavzu: ${data.topic || ""}. OTM: ${data.university || ""}. Yo'nalish: ${data.direction || ""}. Muallif: ${data.author || ""}. Sahifalar soni: ${data.pageCount || ""}`;
+    } else if (docType === "maqola") {
+      topicStr = `Mavzu: ${data.topic || ""}. Muallif: ${data.author || ""}. Sahifalar soni: ${data.pageCount || ""}`;
+    } else if (docType === "dars_ishlanma") {
+      topicStr = `Mavzu: ${data.topic || ""}. Fan: ${data.subject || ""}. Sinf/Kurs: ${data.classGroup || ""}. Davomiyligi: ${data.duration || ""}`;
+    } else if (docType === "test") {
+      topicStr = `Mavzu: ${data.topic || ""}. Fan: ${data.subject || ""}. Testlar soni: ${data.questionCount || ""}. Variantlar soni: ${data.optionsCount || ""}`;
     }
 
     const res = await fetch("http://localhost:3000/api/gemini", {
@@ -2054,7 +2093,8 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
       body: JSON.stringify({
         action: "generateDocument",
         topic: topicStr,
-        docType: docType
+        docType: docType,
+        options: data
       })
     });
 
@@ -2371,7 +2411,7 @@ async function runTranslationGeneration(ctx: any, data: any) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "generateDocument",
-        topic: data.topic,
+        topic: `[Target Language: ${data.language || "O'zbek"}]. Text to translate: ${data.topic}`,
         docType: "tarjimon"
       })
     });
@@ -2400,12 +2440,12 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     if (step === 1) {
       data.topic = input;
       userWizardStates.set(userId, { service, step: 2, data });
-      return ctx.reply("📊 <b>Slaydlar sonini tanlang yoki kiriting:</b>", {
+      return ctx.reply("📊 <b>Slaydlar sonini kiriting:</b>\n<i>Masalan: 10, 15, 20</i>", {
         parse_mode: "HTML",
         reply_markup: {
           keyboard: [
-            [{ text: "10 ta" }, { text: "15 ta" }],
-            [{ text: "20 ta" }],
+            [{ text: "10" }, { text: "15" }],
+            [{ text: "20" }],
             [{ text: "🔙 Asosiy Menyu" }]
           ],
           resize_keyboard: true,
@@ -2415,13 +2455,12 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     } else if (step === 2) {
       data.slideCount = input.replace(/[^0-9]/g, "") || "15";
       userWizardStates.set(userId, { service, step: 3, data });
-      return ctx.reply("📊 <b>Taqdimot dizayn uslubini tanlang:</b>", {
+      return ctx.reply("📊 <b>Dizayn turini tanlang:</b>", {
         parse_mode: "HTML",
         reply_markup: {
           keyboard: [
-            [{ text: "Modern" }, { text: "Business" }],
-            [{ text: "Education" }, { text: "Minimal" }],
-            [{ text: "Creative" }],
+            [{ text: "Zamonaviy" }, { text: "Minimalistik" }],
+            [{ text: "Akademik" }, { text: "Korporativ" }],
             [{ text: "🔙 Asosiy Menyu" }]
           ],
           resize_keyboard: true,
@@ -2431,11 +2470,11 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     } else if (step === 3) {
       data.designType = input;
       userWizardStates.set(userId, { service, step: 4, data });
-      return ctx.reply("📊 <b>Taqdimotga qo'shimcha talablarni kiriting:</b>\n<i>(Masalan, 'Faqat o'zbek tilida bosqichma-bosqich yoritilsin' yoki 'Talab yo'q')</i>", {
+      return ctx.reply("📊 <b>Qo'shimcha talablaringizni kiriting:</b>\n<i>(yoki \"-\" yuboring)</i>", {
         parse_mode: "HTML",
         reply_markup: {
           keyboard: [
-            [{ text: "Hech qanday talab yo'q" }],
+            [{ text: "-" }],
             [{ text: "🔙 Asosiy Menyu" }]
           ],
           resize_keyboard: true,
@@ -2451,68 +2490,60 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
 
   else if (service === "📄 Kurs ishi yaratish") {
     if (step === 1) {
-      data.topic = input;
+      data.university = input;
       userWizardStates.set(userId, { service, step: 2, data });
-      return ctx.reply("📄 <b>Fan nomini yozing:</b>\n<i>(Masalan, 'Oliy Matematika', 'Tarix')</i>", {
+      return ctx.reply("📄 <b>Fakultetni kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 2) {
-      data.subject = input;
+      data.faculty = input;
       userWizardStates.set(userId, { service, step: 3, data });
-      return ctx.reply("📄 <b>OTM (Oliy Ta'lim Muassasasi) nomini yozing:</b>\n<i>(Masalan, 'Toshkent Axborot Texnologiyalari Universiteti')</i>", {
+      return ctx.reply("📄 <b>Kafedrani kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 3) {
-      data.university = input;
+      data.department = input;
       userWizardStates.set(userId, { service, step: 4, data });
-      return ctx.reply("📄 <b>Fakultet nomini kiriting:</b>\n<i>(Masalan, 'Dasturiy muhandislik fakulteti')</i>", {
+      return ctx.reply("📄 <b>Yo'nalishni kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 4) {
-      data.faculty = input;
+      data.direction = input;
       userWizardStates.set(userId, { service, step: 5, data });
-      return ctx.reply("📄 <b>Kafedra nomini kiriting:</b>\n<i>(Masalan, 'Axborot texnologiyalari kafedrasi')</i>", {
+      return ctx.reply("📄 <b>Fan nomini kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 5) {
-      data.department = input;
+      data.subject = input;
       userWizardStates.set(userId, { service, step: 6, data });
-      return ctx.reply("📄 <b>Yo'nalish (Sohangiz) nomini kiriting:</b>\n<i>(Masalan, 'Kompyuter muhandisligi')</i>", {
+      return ctx.reply("📄 <b>Kurs ishi mavzusini kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 6) {
-      data.direction = input;
+      data.topic = input;
       userWizardStates.set(userId, { service, step: 7, data });
-      return ctx.reply("📄 <b>Talabaning F.I.Sh. (Ism va Familiyangiz):</b>", {
+      return ctx.reply("📄 <b>Talaba F.I.Sh. kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 7) {
       data.studentName = input;
       userWizardStates.set(userId, { service, step: 8, data });
-      return ctx.reply("📄 <b>Ilmiy rahbaringizning F.I.Sh. va ilmiy darajasi:</b>\n<i>(Masalan, 't.f.d., prof. Alimov Sh.A.')</i>", {
+      return ctx.reply("📄 <b>Rahbar F.I.Sh. kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 8) {
       data.advisor = input;
       userWizardStates.set(userId, { service, step: 9, data });
-      return ctx.reply("📄 <b>Kurs ishi sahifalar sonini tanlang yoki yozing (Hajmi):</b>", {
+      return ctx.reply("📄 <b>Sahifalar sonini kiriting:</b>", {
         parse_mode: "HTML",
-        reply_markup: {
-          keyboard: [
-            [{ text: "25 sahifa" }, { text: "30 sahifa" }],
-            [{ text: "35 sahifa" }],
-            [{ text: "🔙 Asosiy Menyu" }]
-          ],
-          resize_keyboard: true,
-          one_time_keyboard: true
-        }
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 9) {
       data.pageCount = input;
@@ -2523,7 +2554,35 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
 
   else if (service === "🎓 Tezis yaratish") {
     if (step === 1) {
+      data.university = input;
+      userWizardStates.set(userId, { service, step: 2, data });
+      return ctx.reply("🎓 <b>Yo'nalishni kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 2) {
+      data.direction = input;
+      userWizardStates.set(userId, { service, step: 3, data });
+      return ctx.reply("🎓 <b>Tezis mavzusini kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 3) {
       data.topic = input;
+      userWizardStates.set(userId, { service, step: 4, data });
+      return ctx.reply("🎓 <b>Muallif F.I.Sh.:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 4) {
+      data.author = input;
+      userWizardStates.set(userId, { service, step: 5, data });
+      return ctx.reply("🎓 <b>Sahifalar soni:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 5) {
+      data.pageCount = input;
       userWizardStates.delete(userId);
       await runDocumentGeneration(ctx, "tezis", data);
     }
@@ -2532,6 +2591,20 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
   else if (service === "📑 Maqola yaratish") {
     if (step === 1) {
       data.topic = input;
+      userWizardStates.set(userId, { service, step: 2, data });
+      return ctx.reply("📑 <b>Muallif F.I.Sh.:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 2) {
+      data.author = input;
+      userWizardStates.set(userId, { service, step: 3, data });
+      return ctx.reply("📑 <b>Taxminiy sahifalar soni:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 3) {
+      data.pageCount = input;
       userWizardStates.delete(userId);
       await runDocumentGeneration(ctx, "maqola", data);
     }
@@ -2539,7 +2612,28 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
 
   else if (service === "📝 Dars ishlanma yaratish") {
     if (step === 1) {
+      data.subject = input;
+      userWizardStates.set(userId, { service, step: 2, data });
+      return ctx.reply("📝 <b>Mavzu:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 2) {
       data.topic = input;
+      userWizardStates.set(userId, { service, step: 3, data });
+      return ctx.reply("📝 <b>Sinf yoki kurs:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 3) {
+      data.classGroup = input;
+      userWizardStates.set(userId, { service, step: 4, data });
+      return ctx.reply("📝 <b>Dars davomiyligi:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 4) {
+      data.duration = input;
       userWizardStates.delete(userId);
       await runDocumentGeneration(ctx, "dars_ishlanma", data);
     }
@@ -2549,38 +2643,23 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     if (step === 1) {
       data.subject = input;
       userWizardStates.set(userId, { service, step: 2, data });
-      return ctx.reply("📋 <b>Test mavzusini yozing:</b>", {
+      return ctx.reply("📋 <b>Mavzu:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 2) {
       data.topic = input;
       userWizardStates.set(userId, { service, step: 3, data });
-      return ctx.reply("📋 <b>Savollar sonini yozing (Maksimal 20 ta):</b>", {
+      return ctx.reply("📋 <b>Testlar soni:</b>", {
         parse_mode: "HTML",
-        reply_markup: {
-          keyboard: [
-            [{ text: "10 ta savol" }, { text: "15 ta savol" }],
-            [{ text: "20 ta savol" }],
-            [{ text: "🔙 Asosiy Menyu" }]
-          ],
-          resize_keyboard: true,
-          one_time_keyboard: true
-        }
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 3) {
       data.questionCount = input.replace(/[^0-9]/g, "") || "10";
       userWizardStates.set(userId, { service, step: 4, data });
-      return ctx.reply("📋 <b>Variantlar sonini kiriting (e.g. 4 ta - A,B,C,D variantlari uchun):</b>", {
+      return ctx.reply("📋 <b>Variantlar soni:</b>", {
         parse_mode: "HTML",
-        reply_markup: {
-          keyboard: [
-            [{ text: "4 variant (A,B,C,D)" }, { text: "3 variant (A,B,C)" }],
-            [{ text: "🔙 Asosiy Menyu" }]
-          ],
-          resize_keyboard: true,
-          one_time_keyboard: true
-        }
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
       });
     } else if (step === 4) {
       data.optionsCount = input.replace(/[^0-9]/g, "") || "4";
@@ -2591,7 +2670,14 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
 
   else if (service === "🌐 Tarjimon") {
     if (step === 1) {
-      data.topic = input;
+      data.language = input;
+      userWizardStates.set(userId, { service, step: 2, data });
+      return ctx.reply("🌐 <b>Matnni yuboring:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "🔙 Asosiy Menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 2) {
+      data.topic = input; // Reusing topic for content text to avoid changing generator
       userWizardStates.delete(userId);
       await runTranslationGeneration(ctx, data);
     }
@@ -2621,8 +2707,8 @@ bot.on("message", async (ctx) => {
   }
   const normText = userText.trim();
 
-  // If user directly clicked an AI service button, ensure their AI mode is active
-  if (AI_COSTS[normText]) {
+  // If user directly clicked Savol-javob, ensure their AI mode is active
+  if (normText === "💬 Savol-javob") {
     aiAssistantActiveUsers.set(userId, true);
   }
 
@@ -2645,8 +2731,8 @@ bot.on("message", async (ctx) => {
   ];
   
   if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu") {
-    if (normText !== "🤖 AI yordamchi" && !AI_COSTS[normText]) {
-      // If user clicks a menu that is not AI or sub-AI service, disable AI mode
+    if (normText !== "🤖 AI yordamchi") {
+      // If user clicks a menu or service that is not the pure chat AI mode, disable AI Chat mode
       aiAssistantActiveUsers.delete(userId);
       aiServiceStates.delete(userId);
     }
@@ -2661,6 +2747,55 @@ bot.on("message", async (ctx) => {
       await handleWizardStep(ctx, wizard, normText);
       return;
     }
+  }
+  
+  // Specific AI Services Handler (Runs OUTSIDE of pure AI Chat mode)
+  if (AI_COSTS[normText] && !pending) {
+    const cost = AI_COSTS[normText];
+    const isAdmin = getAdminIds().includes(userId);
+    const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
+    
+    if (!hasBalance) {
+      return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost} ball.\nSizning balansingizda mablag' yetarli emas.`, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "💰 Balansni to'ldirish", callback_data: `add_balance` }]
+          ]
+        }
+      });
+    }
+
+    if (normText === "💬 Savol-javob") {
+      aiAssistantActiveUsers.set(userId, true);
+      aiServiceStates.set(userId, "chat");
+      return ctx.reply("💬 <b>Savol-javob rejimi faollashdi.</b>\n\nIstalgan savol-javobingizni yozing:", { parse_mode: "HTML" });
+    }
+
+    // For other services, disable open AI chat mode to prevent it from interfering with the wizard
+    aiAssistantActiveUsers.delete(userId);
+    aiServiceStates.delete(userId);
+
+    // Start Wizard state for document / slideshow!
+    let promptText = "Mavzuni kiriting:";
+    let debugLogName = "";
+    if (normText === "📊 Slayd yaratish") { promptText = "📚 <b>Taqdimot mavzusini kiriting:</b>"; debugLogName = "slide"; }
+    else if (normText === "📄 Kurs ishi yaratish") { promptText = "🎓 <b>OTM nomini kiriting:</b>"; debugLogName = "coursework"; }
+    else if (normText === "🎓 Tezis yaratish") { promptText = "🎓 <b>OTM nomini kiriting:</b>"; debugLogName = "thesis"; }
+    else if (normText === "📑 Maqola yaratish") { promptText = "📚 <b>Maqola mavzusini kiriting:</b>"; debugLogName = "article"; }
+    else if (normText === "📝 Dars ishlanma yaratish") { promptText = "📚 <b>Fan nomini kiriting:</b>"; debugLogName = "lessonplan"; }
+    else if (normText === "📋 Test yaratish") { promptText = "📚 <b>Fan nomini kiriting:</b>"; debugLogName = "test"; }
+    else if (normText === "🌐 Tarjimon") { promptText = "🌍 <b>Qaysi tilga tarjima qilinsin?</b>\n<i>Masalan: O'zbek, Ingliz, Rus, Turkcha</i>"; debugLogName = "translator"; }
+
+    console.log(`SERVICE_SELECTED:\n${debugLogName}`);
+    userWizardStates.set(userId, { service: normText, step: 1, data: {} });
+    return ctx.reply(promptText, {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: [[{ text: "🔙 Asosiy Menyu" }]],
+        resize_keyboard: true
+      }
+    });
   } else {
     // console.log(`[Telegram] Wizard check: user ${userId} has wizard state: ${!!wizard}, pending: ${!!pending}`);
   }
@@ -2838,47 +2973,6 @@ bot.on("message", async (ctx) => {
     const currentState = aiServiceStates.get(userId);
     
     // Check if message is a known AI service button, switch to that service
-    if (AI_COSTS[normText]) {
-      const cost = AI_COSTS[normText];
-      const isAdmin = getAdminIds().includes(userId);
-      const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
-      
-      if (!hasBalance) {
-        return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost} ball.\nSizning balansingizda mablag' yetarli emas.`, {
-          parse_mode: "HTML",
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "💰 Balansni to'ldirish", callback_data: `add_balance` }]
-            ]
-          }
-        });
-      }
-
-      if (normText === "💬 Savol-javob") {
-        aiServiceStates.set(userId, "chat");
-        return ctx.reply("💬 <b>Savol-javob rejimi faollashdi.</b>\n\nIstalgan savol-javobingizni yozing:", { parse_mode: "HTML" });
-      }
-
-      // Start Wizard state for document / slideshow!
-      let promptText = "Mavzuni kiriting:";
-      if (normText === "📊 Slayd yaratish") promptText = "📊 <b>Taqdimot mavzusini kiriting:</b>";
-      else if (normText === "📄 Kurs ishi yaratish") promptText = "📄 <b>Kurs ishi mavzusini kiriting:</b>";
-      else if (normText === "🎓 Tezis yaratish") promptText = "🎓 <b>Tezis va unga tegishli asosiy ilmiy sohani kiriting:</b>";
-      else if (normText === "📑 Maqola yaratish") promptText = "📑 <b>Maqola mavzusi va maqsadini kiriting:</b>";
-      else if (normText === "📝 Dars ishlanma yaratish") promptText = "📝 <b>Dars ishlanmasi mavzusi va fanning nomini kiriting:</b>";
-      else if (normText === "📋 Test yaratish") promptText = "📋 <b>Qaysi fandan test tuzilsin? Fan nomini kiriting:</b>";
-      else if (normText === "🌐 Tarjimon") promptText = "🌐 <b>Tarjima qilinadigan matnni yuboring:</b>";
-
-      userWizardStates.set(userId, { service: normText, step: 1, data: {} });
-      return ctx.reply(promptText, {
-        parse_mode: "HTML",
-        reply_markup: {
-          keyboard: [[{ text: "🔙 Asosiy Menyu" }]],
-          resize_keyboard: true
-        }
-      });
-    }
-
     if (false && currentState && currentState !== "chat") {
       const loadingMsg = await ctx.reply(`⏳ <b>${currentState} tayyorlanmoqda...</b>\n\nIltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
       try {
@@ -3450,32 +3544,25 @@ bot.on("message", async (ctx) => {
             "🌐 Batafsil: https://aiedutizim.vercel.app";
         }
 
-        // Strict system instructions for academic documents and slide generation AI Assistant
-        const systemInstructionText = `Siz dars ishlanmalari, taqdimotlar, slaydlar va turli akademik hujjatlar yaratishga ixtisoslashgan professional AI Assistant (Yordamchi) ekansiz. Sizning asosiy vazifangiz foydalanuvchi yuborgan har qanday mavzuni tahlil qilib, u uchun mukammal, mantiqiy va tayyor slayd tuzilmasini (rejasini) ishlab chiqishdir.
+        const systemCtx = await getSystemContextInfo();
+        const systemInstructionText = `Siz AIEDUTIZIM botining aqlli yordamchisiz. Foydalanuvchi ismi: ${authed?.displayName || ctx.from?.first_name || "Foydalanuvchi"}.
 
-Har doim quyidagi qat'iy qoidalarga amal qiling:
-1. Foydalanuvchi sizga faqat mavzuni (masalan: "Sun'iy intellekt va ta'lim") yuboradi. Siz o'sha mavzuga moslab Slaydlar rejasini tuzib berishingiz kerak.
-2. Har bir slaydning sarlavhasi (Slide Title) va uning ichida bo'lishi kerak bo'lgan qisqa, tushunarli tezislar (prizentatsiya uchun qisqa matnlar) aniq ajratib ko'rsatilsin.
-3. Taqdimot tuzilmasi mantiqiy bo'lsin: Kirish, asosiy qismlar (muammo, tahlil, yechim) va Xulosa qismlari qamrab olinsin.
-4. Javobingizni Telegram bot interfeysida o'qish qulay bo'lishi uchun emoji (smaylik)lar va Markdown formatlash (qalin harflar, ro'yxatlar) bilan vizual jihatdan chiroyli ko'rinishga keltiring.
-5. Ortiqcha kirish so'zlarsiz ("Men sizga yordam beraman", "Mana sizga reja" kabi gaplarsiz), to'g'ridan-to'g'ri slayd rejasini generatsiya qiling.
-6. Faqat O'zbek tilida javob bering.
+Atrof-muhit va joriy statistika (faqat raqamlar bo'yicha savol berilsa foydalaning):
+${systemCtx}
 
-Javob formati namunasi:
-📊 **Mavzu: [Mavzu nomi]**
+=== QAT'IY QOIDALAR (AI SAVOL-JAVOB TIZIMI): ===
+1. Siz FAQAT va FAQAT quyidagi "Tizim haqida" ma'lumotlar bazasida taqdim etilgan ma'lumotlar asosida javob bera olasiz.
+2. Internetdan mutlaqo foydalanmang! Saytlarni qidirmang!
+3. Umumiy bilimlaringiz asosida javob bermang! O'zingizdan ma'lumot to'qib chiqarmang!
+4. Agar foydalanuvchining so'zi noaniq bo'lsa yoki "Tizim haqida"gi ma'lumotlar bazasida topilmasa, aynan quyidagi matnni javob tariqasida qaytaring:
+❌ Ushbu savol bo'yicha ma'lumot topilmadi.
+📞 Administrator bilan bog'lanishingizni tavsiya qilaman.
 
-🖥 **1-Slayd: Kirish**
-• Mavzuning qisqacha mazmuni va dolzarbligi.
-• Taqdimotning maqsadi.
+=== TIZIM HAQIDA MA'LUMOT ===
+${systemAboutText}
+=============================
 
-🖥 **2-Slayd: [Asosiy qism sarlavhasi]**
-• Kalit so'zlar va muhim faktlar.
-• Qisqa va lo'nda tushuntirish.
-...
-🖥 **Xulosa-Slayd**
-• Umumiy xulosalar va kelgusi qadamlar.
-
-Foydalanuvchi yuborgan mavzu: ${prompt}`;
+Foydalanuvchi xabari: ${prompt}`;
 
         const aiResponse = await generateContentWithRotation({
           model: imagePart ? "gemini-2.5-flash" : "gemini-2.5-flash", 
@@ -3487,6 +3574,34 @@ Foydalanuvchi yuborgan mavzu: ${prompt}`;
         await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
         
         let replyText = aiResponse.text || "";
+        const cleanResponseText = replyText.trim().replace(/[*_`]/g, "");
+
+        // Programmatic fallback to guarantee adherence
+        if (
+          cleanResponseText.includes("topilmadi") ||
+          cleanResponseText.includes("Administrator bilan bog") ||
+          cleanResponseText.includes("mavjud emas") ||
+          cleanResponseText.includes("I cannot find") ||
+          cleanResponseText.includes("do not have") ||
+          cleanResponseText.includes("not found") ||
+          cleanResponseText.includes("Kechirasiz") ||
+          (!cleanResponseText.toLowerCase().includes("aiedu") && 
+           !cleanResponseText.toLowerCase().includes("tizim") && 
+           !cleanResponseText.toLowerCase().includes("platform") && 
+           !cleanResponseText.toLowerCase().includes("test") && 
+           !cleanResponseText.toLowerCase().includes("sertifikat") && 
+           !cleanResponseText.toLowerCase().includes("quiz") && 
+           !cleanResponseText.toLowerCase().includes("portfolio") && 
+           !cleanResponseText.toLowerCase().includes("jurnal") && 
+           !cleanResponseText.toLowerCase().includes("kurs") && 
+           !cleanResponseText.toLowerCase().includes("dars") && 
+           !cleanResponseText.toLowerCase().includes("slayd") && 
+           !cleanResponseText.toLowerCase().includes("maqola") && 
+           !cleanResponseText.toLowerCase().includes("baho") && 
+           !cleanResponseText.toLowerCase().includes("balans"))
+        ) {
+          replyText = "❌ Ushbu savol bo'yicha ma'lumot topilmadi.\n📞 Administrator bilan bog'lanishingizni tavsiya qilaman.";
+        }
 
         try {
           return await ctx.reply(replyText, { parse_mode: "Markdown" });
@@ -3508,7 +3623,7 @@ Foydalanuvchi yuborgan mavzu: ${prompt}`;
       }
     } else {
       if (!pending && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId) && !userText.startsWith("/")) {
-        return ctx.reply("⚠️ Kerakli bo'limni menyudan tanlang.");
+        return ctx.reply("📋 Kerakli xizmatni menyudan tanlang.");
       }
     }
   }
@@ -4922,7 +5037,7 @@ Foydalanuvchi yuborgan mavzu: ${prompt}`;
   } else {
     // If text is sent and AI mode is off, and no previous handler caught it
     if (!userText.startsWith("/") && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId)) {
-      return ctx.reply("⚠️ Kerakli bo'limni menyudan tanlang.");
+      return ctx.reply("📋 Kerakli xizmatni menyudan tanlang.");
     }
   }
 });
