@@ -179,13 +179,36 @@ export default function Login() {
 
           // Log activity
           try {
+            // Close old unclosed sessions for this user on this machine or database
+            const q = query(
+              collection(db, 'activityLogs'),
+              where('userId', '==', res.user.uid),
+              where('logoutTime', '==', null)
+            );
+            const staleSnap = await getDocs(q);
+            for (const d of staleSnap.docs) {
+              const dData = d.data();
+              const lTime = dData.loginTime || Date.now();
+              const laTime = dData.lastActiveTime || Date.now();
+              const dur = Math.max(1, Math.round((laTime - lTime) / 60000));
+              await setDoc(doc(db, 'activityLogs', d.id), {
+                logoutTime: laTime,
+                durationMinutes: dur
+              }, { merge: true });
+            }
+          } catch (staleErr) {
+            console.error("Failed to close stale web sessions:", staleErr);
+          }
+
+          try {
             const sessionRef = await addDoc(collection(db, 'activityLogs'), {
               userId: res.user.uid,
               userDisplayName: userDocData.displayName,
               role: role,
               loginTime: Date.now(),
               logoutTime: null,
-              durationMinutes: 0
+              durationMinutes: 0,
+              lastActiveTime: Date.now()
             });
             localStorage.setItem('sessionId', sessionRef.id);
             localStorage.setItem('sessionStart', Date.now().toString());

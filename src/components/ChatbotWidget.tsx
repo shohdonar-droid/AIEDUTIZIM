@@ -44,7 +44,7 @@ export function ChatbotWidget() {
       text: "Assalomu alaykum! Men AI yordamchiman. Sizga qanday yordam bera olaman?",
     },
   ]);
-  const [activeTab, setActiveTab] = useState<"ai" | "admin">("ai");
+  const [activeTab, setActiveTab] = useState<"ai" | "admin">("admin");
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -702,7 +702,13 @@ export function ChatbotWidget() {
         }),
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseE) {
+        throw new Error(responseText || "Server bilan bog'lanishda xato.");
+      }
       if (data.reply) {
         setAiMessages((prev) => [
           ...prev,
@@ -755,7 +761,13 @@ export function ChatbotWidget() {
         }),
       });
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseE) {
+        throw new Error(responseText || "Server bilan bog'lanishda xato.");
+      }
       setSelectedService(null);
 
       let replyText = "";
@@ -824,7 +836,7 @@ export function ChatbotWidget() {
                     </button>
                   ) : (
                     <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                      <Bot className="w-6 h-6 text-white" />
+                      <UserIcon className="w-6 h-6 text-white" />
                     </div>
                   )}
                   <div>
@@ -836,13 +848,11 @@ export function ChatbotWidget() {
                           : "Muloqot"}
                     </h3>
                     <p className="text-blue-100 text-[10px] uppercase tracking-widest">
-                      {activeTab === "ai"
-                        ? "AI Yordamchi"
-                        : isAdmin && adminView === "chat"
-                          ? selectedUser?.role === "inquiry"
-                            ? "Mehmon"
-                            : "Foydalanuvchi"
-                          : "Admin bilan muloqot"}
+                      {isAdmin && adminView === "chat"
+                        ? selectedUser?.role === "inquiry"
+                          ? "Mehmon"
+                          : "Foydalanuvchi"
+                        : "Admin bilan muloqot"}
                     </p>
                   </div>
                 </div>
@@ -853,50 +863,11 @@ export function ChatbotWidget() {
                   <X className="w-5 h-5 text-white" />
                 </button>
               </div>
-
-              {/* Tabs */}
-              {!isAdmin && (
-                <div className="flex p-1 bg-black/10 rounded-xl">
-                  <button
-                    onClick={() => setActiveTab("ai")}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${activeTab === "ai" ? "bg-white text-blue-600 shadow-sm" : "text-white/80 hover:text-white"}`}
-                  >
-                    AI Yordamchi
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("admin")}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${activeTab === "admin" ? "bg-white text-blue-600 shadow-sm" : "text-white/80 hover:text-white"}`}
-                  >
-                    Admin
-                  </button>
-                </div>
-              )}
             </div>
 
             {isAdmin && adminView === "list" ? (
               <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col min-h-0 custom-scrollbar divide-y divide-gray-100 p-2 space-y-1">
-                <button
-                  onClick={() => {
-                    setSelectedUser(null);
-                    setChatId(`chatbot_admin_${user.uid}`);
-                    setAdminView("chat");
-                  }}
-                  className="w-full text-left p-3 hover:bg-white bg-blue-50/50 rounded-xl transition-colors flex items-center gap-3 border border-blue-100"
-                >
-                  <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-full flex items-center justify-center shrink-0">
-                    <Bot className="w-5 h-5 relative z-10" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-sm text-blue-900 truncate">
-                      AI Yordamchi (O'zingiz uchun)
-                    </h4>
-                    <p className="text-xs text-blue-600 truncate">
-                      AI bilan sinov suhbati
-                    </p>
-                  </div>
-                </button>
-
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-2 pt-4 pb-1">
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest px-2 pt-2 pb-1">
                   Murojaatlar ({adminChats.length})
                 </div>
 
@@ -937,72 +908,36 @@ export function ChatbotWidget() {
               <>
                 {/* Chat Area */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 flex flex-col min-h-0 custom-scrollbar">
-                  {activeTab === "ai" ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-2 mb-4 shrink-0 px-1">
-                        {aiServices.map((s) => (
-                          <button
-                            key={s.id}
-                            onClick={() => handleServiceClick(s)}
-                            className="flex flex-col items-center justify-center p-2 bg-white border border-gray-100 rounded-xl hover:shadow-md transition-all group"
-                          >
-                            <s.icon className="w-4 h-4 text-blue-600 mb-1 group-hover:scale-110 transition-transform" />
-                            <span className="text-[10px] font-medium text-gray-700 text-center">
-                              {s.label}
-                            </span>
-                            <span className="text-[9px] text-gray-400 mt-0.5">
-                              {s.cost} ball
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                      {aiMessages.map((msg) => (
-                        <div
-                          key={msg.id}
-                          className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                        >
-                          <div
-                            className={`max-w-[80%] rounded-2xl p-3 text-sm ${msg.role === "user" ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"}`}
-                          >
-                            {msg.text}
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  ) : (
-                    <>
-                      {messages.length === 0 && (
-                        <div className="flex-1 flex flex-col justify-center items-center text-center opacity-50">
-                          <Bot className="w-12 h-12 mb-3 mt-10" />
-                          <p className="text-sm px-4">
-                            Assalomu alaykum! Savol va murojaatlaringizni shu
-                            yerda yozib qoldirishingiz mumkin. Xabaringiz
-                            to'g'ridan-to'g'ri administratorga yetkaziladi.
-                            Admin tez orada javob yozadi.
-                          </p>
-                        </div>
-                      )}
-                      {messages.map((msg) => {
-                        const isMe =
-                          msg.senderId ===
-                          (isAdmin && adminView === "chat" && selectedUser
-                            ? adminId
-                            : chatId);
-                        return (
-                          <div
-                            key={msg.id}
-                            className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"}`}
-                            >
-                              {msg.text}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </>
+                  {messages.length === 0 && (
+                    <div className="flex-1 flex flex-col justify-center items-center text-center opacity-50">
+                      <UserIcon className="w-12 h-12 mb-3 mt-10 text-gray-400" />
+                      <p className="text-sm px-4">
+                        Assalomu alaykum! Savol va murojaatlaringizni shu
+                        yerda yozib qoldirishingiz mumkin. Xabaringiz
+                        to'g'ridan-to'g'ri administratorga yetkaziladi.
+                        Admin tez orada javob yozadi.
+                      </p>
+                    </div>
                   )}
+                  {messages.map((msg) => {
+                    const isMe =
+                      msg.senderId ===
+                      (isAdmin && adminView === "chat" && selectedUser
+                        ? adminId
+                        : chatId);
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"}`}
+                        >
+                          {msg.text}
+                        </div>
+                      </div>
+                    );
+                  })}
                   {loading && (
                     <div className="flex justify-start">
                       <div className="max-w-[80%] rounded-2xl p-4 bg-white border border-gray-100 rounded-bl-sm shadow-sm flex items-center gap-2">

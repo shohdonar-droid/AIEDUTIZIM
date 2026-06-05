@@ -67,19 +67,147 @@ if (fs.existsSync(rawConfigPath)) {
   );
 }
 
+export let botPaused = false;
+export let adminTelegramId: number | null = null;
+export let adminTelegramIds: number[] = [];
+
+// Session tracking and broadcast logic for Telegram bot users
+export const activeTgSessions = new Map<number, { sessionId: string; lastActive: number; loginTime: number }>();
+
+export async function broadcastBotResumed() {
+  if (!db) return;
+  try {
+    const snap = await getDocs(collection(db, "telegram_users"));
+    console.log(`[Broadcast Resumed] Broadcasting bot active state to ${snap.size} users...`);
+    const userDocs = snap.docs;
+    const broadcastText = 
+      `⚡️ <b>TIZIM QAYTA ISHGA TUSHIRILDI!</b>\n\n` +
+      `Assalomu alaykum! Hurmatli foydalanuvchi, <b>AIEDUTIZIM</b> Telegram boti tizimdagi yangilanish ishlaridan so'ng qayta ishga tushirildi.\n\n` +
+      `🤖 <b>Barcha xizmatlar va buyruqlar to'liq faol:</b>\n` +
+      `• Sun'iy intellekt (AI) yordamchisidan bemalol foydalanishingiz mumkin.\n` +
+      `• Profilni tekshirish, savol-javob, tarjimon, tezis hamda maqola tayyorlash xizmatlari ishlamoqda.\n\n` +
+      `💡 <i>Botdan bemalol foydalanishingiz mumkin! Yangi menyuni ko'rish uchun /start buyrug'ini yuboring.</i>`;
+
+    const getKeyboard = (role: string, uid: number, authVal: boolean) => {
+      const buttons = [];
+      if (authVal) {
+        buttons.push([{ text: "🤖 AI yordamchi" }]);
+        buttons.push([{ text: "👤 Profil" }, { text: "💰 Balans" }]);
+        buttons.push([{ text: "🚪 Chiqish" }]);
+      } else {
+        buttons.push([{ text: "🔑 Kirish" }]);
+        buttons.push([{ text: "ℹ️ Tizim haqida" }]);
+      }
+      return buttons;
+    };
+
+    for (const uDoc of userDocs) {
+      const userId = Number(uDoc.id);
+      if (!isNaN(userId) && userId > 0) {
+        try {
+          const isAuthed = authedUsers.get(userId) !== undefined;
+          const kb = getKeyboard("student", userId, isAuthed);
+          await bot.telegram.sendMessage(userId, broadcastText, {
+            parse_mode: "HTML"
+          });
+          console.log(`[Broadcast Resumed] Sent notice to ${userId}`);
+        } catch (sendErr: any) {
+          const msg = sendErr?.message || "";
+          if (
+            !msg.includes("chat not found") &&
+            !msg.includes("bot was blocked") &&
+            !msg.includes("bot was kicked") &&
+            !msg.includes("user is deactivated")
+          ) {
+            console.error(`[Broadcast Resumed] Failed to send to ${userId}:`, sendErr);
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 80)); // polite rate limit
+      }
+    }
+  } catch (err) {
+    console.error("[Broadcast Resumed] Error reading telegram_users:", err);
+  }
+}
+
+let lastKnownPaused: boolean | null = null;
+
+if (db) {
+  onSnapshot(doc(db, "settings", "bot_settings"), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      const nextPaused = data.isPaused === true || data.status === "paused";
+      
+      const wasPaused = lastKnownPaused;
+      lastKnownPaused = nextPaused;
+      botPaused = nextPaused;
+
+      if (wasPaused === true && nextPaused === false) {
+        console.log("[Telegram] Bot was resumed by admin. Initiating reload/resume union broadcast notifications...");
+        broadcastBotResumed().catch((e) => console.error("Broadcast resumed fail: ", e));
+      }
+
+      if (data.adminTelegramId) {
+        adminTelegramId = Number(data.adminTelegramId);
+      } else {
+        adminTelegramId = null;
+      }
+
+      if (Array.isArray(data.adminTelegramIds)) {
+        adminTelegramIds = data.adminTelegramIds.map(Number).filter(x => !isNaN(x) && x > 0);
+      } else if (typeof data.adminTelegramIds === "string") {
+        adminTelegramIds = data.adminTelegramIds.split(",")
+          .map(x => Number(x.trim()))
+          .filter(x => !isNaN(x) && x > 0);
+      } else {
+        adminTelegramIds = adminTelegramId ? [adminTelegramId] : [];
+      }
+
+      // Ensure the primary is first
+      if (adminTelegramId && !adminTelegramIds.includes(adminTelegramId)) {
+        adminTelegramIds.unshift(adminTelegramId);
+      }
+      console.log(`[Telegram Runtime] Paused: ${botPaused}, Admin ID: ${adminTelegramId}, Active Admins: ${adminTelegramIds}`);
+    } else {
+      setDoc(doc(db, "settings", "bot_settings"), { isPaused: false, status: "active", adminTelegramId: "", adminTelegramIds: [] }).catch(() => {});
+    }
+  }, (err) => {
+    console.error("[Telegram Runtime] Error listening to bot_settings:", err);
+  });
+}
+
 const botToken =
   process.env.TELEGRAM_BOT_TOKEN ||
   "8602426313:AAEnX9khyPLZYFWrvvVRJqP5PRANqbD7i-I";
-export const bot = new Telegraf(botToken);
+
+interface GlobalTelegram {
+  bot?: Telegraf;
+  botLaunched?: boolean;
+}
+const globalT = globalThis as unknown as GlobalTelegram;
+
+if (!globalT.bot) {
+  globalT.bot = new Telegraf(botToken);
+}
+export const bot = globalT.bot;
 
 export let telegramUsersCount = 0;
 
 const adminIdsPath = path.join(process.cwd(), "admin_telegram_ids.json");
 
 export function getAdminIds(): number[] {
+  if (adminTelegramIds && adminTelegramIds.length > 0) {
+    return adminTelegramIds;
+  }
+  if (adminTelegramId) {
+    return [adminTelegramId];
+  }
   try {
     if (fs.existsSync(adminIdsPath)) {
-      return JSON.parse(fs.readFileSync(adminIdsPath, "utf8"));
+      const stored = JSON.parse(fs.readFileSync(adminIdsPath, "utf8"));
+      if (Array.isArray(stored) && stored.length > 0) {
+        return stored.map(Number).filter(x => !isNaN(x) && x > 0);
+      }
     }
   } catch (e) {}
   return [];
@@ -334,7 +462,8 @@ class PersistentMap<K, V> extends Map<K, V> {
         if (isDelete) {
           dataToUpdate[this.syncToFirestoreKey] = deleteField();
         } else {
-          dataToUpdate[this.syncToFirestoreKey] = valueToUpdate;
+          // Sanitize to remove undefined which Firestore rejects
+          dataToUpdate[this.syncToFirestoreKey] = JSON.parse(JSON.stringify(valueToUpdate));
         }
         setDoc(doc(db, "telegram_user_states", docId), dataToUpdate, { merge: true })
           .catch((err) => console.error(`[PersistentMap Firestore Sync] Failed to write ${this.syncToFirestoreKey} for ${docId}:`, err));
@@ -402,10 +531,183 @@ const AI_COSTS: Record<string, number> = {
 
 const requestHistory = new Map<number, number[]>();
 
+export async function trackTelegramUserActivity(userId: number, from: any, role: string) {
+  if (!db) return;
+  const now = Date.now();
+  
+  let session = activeTgSessions.get(userId);
+  
+  if (!session) {
+    try {
+      const q = query(
+        collection(db, "activityLogs"),
+        where("userId", "==", `tg_${userId}`),
+        where("logoutTime", "==", null)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        const data = d.data();
+        session = {
+          sessionId: d.id,
+          lastActive: data.lastActiveTime || now,
+          loginTime: data.loginTime || now
+        };
+        activeTgSessions.set(userId, session);
+      }
+    } catch (err) {
+      console.error("Error checking open TG session in DB:", err);
+    }
+  }
+  
+  if (session) {
+    const idleTime = now - session.lastActive;
+    if (idleTime > 120000) {
+      // Close stale session
+      try {
+        const duration = Math.max(1, Math.round((session.lastActive - session.loginTime) / 60000));
+        await updateDoc(doc(db, "activityLogs", session.sessionId), {
+          logoutTime: session.lastActive,
+          durationMinutes: duration
+        });
+        console.log(`[TG Session] Closed stale session ${session.sessionId} for tg_${userId}`);
+      } catch (err) {
+        console.error("Error closing stale TG session:", err);
+      }
+      
+      // Open fresh session
+      try {
+        const displayName = `${from?.first_name || ""} ${from?.last_name || ""}`.trim() || `TG_${userId}`;
+        const docRef = await addDoc(collection(db, "activityLogs"), {
+          userId: `tg_${userId}`,
+          userDisplayName: displayName + " (Bot)",
+          role: role || "student",
+          loginTime: now,
+          logoutTime: null,
+          durationMinutes: 0,
+          lastActiveTime: now,
+          isTelegram: true
+        });
+        activeTgSessions.set(userId, {
+          sessionId: docRef.id,
+          lastActive: now,
+          loginTime: now
+        });
+        console.log(`[TG Session] Created fresh session ${docRef.id} for tg_${userId}`);
+      } catch (err) {
+        console.error("Error creating fresh TG session:", err);
+      }
+    } else {
+      // Within 2 minutes, update heartbeat
+      session.lastActive = now;
+      try {
+        await updateDoc(doc(db, "activityLogs", session.sessionId), {
+          lastActiveTime: now
+        });
+      } catch (err) {
+        console.error("Error updating TG session heartbeat:", err);
+      }
+    }
+  } else {
+    // Create new session
+    try {
+      const displayName = `${from?.first_name || ""} ${from?.last_name || ""}`.trim() || `TG_${userId}`;
+      const docRef = await addDoc(collection(db, "activityLogs"), {
+        userId: `tg_${userId}`,
+        userDisplayName: displayName + " (Bot)",
+        role: role || "student",
+        loginTime: now,
+        logoutTime: null,
+        durationMinutes: 0,
+        lastActiveTime: now,
+        isTelegram: true
+      });
+      activeTgSessions.set(userId, {
+        sessionId: docRef.id,
+        lastActive: now,
+        loginTime: now
+      });
+      console.log(`[TG Session] Spawning brand new session ${docRef.id} for tg_${userId}`);
+    } catch (err) {
+      console.error("Error spawning brand new TG session:", err);
+    }
+  }
+}
+
+export async function sweepInactiveSessions() {
+  if (!db) return;
+  const now = Date.now();
+  try {
+    const q = query(
+      collection(db, "activityLogs"),
+      where("logoutTime", "==", null)
+    );
+    const snap = await getDocs(q);
+    for (const d of snap.docs) {
+      const data = d.data();
+      const lastActive = data.lastActiveTime || data.loginTime || now;
+      const idleTime = now - lastActive;
+      
+      if (idleTime > 120000) {
+        const loginTime = data.loginTime || now;
+        const duration = Math.max(1, Math.round((lastActive - loginTime) / 60000));
+        
+        await updateDoc(doc(db, "activityLogs", d.id), {
+          logoutTime: lastActive,
+          durationMinutes: duration
+        });
+        
+        if (data.userId && data.userId.startsWith("tg_")) {
+          const tgId = Number(data.userId.replace("tg_", ""));
+          if (!isNaN(tgId)) {
+            activeTgSessions.delete(tgId);
+          }
+        }
+        console.log(`[Sweeper] Closed inactive session ${d.id} for ${data.userId} (Idle: ${Math.round(idleTime/1000)}s)`);
+      }
+    }
+  } catch (err) {
+    console.error("[Sweeper] Error sweeping inactive sessions:", err);
+  }
+}
+
+// Sweep inactive sessions every 30 seconds
+if (typeof clearInterval !== "undefined") {
+  setInterval(sweepInactiveSessions, 30000);
+}
+
 // Rate limiting middleware: 20 requests per minute per user (exempts admins and teachers)
 bot.use(async (ctx, next) => {
   const userId = ctx.from?.id;
   if (!userId) return next();
+
+  // 1. Trace and log the user's action into their active activity session
+  const authed = await getAuthedUser(userId);
+  const resolvedRole = authed ? authed.role : "student";
+  await trackTelegramUserActivity(userId, ctx.from, resolvedRole);
+
+  // 2. Pause/Maintenance handling
+  if (botPaused) {
+    const adminIds = getAdminIds();
+    const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin"));
+    
+    if (isAdminUser) {
+      return next();
+    }
+    
+    try {
+      if (ctx.message || ctx.callbackQuery) {
+        const text = 
+          `🔧 <b>Botda vaqtinchalik tuzatish ishlari olib borilmoqda!</b>\n\n` +
+          `Assalomu alaykum! Hurmatli foydalanuvchi, ayni vaqtda botda vaqtinchalik tuzatish va yangilash ishlari olib borilayotganligi sababli bot faoliyati vaqtinchalik to'xtatildi.\n\n` +
+          `🔔 <b>Bot qayta ishga tushganda yoki yangilanganda sizga darhol bildirishnoma yuboriladi.</b>\n\n` +
+          `<i>Keltirilgan noqulayliklar uchun uzr so'raymiz hamda tushunishingiz uchun katta rahmat!</i>`;
+        
+        await ctx.reply(text, { parse_mode: "HTML" }).catch(() => {});
+      }
+    } catch (e) {}
+    return; // Block execution for standard users
+  }
 
   const now = Date.now();
 
@@ -419,8 +721,6 @@ bot.use(async (ctx, next) => {
     return next();
   }
 
-  // Retrieve authenticated state (including database check if needed)
-  const authed = await getAuthedUser(userId);
   if (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "teacher")) {
     return next();
   }
@@ -476,10 +776,15 @@ async function getKeyboard(
           const excludeForAdmin = ["🎁 Bepul olish", "💬 Adminga murojaat", ...alwaysExclude];
           kb = kb.map(row => row.filter((btn: any) => !excludeForAdmin.includes(btn.text))).filter(row => row.length > 0);
 
+          const adminIds = getAdminIds();
+          const isPrimary = adminIds.length === 0 || adminIds[0] === userId;
+
           const adminHeader = [
             [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
             [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
-            [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }],
+            isPrimary 
+              ? [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }]
+              : [{ text: "📥 Javob berilmaganlar" }],
             [{ text: "ℹ️ Tizim haqida" }]
           ];
           return [...adminHeader, ...kb];
@@ -527,17 +832,18 @@ async function getKeyboard(
       return rows;
     }
     rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
-  } else {
-    rows.push([{ text: "🔑 Kirish" }]);
   }
 
   rows.push([{ text: "🤖 AI yordamchi" }]);
   rows.push([{ text: "ℹ️ Tizim haqida" }, { text: "🎁 Bepul olish" }]);
-  rows.push([{ text: "💬 Adminga murojaat" }, { text: "🌐 Rasmiy sayt" }]);
-
+  if (userRole !== "admin" && userRole !== "subadmin") {
+    rows.push([{ text: "💬 Adminga murojaat" }, { text: "🌐 Rasmiy sayt" }]);
+  } else {
+    rows.push([{ text: "🌐 Rasmiy sayt" }]);
+  }
+  
   return rows;
 }
-
 async function getAiAssistantKeyboard(userId?: number) {
   const adminIds = getAdminIds();
   const isAdmin = userId ? adminIds.includes(userId) : false;
@@ -550,7 +856,7 @@ async function getAiAssistantKeyboard(userId?: number) {
   ];
 
   if (isAdmin) {
-    rows.push([{ text: "💳 Balansni to'ldirish" }]);
+    // Admin has no need to replenish balance, keep empty or avoid adding balance buttons
   } else {
     rows.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
     rows.push([{ text: "👥 Do'stlarni taklif qilish" }]);
@@ -691,12 +997,12 @@ async function getAuthedUser(userId: number) {
 }
 
 const paymentInstructionsText = `💳 <b>Balansni to'ldirish yo'riqnomasi:</b>\n\n` +
-                     `1. Saytga kiring: ${APP_URL}/profile\n` +
+                     `1. Saytga kiring: https://aiedutizim.vercel.uz\n` +
                      `2. "To'ldirish" bo'limini tanlang.\n` +
                      `3. Click yoki Payme orqali to'lovni amalga oshiring.\n\n` +
                      `Yoki quyidagi karta raqamiga o'tkazma qiling va adminga skrinshot yuboring:\n` +
-                     `💳 <code>8600 0000 0000 0000</code>\n` +
-                     `Eshmatov Toshmat`;
+                     `💳 <code>5614 6812 9015 3646</code>\n` +
+                     `Ibodullayeva SH`;
 
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
@@ -731,7 +1037,8 @@ bot.start(async (ctx) => {
           referralCount: 0,
           referrals: 0,
           createdAt: serverTimestamp(),
-          isTelegramUser: true
+          isTelegramUser: true,
+          isBotUser: true
         });
         console.log(`[Telegram] Auto-created user profile for ${userId}`);
       }
@@ -1181,7 +1488,7 @@ bot.action(/admin_reject_pay_(\d+)/, async (ctx) => {
   
   await bot.telegram.sendMessage(targetId, `❌ To\x27lov chekingiz rad etildi.\n\nIltimos administrator bilan bog\x27laning.`, { parse_mode: "HTML" }).catch(() => {});
   
-  // Update payment status in Firestore
+  // Update payment status in Firestore and delete all admin messages
   try {
     const pQuery = query(collection(db, "payments"), 
       where("userId", "==", targetId), 
@@ -1191,7 +1498,19 @@ bot.action(/admin_reject_pay_(\d+)/, async (ctx) => {
     );
     const pSnap = await getDocs(pQuery);
     if (!pSnap.empty) {
-      await updateDoc(doc(db, "payments", pSnap.docs[0].id), {
+      const pDoc = pSnap.docs[0];
+      const pData = pDoc.data();
+      
+      // Delete the message from all admins chats
+      if (Array.isArray(pData.tgSentMessages)) {
+        for (const item of pData.tgSentMessages) {
+          if (item.chatId && item.messageId) {
+            await bot.telegram.deleteMessage(item.chatId, item.messageId).catch(() => {});
+          }
+        }
+      }
+
+      await updateDoc(doc(db, "payments", pDoc.id), {
         status: "rejected",
         processedAt: serverTimestamp(),
         processedBy: userId
@@ -1243,6 +1562,17 @@ bot.action("logout", async (ctx) => {
 
 bot.action(/reply_(.+)/, async (ctx) => {
   const targetUserId = ctx.match[1];
+  
+  // Extract original text from the callback message (where the reply button was clicked)
+  let originalText = "";
+  if (ctx.callbackQuery?.message) {
+    if ("text" in ctx.callbackQuery.message) {
+      originalText = ctx.callbackQuery.message.text;
+    } else if ("caption" in ctx.callbackQuery.message) {
+      originalText = ctx.callbackQuery.message.caption || "";
+    }
+  }
+
   const promptMsg = await ctx.reply(
     "Javob xabarini yuboring (bu unga Telegram va tizim orqali boradi):",
   );
@@ -1252,6 +1582,7 @@ bot.action(/reply_(.+)/, async (ctx) => {
     originalMessageId: ctx.callbackQuery?.message?.message_id,
     originalChatId: ctx.callbackQuery?.message?.chat?.id,
     promptMessageId: promptMsg.message_id,
+    originalText,
   } as any);
   ctx.answerCbQuery();
 });
@@ -1519,14 +1850,34 @@ async function runPresentationGeneration(ctx: any, data: any) {
 
       const selectedStyle = stylesMap[templateName] || stylesMap.Modern;
 
-      const getSlideImage = (point: any) => {
-        const query = point.imageKeyword || point.title || "abstract digital background abstract";
+      const getSlideImage = (query: string) => {
         return `https://image.pollinations.ai/prompt/${encodeURIComponent(query)}?width=800&height=600&nologo=true&seed=${Math.floor(Math.random()*1000)}`;
+      };
+      
+      const getIconUrl = (iconName: string) => {
+        return `https://api.iconify.design/${iconName || 'mdi:star'}.svg?width=128&height=128`;
+      };
+      
+      const getChartUrl = (chartData: any[]) => {
+        const labels = chartData.map(d => d.label);
+        const data = chartData.map(d => d.value);
+        const chartConfig = {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{ label: 'Data', data: data, backgroundColor: '#3B82F6' }]
+          }
+        };
+        return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
       };
 
       slidesList.forEach((s: any, idx: number) => {
         const layout = s.layout || (idx === 0 ? "cover" : "content");
         const slide = pptx.addSlide();
+        
+        if (s.iconType) {
+            slide.addImage({ path: getIconUrl(s.iconType), x: 0.2, y: 0.2, w: 0.6, h: 0.6 });
+        }
         
         if (layout === "cover") {
             slide.background = { fill: selectedStyle.coverBg };
@@ -1573,6 +1924,10 @@ async function runPresentationGeneration(ctx: any, data: any) {
             slide.addShape(pptx.ShapeType.rect, { x: 0.7, y: 1.4, w: 4.0, h: 3.6, fill: { color: selectedStyle.accentLight } });
             const imgUrl = getSlideImage(s);
             slide.addImage({ path: imgUrl, x: 0.8, y: 1.3, w: 4.0, h: 3.6 });
+            
+            if (s.chartData) {
+              slide.addImage({ path: getChartUrl(s.chartData), x: 5.5, y: 2.0, w: 4, h: 2.5 });
+            }
             
             let currY = 1.3;
             if (s.subtitle) {
@@ -2306,14 +2661,41 @@ bot.on("message", async (ctx) => {
       await handleWizardStep(ctx, wizard, normText);
       return;
     }
+  } else {
+    // console.log(`[Telegram] Wizard check: user ${userId} has wizard state: ${!!wizard}, pending: ${!!pending}`);
   }
 
   // Photo or Text (cheque) forwarding to admin
-  const isCheque = ("photo" in ctx.message) || 
-    (userText.length > 15 && (userText.includes("8600") || userText.includes("9860") || userText.includes("4444"))); // Heuristic for text cheque with common prefixes
+  const isCheque = (ctx.message && "photo" in ctx.message) || 
+    (userText.length > 15 && (userText.includes("8600") || userText.includes("9860") || userText.includes("4444") || userText.toLowerCase().includes("payme") || userText.toLowerCase().includes("click") || userText.toLowerCase().includes("uzcard") || userText.toLowerCase().includes("humo"))); // Heuristic for text cheque with common prefixes
   
-  if (isCheque && !aiAssistantActiveUsers.get(userId) && !pending) {
-    const adminIds = getAdminIds();
+  if (isCheque) {
+    let adminIds = getAdminIds();
+    
+    // Self-healing: if adminIds is empty, look up in Firestore dynamically
+    if (adminIds.length === 0 && db) {
+      try {
+        const usersRef = collection(db, "users");
+        const adminQuery = query(usersRef, where("role", "in", ["admin", "subadmin"]));
+        const adminSnap = await getDocs(adminQuery);
+        const resolvedIds: number[] = [];
+        for (const doc of adminSnap.docs) {
+          const data = doc.data();
+          const tgId = Number(data.telegramId);
+          if (tgId && !isNaN(tgId)) {
+            resolvedIds.push(tgId);
+            registerAdminId(tgId); // Write to file
+          }
+        }
+        if (resolvedIds.length > 0) {
+          adminIds = resolvedIds;
+          console.log("[Telegram Cheque] Dynamically healed admin List:", adminIds);
+        }
+      } catch (adminHealErr) {
+        console.error("[Telegram Cheque] Admin healing failed:", adminHealErr);
+      }
+    }
+
     if (adminIds.length > 0) {
       const caption = `🧾 Yangi to\x27lov cheki\n\n👤 Ism: ${ctx.from.first_name || ""} ${ctx.from.last_name || ""}\n🆔 ID: ${userId}\n🔗 Username: @${ctx.from.username || "yo\x27q"}\n\n💰 Status: Tekshiruvda`;
       
@@ -2326,36 +2708,52 @@ bot.on("message", async (ctx) => {
         ]
       };
 
+      const sentAlerts: { chatId: number; messageId: number }[] = [];
+
       for (const aId of adminIds) {
-        if ("photo" in ctx.message) {
+        if (ctx.message && "photo" in ctx.message) {
           const photo = ctx.message.photo[ctx.message.photo.length - 1];
-          await bot.telegram.sendPhoto(aId, photo.file_id, { 
-            caption, 
-            parse_mode: "HTML",
-            reply_markup: keyboard
-          }).catch(() => {});
+          try {
+            const sentMsg = await bot.telegram.sendPhoto(aId, photo.file_id, { 
+              caption, 
+              parse_mode: "HTML",
+              reply_markup: keyboard
+            });
+            if (sentMsg) {
+              sentAlerts.push({ chatId: aId, messageId: sentMsg.message_id });
+            }
+          } catch (err) {}
         } else {
-          await bot.telegram.sendMessage(aId, caption + `\n\n📝 <b>Chek matni:</b>\n${userText}`, {
-            parse_mode: "HTML",
-            reply_markup: keyboard
-          }).catch(() => {});
+          try {
+            const sentMsg = await bot.telegram.sendMessage(aId, caption + `\n\n📝 <b>Chek matni:</b>\n${userText}`, {
+              parse_mode: "HTML",
+              reply_markup: keyboard
+            });
+            if (sentMsg) {
+              sentAlerts.push({ chatId: aId, messageId: sentMsg.message_id });
+            }
+          } catch (err) {}
         }
       }
-      
-      // Save payment intent to Firestore (optional but good for tracking)
+
+      // Save payment intent to Firestore with tgSentMessages
       try {
         await addDoc(collection(db, "payments"), {
           userId,
           userName: `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim(),
           status: "pending",
           timestamp: serverTimestamp(),
-          type: "photo" in ctx.message ? "image" : "text",
-          content: "photo" in ctx.message ? ctx.message.photo[ctx.message.photo.length - 1].file_id : userText
+          type: (ctx.message && "photo" in ctx.message) ? "image" : "text",
+          content: (ctx.message && "photo" in ctx.message) ? ctx.message.photo[ctx.message.photo.length - 1].file_id : userText,
+          tgSentMessages: sentAlerts
         });
       } catch (e) {}
 
-      return ctx.reply("✅ Chekingiz adminga yuborildi. Tez orada tekshirilib, javobi yuboriladi.");
+    } else {
+      console.warn("[Telegram Cheque] No admins found to notify about cheque submission of user id:", userId);
     }
+
+    return ctx.reply("✅ Chekingiz adminga yuborildi. Tez orada tekshirilib, javobi yuboriladi. Muammolar yuzaga kelsa, support bilan bog'lanishingiz mumkin.");
   }
 
   // Broadcast step
@@ -2442,7 +2840,8 @@ bot.on("message", async (ctx) => {
     // Check if message is a known AI service button, switch to that service
     if (AI_COSTS[normText]) {
       const cost = AI_COSTS[normText];
-      const hasBalance = await checkAndDeductBalance(userId, cost);
+      const isAdmin = getAdminIds().includes(userId);
+      const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
       
       if (!hasBalance) {
         return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost} ball.\nSizning balansingizda mablag' yetarli emas.`, {
@@ -3051,27 +3450,32 @@ bot.on("message", async (ctx) => {
             "🌐 Batafsil: https://aiedutizim.vercel.app";
         }
 
-        const systemCtx = await getSystemContextInfo();
-        
-        // Strict system instructions for AI Savol-javob Tizimi
-        const systemInstructionText = `Siz AIEDUTIZIM botining aqlli yordamchisiz. Foydalanuvchi ismi: ${authed?.displayName || ctx.from?.first_name || "Foydalanuvchi"}.
+        // Strict system instructions for academic documents and slide generation AI Assistant
+        const systemInstructionText = `Siz dars ishlanmalari, taqdimotlar, slaydlar va turli akademik hujjatlar yaratishga ixtisoslashgan professional AI Assistant (Yordamchi) ekansiz. Sizning asosiy vazifangiz foydalanuvchi yuborgan har qanday mavzuni tahlil qilib, u uchun mukammal, mantiqiy va tayyor slayd tuzilmasini (rejasini) ishlab chiqishdir.
 
-Atrof-muhit va haqiqiy joriy statistika (faqat raqamlar bo'yicha savol berilsa foydalaning):
-${systemCtx}
+Har doim quyidagi qat'iy qoidalarga amal qiling:
+1. Foydalanuvchi sizga faqat mavzuni (masalan: "Sun'iy intellekt va ta'lim") yuboradi. Siz o'sha mavzuga moslab Slaydlar rejasini tuzib berishingiz kerak.
+2. Har bir slaydning sarlavhasi (Slide Title) va uning ichida bo'lishi kerak bo'lgan qisqa, tushunarli tezislar (prizentatsiya uchun qisqa matnlar) aniq ajratib ko'rsatilsin.
+3. Taqdimot tuzilmasi mantiqiy bo'lsin: Kirish, asosiy qismlar (muammo, tahlil, yechim) va Xulosa qismlari qamrab olinsin.
+4. Javobingizni Telegram bot interfeysida o'qish qulay bo'lishi uchun emoji (smaylik)lar va Markdown formatlash (qalin harflar, ro'yxatlar) bilan vizual jihatdan chiroyli ko'rinishga keltiring.
+5. Ortiqcha kirish so'zlarsiz ("Men sizga yordam beraman", "Mana sizga reja" kabi gaplarsiz), to'g'ridan-to'g'ri slayd rejasini generatsiya qiling.
+6. Faqat O'zbek tilida javob bering.
 
-=== QAT'IY QOIDALAR (AI SAVOL-JAVOB TIZIMI): ===
-1. Siz FAQAT va FAQAT quyidagi "Tizim haqida" ma'lumotlar bazasida taqdim etilgan ma'lumotlar asosida javob bera olasiz.
-2. Internetdan mutlaqo foydalanmang! Sayt sahifalarini skan qilmang!
-3. Umumiy bilimlaringiz asosida javob bermang, taxmin qilmang va o'zingizdan ma'lumot to'qib chiqarmang!
-4. Agar foydalanuvchining so'ragan xabari quyidagi "Tizim haqida" ma'lumotlar bazasida topilmasa (yoki javob berish uchun ma'lumot yetarli bo'lmasa), unda mutlaqo boshqa hech narsa to'qimang va aynan quyidagi matnni qaytaring (hech qanday qo'shimcha so'zsiz):
-❌ Ushbu savol bo'yicha bazamda ma'lumot mavjud emas.
-📞 Administrator bilan bog'lanishingizni tavsiya qilaman.
+Javob formati namunasi:
+📊 **Mavzu: [Mavzu nomi]**
 
-=== TIZIM HAQIDA MA'LUMOT ===
-${systemAboutText}
-=============================
+🖥 **1-Slayd: Kirish**
+• Mavzuning qisqacha mazmuni va dolzarbligi.
+• Taqdimotning maqsadi.
 
-Foydalanuvchi xabari: ${prompt}`;
+🖥 **2-Slayd: [Asosiy qism sarlavhasi]**
+• Kalit so'zlar va muhim faktlar.
+• Qisqa va lo'nda tushuntirish.
+...
+🖥 **Xulosa-Slayd**
+• Umumiy xulosalar va kelgusi qadamlar.
+
+Foydalanuvchi yuborgan mavzu: ${prompt}`;
 
         const aiResponse = await generateContentWithRotation({
           model: imagePart ? "gemini-2.5-flash" : "gemini-2.5-flash", 
@@ -3083,33 +3487,16 @@ Foydalanuvchi xabari: ${prompt}`;
         await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
         
         let replyText = aiResponse.text || "";
-        const cleanResponseText = replyText.trim().replace(/[*_`]/g, "");
 
-        // Programmatic fallback to guarantee 100% adherence under any LLM drift/hallucination
-        if (
-          cleanResponseText.includes("bazamda ma'lumot mavjud emas") ||
-          cleanResponseText.includes("Administrator bilan bog") ||
-          cleanResponseText.includes("mavjud emas") ||
-          cleanResponseText.includes("I cannot find") ||
-          cleanResponseText.includes("do not have") ||
-          cleanResponseText.includes("not found") ||
-          cleanResponseText.includes("Kechirasiz") ||
-          (!cleanResponseText.toLowerCase().includes("aiedu") && 
-           !cleanResponseText.toLowerCase().includes("tizim") && 
-           !cleanResponseText.toLowerCase().includes("platform") && 
-           !cleanResponseText.toLowerCase().includes("test") && 
-           !cleanResponseText.toLowerCase().includes("sertifikat") && 
-           !cleanResponseText.toLowerCase().includes("quiz") && 
-           !cleanResponseText.toLowerCase().includes("portfolio") && 
-           !cleanResponseText.toLowerCase().includes("jurnal") && 
-           !cleanResponseText.toLowerCase().includes("kurs") && 
-           !cleanResponseText.toLowerCase().includes("dars") && 
-           !cleanResponseText.toLowerCase().includes("balans"))
-        ) {
-          replyText = "❌ Ushbu savol bo'yicha bazamda ma'lumot mavjud emas.\n📞 Administrator bilan bog'lanishingizni tavsiya qilaman.";
+        try {
+          return await ctx.reply(replyText, { parse_mode: "Markdown" });
+        } catch (markdownErr) {
+          try {
+            return await ctx.reply(replyText, { parse_mode: "HTML" });
+          } catch (htmlErr) {
+            return await ctx.reply(replyText);
+          }
         }
-
-        return ctx.reply(replyText, { parse_mode: "HTML" });
       } catch (err: any) {
         await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
         console.error("AI Assistant error detail:", err);
@@ -3120,7 +3507,7 @@ Foydalanuvchi xabari: ${prompt}`;
         return ctx.reply(`❌ AI bilan bog'lanishda xatolik yuz berdi: ${errMsg.substring(0, 100)}\n\nIltimos keyinroq urinib ko'ring.`);
       }
     } else {
-      if (!pending && !userText.startsWith("/")) {
+      if (!pending && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId) && !userText.startsWith("/")) {
         return ctx.reply("⚠️ Kerakli bo'limni menyudan tanlang.");
       }
     }
@@ -3419,7 +3806,7 @@ Foydalanuvchi xabari: ${prompt}`;
     );
   }
 
-  if (normText === "🔑 Kirish" || normText === "Kirish") {
+  if (normText === "Admin profilga kirish") {
     aiAssistantActiveUsers.delete(userId);
     if (!db) return ctx.reply("Ma'lumotlar bazasi ulanmagan.");
     pendingLogins.set(userId, { step: "email" });
@@ -3499,11 +3886,7 @@ Foydalanuvchi xabari: ${prompt}`;
         const snap = await getDocs(
           query(collection(db, "users"), where("telegramId", "==", userId)),
         );
-        if (!snap.empty) {
-          await updateDoc(doc(db, "users", snap.docs[0].id), {
-            telegramId: deleteField(),
-          });
-        }
+        // Do not update/delete telegramId here
       } catch (e) {
         console.error("Logout error", e);
       }
@@ -3662,7 +4045,7 @@ Foydalanuvchi xabari: ${prompt}`;
              console.error(`Notify user ${targetId} failed:`, e);
           });
 
-          // Update payment status in Firestore
+          // Retrieve payment details to delete sent Telegram cheque messages from all admins chats
           try {
             const pQuery = query(collection(db, "payments"), 
               where("userId", "==", Number(targetId)), 
@@ -3672,7 +4055,17 @@ Foydalanuvchi xabari: ${prompt}`;
             );
             const pSnap = await getDocs(pQuery);
             if (!pSnap.empty) {
-              await updateDoc(doc(db, "payments", pSnap.docs[0].id), {
+              const pDoc = pSnap.docs[0];
+              const pData = pDoc.data();
+              if (Array.isArray(pData.tgSentMessages)) {
+                for (const item of pData.tgSentMessages) {
+                  if (item.chatId && item.messageId) {
+                    await bot.telegram.deleteMessage(item.chatId, item.messageId).catch(() => {});
+                  }
+                }
+              }
+
+              await updateDoc(doc(db, "payments", pDoc.id), {
                 status: "approved",
                 amount: amount,
                 processedAt: serverTimestamp(),
@@ -3749,18 +4142,56 @@ Foydalanuvchi xabari: ${prompt}`;
       pendingLogins.delete(userId);
 
       try {
+        let originalPromptClean = (pending as any).originalText || "";
+        if (originalPromptClean.startsWith("📨 Yangi xabar")) {
+          const lines = originalPromptClean.split("\n");
+          lines.shift(); // remove "📨 Yangi xabar"
+          originalPromptClean = lines.join("\n").trim();
+        }
+
+        const combinedTextToUser = 
+          `📬 <b>Siz yuborgan murojaat:</b>\n` +
+          `<i>${originalPromptClean}</i>\n\n` +
+          `✍️ <b>Admindan javob:</b>\n` +
+          `<b>${userText}</b>`;
+
         await addDoc(collection(db, "messages"), {
           senderId: senderId,
           senderName: uName + " (Admin / Telegram)",
           senderRole: "admin",
           receiverId: pending.targetUserId,
-          text: userText,
+          text: combinedTextToUser,
           timestamp: serverTimestamp(),
           isRead: false,
           fromTelegram: true,
           senderTelegramId: userId,
         });
 
+        // Query the original message from Firestore to find the sent alert message IDs for ALL admins and delete them
+        try {
+          const mQuery = query(
+            collection(db, "messages"),
+            where("senderId", "==", pending.targetUserId),
+            orderBy("timestamp", "desc"),
+            limit(1)
+          );
+          const mSnap = await getDocs(mQuery);
+          if (!mSnap.empty) {
+            const mDoc = mSnap.docs[0];
+            const mData = mDoc.data();
+            if (Array.isArray(mData.tgSentMessages)) {
+              for (const item of mData.tgSentMessages) {
+                if (item.chatId && item.messageId) {
+                  await bot.telegram.deleteMessage(item.chatId, item.messageId).catch(() => {});
+                }
+              }
+            }
+          }
+        } catch (mErr) {
+          console.warn("[Telegram reply clean] Error deleting alerts from admins: ", mErr);
+        }
+
+        // Clean up current admin's prompt/temp messages as fallback
         const origMsgId = (pending as any).originalMessageId;
         const origChatId = (pending as any).originalChatId;
         if (origMsgId && origChatId) {
@@ -3840,6 +4271,8 @@ Foydalanuvchi xabari: ${prompt}`;
                   displayName: uName + " (Telegram)",
                   role: senderRole,
                   telegramId: userId,
+                  isBotUser: true,
+                  fromTelegram: true,
                 });
               }
             });
@@ -4018,6 +4451,9 @@ Foydalanuvchi xabari: ${prompt}`;
                 uData = docSnap.data();
               }
             }
+            if (uData && uData.role === 'admin') {
+              registerAdminId(userId);
+            }
           } catch (e) {}
 
           // Role fallback logic if no user data found
@@ -4037,6 +4473,7 @@ Foydalanuvchi xabari: ${prompt}`;
               try {
                 await setDoc(doc(db, "users", uid), adminDocParams);
                 docId = uid;
+                registerAdminId(userId);
                 uData = adminDocParams;
               } catch (err) {
                 console.error("Failed to create admin doc:", err);
@@ -4484,7 +4921,7 @@ Foydalanuvchi xabari: ${prompt}`;
     }
   } else {
     // If text is sent and AI mode is off, and no previous handler caught it
-    if (!userText.startsWith("/")) {
+    if (!userText.startsWith("/") && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId)) {
       return ctx.reply("⚠️ Kerakli bo'limni menyudan tanlang.");
     }
   }
@@ -4560,7 +4997,12 @@ function startSelfPing() {
   }, 120000); // Trigger every 2 minutes
 }
 
-export function launchBot() {
+export async function launchBot() {
+  if (globalT.botLaunched) {
+    console.log("[Telegram] Bot already launched on this process. Skipping double launch.");
+    return;
+  }
+  globalT.botLaunched = true;
   fetchTelegramUsersCount();
   bot.telegram
     .setMyDescription(
@@ -4708,6 +5150,8 @@ export function launchBot() {
             const senderTgIdStr = mData.senderId?.startsWith("tg_") ? mData.senderId.replace("tg_", "") : null;
             const senderTgId = senderTgIdStr ? Number(senderTgIdStr) : (mData.senderTelegramId ? Number(mData.senderTelegramId) : null);
 
+            const sentAlerts: { chatId: number; messageId: number }[] = [];
+
             for (const uData of recipients) {
               if (uData.telegramId) {
                 const tgId = Number(uData.telegramId);
@@ -4722,7 +5166,8 @@ export function launchBot() {
 
                 let opts: any = {};
                 let messageText = "";
-                if (uData.role === "admin" || uData.role === "teacher") {
+                const isRecipientAdmin = uData.role === "admin" || uData.role === "teacher";
+                if (isRecipientAdmin) {
                   opts.reply_markup = {
                     inline_keyboard: [
                       [
@@ -4737,15 +5182,30 @@ export function launchBot() {
                 } else {
                   messageText = `📨 Sizga Admindan xabar keldi:\n\n${mData.text}`;
                 }
-                bot.telegram
-                  .sendMessage(tgId, messageText, opts)
-                  .catch((e) => {
-                    const msg = e.message || "";
-                    if (!msg.includes("chat not found") && !msg.includes("bot was blocked") && !msg.includes("bot was kicked") && !msg.includes("user is deactivated")) {
-                      console.error("TG MSG: ", e);
+                
+                if (isRecipientAdmin) {
+                  try {
+                    const sentMsg = await bot.telegram.sendMessage(tgId, messageText, opts);
+                    if (sentMsg) {
+                      sentAlerts.push({ chatId: tgId, messageId: sentMsg.message_id });
                     }
-                  });
+                  } catch (e) {}
+                } else {
+                  bot.telegram
+                    .sendMessage(tgId, messageText, opts)
+                    .catch((e) => {
+                      const msg = e.message || "";
+                      if (!msg.includes("chat not found") && !msg.includes("bot was blocked") && !msg.includes("bot was kicked") && !msg.includes("user is deactivated")) {
+                        console.error("TG MSG: ", e);
+                      }
+                    });
+                }
               }
+            }
+            if (sentAlerts.length > 0) {
+              await updateDoc(doc(db, "messages", change.doc.id), {
+                tgSentMessages: sentAlerts
+              }).catch(() => {});
             }
           } catch (e) {
             console.error("Error sending TG msg", e);
@@ -4982,8 +5442,8 @@ export function launchBot() {
 
   // Initial trigger start
   triggerBotLaunch();
-}
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
+}

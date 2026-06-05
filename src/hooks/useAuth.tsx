@@ -54,6 +54,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      localStorage.removeItem('impersonateUserId');
      localStorage.removeItem('offline_user_profile');
      localStorage.removeItem('cached_user_profile');
+     
+     const sessionId = localStorage.getItem('sessionId');
+     if (sessionId && db) {
+       try {
+         const sessionStart = Number(localStorage.getItem('sessionStart') || Date.now());
+         const rawLastTime = localStorage.getItem('lastActivityTime');
+         const finalActiveTime = rawLastTime ? Number(rawLastTime) : Date.now();
+         const duration = Math.max(1, Math.round((finalActiveTime - sessionStart) / 60000));
+         await updateDoc(doc(db, 'activityLogs', sessionId), {
+           logoutTime: finalActiveTime,
+           durationMinutes: duration
+         });
+       } catch (shErr) {
+         console.error("Failed to close session on logout:", shErr);
+       }
+       localStorage.removeItem('sessionId');
+       localStorage.removeItem('sessionStart');
+       localStorage.removeItem('lastActivityTime');
+     }
+
      try {
        await auth.signOut();
      } catch (e) {}
@@ -183,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                    role: user.role,
                    loginTime: now,
                    lastSeen: now,
+                   lastActiveTime: now,
                    logoutTime: null,
                    durationMinutes: 0
                 });
@@ -198,6 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const durationMinutes = Math.max(0, Math.round((now - parseInt(sessionStart)) / 60000));
                 await updateDoc(doc(db, 'activityLogs', sessionId), {
                    lastSeen: now,
+                   lastActiveTime: now,
                    durationMinutes
                 });
              } catch (e) {}
@@ -211,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                role: user.role,
                loginTime: now,
                lastSeen: now,
+               lastActiveTime: now,
                logoutTime: null,
                durationMinutes: 0
             });

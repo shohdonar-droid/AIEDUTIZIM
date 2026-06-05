@@ -21,7 +21,16 @@ async function fetchWithRetry(prompt: string, retries = 3): Promise<string> {
         body: JSON.stringify({ prompt, model: MODEL_NAME })
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseE) {
+        if (response && !response.ok) {
+          throw new Error(responseText || "Bo'sh javob qaytdi yoki barcha kalitlar limiti tugagan.");
+        }
+        throw new Error("Javob formati noto'g'ri shakllandi.");
+      }
       
       if (!response.ok) {
         throw new Error(data.error || "Bo'sh javob qaytdi yoki barcha kalitlar limiti tugagan.");

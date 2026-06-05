@@ -47,7 +47,7 @@ export default function AdminFooter() {
     <div className="space-y-10">
       <header className="flex justify-between items-center">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Tepa va Aloqa boshqaruvi</h1>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Boshqaruv ma'lumotlari</h1>
           <p className="text-gray-500 mt-2 text-lg">Saytning yuqori (header), pastki (footer) va aloqa sahifasi ma'lumotlarini tahrirlang.</p>
         </div>
         <button

@@ -77,47 +77,48 @@ export default function StudentProfile() {
   const filteredGroups = groups.filter(g => g.departmentId === formData.departmentId);
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Shaxsiy profil</h1>
-        <p className="text-gray-500 mt-1">Platformadagi ma'lumotlaringizni boshqaring.</p>
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-10">
+      <header className="px-4 lg:px-0">
+        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3">
+          Shaxsiy profil
+        </h1>
+        <p className="text-gray-500 mt-2 text-base max-w-lg">
+          Platformadagi ma'lumotlaringizni boshqaring.
+        </p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-4 lg:px-0">
         {/* Profile Picture Card */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm flex flex-col items-center">
+          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col items-center">
             <div className="relative group cursor-pointer">
-              <div className="w-40 h-40 rounded-3xl bg-blue-50 flex items-center justify-center text-blue-600 overflow-hidden ring-4 ring-white shadow-2xl">
+              <div className="w-32 h-32 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 overflow-hidden ring-2 ring-white shadow-lg">
                 {formData.photoURL ? (
                   <img src={formData.photoURL || null} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <UserIcon className="h-16 w-16" />
+                  <UserIcon className="h-12 w-12" />
                 )}
               </div>
-              <div className="absolute inset-0 bg-blue-600/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl">
-                <Camera className="h-8 w-8 text-white" />
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                <Camera className="h-6 w-6 text-white" />
               </div>
             </div>
-            <div className="mt-8 w-full">
-              <label className="block text-sm font-bold text-gray-700 mb-2 text-center uppercase tracking-wider">Rasm URL</label>
+            <div className="mt-6 w-full">
+              <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider text-center">Rasm URL</label>
               <input
                 type="text"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-medium focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 transition-all text-center"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all text-center"
                 placeholder="https://example.com/avatar.jpg"
                 value={formData.photoURL}
                 onChange={(e) => setFormData({ ...formData, photoURL: e.target.value })}
               />
             </div>
-            <p className="mt-6 text-xs text-gray-400 text-center leading-relaxed font-medium">
-              O'quv sertifikatlarida aynan shu ism va rasm aks etadi.
-            </p>
           </div>
         </div>
 
         {/* Info Card */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-3xl p-10 border border-gray-100 shadow-sm space-y-8">
+          <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="flex items-center gap-2 text-xs font-black text-gray-400 mb-2 uppercase tracking-widest">

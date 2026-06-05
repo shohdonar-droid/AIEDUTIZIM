@@ -575,13 +575,13 @@ export default function ChatSection() {
              </div>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {sortedFilteredContacts.map(c => {
+            {sortedFilteredContacts.map((c, i) => {
               const cid = c.uid || '';
               const unread = unreadCounts[cid] || 0;
               const isSelected = selectedContactId === cid;
               return (
                 <button
-                  key={cid}
+                  key={`${cid}_${i}`}
                   onClick={() => setSelectedContactId(cid)}
                   className={`w-full p-3 rounded-2xl flex items-center justify-between gap-3 transition-all border ${
                     isSelected ? 'bg-blue-50 border-blue-100' : 'border-transparent hover:bg-gray-50 hover:border-gray-100'

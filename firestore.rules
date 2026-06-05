@@ -100,11 +100,8 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    match /activityLogs/{id} {
-      allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if true;
-      allow delete: if isAdmin();
+    match /activityLogs/{document=**} {
+      allow read, write: if true;
     }
   }
 }

@@ -120,7 +120,16 @@ Tizimdagi barcha ma'lumotlar, foydalanuvchilar, darslar va sertifikatlar bo'yich
         })
       });
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseE) {
+        if (!res.ok) {
+          throw new Error(responseText || "Serverda AI javob bermadi");
+        }
+        throw new Error("Javob formati noto'g'ri shakllandi");
+      }
       if (!res.ok) {
         throw new Error(data.error || "Serverda AI javob bermadi");
       }

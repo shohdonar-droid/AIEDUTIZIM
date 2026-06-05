@@ -46,8 +46,11 @@ export default function AdminUsers() {
   const [filterGrp, setFilterGrp] = useState("");
   const [filterOrg, setFilterOrg] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "students" | "teachers" | "staff" | "subadmins"
+    "students" | "teachers" | "staff" | "subadmins" | "botUsers"
   >("teachers");
+
+  const [telegramUsers, setTelegramUsers] = useState<any[]>([]);
+  const [allBotUsersConfigs, setAllBotUsersConfigs] = useState<any[]>([]);
 
   // Sub-admin Creation
   const [editingSubadmin, setEditingSubadmin] =
@@ -238,9 +241,9 @@ export default function AdminUsers() {
     const unsubStudents = safeOnSnapshot(
       query(collection(db, "users"), where("role", "==", "student")),
       (snap) => {
-        const dbUsers = snap.docs.map(
-          (doc) => ({ ...doc.data() }) as UserProfile,
-        );
+        const dbUsers = snap.docs
+          .map((doc) => ({ ...doc.data() }) as UserProfile)
+          .filter((u) => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"));
         dbUsers.sort((a, b) =>
           (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"),
         );
@@ -311,6 +314,24 @@ export default function AdminUsers() {
       },
     );
 
+    const unsubTelegramUsers = safeOnSnapshot(
+      collection(db, "telegram_users"),
+      (snap) => {
+        const tgData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setTelegramUsers(tgData);
+      },
+      (err) => console.log("telegram_users load error", err)
+    );
+
+    const unsubBotConfigs = safeOnSnapshot(
+      query(collection(db, "users"), where("isBotUser", "==", true)),
+      (snap) => {
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setAllBotUsersConfigs(data);
+      },
+      (err) => console.log("users bot configs error", err)
+    );
+
     return () => {
       unsubDepts();
       unsubGroups();
@@ -318,6 +339,8 @@ export default function AdminUsers() {
       unsubTeachers();
       unsubStaff();
       unsubSubadmins();
+      unsubTelegramUsers();
+      unsubBotConfigs();
     };
   }, []);
 
@@ -718,6 +741,12 @@ export default function AdminUsers() {
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "subadmins" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
           >
             Kichik Adminlar ({subadmins.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("botUsers")}
+            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "botUsers" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
+          >
+            Bot foydalanuvchilari ({telegramUsers.length})
           </button>
         </div>
       </header>
@@ -1735,6 +1764,164 @@ export default function AdminUsers() {
           )}
         </div>
       )}
+
+      {activeTab === "botUsers" && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center">
+                <div className="relative w-full md:w-80 flex-shrink-0">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    className="w-full pl-12 pr-6 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
+                    placeholder="Foydalanuvchini qidirish..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="text-xs text-gray-400 font-extrabold ml-auto">
+                  Tizimda ulangan telegram bot a'zolari soni: {telegramUsers.length} ta
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/50 border-b border-gray-50">
+                        <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                          №
+                        </th>
+                        <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
+                          Telegramdagi Ism-sharifi
+                        </th>
+                        <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
+                          Username
+                        </th>
+                        <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
+                          Telegram ID
+                        </th>
+                        <th className="px-6 py-5 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
+                          Mavjud Balans (Ball)
+                        </th>
+                        <th className="px-6 py-5 text-right text-xs font-black text-gray-400 uppercase tracking-widest">
+                          Amallar
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {telegramUsers
+                        .filter(tu => {
+                          const searchLower = searchTerm.toLowerCase();
+                          const firstName = (tu.firstName || "").toLowerCase();
+                          const lastName = (tu.lastName || "").toLowerCase();
+                          const username = (tu.username || "").toLowerCase();
+                          const idStr = String(tu.telegramId || tu.id || "").toLowerCase();
+                          return firstName.includes(searchLower) || 
+                                 lastName.includes(searchLower) || 
+                                 username.includes(searchLower) || 
+                                 idStr.includes(searchLower);
+                        })
+                        .map((tu, i) => {
+                          const tgId = tu.telegramId || tu.id;
+                          const matchedUser = allBotUsersConfigs.find(u => 
+                            Number(u.telegramId) === Number(tgId) || 
+                             String(u.telegramId) === String(tgId)
+                          );
+                          const currentBall = matchedUser ? (matchedUser.ball !== undefined ? matchedUser.ball : (matchedUser.balance || 0)) : 0;
+                          return (
+                            <tr key={`${tgId}_${i}`} className="hover:bg-gray-50/30 group transition">
+                              <td className="px-6 py-4 font-bold text-gray-400 whitespace-nowrap">
+                                {i + 1}
+                              </td>
+                              <td className="px-6 py-4 font-black text-sm uppercase text-gray-800">
+                                {tu.firstName || ""} {tu.lastName || ""}
+                              </td>
+                              <td className="px-6 py-4 text-sm font-semibold text-blue-600">
+                                {tu.username ? `@${tu.username}` : "yo'q"}
+                              </td>
+                              <td className="px-6 py-4 text-sm font-mono text-gray-500">
+                                {tgId}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <span className="bg-emerald-50 text-emerald-700 font-extrabold px-3 py-1.5 rounded-xl border border-emerald-100 text-sm inline-flex items-center gap-1">
+                                  💎 {currentBall} ball
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={async () => {
+                                      const newBallStr = prompt("Yangi balans (ball) miqdorini kiriting:", String(currentBall));
+                                      if (newBallStr === null) return;
+                                      const newBall = Number(newBallStr.trim());
+                                      if (isNaN(newBall)) {
+                                        alert("Iltimos, to'g'ri son kiriting!");
+                                        return;
+                                      }
+                                      try {
+                                        if (matchedUser) {
+                                          await updateDoc(doc(db, "users", matchedUser.id), {
+                                            ball: newBall,
+                                            balance: newBall
+                                          });
+                                        } else {
+                                          await setDoc(doc(db, "users", `tg_${tgId}`), {
+                                            telegramId: Number(tgId),
+                                            uid: `tg_${tgId}`,
+                                            displayName: `${tu.firstName || ""} ${tu.lastName || ""}`.trim() || "Telegram Foydalanuvchi",
+                                            role: "bot_user",
+                                            ball: newBall,
+                                            balance: newBall,
+                                            spentBalls: 0,
+                                            isBotUser: true,
+                                            isTelegramUser: true,
+                                            createdAt: serverTimestamp()
+                                          });
+                                        }
+                                        alert("Balans muvaffaqiyatli o'zgartirildi!");
+                                      } catch (e) {
+                                        console.error(e);
+                                        alert("Balansni saqlashda xatolik yuz berdi");
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition shadow-sm cursor-pointer"
+                                  >
+                                    Balansni o'zgartirish
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm("Haqiqatan ham ushbu bot foydalanuvchisini o'chirmoqchimisiz?")) return;
+                                      try {
+                                        await deleteDoc(doc(db, "telegram_users", String(tu.id || tgId)));
+                                        if (matchedUser) {
+                                          await deleteDoc(doc(db, "users", matchedUser.id));
+                                        }
+                                        alert("Foydalanuvchi muvaffaqiyatli o'chirildi!");
+                                      } catch (e) {
+                                        console.error(e);
+                                        alert("Xatolik yuz berdi!");
+                                      }
+                                    }}
+                                    className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition shadow-sm cursor-pointer"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                  {telegramUsers.length === 0 && (
+                    <div className="p-16 text-center text-gray-400 font-bold italic opacity-40">
+                      Telegram botga hali hech kim a'zo bo'lmagan.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
     </div>
   );
 }
