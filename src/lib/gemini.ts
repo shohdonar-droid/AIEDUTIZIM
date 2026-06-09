@@ -298,11 +298,17 @@ export async function generateContentWithRotation(
 
     try {
       console.log(`[Gemini Rotator] Attempting generation using key index ${keyIndex}/${pool.length || 1} with model ${modelToUse}`);
-      const response = await client.models.generateContent({
-        model: modelToUse,
-        contents: params.contents,
-        config: params.config,
-      });
+      
+      // individual generation attempt with a 60-second absolute timeout to prevent hanging the entire process
+      const timeoutMs = 60000;
+      const response = await Promise.race([
+        client.models.generateContent({
+          model: modelToUse,
+          contents: params.contents,
+          config: params.config,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Gemini request timed out after 60 seconds")), timeoutMs))
+      ]);
 
       // Update the main index on success so future requests continue using this working key
       currentKeyIndex = keyIndex;

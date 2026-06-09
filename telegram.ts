@@ -208,26 +208,53 @@ if (!globalT.bot) {
 }
 export const bot = globalT.bot;
 
+const processedUpdateIds = new Set<number>();
+const processingUsers = new Set<number>();
+
+bot.use(async (ctx, next) => {
+  if (ctx.update.update_id && processedUpdateIds.has(ctx.update.update_id)) {
+    return;
+  }
+  if (ctx.update.update_id) {
+    processedUpdateIds.add(ctx.update.update_id);
+    if (processedUpdateIds.size > 2000) {
+      const firstId = processedUpdateIds.values().next().value;
+      if (firstId !== undefined) processedUpdateIds.delete(firstId);
+    }
+  }
+  return next();
+});
+
 export let telegramUsersCount = 0;
 
 const adminIdsPath = path.join(process.cwd(), "admin_telegram_ids.json");
 
 export function getAdminIds(): number[] {
+  const hardcodedAdmins = [1834968503];
+  let ids: number[] = [...hardcodedAdmins];
+  
   if (adminTelegramIds && adminTelegramIds.length > 0) {
-    return adminTelegramIds;
+    ids = [...ids, ...adminTelegramIds];
   }
-  if (adminTelegramId) {
-    return [adminTelegramId];
+  if (adminTelegramId && !ids.includes(adminTelegramId)) {
+    ids.push(adminTelegramId);
   }
+  
   try {
     if (fs.existsSync(adminIdsPath)) {
       const stored = JSON.parse(fs.readFileSync(adminIdsPath, "utf8"));
       if (Array.isArray(stored) && stored.length > 0) {
-        return stored.map(Number).filter(x => !isNaN(x) && x > 0);
+        stored.forEach(id => {
+          const num = Number(id);
+          if (!isNaN(num) && num > 0 && !ids.includes(num)) {
+            ids.push(num);
+          }
+        });
       }
     }
   } catch (e) {}
-  return [];
+  
+  return Array.from(new Set(ids));
 }
 
 export function registerAdminId(id: number) {
@@ -794,8 +821,8 @@ async function getKeyboard(
       if (data.keyboard) {
         let kb = [...data.keyboard];
         
-        // Always exclude these from main menu as they are handled in custom headers or no longer supported
-        const alwaysExclude = ["🤖 AI yordamchi", "🤖 AI Yordamchi", "🎁 Bepul ball olish", "🎁 Bepul ball", "Bepul ball", "Bepul olish"];
+        // List of items that should be treated as features rather than generic buttons
+        const alwaysExclude = ["🤖 AI yordamchi", "🤖 AI Yordamchi"];
         
         if (authed && (userRole === "admin" || userRole === "subadmin")) {
           const excludeForAdmin = ["💬 Adminga murojaat", "💰 Balans", "💳 Balansni to'ldirish", ...alwaysExclude];
@@ -827,7 +854,7 @@ async function getKeyboard(
             [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
             [{ text: "🤖 AI Yordamchi" }],
             [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
-            // [{ text: "👥 Do'stlarni taklif qilish" }]
+            [{ text: "👥 Do'stlarni taklif qilish" }, { text: "🎁 Bepul ball" }]
           ];
           return [...userHeader, ...kb];
         } else {
@@ -840,7 +867,8 @@ async function getKeyboard(
           const guestHeader = [
             [{ text: "🔑 Kirish" }],
             [{ text: "🤖 AI Yordamchi" }],
-            [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]
+            [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
+            [{ text: "👥 Do'stlarni taklif qilish" }, { text: "🎁 Bepul ball" }]
           ];
           return [...guestHeader, ...kb];
         }
@@ -3654,49 +3682,55 @@ bot.on("message", async (ctx) => {
 
     // Default chat logic if currentState is "chat" (AI Savol-javob Tizimi)
     if (currentState === "chat") {
-      const loadingMsg = await ctx.reply("🤖 <i>AI o'ylamoqda...</i>", { parse_mode: "HTML" });
+      if (processingUsers.has(userId)) {
+        return ctx.reply("⏳ Iltimos kuting, AI hali o'ylamoqda...");
+      }
+      processingUsers.add(userId);
       try {
-        let prompt = userText;
-        let imagePart: any = null;
-
-        if ("photo" in ctx.message) {
-          const photo = ctx.message.photo[ctx.message.photo.length - 1];
-          const link = await bot.telegram.getFileLink(photo.file_id);
-          const response = await fetch(link.href);
-          const buffer = await response.arrayBuffer();
-          imagePart = {
-            inlineData: {
-              data: Buffer.from(buffer).toString("base64"),
-              mimeType: "image/jpeg"
-            }
-          };
-        }
-
-        // Fetch "Tizim haqida" (system_about) content directly from Firestore
-        let systemAboutText = "";
+        try { await ctx.sendChatAction("typing"); } catch (e) {}
+        const loadingMsg = await ctx.reply("🤖 <i>AI o'ylamoqda...</i>", { parse_mode: "HTML" });
         try {
-          const aboutSnap = await getDoc(doc(db, "siteContent", "system_about"));
-          if (aboutSnap.exists()) {
-            systemAboutText = aboutSnap.data().content || "";
+          let prompt = userText;
+          let imagePart: any = null;
+
+          if ("photo" in ctx.message) {
+            const photo = ctx.message.photo[ctx.message.photo.length - 1];
+            const link = await bot.telegram.getFileLink(photo.file_id);
+            const response = await fetch(link.href);
+            const buffer = await response.arrayBuffer();
+            imagePart = {
+              inlineData: {
+                data: Buffer.from(buffer).toString("base64"),
+                mimeType: "image/jpeg"
+              }
+            };
           }
-        } catch (aboutErr) {
-          console.warn("Failed to fetch system_about for AI context, using static fallback:", aboutErr);
-        }
 
-        if (!systemAboutText) {
-          systemAboutText = 
-            "🚀 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Zamonaviy Ta'lim Tizimi.\n\n" +
-            "Platformamiz talabalar, o'qituvchilar va tashkilotlar uchun quyidagi imkoniyatlarni taqdim etadi:\n\n" +
-            "✅ <b>AI-Test Tizimi:</b> Sun'iy intellekt yordamida mavzuga oid savollarni avtomatik shakllantirish.\n" +
-            "✅ <b>Modulli Ta'lim:</b> Interaktiv darslar va o'quv jarayonini bosqichma-bosqich kuzatish.\n" +
-            "✅ <b>Avtomatik Sertifikatlar:</b> QR-kodli rasmiy sertifikatlarni darhol yuklab olish.\n" +
-            "✅ <b>Quizizz va Musobaqalar:</b> Real-vaqt rejimida bilimlar musobaqasini o'tkazish.\n" +
-            "✅ <b>Smart Jurnal:</b> Barcha natijalar va statistikani xavfsiz kataloglash.\n\n" +
-            "🌐 Batafsil: https://aiedutizim.vercel.app";
-        }
+          // Fetch "Tizim haqida" (system_about) content directly from Firestore
+          let systemAboutText = "";
+          try {
+            const aboutSnap = await getDoc(doc(db, "siteContent", "system_about"));
+            if (aboutSnap.exists()) {
+              systemAboutText = aboutSnap.data().content || "";
+            }
+          } catch (aboutErr) {
+            console.warn("Failed to fetch system_about for AI context, using static fallback:", aboutErr);
+          }
 
-        const systemCtx = await getSystemContextInfo();
-        const systemInstructionText = `Siz AIEDUTIZIM botining aqlli yordamchisiz. Foydalanuvchi ismi: ${authed?.displayName || ctx.from?.first_name || "Foydalanuvchi"}.
+          if (!systemAboutText) {
+            systemAboutText = 
+              "🚀 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Zamonaviy Ta'lim Tizimi.\n\n" +
+              "Platformamiz talabalar, o'qituvchilar va tashkilotlar uchun quyidagi imkoniyatlarni taqdim etadi:\n\n" +
+              "✅ <b>AI-Test Tizimi:</b> Sun'iy intellekt yordamida mavzuga oid savollarni avtomatik shakllantirish.\n" +
+              "✅ <b>Modulli Ta'lim:</b> Interaktiv darslar va o'quv jarayonini bosqichma-bosqich kuzatish.\n" +
+              "✅ <b>Avtomatik Sertifikatlar:</b> QR-kodli rasmiy sertifikatlarni darhol yuklab olish.\n" +
+              "✅ <b>Quizizz va Musobaqalar:</b> Real-vaqt rejimida bilimlar musobaqasini o'tkazish.\n" +
+              "✅ <b>Smart Jurnal:</b> Barcha natijalar va statistikani xavfsiz kataloglash.\n\n" +
+              "🌐 Batafsil: https://aiedutizim.vercel.app";
+          }
+
+          const systemCtx = await getSystemContextInfo();
+          const systemInstructionText = `Siz AIEDUTIZIM botining aqlli yordamchisiz. Foydalanuvchi ismi: ${authed?.displayName || ctx.from?.first_name || "Foydalanuvchi"}.
 
 Atrof-muhit va joriy statistika (faqat raqamlar bo'yicha savol berilsa foydalaning):
 ${systemCtx}
@@ -3715,63 +3749,68 @@ ${systemAboutText}
 
 Foydalanuvchi xabari: ${prompt}`;
 
-        const aiResponse = await generateContentWithRotation({
-          model: imagePart ? "gemini-3.5-flash" : "gemini-3.5-flash", 
-          contents: [
-            { role: "user", parts: [{ text: systemInstructionText }, ...(imagePart ? [imagePart] : [])] }
-          ]
-        });
+          const aiResponse = await generateContentWithRotation({
+            model: imagePart ? "gemini-3.5-flash" : "gemini-3.5-flash", 
+            contents: [
+              { role: "user", parts: [{ text: systemInstructionText }, ...(imagePart ? [imagePart] : [])] }
+            ]
+          });
 
-        await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
-        
-        let replyText = aiResponse.text || "";
-        const cleanResponseText = replyText.trim().replace(/[*_`]/g, "");
+          await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+          
+          let replyText = aiResponse.text || "";
+          const cleanResponseText = replyText.trim().replace(/[*_`]/g, "");
 
-        // Programmatic fallback to guarantee adherence
-        if (
-          cleanResponseText.includes("topilmadi") ||
-          cleanResponseText.includes("Administrator bilan bog") ||
-          cleanResponseText.includes("mavjud emas") ||
-          cleanResponseText.includes("I cannot find") ||
-          cleanResponseText.includes("do not have") ||
-          cleanResponseText.includes("not found") ||
-          cleanResponseText.includes("Kechirasiz") ||
-          (!cleanResponseText.toLowerCase().includes("aiedu") && 
-           !cleanResponseText.toLowerCase().includes("tizim") && 
-           !cleanResponseText.toLowerCase().includes("platform") && 
-           !cleanResponseText.toLowerCase().includes("test") && 
-           !cleanResponseText.toLowerCase().includes("sertifikat") && 
-           !cleanResponseText.toLowerCase().includes("quiz") && 
-           !cleanResponseText.toLowerCase().includes("portfolio") && 
-           !cleanResponseText.toLowerCase().includes("jurnal") && 
-           !cleanResponseText.toLowerCase().includes("kurs") && 
-           !cleanResponseText.toLowerCase().includes("dars") && 
-           !cleanResponseText.toLowerCase().includes("slayd") && 
-           !cleanResponseText.toLowerCase().includes("maqola") && 
-           !cleanResponseText.toLowerCase().includes("baho") && 
-           !cleanResponseText.toLowerCase().includes("balans"))
-        ) {
-          replyText = "❌ Ushbu savol bo'yicha ma'lumot topilmadi.\n📞 Administrator bilan bog'lanishingizni tavsiya qilaman.";
-        }
+          // Programmatic fallback to guarantee adherence
+          if (
+            cleanResponseText.includes("topilmadi") ||
+            cleanResponseText.includes("Administrator bilan bog") ||
+            cleanResponseText.includes("mavjud emas") ||
+            cleanResponseText.includes("I cannot find") ||
+            cleanResponseText.includes("do not have") ||
+            cleanResponseText.includes("not found") ||
+            cleanResponseText.includes("Kechirasiz") ||
+            (!cleanResponseText.toLowerCase().includes("aiedu") && 
+            !cleanResponseText.toLowerCase().includes("tizim") && 
+            !cleanResponseText.toLowerCase().includes("platform") && 
+            !cleanResponseText.toLowerCase().includes("test") && 
+            !cleanResponseText.toLowerCase().includes("sertifikat") && 
+            !cleanResponseText.toLowerCase().includes("quiz") && 
+            !cleanResponseText.toLowerCase().includes("portfolio") && 
+            !cleanResponseText.toLowerCase().includes("jurnal") && 
+            !cleanResponseText.toLowerCase().includes("kurs") && 
+            !cleanResponseText.toLowerCase().includes("dars") && 
+            !cleanResponseText.toLowerCase().includes("slayd") && 
+            !cleanResponseText.toLowerCase().includes("maqola") && 
+            !cleanResponseText.toLowerCase().includes("baho") && 
+            !cleanResponseText.toLowerCase().includes("balans"))
+          ) {
+            replyText = "❌ Ushbu savol bo'yicha ma'lumot topilmadi.\n📞 Administrator bilan bog'lanishingizni tavsiya qilaman.";
+          }
 
-        try {
-          return await ctx.reply(replyText, { parse_mode: "Markdown" });
-        } catch (markdownErr) {
           try {
-            return await ctx.reply(replyText, { parse_mode: "HTML" });
-          } catch (htmlErr) {
-            return await ctx.reply(replyText);
+            await ctx.reply(replyText, { parse_mode: "Markdown" });
+          } catch (markdownErr) {
+            try {
+              await ctx.reply(replyText, { parse_mode: "HTML" });
+            } catch (htmlErr) {
+              await ctx.reply(replyText);
+            }
+          }
+        } catch (err: any) {
+          await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+          console.error("AI Assistant error detail:", err);
+          const errMsg = err.message || "";
+          if (errMsg.includes("Quota") || errMsg.includes("limit")) {
+            await ctx.reply("⚠️ <b>AI limiti tugadi.</b> Iltimos birozdan so'ng urinib ko'ring yoki boshqa xizmatdan foydalaning.", { parse_mode: "HTML" });
+          } else {
+            await ctx.reply(`❌ AI bilan bog'lanishda xatolik yuz berdi: ${errMsg.substring(0, 100)}\n\nIltimos keyinroq urinib ko'ring.`);
           }
         }
-      } catch (err: any) {
-        await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
-        console.error("AI Assistant error detail:", err);
-        const errMsg = err.message || "";
-        if (errMsg.includes("Quota") || errMsg.includes("limit")) {
-          return ctx.reply("⚠️ <b>AI limiti tugadi.</b> Iltimos birozdan so'ng urinib ko'ring yoki boshqa xizmatdan foydalaning.", { parse_mode: "HTML" });
-        }
-        return ctx.reply(`❌ AI bilan bog'lanishda xatolik yuz berdi: ${errMsg.substring(0, 100)}\n\nIltimos keyinroq urinib ko'ring.`);
+      } finally {
+        processingUsers.delete(userId);
       }
+      return;
     } else {
       if (chatType === "private" && !pending && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId) && !userText.startsWith("/")) {
         return ctx.reply("📋 Kerakli xizmatni menyudan tanlang.");
@@ -3997,6 +4036,32 @@ Foydalanuvchi xabari: ${prompt}`;
                        `💎 Ball: <b>0</b>\n\n` +
                        `<i>⚠️ Ma'lumotlarni yangilashda texnik uzilish. Tez orada tuzatiladi.</i>`, { parse_mode: "HTML" });
     }
+  }
+
+  if (normText === "🎁 Bepul ball" || normText === "🎁 Bepul ball olish") {
+    aiModeDeactivate();
+    return ctx.reply(
+      `🎁 <b>Bepul ballar olish imkoniyatlari:</b>\n\n` +
+      `1️⃣ <b>Do'stlarni taklif qilish:</b> Har bir taklif qilingan do'stingiz uchun <b>5 ball</b> beriladi. Do'stingiz botga kirib /start bosishi kifoya.\n` +
+      `2️⃣ <b>Kunlik bonus:</b> Tizimga har kuni kirganingizda profilingizda ballar yangilanadi.\n` +
+      `3️⃣ <b>Xatoliklar bo'yicha xabar:</b> Tizimdagi xatoliklar haqida @adminga xabar bersangiz va tasdiqlansa, sizga sovg'a tariqasida ballar taqdim etiladi.\n\n` +
+      `💡 <i>Hozircha har bir do'stingiz uchun 5 ball olish uchun quyidagi "👥 Do'stlarni taklif qilish" tugmasidan foydalaning!</i>`,
+      { parse_mode: "HTML" }
+    );
+  }
+
+  if (normText === "👥 Do'stlarni taklif qilish") {
+    aiModeDeactivate();
+    const refLink = `${APP_URL}/?r=${userId}`; // Web link
+    const botRefLink = `https://t.me/${ctx.botInfo.username}?start=ref_${userId}`; // Bot link
+    return ctx.reply(
+      `👥 <b>Do'stlarni taklif qiling va ballar to'plang!</b>\n\n` +
+      `Sizning shaxsiy referal havolangiz:\n\n` +
+      `🔗 <b>Telegram bot uchun:</b> ${botRefLink}\n` +
+      `🔗 <b>Veb-sayt uchun:</b> ${refLink}\n\n` +
+      `🎁 Har bir taklif qilingan do'st uchun <b>5 ball</b> balansingizga qo'shiladi!`,
+      { parse_mode: "HTML" }
+    );
   }
 
   if (normText === "💳 Balansni to'ldirish") {

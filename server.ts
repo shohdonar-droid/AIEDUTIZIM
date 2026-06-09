@@ -124,7 +124,8 @@ async function startServer() {
     launchBot();
   }
 
-  app.use(express.json());
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
   app.get("/api/health", (req, res) => {
     // Log for debugging
@@ -161,16 +162,23 @@ async function startServer() {
     try {
       const { action, topic, count, context, docType, options } = req.body;
       
-      await syncGeminiKeysWithFirestore();
+      syncGeminiKeysWithFirestore().catch(e => console.warn("[API Gemini] Initial sync failed:", e));
       let keysPool = getGeminiKeysPool();
       if (keysPool.length === 0) {
-        console.log("[API Gemini] Keys pool is empty. Forcing full reload from environment and configuration file...");
+        console.log("[API Gemini] Keys pool is empty. Forcing full reload from environment...");
         clearKeysCache();
         await syncGeminiKeysWithFirestore();
         keysPool = getGeminiKeysPool();
       }
       if (keysPool.length === 0) {
-        return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda va configda sozlanmagan)." });
+        // Final fallback: try to use GEMINI_API_KEY directly if it's there but wasn't picked up
+        const directKey = process.env.GEMINI_API_KEY;
+        if (directKey && directKey.length > 5) {
+          console.log("[API Gemini] Using direct GEMINI_API_KEY fallback.");
+          keysPool = [directKey];
+        } else {
+          return res.status(500).json({ error: "Gemini API kaliti topilmadi. Iltimos, server sozlamalarini tekshiring." });
+        }
       }
 
       const MODEL_NAME = "gemini-3.5-flash";
@@ -178,16 +186,18 @@ async function startServer() {
       if (action === "generateDynamicTest") {
         const countOptions = options?.optionsCount || 4;
         const prompt = context 
-          ? `Berilgan matn: "${context}". 
-             Mavzu: "${topic}".
-             Ushbu matn ichidan ${count || 10} ta o'zbek tilidagi test savollarini yarating. 
-             Savollar faqat berilgan matn asosida bo'lishi shart.
-             Natija faqat JSON formatida bo'lsin.
-             Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.`
-          : `Mavzu: "${topic}".
-             Ushbu mavzu asosida ${count || 10} ta o'zbek tilidagi umumiy bilimga asoslangan test savollarini yarating. 
-             Natija faqat JSON formatida bo'lsin.
-             Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.`;
+          ? `Mavzu: ${topic}
+              Ushbu matn asosida ${count || 10} ta o'zbek tilidagi test savollarini yarating. 
+              Savollar faqat berilgan matn asosida bo'lishi shart.
+              Natija faqat JSON formatida bo'lsin.
+              Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.
+              
+              Berilgan matn:
+              ${context}`
+          : `Mavzu: ${topic}
+              Ushbu mavzu asosida ${count || 10} ta o'zbek tilidagi umumiy bilimga asoslangan test savollarini yarating. 
+              Natija faqat JSON formatida bo'lsin.
+              Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.`;
 
         const response = await generateContentWithRotation({
           model: MODEL_NAME,
