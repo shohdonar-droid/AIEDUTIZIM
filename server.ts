@@ -1,9 +1,11 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
-import { generateContentWithRotation, getGeminiKeysPool } from "./src/lib/gemini";
-import dotenv from "dotenv";
+import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini";
 import { launchBot } from "./telegram";
 import { initPostgres } from "./src/lib/postgres";
 
@@ -113,18 +115,14 @@ function validateKursIshi(
   return { isValid, reason, cleanContent: text };
 }
 
-dotenv.config();
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Initialize PostgreSQL and restore cached states from cloud database
-  try {
-    await initPostgres();
-  } catch (pgError) {
-    console.error("[PostgreSQL] Failed during startup init:", pgError);
-  }
+  // Initialize PostgreSQL inside a non-blocking background task to prevent connections from hanging startup
+  initPostgres().catch((pgError) => {
+    console.error("[PostgreSQL] Background init failed:", pgError);
+  });
 
   // Launch the Telegram bot silently in the background
   launchBot();
@@ -166,9 +164,16 @@ async function startServer() {
     try {
       const { action, topic, count, context, docType, options } = req.body;
       
-      const keysPool = getGeminiKeysPool();
+      await syncGeminiKeysWithFirestore();
+      let keysPool = getGeminiKeysPool();
       if (keysPool.length === 0) {
-        return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda sozlanmagan)." });
+        console.log("[API Gemini] Keys pool is empty. Forcing full reload from environment and configuration file...");
+        clearKeysCache();
+        await syncGeminiKeysWithFirestore();
+        keysPool = getGeminiKeysPool();
+      }
+      if (keysPool.length === 0) {
+        return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda va configda sozlanmagan)." });
       }
 
       const MODEL_NAME = "gemini-3.5-flash";
@@ -583,6 +588,7 @@ async function startServer() {
   app.post("/api/raw-gemini", async (req, res) => {
     try {
       const { prompt, model } = req.body;
+      await syncGeminiKeysWithFirestore();
       const keysPool = getGeminiKeysPool();
       if (keysPool.length === 0) {
         return res.status(500).json({ error: "Gemini API kalitlari topilmadi." });
@@ -604,6 +610,7 @@ async function startServer() {
     try {
       const { prompt, history, userName, isAdminMode, systemContext, functionResponses, lastFunctionCall, lastModelParts } = req.body;
       
+      await syncGeminiKeysWithFirestore();
       const keysPool = getGeminiKeysPool();
       if (keysPool.length === 0) {
         return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda sozlanmagan)." });

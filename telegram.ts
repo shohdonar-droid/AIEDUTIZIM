@@ -31,6 +31,11 @@ setLogLevel("error");
 
 const APP_URL = (process.env.APP_URL || "https://aiedutizim.vercel.app").replace(/\/$/, "");
 
+function getApiUrl(subPath: string): string {
+  const port = process.env.PORT || "3000";
+  return `http://127.0.0.1:${port}${subPath}`;
+}
+
 function mdToHtml(md: string): string {
   if (!md) return "";
   return md
@@ -92,12 +97,13 @@ export async function broadcastBotResumed() {
     const getKeyboard = (role: string, uid: number, authVal: boolean) => {
       const buttons = [];
       if (authVal) {
-        buttons.push([{ text: "🤖 AI yordamchi" }]);
-        buttons.push([{ text: "👤 Profil" }, { text: "💰 Balans" }]);
-        buttons.push([{ text: "🚪 Chiqish" }]);
+        buttons.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
+        buttons.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
+        buttons.push([{ text: "👥 Do'stlarni taklif qilish" }]);
       } else {
         buttons.push([{ text: "🔑 Kirish" }]);
-        buttons.push([{ text: "ℹ️ Tizim haqida" }]);
+        buttons.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
+        buttons.push([{ text: "👥 Do'stlarni taklif qilish" }]);
       }
       return buttons;
     };
@@ -178,9 +184,19 @@ if (db) {
   });
 }
 
-const botToken =
+const rawBotToken =
   process.env.TELEGRAM_BOT_TOKEN ||
   "8602426313:AAEnX9khyPLZYFWrvvVRJqP5PRANqbD7i-I";
+
+function sanitizeBotToken(raw: string): string {
+  const match = raw.match(/\d+:[A-Za-z0-9_-]+/);
+  if (match) {
+    return match[0];
+  }
+  return raw.trim();
+}
+
+const botToken = sanitizeBotToken(rawBotToken);
 
 interface GlobalTelegram {
   bot?: Telegraf;
@@ -783,11 +799,11 @@ async function getKeyboard(
       if (data.keyboard) {
         let kb = [...data.keyboard];
         
-        // Always exclude these from main menu as they belong to AI assistant now
-        const alwaysExclude = ["💰 Balans", "💳 Balansni to'ldirish", "👥 Do'stlarni taklif qilish"];
+        // Always exclude these from main menu as they are handled in custom headers or no longer supported
+        const alwaysExclude = ["🤖 AI yordamchi"];
         
         if (authed && (userRole === "admin" || userRole === "subadmin")) {
-          const excludeForAdmin = ["🎁 Bepul olish", "💬 Adminga murojaat", ...alwaysExclude];
+          const excludeForAdmin = ["🎁 Bepul olish", "💬 Adminga murojaat", "💰 Balans", "💳 Balansni to'ldirish", "👥 Do'stlarni taklif qilish", ...alwaysExclude];
           kb = kb.map(row => row.filter((btn: any) => !excludeForAdmin.includes(btn.text))).filter(row => row.length > 0);
 
           const adminIds = getAdminIds();
@@ -812,7 +828,9 @@ async function getKeyboard(
           })).filter(row => row.length > 0);
 
           const userHeader = [
-            [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]
+            [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
+            [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
+            [{ text: "👥 Do'stlarni taklif qilish" }]
           ];
           return [...userHeader, ...kb];
         } else {
@@ -823,7 +841,9 @@ async function getKeyboard(
           })).filter(row => row.length > 0);
 
           const guestHeader = [
-            [{ text: "🔑 Kirish" }]
+            [{ text: "🔑 Kirish" }],
+            [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
+            [{ text: "👥 Do'stlarni taklif qilish" }]
           ];
           return [...guestHeader, ...kb];
         }
@@ -841,16 +861,20 @@ async function getKeyboard(
       rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
       rows.push([{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }]);
       rows.push([{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }]);
-      rows.push([{ text: "🤖 AI yordamchi" }]);
       rows.push([{ text: "ℹ️ Tizim haqida" }]);
       rows.push([{ text: "🎁 Bepul olish" }]);
       rows.push([{ text: "🌐 Rasmiy sayt" }]);
       return rows;
     }
     rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
+    rows.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
+    rows.push([{ text: "👥 Do'stlarni taklif qilish" }]);
+  } else {
+    rows.push([{ text: "🔑 Kirish" }]);
+    rows.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
+    rows.push([{ text: "👥 Do'stlarni taklif qilish" }]);
   }
 
-  rows.push([{ text: "🤖 AI yordamchi" }]);
   rows.push([{ text: "ℹ️ Tizim haqida" }, { text: "🎁 Bepul olish" }]);
   if (userRole !== "admin" && userRole !== "subadmin") {
     rows.push([{ text: "💬 Adminga murojaat" }, { text: "🌐 Rasmiy sayt" }]);
@@ -1769,7 +1793,8 @@ ${coursesListText}`;
 interface WizardState {
   service: string;
   step: number;
-  data: Record<string, string>;
+  data: any;
+  state?: string;
 }
 
 const userWizardStates = new PersistentMap<number, WizardState>(
@@ -1784,7 +1809,7 @@ async function runPresentationGeneration(ctx: any, data: any) {
 
   try {
     const topicStr = `Mavzu: ${data.topic}. Slaydlar soni: ${data.slideCount}. Dizayn turi: ${data.designType}. Qo'shimcha talablar: ${data.requirements}`;
-    const res = await fetch("http://localhost:3000/api/gemini", {
+    const res = await fetch(getApiUrl("/api/gemini"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1830,7 +1855,10 @@ async function runPresentationGeneration(ctx: any, data: any) {
 
       const selectedStyle = stylesMap[templateName] || stylesMap.Zamonaviy || stylesMap.Modern;
 
-      const getSlideImage = (query: string) => {
+      const getSlideImage = (queryOrObj: any) => {
+        const query = typeof queryOrObj === "string" 
+          ? queryOrObj 
+          : (queryOrObj?.imageKeyword || queryOrObj?.title || data.topic || "presentation");
         return `https://image.pollinations.ai/prompt/${encodeURIComponent(query)}?width=800&height=600&nologo=true&seed=${Math.floor(Math.random()*1000)}`;
       };
       
@@ -2023,7 +2051,7 @@ async function runPresentationGeneration(ctx: any, data: any) {
                 }
             } else {
                 const imgUrl = getSlideImage(s);
-                slide.addShape(pptx.ShapeType.rect, { x: 5.3, y: 1.4, w: 3.9, h: 3.6, fill: { color: "FFFFFF" }, line: { color: selectedStyle.secondaryAccent, width: 1 } });
+                slide.addShape(pptx.ShapeType.rect, { x: 5.3, y: 1.4, w: 3.9, h: 3.6, fill: { color: selectedStyle.accentLight } });
                 slide.addImage({ path: imgUrl, x: 5.2, y: 1.3, w: 4.0, h: 3.6 });
 
                 let currY = 1.3;
@@ -2045,6 +2073,7 @@ async function runPresentationGeneration(ctx: any, data: any) {
 
       const pptxBuffer = await pptx.write({ outputType: "nodebuffer" });
       const filename = `${data.topic?.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_taqdimot.pptx`;
+      userWizardStates.delete(userId);
       return ctx.replyWithDocument(
         { source: pptxBuffer as any, filename },
         { caption: `📊 "${data.topic}" mavzusida premium ${templateName} taqdimoti tayyor!\n🎨 Dizayn uslubi: ${designPlanText}` }
@@ -2060,10 +2089,12 @@ async function runPresentationGeneration(ctx: any, data: any) {
         errMsg = errText.substring(0, 100);
       }
       console.error("Presentation API Error:", res.status, errMsg);
+      userWizardStates.delete(userId);
       return ctx.reply(`❌ Taqdimot ma'lumotlarini yuklashda xato yuz berdi:\n\n💬 Sabab: ${errMsg}\n\nIltimos, keyinroq qayta urinib ko'ring yoki Slaydlar sonini biroz kamaytirib tekshiring.`);
     }
   } catch (err: any) {
     console.error("Presentation generation err:", err);
+    userWizardStates.delete(userId);
     return ctx.reply("❌ Taqdimot PPTX faylini yaratishda xato yuz berdi: " + err.message);
   }
 }
@@ -2087,7 +2118,7 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
       topicStr = `Mavzu: ${data.topic || ""}. Fan: ${data.subject || ""}. Testlar soni: ${data.questionCount || ""}. Variantlar soni: ${data.optionsCount || ""}`;
     }
 
-    const res = await fetch("http://localhost:3000/api/gemini", {
+    const res = await fetch(getApiUrl("/api/gemini"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2294,7 +2325,7 @@ async function runTestGeneration(ctx: any, data: any) {
 
   try {
     const topicStr = `Fan: ${data.subject}. Mavzu: ${data.topic}. Soni: ${data.questionCount}`;
-    const res = await fetch("http://localhost:3000/api/gemini", {
+    const res = await fetch(getApiUrl("/api/gemini"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2406,7 +2437,7 @@ async function runTranslationGeneration(ctx: any, data: any) {
   const loadingMsg = await ctx.reply(`⏳ <b>Tarjima qilinmoqda...</b>`, { parse_mode: "HTML" });
 
   try {
-    const res = await fetch("http://localhost:3000/api/gemini", {
+    const res = await fetch(getApiUrl("/api/gemini"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2439,7 +2470,8 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
   if (service === "📊 Slayd yaratish") {
     if (step === 1) {
       data.topic = input;
-      userWizardStates.set(userId, { service, step: 2, data });
+      console.log("STATE: waiting_slide_count");
+      userWizardStates.set(userId, { service, step: 2, data, state: "waiting_slide_count" });
       return ctx.reply("📊 <b>Slaydlar sonini kiriting:</b>\n<i>Masalan: 10, 15, 20</i>", {
         parse_mode: "HTML",
         reply_markup: {
@@ -2454,7 +2486,8 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       });
     } else if (step === 2) {
       data.slideCount = input.replace(/[^0-9]/g, "") || "15";
-      userWizardStates.set(userId, { service, step: 3, data });
+      console.log("STATE: waiting_design");
+      userWizardStates.set(userId, { service, step: 3, data, state: "waiting_design" });
       return ctx.reply("📊 <b>Dizayn turini tanlang:</b>", {
         parse_mode: "HTML",
         reply_markup: {
@@ -2469,7 +2502,7 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       });
     } else if (step === 3) {
       data.designType = input;
-      userWizardStates.set(userId, { service, step: 4, data });
+      userWizardStates.set(userId, { service, step: 4, data, state: "waiting_requirements" });
       return ctx.reply("📊 <b>Qo'shimcha talablaringizni kiriting:</b>\n<i>(yoki \"-\" yuboring)</i>", {
         parse_mode: "HTML",
         reply_markup: {
@@ -2483,7 +2516,8 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       });
     } else if (step === 4) {
       data.requirements = input;
-      userWizardStates.delete(userId); // Clear state
+      console.log("STATE: generating_ppt");
+      userWizardStates.set(userId, { service, step: 5, data, state: "generating_ppt" });
       await runPresentationGeneration(ctx, data);
     }
   }
@@ -2725,17 +2759,14 @@ bot.on("message", async (ctx) => {
 
   // AI and Menu section exit check
   const menuButtons = [
-    "🤖 AI yordamchi", "ℹ️ Tizim haqida", "💰 Balans", "💳 Balansni to'ldirish",
+    "ℹ️ Tizim haqida", "💰 Balans", "💳 Balansni to'ldirish",
     "🎁 Bepul olish", "👥 Do'stlarni taklif qilish", "💬 Adminga murojaat", "🌐 Rasmiy sayt",
     "🔙 Asosiy Menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish"
   ];
   
   if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu") {
-    if (normText !== "🤖 AI yordamchi") {
-      // If user clicks a menu or service that is not the pure chat AI mode, disable AI Chat mode
-      aiAssistantActiveUsers.delete(userId);
-      aiServiceStates.delete(userId);
-    }
+    aiAssistantActiveUsers.delete(userId);
+    aiServiceStates.delete(userId);
   }
 
   // Check if user is in an active Wizard state (only check if there is no pending transaction/admin state)
@@ -2788,7 +2819,12 @@ bot.on("message", async (ctx) => {
     else if (normText === "🌐 Tarjimon") { promptText = "🌍 <b>Qaysi tilga tarjima qilinsin?</b>\n<i>Masalan: O'zbek, Ingliz, Rus, Turkcha</i>"; debugLogName = "translator"; }
 
     console.log(`SERVICE_SELECTED:\n${debugLogName}`);
-    userWizardStates.set(userId, { service: normText, step: 1, data: {} });
+    if (normText === "📊 Slayd yaratish") {
+      console.log("STATE: waiting_topic");
+      userWizardStates.set(userId, { service: normText, step: 1, data: {}, state: "waiting_topic" });
+    } else {
+      userWizardStates.set(userId, { service: normText, step: 1, data: {} });
+    }
     return ctx.reply(promptText, {
       parse_mode: "HTML",
       reply_markup: {
@@ -2996,7 +3032,7 @@ bot.on("message", async (ctx) => {
           action = "generateDynamicTest";
         }
 
-        const res = await fetch("http://localhost:3000/api/gemini", {
+        const res = await fetch(getApiUrl("/api/gemini"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -3732,17 +3768,7 @@ Foydalanuvchi xabari: ${prompt}`;
     );
   }
 
-  if (normText === "🤖 AI yordamchi") {
-    aiAssistantActiveUsers.set(userId, true);
-    aiServiceStates.delete(userId);
-    return ctx.reply("🤖 <b>AI Yordamchi bo'limiga xush kelibsiz!</b>\n\nMen sizga dars ishlari, taqdimotlar va turli hujjatlar yaratishda yordam bera olaman. Kerakli xizmatni tanlang:", { 
-      parse_mode: "HTML",
-      reply_markup: {
-        keyboard: await getAiAssistantKeyboard(userId),
-        resize_keyboard: true
-      }
-    });
-  }
+
 
   if (normText === "🔙 Asosiy Menyu") {
     aiModeDeactivate();
@@ -4771,7 +4797,7 @@ Foydalanuvchi xabari: ${prompt}`;
 
       while (loopCount < 3) {
         loopCount++;
-        const res = await fetch("http://localhost:3000/api/chat", {
+        const res = await fetch(getApiUrl("/api/chat"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -5095,7 +5121,7 @@ bot.catch((err: any, ctx) => {
 
 // Active self-referential ping sequence to prevent Cloud Run idle state (scale-to-zero prevention)
 function startSelfPing() {
-  const url = process.env.APP_URL || "http://localhost:3000";
+  const url = process.env.APP_URL || "http://127.0.0.1:3000";
   console.log(`[Self-Ping Check] Initialized with target host: ${url}`);
   
   // Dynamic self-request loop to trick Cloud Run container lifecycles

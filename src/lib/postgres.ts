@@ -15,7 +15,13 @@ if (connectionString) {
   const isLocal = connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
   pool = new Pool({
     connectionString,
-    ssl: isLocal ? false : { rejectUnauthorized: false }
+    ssl: isLocal ? false : { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15000 // safer timeout for remote/Railway PostgreSQL connection handshakes
+  });
+
+  // Handle unexpected errors on idle clients to prevent unhandled exceptions
+  pool.on("error", (err: any) => {
+    console.warn("[PostgreSQL] Idle client connection issue/timeout:", err.message || err);
   });
 }
 

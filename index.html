@@ -12,13 +12,23 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // Clean up cached service workers and cache storage to prevent white-screen load issues
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(reg => {
-            console.log('SW registered:', reg);
-          }).catch(err => {
-            console.log('SW failed:', err);
-          });
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          for (let reg of regs) {
+            reg.unregister().then(() => {
+              console.log('Stale SW unregistered successfully');
+            });
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(keys => {
+          for (let key of keys) {
+            caches.delete(key).then(() => {
+              console.log('Cache storage cleared:', key);
+            });
+          }
         });
       }
     </script>

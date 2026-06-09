@@ -1,8 +1,140 @@
 import { GoogleGenAI } from "@google/genai";
+import { initializeApp, getApps } from "firebase/app";
+import { initializeFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import fs from "fs";
+import path from "path";
 
 // Cache for valid Gemini API keys
 let keysCache: string[] = [];
 let currentKeyIndex = 0;
+let hasSyncedWithFirestore = false;
+
+/**
+ * Helper to wrap a promise with a timeout so it never hangs indefinitely.
+ */
+function promiseWithTimeout<T>(promise: Promise<T>, timeoutMs: number, fallbackValue: T): Promise<T> {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timeoutId = setTimeout(() => {
+      console.warn(`[Gemini Sync] Firestore operation timed out after ${timeoutMs}ms.`);
+      resolve(fallbackValue);
+    }, timeoutMs);
+  });
+  return Promise.race([
+    promise.then((val) => {
+      clearTimeout(timeoutId);
+      return val;
+    }).catch((err) => {
+      clearTimeout(timeoutId);
+      throw err;
+    }),
+    timeoutPromise
+  ]);
+}
+
+/**
+ * Robust background synchronization of Gemini keys with Firestore database.
+ * This runs on demand or when generation starts.
+ */
+export async function syncGeminiKeysWithFirestore(): Promise<void> {
+  if (hasSyncedWithFirestore) {
+    return;
+  }
+
+  // Load keys available locally
+  const localKeys = getGeminiKeysPool();
+  if (localKeys.length > 0) {
+    hasSyncedWithFirestore = true;
+    console.log(`[Gemini Sync] Successfully loaded ${localKeys.length} Gemini API keys locally from environment variables. Skipping Firestore synchronization for security and speed.`);
+    return;
+  }
+
+  hasSyncedWithFirestore = true;
+
+  try {
+    const rawConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (!fs.existsSync(rawConfigPath)) {
+      console.log("[Gemini Sync] No firebase-applet-config.json found. Skipping Firestore sync.");
+      return;
+    }
+
+    const firebaseConfigRaw = JSON.parse(fs.readFileSync(rawConfigPath, "utf8"));
+    const firebaseConfig = {
+      apiKey: firebaseConfigRaw.apiKey,
+      authDomain: firebaseConfigRaw.authDomain,
+      projectId: firebaseConfigRaw.projectId,
+      storageBucket: firebaseConfigRaw.storageBucket,
+      messagingSenderId: firebaseConfigRaw.messagingSenderId,
+      appId: firebaseConfigRaw.appId,
+    };
+
+    // Initialize or retrieve Firebase app
+    let fbApp;
+    const apps = getApps();
+    if (apps.length > 0) {
+      fbApp = apps[0];
+    } else {
+      fbApp = initializeApp(firebaseConfig);
+    }
+
+    const db = initializeFirestore(
+      fbApp,
+      { experimentalForceLongPolling: true },
+      firebaseConfigRaw.firestoreDatabaseId || "(default)"
+    );
+
+    // 1. Load keys available locally
+    const localKeys = getGeminiKeysPool();
+
+    // 2. Load keys available on Firestore
+    const docRef = doc(db, "system_settings", "gemini_pool");
+    let remoteKeys: string[] = [];
+
+    try {
+      // Use standard client SDK getDoc wrapped in a fast 1500ms timeout
+      const docSnap = await promiseWithTimeout(getDoc(docRef), 1500, null);
+      if (docSnap && docSnap.exists()) {
+        const data = docSnap.data();
+        if (Array.isArray(data.keys)) {
+          remoteKeys = data.keys.filter((val: any) => typeof val === "string" && val.length > 5);
+        }
+      }
+    } catch (dbErr: any) {
+      console.warn("[Gemini Sync] Firestore read failed/offline. Relying on local pool:", dbErr.message || dbErr);
+    }
+
+    // 3. Merge keys
+    const mergedKeysSet = new Set<string>([...localKeys, ...remoteKeys]);
+    const mergedKeys = Array.from(mergedKeysSet);
+
+    // 4. Update Firestore if we have a larger or new set of keys locally in our process environment
+    if (localKeys.length > remoteKeys.length && localKeys.length > 0) {
+      try {
+        await promiseWithTimeout(
+          setDoc(docRef, {
+            keys: localKeys,
+            updatedAt: new Date().toISOString(),
+            poolSize: localKeys.length
+          }, { merge: true }),
+          1500,
+          undefined
+        );
+        console.log(`[Gemini Sync] Published ${localKeys.length} Gemini keys to Firestore system_settings.`);
+      } catch (saveErr: any) {
+        console.warn("[Gemini Sync] Firestore write failed/unauthorized:", saveErr.message || saveErr);
+      }
+    }
+
+    // 5. Update the local keys cache
+    if (mergedKeys.length > 0) {
+      keysCache = mergedKeys;
+      console.log(`[Gemini Sync] Complete. Synced pool has ${keysCache.length} keys total.`);
+    }
+
+  } catch (err: any) {
+    console.error("[Gemini Sync] General synchronization issue:", err.message || err);
+  }
+}
 
 /**
  * Collects and filters all unique Gemini API keys from environment variables.
@@ -18,7 +150,7 @@ export function getGeminiKeysPool(): string[] {
   if (process.env.GEMINI_API_KEYS) {
     process.env.GEMINI_API_KEYS.split(/[,,;]/)
       .map((k) => k.trim())
-      .filter((k) => k.length > 0)
+      .filter((k) => k.length > 5)
       .forEach((k) => keys.add(k));
   }
 
@@ -26,7 +158,7 @@ export function getGeminiKeysPool(): string[] {
   Object.keys(process.env).forEach((v) => {
     if (v.includes("GEMINI_API_KEY") || v === "VITE_API_KEY") {
       const val = process.env[v];
-      if (val && val.trim().length > 0) {
+      if (val && val.trim().length > 5) {
         keys.add(val.trim());
       }
     }
@@ -41,6 +173,7 @@ export function getGeminiKeysPool(): string[] {
  */
 export function clearKeysCache(): void {
   keysCache = [];
+  hasSyncedWithFirestore = false;
 }
 
 /**
@@ -91,7 +224,19 @@ export async function generateContentWithRotation(
     config?: any;
   }
 ): Promise<any> {
-  const pool = getGeminiKeysPool();
+  await syncGeminiKeysWithFirestore();
+  let pool = getGeminiKeysPool();
+  if (pool.length === 0) {
+    console.log("[Gemini Rotator] Keys pool is empty. Forcing full reload from environment and configuration file...");
+    clearKeysCache();
+    await syncGeminiKeysWithFirestore();
+    pool = getGeminiKeysPool();
+  }
+
+  if (pool.length === 0) {
+    throw new Error("Gemini API kaliti topilmadi (Serverda va configda sozlanmagan).");
+  }
+
   const maxAttempts = Math.max(4, pool.length * 2);
 
   let attempts = 0;
@@ -101,11 +246,25 @@ export async function generateContentWithRotation(
     const activeIndex = (currentKeyIndex + attempts) % (pool.length || 1);
     const { client, keyIndex } = getRotationalClient(activeIndex);
 
-    // Fall back to highly available, resilient gemini-3.5-flash if pro or other models fail due to overloading (e.g. 503/429)
+    // Fall back to highly available, resilient alternative models if pro or other models fail due to overloading (e.g. 503/429)
     let modelToUse = params.model;
-    if (attempts >= 1 && params.model !== "gemini-3.5-flash") {
-      modelToUse = "gemini-3.5-flash";
-      console.log(`[Gemini Rotator] Attempt ${attempts + 1}: Falling back to highly-available "gemini-3.5-flash" (original model: "${params.model}") due to load/rate limits.`);
+    if (attempts >= 1) {
+      if (params.model === "gemini-3.5-flash") {
+        if (attempts % 2 === 1) {
+          modelToUse = "gemini-flash-latest";
+        } else {
+          modelToUse = "gemini-3.1-flash-lite";
+        }
+      } else {
+        if (attempts === 1) {
+          modelToUse = "gemini-3.5-flash";
+        } else if (attempts === 2) {
+          modelToUse = "gemini-flash-latest";
+        } else {
+          modelToUse = "gemini-3.1-flash-lite";
+        }
+      }
+      console.log(`[Gemini Rotator] Attempt ${attempts + 1}: Falling back to alternative highly-available model "${modelToUse}" (original model: "${params.model}") to bypass 503/429 high demand.`);
     }
 
     try {
