@@ -7,7 +7,6 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini";
 import { launchBot } from "./telegram";
-import { initPostgres } from "./src/lib/postgres";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
   if (!text) return defaultOutput;
@@ -119,11 +118,6 @@ export const app = express();
 
 async function startServer() {
   const PORT = 3000;
-
-  // Initialize PostgreSQL inside a non-blocking background task to prevent connections from hanging startup
-  initPostgres().catch((pgError) => {
-    console.error("[PostgreSQL] Background init failed:", pgError);
-  });
 
   // Launch the Telegram bot silently in the background
   if (process.env.VERCEL !== "1") {
@@ -415,10 +409,14 @@ async function startServer() {
           7. Xulosa (Tadqiqot yakuniy natijalari)
           8. Foydalanilgan Adabiyotlar ro'yxati (Kamida 3-5 ta asosiy manba)
           Tezis to'liq va barcha ilmiy me'yorlarga javob beradigan professional darajada yozilsin.`;
-        } else if (docType === "maqola") {
-          prompt = `Ma'lumotlar: "${topic}". 
-          Ushbu mavzu/ma'lumotlar asosida nufuzli ilmiy jurnallar (OAK yoki xalqaro Scopus/Web of Science) talablariga mos keladigan professional darajadagi nufuzli ilmiy Maqola yarating. O'zbek tilida, rasmiy va yuqori ilmiy uslubda.
-          Tarkibi:
+      } else if (docType === "maqola") {
+          const author = options?.author || "Muallif";
+          const org = options?.org || "Tashkilot";
+          const lang = options?.language || "O'zbek";
+
+          prompt = `Mavzu: "${topic}". Muallif: ${author}. Tashkilot: ${org}. Til: ${lang}.
+          Ushbu mavzu asosida nufuzli ilmiy jurnallar (OAK yoki xalqaro Scopus/Web of Science) talablariga mos keladigan professional darajadagi nufuzli ilmiy Maqola yarating. Til: ${lang}, rasmiy va yuqori ilmiy uslubda.
+          Tarkibi (IMRAD standarti asosida):
           1. Maqola Sarlavha (Mavzu nomi)
           2. Muallif(lar) va ishlash/o'qish joyi (Namuna sifatida kiritiladi)
           3. Annotatsiya (O'zbek tilida) va Abstract (Ingliz tilida, mukammal grammatika bilan)
@@ -430,6 +428,28 @@ async function startServer() {
           9. Xulosa (Conclusion) - Yakuniy xulosalar va kelajakdagi tadqiqot yo'nalishlari
           10. Foydalanilgan Adabiyotlar (References) - Kamida 10 ta xalqaro va milliy ilmiy manbalar
           Maqola juda batafsil, ilmiy g'oyalarga boy va yuqori saviyada yozilsin.`;
+        } else if (docType === "cv") {
+          prompt = `Foydalanuvchi ma'lumotlari:
+          - Ism Familiya: ${options?.name}
+          - Tug'ilgan sana: ${options?.birthDate}
+          - Telefon: ${options?.phone}
+          - Email: ${options?.email}
+          - Manzil: ${options?.address}
+          - Ta'lim: ${options?.edu}
+          - Ish tajribasi: ${options?.exp}
+          - Ko'nikmalar: ${options?.skills}
+          - Tillar: ${options?.languages}
+
+          Ushbu ma'lumotlar asosida professional, zamonaviy va ish beruvchini jalb qiladigan mukammal va to'liq "CV / Rezyume" yarating. O'zbek tilida, rasmiy uslubda bo'lishi shart.
+          Hujjat tarkibi:
+          1. Shaxsiy ma'lumotlar (F.I.Sh., aloqa ma'lumotlari sarlavha qismida)
+          2. Objective / Maqsad (Professional maqsad haqida qisqa va pishiq paragraf)
+          3. Ta'lim (Batafsil yoritilgan)
+          4. Ish tajribasi (Vazifalar va yutuqlar bilan)
+          5. Ko'nikmalar (Texnik va yumshoq ko'nikmalar)
+          6. Tillar (Bilish darajalari bilan)
+          7. Qo'shimcha ma'lumotlar (Sertifikatlar, qiziqishlar bo'lsa)
+          Hujjat vizual jihatdan tartibli va professional ko'rinishda bo'lsin.`;
         } else if (docType === "dars_ishlanma") {
           prompt = `Ma'lumotlar: "${topic}". 
           Ushbu ma'lumotlar asosida zamonaviy dars berish metodlari va ilg'or pedagogik texnologiyalar asosida tayyorlangan mukammal va to'liq "Dars ishlanmasi" (Lesson Plan) tayyorlang. O'zbek tilida va pedagogik qoidalarga mos holda yozilishi shart.
