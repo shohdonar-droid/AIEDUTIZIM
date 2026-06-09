@@ -90,9 +90,9 @@ export default function CourseView() {
 
       setAnswers(Array(questions.length).fill(-1));
       setShowTest(true);
-    } catch (err) { 
+    } catch (err: any) { 
       console.error(err);
-      alert("Test generatsiyasida xatolik yuz berdi. Iltimos qayta urinib ko'ring.");
+      alert("Test generatsiyasida xatolik yuz berdi: " + (err?.message || ""));
     }
     finally { setGeneratingTest(false); }
   };

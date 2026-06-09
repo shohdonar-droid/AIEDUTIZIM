@@ -792,14 +792,14 @@ export function ChatbotWidget() {
         ...prev,
         { id: Date.now().toString(), role: "assistant", text: replyText },
       ]);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Specialized service error:", err);
       setAiMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
           role: "assistant",
-          text: "Kechirasiz, yaratishda xatolik yuz berdi.",
+          text: `Kechirasiz, yaratishda xatolik yuz berdi: ${err?.message || "Kutilmagan xato"}.`,
         },
       ]);
     } finally {

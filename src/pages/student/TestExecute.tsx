@@ -80,14 +80,20 @@ export default function TestExecute() {
             setGeneratingMessage("Sun'iy intellekt siz uchun maxsus imtihon savollarini tuzmoqda...");
             let allQuestions: Question[] = [];
             
-            for (let i = 0; i < t.generationRules.length; i++) {
-               const rule = t.generationRules[i];
-               setGeneratingMessage(`AI savollar tuzmoqda: ${rule.subject} (${i+1}/${t.generationRules.length})`);
-               const qs = await generateDynamicTest(rule.subject, rule.count, rule.context);
-               allQuestions = [...allQuestions, ...qs];
+            try {
+              for (let i = 0; i < t.generationRules.length; i++) {
+                 const rule = t.generationRules[i];
+                 setGeneratingMessage(`AI savollar tuzmoqda: ${rule.subject} (${i+1}/${t.generationRules.length})`);
+                 const qs = await generateDynamicTest(rule.subject, rule.count, rule.context);
+                 allQuestions = [...allQuestions, ...qs];
+              }
+              t.questions = allQuestions;
+            } catch (err: any) {
+              console.error(err);
+              alert("Xatolik: Imtihon savollarini yaratib bo'lmadi. " + (err?.message || ""));
+              navigate('/tests');
+              return;
             }
-            
-            t.questions = allQuestions;
           }
 
           if (t.randomQuestionCount && t.questions && t.questions.length > t.randomQuestionCount) {

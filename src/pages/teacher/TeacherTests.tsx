@@ -205,7 +205,10 @@ nato'g'ri_variant`;
     try {
       const questions = await generateDynamicTest(topic, testCount, context);
       setGeneratedQuestions(questions);
-    } catch (err) { console.error(err); }
+    } catch (err: any) { 
+      console.error(err);
+      alert(err?.message || "Xatolik: Test savollarini yaratib bo'lmadi.");
+    }
     finally { setLoading(false); }
   };
 

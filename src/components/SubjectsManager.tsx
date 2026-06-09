@@ -136,9 +136,9 @@ export default function SubjectsManager() {
       const generated = await generateDynamicTest(title, testCount, content);
       setQuestions(generated);
       alert(`${generated.length} ta test savollari generatsiya qilindi!`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Test generatsiya qilishda xatolik yuz berdi');
+      alert('Test generatsiya qilishda xatolik yuz berdi: ' + (err?.message || ''));
     } finally {
       setLoading(false);
     }
