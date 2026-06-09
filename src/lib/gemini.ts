@@ -249,19 +249,27 @@ export async function generateContentWithRotation(
     // Fall back to highly available, resilient alternative models if pro or other models fail due to overloading (e.g. 503/429)
     let modelToUse = params.model;
     if (attempts >= 1) {
-      if (params.model === "gemini-3.5-flash") {
-        if (attempts % 2 === 1) {
-          modelToUse = "gemini-flash-latest";
+      if (params.model === "gemini-1.5-flash" || params.model === "gemini-3.5-flash") {
+        if (attempts === 1) {
+          modelToUse = "gemini-2.0-flash";
+        } else if (attempts === 2) {
+          modelToUse = "gemini-1.5-flash-8b";
+        } else if (attempts === 3) {
+          modelToUse = "gemini-1.5-pro";
         } else {
-          modelToUse = "gemini-3.1-flash-lite";
+          const cycle = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"];
+          modelToUse = cycle[attempts % cycle.length];
         }
       } else {
         if (attempts === 1) {
-          modelToUse = "gemini-3.5-flash";
+          modelToUse = "gemini-1.5-flash";
         } else if (attempts === 2) {
-          modelToUse = "gemini-flash-latest";
+          modelToUse = "gemini-2.0-flash";
+        } else if (attempts === 3) {
+          modelToUse = "gemini-1.5-pro";
         } else {
-          modelToUse = "gemini-3.1-flash-lite";
+          const cycle = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+          modelToUse = cycle[attempts % cycle.length];
         }
       }
       console.log(`[Gemini Rotator] Attempt ${attempts + 1}: Falling back to alternative highly-available model "${modelToUse}" (original model: "${params.model}") to bypass 503/429 high demand.`);
@@ -299,9 +307,11 @@ export async function generateContentWithRotation(
          throw error;
       }
       
-      // Add a backoff delay for 503/429 errors before retrying
+      // Add a backoff delay with randomized jitter for 503/429 errors before retrying
       if (errMsg.includes("503") || errMsg.includes("429") || errMsg.includes("quota")) {
-         await new Promise((resolve) => setTimeout(resolve, 2000 * attempts));
+         const delay = (1500 * attempts) + Math.floor(Math.random() * 1000);
+         console.log(`[Gemini Rotator] Backoff retry activated. Waiting for ${delay}ms before attempt ${attempts + 1}...`);
+         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }

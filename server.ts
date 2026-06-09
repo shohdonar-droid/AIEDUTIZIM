@@ -115,8 +115,9 @@ function validateKursIshi(
   return { isValid, reason, cleanContent: text };
 }
 
+export const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = 3000;
 
   // Initialize PostgreSQL inside a non-blocking background task to prevent connections from hanging startup
@@ -125,7 +126,9 @@ async function startServer() {
   });
 
   // Launch the Telegram bot silently in the background
-  launchBot();
+  if (process.env.VERCEL !== "1") {
+    launchBot();
+  }
 
   app.use(express.json());
 
@@ -176,7 +179,7 @@ async function startServer() {
         return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda va configda sozlanmagan)." });
       }
 
-      const MODEL_NAME = "gemini-3.5-flash";
+      const MODEL_NAME = "gemini-1.5-flash";
 
       if (action === "generateDynamicTest") {
         const prompt = context 
@@ -184,10 +187,12 @@ async function startServer() {
              Mavzu: "${topic}".
              Ushbu matn ichidan ${count || 10} ta o'zbek tilidagi test savollarini yarating. 
              Savollar faqat berilgan matn asosida bo'lishi shart.
-             Har bir savol 4 ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (0-3) ko'rsatilishi kerak.`
+             Natija faqat JSON formatida bo'lsin.
+             Har bir savol 4 ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-3) ko'rsatilishi kerak.`
           : `Mavzu: "${topic}".
              Ushbu mavzu asosida ${count || 10} ta o'zbek tilidagi umumiy bilimga asoslangan test savollarini yarating. 
-             Har bir savol 4 ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (0-3) ko'rsatilishi kerak.`;
+             Natija faqat JSON formatida bo'lsin.
+             Har bir savol 4 ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-3) ko'rsatilishi kerak.`;
 
         const response = await generateContentWithRotation({
           model: MODEL_NAME,
@@ -855,10 +860,16 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  // Start listening only if not on Vercel
+  if (process.env.VERCEL !== "1") {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+// Execute startup but catch errors to prevent whole process crash
+startServer().catch(err => {
+  console.error("Startup error:", err);
+});
 
