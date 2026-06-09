@@ -181,7 +181,7 @@ async function startServer() {
         }
       }
 
-      const MODEL_NAME = "gemini-3.5-flash";
+      const MODEL_NAME = "gemini-1.5-flash";
 
       if (action === "generateDynamicTest") {
         const countOptions = options?.optionsCount || 4;
@@ -199,6 +199,7 @@ async function startServer() {
               Natija faqat JSON formatida bo'lsin.
               Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.`;
 
+        console.log(`[API Gemini] Generating test for topic: ${topic}, count: ${count}`);
         const response = await generateContentWithRotation({
           model: MODEL_NAME,
           contents: prompt,
@@ -223,7 +224,12 @@ async function startServer() {
           }
         });
 
+        if (!response || !response.text) {
+          throw new Error("AI javob bermadi (Bo'sh matn).");
+        }
+
         const json = parseJSONResponse(response.text, []);
+        console.log(`[API Gemini] Successfully generated ${json.length} questions.`);
         return res.json(json);
 
       } else if (action === "generatePresentation") {
