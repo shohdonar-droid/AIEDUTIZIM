@@ -96,7 +96,7 @@ export async function syncGeminiKeysWithFirestore(): Promise<void> {
       if (docSnap && docSnap.exists()) {
         const data = docSnap.data();
         if (Array.isArray(data.keys)) {
-          remoteKeys = data.keys.filter((val: any) => typeof val === "string" && val.length > 5);
+          remoteKeys = data.keys.filter((val: any) => typeof val === "string" && val.length > 5 && val.startsWith("AIzaSy"));
         }
       }
     } catch (dbErr: any) {
@@ -150,7 +150,7 @@ export function getGeminiKeysPool(): string[] {
   if (process.env.GEMINI_API_KEYS) {
     process.env.GEMINI_API_KEYS.split(/[,,;]/)
       .map((k) => k.trim())
-      .filter((k) => k.length > 5)
+      .filter((k) => k.length > 5 && k.startsWith("AIzaSy"))
       .forEach((k) => keys.add(k));
   }
 
@@ -158,13 +158,34 @@ export function getGeminiKeysPool(): string[] {
   Object.keys(process.env).forEach((v) => {
     if (v.includes("GEMINI_API_KEY") || v === "VITE_API_KEY") {
       const val = process.env[v];
-      if (val && val.trim().length > 5) {
+      if (val && val.trim().length > 5 && val.trim().startsWith("AIzaSy")) {
         keys.add(val.trim());
       }
     }
   });
 
   keysCache = Array.from(keys);
+  
+  // If no keys starting with AIzaSy were resolved, fallback to original unfiltered loading to be safe.
+  if (keysCache.length === 0) {
+    console.warn("[Gemini keys] No keys starting with 'AIzaSy' found in environment. Falling back to unfiltered key list.");
+    if (process.env.GEMINI_API_KEYS) {
+      process.env.GEMINI_API_KEYS.split(/[,,;]/)
+        .map((k) => k.trim())
+        .filter((k) => k.length > 5)
+        .forEach((k) => keys.add(k));
+    }
+    Object.keys(process.env).forEach((v) => {
+      if (v.includes("GEMINI_API_KEY") || v === "VITE_API_KEY") {
+        const val = process.env[v];
+        if (val && val.trim().length > 5) {
+          keys.add(val.trim());
+        }
+      }
+    });
+    keysCache = Array.from(keys);
+  }
+
   return keysCache;
 }
 
@@ -251,24 +272,24 @@ export async function generateContentWithRotation(
     if (attempts >= 1) {
       if (params.model === "gemini-1.5-flash" || params.model === "gemini-3.5-flash") {
         if (attempts === 1) {
-          modelToUse = "gemini-2.0-flash";
+          modelToUse = "gemini-3.1-flash-lite";
         } else if (attempts === 2) {
-          modelToUse = "gemini-1.5-flash-8b";
+          modelToUse = "gemini-3.5-flash";
         } else if (attempts === 3) {
-          modelToUse = "gemini-1.5-pro";
+          modelToUse = "gemini-3.1-pro-preview";
         } else {
-          const cycle = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"];
+          const cycle = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
           modelToUse = cycle[attempts % cycle.length];
         }
       } else {
         if (attempts === 1) {
-          modelToUse = "gemini-1.5-flash";
+          modelToUse = "gemini-3.5-flash";
         } else if (attempts === 2) {
-          modelToUse = "gemini-2.0-flash";
+          modelToUse = "gemini-3.1-flash-lite";
         } else if (attempts === 3) {
-          modelToUse = "gemini-1.5-pro";
+          modelToUse = "gemini-3.1-pro-preview";
         } else {
-          const cycle = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+          const cycle = ["gemini-3.5-flash", "gemini-3.1-pro-preview"];
           modelToUse = cycle[attempts % cycle.length];
         }
       }
@@ -295,6 +316,9 @@ export async function generateContentWithRotation(
           `[Gemini Rotator] Attempt ${attempts} failed with key index ${keyIndex}. Error: ${errMsg}.`
         );
       }
+      
+      // Proactively rotate the global index so other concurrent/subsequent requests start on a fresh key
+      rotateKeyIndex(pool.length);
       
       // Do not retry on 400 Bad Request / Invalid Argument as the payload itself is wrong
       if (

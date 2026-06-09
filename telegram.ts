@@ -1791,6 +1791,47 @@ const userWizardStates = new PersistentMap<number, WizardState>(
   "wizard"
 );
 
+async function ensureUserStateSynced(userId: number) {
+  if (!db) return;
+  try {
+    const docRef = doc(db, "telegram_user_states", String(userId));
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      
+      // sync authedUsers
+      if (data.authed) {
+        authedUsers.setLocalOnly(userId, data.authed);
+      } else {
+        authedUsers.deleteLocalOnly(userId);
+      }
+      
+      // sync aiActive
+      if (data.aiActive !== undefined) {
+        aiAssistantActiveUsers.setLocalOnly(userId, data.aiActive);
+      } else {
+        aiAssistantActiveUsers.deleteLocalOnly(userId);
+      }
+      
+      // sync aiState
+      if (data.aiState !== undefined) {
+        aiServiceStates.setLocalOnly(userId, data.aiState);
+      } else {
+        aiServiceStates.deleteLocalOnly(userId);
+      }
+      
+      // sync wizard
+      if (data.wizard) {
+        userWizardStates.setLocalOnly(userId, data.wizard);
+      } else {
+        userWizardStates.deleteLocalOnly(userId);
+      }
+    }
+  } catch (err) {
+    console.error(`[ensureUserStateSynced] Error syncing state for ${userId} from Firestore:`, err);
+  }
+}
+
 async function runPresentationGeneration(ctx: any, data: any) {
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
@@ -2103,7 +2144,7 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
   try {
     let topicStr = data.topic;
     if (docType === "kurs_ishi") {
-      topicStr = `Mavzu: ${data.topic || ""}. Fan: ${data.subject || ""}. OTM: ${data.university || ""}. Fakultet: ${data.faculty || ""}. Yo'nalish: ${data.direction || ""}. Talaba: ${data.studentName || ""}. Rahbar: ${data.advisor || ""}. Sahifalar: ${data.pageCount || ""}`;
+      topicStr = `Mavzu: ${data.topic || ""}. Fan: ${data.subject || ""}. OTM: ${data.university || ""}. Fakultet: ${data.faculty || ""}. Kafedra: ${data.department || ""}. Yo'nalish: ${data.direction || ""}. Talaba: ${data.studentName || ""}. Rahbar: ${data.advisor || ""}. Sahifalar: ${data.pageCount || ""}`;
     } else if (docType === "tezis") {
       topicStr = `Mavzu: ${data.topic || ""}. Muallif: ${data.author || ""}. OTM: ${data.university || ""}. Yo'nalish: ${data.direction || ""}.`;
     } else if (docType === "maqola") {
@@ -2336,7 +2377,10 @@ async function runTestGeneration(ctx: any, data: any) {
       body: JSON.stringify({
         action: "generateDynamicTest",
         topic: topicStr,
-        count: Number(data.questionCount) || 10
+        count: Number(data.questionCount) || 10,
+        options: {
+          optionsCount: Number(data.optionsCount) || 4
+        }
       })
     });
 
@@ -2553,32 +2597,39 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     } else if (step === 4) {
       data.faculty = input;
       userWizardStates.set(userId, { service, step: 5, data });
-      return ctx.reply("📄 <b>Yo'nalishni kiriting:</b>", {
+      return ctx.reply("📄 <b>Kafedrani kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
     } else if (step === 5) {
-      data.direction = input;
+      data.department = input;
       userWizardStates.set(userId, { service, step: 6, data });
-      return ctx.reply("📄 <b>Talaba F.I.Sh. kiriting:</b>", {
+      return ctx.reply("📄 <b>Yo'nalishni kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
     } else if (step === 6) {
-      data.studentName = input;
+      data.direction = input;
       userWizardStates.set(userId, { service, step: 7, data });
-      return ctx.reply("📄 <b>Rahbar F.I.Sh. kiriting:</b>", {
+      return ctx.reply("📄 <b>Talaba F.I.Sh. kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
     } else if (step === 7) {
-      data.advisor = input;
+      data.studentName = input;
       userWizardStates.set(userId, { service, step: 8, data });
+      return ctx.reply("📄 <b>Rahbar F.I.Sh. kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 8) {
+      data.advisor = input;
+      userWizardStates.set(userId, { service, step: 9, data });
       return ctx.reply("📄 <b>Sahifalar sonini kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "15" }, { text: "20" }, { text: "25" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
-    } else if (step === 8) {
+    } else if (step === 9) {
       data.pageCount = input;
       userWizardStates.delete(userId);
       await runDocumentGeneration(ctx, "kurs_ishi", data);
@@ -2783,6 +2834,7 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
 
 bot.on("message", async (ctx) => {
   const userId = ctx.from.id;
+  await ensureUserStateSynced(userId);
 
   const chatId = ctx.chat?.id;
   const chatType = ctx.chat?.type;
@@ -3664,7 +3716,7 @@ ${systemAboutText}
 Foydalanuvchi xabari: ${prompt}`;
 
         const aiResponse = await generateContentWithRotation({
-          model: imagePart ? "gemini-2.5-flash" : "gemini-2.5-flash", 
+          model: imagePart ? "gemini-3.5-flash" : "gemini-3.5-flash", 
           contents: [
             { role: "user", parts: [{ text: systemInstructionText }, ...(imagePart ? [imagePart] : [])] }
           ]
@@ -3721,7 +3773,7 @@ Foydalanuvchi xabari: ${prompt}`;
         return ctx.reply(`❌ AI bilan bog'lanishda xatolik yuz berdi: ${errMsg.substring(0, 100)}\n\nIltimos keyinroq urinib ko'ring.`);
       }
     } else {
-      if (!pending && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId) && !userText.startsWith("/")) {
+      if (chatType === "private" && !pending && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId) && !userText.startsWith("/")) {
         return ctx.reply("📋 Kerakli xizmatni menyudan tanlang.");
       }
     }
@@ -4953,7 +5005,7 @@ Foydalanuvchi xabari: ${prompt}`;
                     : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
 
                   const genRes = await generateContentWithRotation({
-                    model: "gemini-2.5-flash-lite",
+                    model: "gemini-3.1-flash-lite",
                     contents: [{ role: "user", parts: [{ text: pText }] }],
                     config: {
                       systemInstruction:
@@ -5084,7 +5136,7 @@ Foydalanuvchi xabari: ${prompt}`;
     }
   } else {
     // If text is sent and AI mode is off, and no previous handler caught it
-    if (!userText.startsWith("/") && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId)) {
+    if (chatType === "private" && !userText.startsWith("/") && !userWizardStates.has(userId) && !aiAssistantActiveUsers.has(userId)) {
       return ctx.reply("📋 Kerakli xizmatni menyudan tanlang.");
     }
   }

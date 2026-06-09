@@ -173,20 +173,21 @@ async function startServer() {
         return res.status(500).json({ error: "Gemini API kaliti topilmadi (Serverda va configda sozlanmagan)." });
       }
 
-      const MODEL_NAME = "gemini-1.5-flash";
+      const MODEL_NAME = "gemini-3.5-flash";
 
       if (action === "generateDynamicTest") {
+        const countOptions = options?.optionsCount || 4;
         const prompt = context 
           ? `Berilgan matn: "${context}". 
              Mavzu: "${topic}".
              Ushbu matn ichidan ${count || 10} ta o'zbek tilidagi test savollarini yarating. 
              Savollar faqat berilgan matn asosida bo'lishi shart.
              Natija faqat JSON formatida bo'lsin.
-             Har bir savol 4 ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-3) ko'rsatilishi kerak.`
+             Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.`
           : `Mavzu: "${topic}".
              Ushbu mavzu asosida ${count || 10} ta o'zbek tilidagi umumiy bilimga asoslangan test savollarini yarating. 
              Natija faqat JSON formatida bo'lsin.
-             Har bir savol 4 ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-3) ko'rsatilishi kerak.`;
+             Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.`;
 
         const response = await generateContentWithRotation({
           model: MODEL_NAME,
@@ -397,17 +398,21 @@ async function startServer() {
      
      Har bir bob va bo'limni o'ta batafsil va batafsil tushuntirishlar bilan, doimiy 25-30 listli (sahifali) akademik hajmga to'liq javob beradigan darajada nihoyatda uzun va qiziqarli yozing.`;
         } else if (docType === "tezis") {
-          prompt = `Ma'lumotlar: "${topic}". 
-          Ushbu mavzu/ma'lumotlar asosida mukammal va professional Ilmiy Tezis (Thesis/Abstract) tayyorlang. O'zbek tilida, ilmiy uslubda.
+          const author = options?.author || "Muallif";
+          const university = options?.university || "OTM";
+          const direction = options?.direction || "Yo'nalish";
+          prompt = `Mavzu: "${topic}". Muallif: ${author}. OTM: ${university}. Yo'nalish: ${direction}.
+          Ushbu mavzu asosida mukammal va professional Ilmiy Tezis (Thesis/Abstract) tayyorlang. O'zbek tilida, ilmiy uslubda.
           Tarkibi:
           1. Sarlavha (Mavzu nomi)
-          2. Muallif(lar) va Ilmiy rahbar haqida ma'lumot (namuna sifatida kiritiladi, foydalanuvchi keyinchalik o'zgartirishi mumkin)
-          3. Annotatsiya (O'zbek va Ingliz tillarida qisqacha ma'lumot)
-          4. Kalit so'zlar (5-8 ta asosiy ilmiy atama)
-          5. Kirish va O'rganilganlik darajasi
-          6. Asosiy Qism (Metodlar, amaliy natijalar, tahlillar)
-          7. Xulosa (Tadqiqot yakuniy natijalari)
-          8. Foydalanilgan Adabiyotlar ro'yxati (Kamida 3-5 ta asosiy manba)
+          2. Muallif: ${author}
+          3. Tashkilot: ${university} (${direction})
+          4. Annotatsiya (O'zbek va Ingliz tillarida qisqacha ma'lumot)
+          5. Kalit so'zlar (5-8 ta asosiy ilmiy atama)
+          6. Kirish va O'rganilganlik darajasi
+          7. Asosiy Qism (Metodlar, amaliy natijalar, tahlillar)
+          8. Xulosa (Tadqiqot yakuniy natijalari)
+          9. Foydalanilgan Adabiyotlar ro'yxati (Kamida 3-5 ta asosiy manba)
           Tezis to'liq va barcha ilmiy me'yorlarga javob beradigan professional darajada yozilsin.`;
       } else if (docType === "maqola") {
           const author = options?.author || "Muallif";
@@ -430,15 +435,15 @@ async function startServer() {
           Maqola juda batafsil, ilmiy g'oyalarga boy va yuqori saviyada yozilsin.`;
         } else if (docType === "cv") {
           prompt = `Foydalanuvchi ma'lumotlari:
-          - Ism Familiya: ${options?.name}
-          - Tug'ilgan sana: ${options?.birthDate}
-          - Telefon: ${options?.phone}
-          - Email: ${options?.email}
-          - Manzil: ${options?.address}
-          - Ta'lim: ${options?.edu}
-          - Ish tajribasi: ${options?.exp}
-          - Ko'nikmalar: ${options?.skills}
-          - Tillar: ${options?.languages}
+          - Ism Familiya: ${options?.name || "Kiritilmagan"}
+          - Tug'ilgan sana: ${options?.birthDate || "Kiritilmagan"}
+          - Telefon: ${options?.phone || "Kiritilmagan"}
+          - Email: ${options?.email || "Kiritilmagan"}
+          - Manzil: ${options?.address || "Kiritilmagan"}
+          - Ta'lim: ${options?.edu || "Kiritilmagan"}
+          - Ish tajribasi: ${options?.exp || "Kiritilmagan"}
+          - Ko'nikmalar: ${options?.skills || "Kiritilmagan"}
+          - Tillar: ${options?.languages || "Kiritilmagan"}
 
           Ushbu ma'lumotlar asosida professional, zamonaviy va ish beruvchini jalb qiladigan mukammal va to'liq "CV / Rezyume" yarating. O'zbek tilida, rasmiy uslubda bo'lishi shart.
           Hujjat tarkibi:
@@ -465,33 +470,13 @@ async function startServer() {
           Dars o'qituvchi va talabalar uchun to'liq yo'riqnoma vazifasini o'taydigan darajada batafsil yozilsin.`;
         } else if (docType === "tarjimon") {
           prompt = `Ma'lumotlar: "${topic}".
-          Yuqoridagi ma'lumotlarda "Target Language" (Tarjima qilinadigan til) berilgan. 
+          Yuqoridagi ma'lumotlarda "Direction" (Tarjima yo'nalishi) berilgan. 
           Iltimos, berilgan matnni xalqaro tarjimonlik darajasida, grammatik qoidalarga rioya qilgan holda faqatgina ko'rsatilgan maqsadli tilga tarjima qiling. Qavslarsiz, to'g'ridan to'g'ri tarjimani bering.`;
-        } else if (docType === 'dars_ishlanma') {
-          prompt = `Mavzu: "${topic}". Ushbu mavzu bo'yicha maktab yoki universitet uchun 1 soatlik (45-80 min) batafsil "Dars ishlanmasi" (Lesson plan) tayyorlang. O'zbek tilida bo'lishi shart.
-     Darsning maqsadi, jihozlari, mavzu bayoni, o'qitish metodlari, mashqlar va uy vazifasi to'liq yozilsin.
-     Javob faqat JSON formatida bo'lsin.`;
         } else if (docType === 'hisobot') {
           prompt = `Mavzu: "${topic}". 
      Birlamchi ma'lumotlar: "${options?.context || ''}".
      Ushbu ma'lumotlar asosida mukammal va kengaytirilgan "Hisobot" (Report) tayyorlang. O'zbek tilida, rasmiy uslubda bo'lishi shart.
      Berilgan qilingan/rejalashtirilgan ishlar haqidagi qisqa matnni professional va ilmiy darajaga ko'taring.
-     Javob faqat JSON formatida bo'lsin.`;
-        } else if (docType === 'maqola') {
-          prompt = `Mavzu: "${topic}". 
-     Jurnal turi: ${options?.journalType === 'international' ? 'Xalqaro' : 'O\'zbekiston (OAK)'}.
-     Ushbu mavzu bo'yicha ilmiy "Maqola" (Article) tayyorlang. O'zbek tilida bo'lishi shart.
-     Belgalangan jurnal turi uchun barcha standard talablarga (IMRAD va h.k.) javob bersin.
-     Javob faqat JSON formatida bo'lsin.`;
-        } else if (docType === 'tezis') {
-          prompt = `Mavzu: "${topic}". 
-     Ushbu mavzu bo'yicha ilmiy "Tezis" (Thesis/Abstract) tayyorlang. O'zbek tilida bo'lishi shart.
-     Tezis qisqa, lo'nda va ilmiy bo'lsin (Imlo qoidalari, maqsad, uslublar, natijalar va xulosa).
-     Javob faqat JSON formatida bo'lsin.`;
-        } else if (docType === 'tarjimon') {
-          prompt = `Matn: "${topic}". 
-     Ushbu matnni o'zbek tiliga (agar boshqa tilda bo'lsa) yoki o'zbek tilidan ingliz/rus tillariga (agar o'zbekchada bo'lsa) tarjima qiling. 
-     Professional tarjima bo'lsin.
      Javob faqat JSON formatida bo'lsin.`;
         }
 
