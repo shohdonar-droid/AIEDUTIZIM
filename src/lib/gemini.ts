@@ -58,7 +58,7 @@ export function getGeminiKeysPool(): string[] {
     });
   }
   Object.keys(process.env).forEach(v => {
-    if (v.includes("GEMINI_API_KEY") || v === "VITE_API_KEY") {
+    if (v.includes("GEMINI_API_KEY") || v.includes("GOOGLE_GENAI_API_KEY") || v === "VITE_API_KEY") {
       const val = process.env[v]?.trim();
       if (val && val.length > 5) keys.add(val);
     }
@@ -126,7 +126,7 @@ export async function generateContentWithRotation(
      // If pool is empty because of filtering/blacklisting, try one desperation reload without filter
      const rawKeys = new Set<string>();
      Object.keys(process.env).forEach(v => {
-       if (v.includes("GEMINI_API_KEY")) {
+       if (v.includes("GEMINI_API_KEY") || v.includes("GOOGLE_GENAI_API_KEY")) {
          const val = process.env[v]?.trim();
          if (val) rawKeys.add(val);
        }

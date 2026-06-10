@@ -180,7 +180,7 @@ async function startServer() {
       }
       if (keysPool.length === 0) {
         // Final fallback: try to use GEMINI_API_KEY directly if it's there but wasn't picked up
-        const directKey = process.env.GEMINI_API_KEY;
+        const directKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
         if (directKey && directKey.length > 5) {
           console.log("[API Gemini] Using direct GEMINI_API_KEY fallback.");
           keysPool = [directKey];
