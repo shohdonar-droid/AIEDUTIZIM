@@ -1,5 +1,6 @@
 import { Telegraf } from "telegraf";
-import { initializeApp, setLogLevel } from "firebase/app";
+import { initializeApp, getApps, getApp, setLogLevel } from "firebase/app";
+import firebaseConfigRaw from "./firebase-applet-config.json";
 import {
   initializeFirestore,
   collection,
@@ -55,31 +56,26 @@ function mdToHtml(md: string): string {
     .replace(/`(.*?)`/g, "<code>$1</code>");
 }
 
-// Simple initialization of Firebase Client outside of React
-const rawConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+// Robust initialization of Firebase Client using static JSON config and safe getApps context
 let db: any = null;
-let firebaseApiKey = "";
-let firebaseProjectId = "";
+let firebaseApiKey = firebaseConfigRaw.apiKey;
+let firebaseProjectId = firebaseConfigRaw.projectId;
 
-if (fs.existsSync(rawConfigPath)) {
-  const firebaseConfigRaw = JSON.parse(fs.readFileSync(rawConfigPath, "utf8"));
-  firebaseApiKey = firebaseConfigRaw.apiKey;
-  firebaseProjectId = firebaseConfigRaw.projectId;
-  const firebaseConfig = {
-    apiKey: firebaseConfigRaw.apiKey,
-    authDomain: firebaseConfigRaw.authDomain,
-    projectId: firebaseConfigRaw.projectId,
-    storageBucket: firebaseConfigRaw.storageBucket,
-    messagingSenderId: firebaseConfigRaw.messagingSenderId,
-    appId: firebaseConfigRaw.appId,
-  };
-  const app = initializeApp(firebaseConfig);
-  db = initializeFirestore(
-    app,
-    { experimentalForceLongPolling: true },
-    firebaseConfigRaw.firestoreDatabaseId,
-  );
-}
+const firebaseConfig = {
+  apiKey: firebaseConfigRaw.apiKey,
+  authDomain: firebaseConfigRaw.authDomain,
+  projectId: firebaseConfigRaw.projectId,
+  storageBucket: firebaseConfigRaw.storageBucket,
+  messagingSenderId: firebaseConfigRaw.messagingSenderId,
+  appId: firebaseConfigRaw.appId,
+};
+
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+db = initializeFirestore(
+  app,
+  { experimentalForceLongPolling: true },
+  firebaseConfigRaw.firestoreDatabaseId,
+);
 
 export let botPaused = false;
 export let adminTelegramId: number | null = null;

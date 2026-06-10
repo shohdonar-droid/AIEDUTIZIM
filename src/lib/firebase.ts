@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -13,7 +13,7 @@ const firebaseConfig = {
   appId: firebaseConfigRaw.appId,
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 }, firebaseConfigRaw.firestoreDatabaseId);

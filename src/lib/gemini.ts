@@ -1,5 +1,6 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { initializeApp, getApps } from "firebase/app";
+import firebaseConfigRaw from "../../firebase-applet-config.json";
 import { initializeFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import fs from "fs";
 import path from "path";
@@ -65,16 +66,8 @@ export function getGeminiKeysPool(): string[] {
   });
 
   // Always include the Firebase configuration API key as a solid, robust fallback (vital for Vercel imports without manually set env keys)
-  try {
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      if (config && config.apiKey && config.apiKey.length > 5) {
-        keys.add(config.apiKey.trim());
-      }
-    }
-  } catch (err) {
-    console.warn("[Gemini Config Fallback] Failed reading firebase-applet-config.json:", err);
+  if (firebaseConfigRaw && firebaseConfigRaw.apiKey && firebaseConfigRaw.apiKey.length > 5) {
+    keys.add(firebaseConfigRaw.apiKey.trim());
   }
 
   const allKeys = Array.from(keys);
