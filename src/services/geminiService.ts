@@ -3,9 +3,15 @@ import { Question } from "../types";
 async function handleErrorRes(res: Response, fallback: string): Promise<never> {
   let errMsg = fallback;
   try {
-    const errData = await res.json();
-    if (errData && errData.error) {
-      errMsg = errData.error;
+    const text = await res.text();
+    try {
+      const errData = JSON.parse(text);
+      if (errData && errData.error) {
+        errMsg = typeof errData.error === 'string' ? errData.error : JSON.stringify(errData.error);
+      }
+    } catch (_) {
+      // Not JSON, probably Vercel HTML
+      errMsg = `Server xatosi: HTTP ${res.status}. ${text.substring(0, 150).replace(/<[^>]*>?/gm, ' ').trim()}`;
     }
   } catch (_) {}
   throw new Error(errMsg);

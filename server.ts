@@ -4,7 +4,16 @@ dotenv.config();
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type as SDKType } from "@google/genai";
+
+const Type = SDKType || {
+    STRING: "STRING",
+    NUMBER: "NUMBER",
+    INTEGER: "INTEGER",
+    BOOLEAN: "BOOLEAN",
+    ARRAY: "ARRAY",
+    OBJECT: "OBJECT",
+};
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini";
 import { launchBot } from "./telegram";
 
