@@ -3760,7 +3760,7 @@ ${systemAboutText}
 Foydalanuvchi xabari: ${prompt}`;
 
           const aiResponse = await generateContentWithRotation({
-            model: imagePart ? "gemini-3.5-flash" : "gemini-3.5-flash", 
+            model: imagePart ? "gemini-1.5-flash" : "gemini-1.5-flash",
             contents: [
               { role: "user", parts: [{ text: systemInstructionText }, ...(imagePart ? [imagePart] : [])] }
             ]

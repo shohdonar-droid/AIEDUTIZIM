@@ -181,7 +181,7 @@ async function startServer() {
         }
       }
 
-      const MODEL_NAME = "gemini-3.5-flash";
+      const MODEL_NAME = "gemini-1.5-flash";
 
       if (action === "generateDynamicTest") {
         const countOptions = options?.optionsCount || 4;
@@ -626,7 +626,7 @@ async function startServer() {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-3.5-flash",
+        model: model || "gemini-1.5-flash",
         contents: prompt
       });
 
@@ -814,7 +814,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-3.5-flash",
+               model: "gemini-1.5-flash",
                contents: contents,
                config: {
                  systemInstruction,
