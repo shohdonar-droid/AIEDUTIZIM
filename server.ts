@@ -199,7 +199,8 @@ async function startServer() {
               Natija faqat JSON formatida bo'lsin.
               Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.`;
 
-        console.log(`[API Gemini] Generating test for topic: ${topic}, count: ${count}`);
+      console.log(`[API Gemini] Generating test for topic: ${topic}, count: ${count}`);
+      try {
         const response = await generateContentWithRotation({
           model: MODEL_NAME,
           contents: prompt,
@@ -231,6 +232,10 @@ async function startServer() {
         const json = parseJSONResponse(response.text, []);
         console.log(`[API Gemini] Successfully generated ${json.length} questions.`);
         return res.json(json);
+      } catch (err: any) {
+        console.error(`[API Gemini] Test generation failed: ${err.message}`);
+        return res.status(500).json({ error: `Test yaratishda xatolik: ${err.message}` });
+      }
 
       } else if (action === "generatePresentation") {
         const prompt = `Mavzu: "${topic}".

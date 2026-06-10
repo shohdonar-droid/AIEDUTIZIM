@@ -6,6 +6,7 @@ import path from "path";
 
 // Cache for valid Gemini API keys
 let keysCache: string[] = [];
+let badKeys = new Set<string>(); // Keep track of keys that gave 401
 let currentKeyIndex = 0;
 let hasSyncedWithFirestore = false;
 
@@ -48,6 +49,8 @@ export async function syncGeminiKeysWithFirestore(): Promise<void> {
 export function getGeminiKeysPool(): string[] {
   if (keysCache.length > 0) return keysCache;
   const keys = new Set<string>();
+  
+  // Collect all potential keys
   if (process.env.GEMINI_API_KEYS) {
     process.env.GEMINI_API_KEYS.split(/[,,;]/).forEach(k => {
       const tk = k.trim();
@@ -60,12 +63,30 @@ export function getGeminiKeysPool(): string[] {
       if (val && val.length > 5) keys.add(val);
     }
   });
-  keysCache = Array.from(keys);
+
+  const allKeys = Array.from(keys);
+  
+  // Filter out known bad keys and prioritize AIzaSy keys
+  // Many keys provided by the environment starting with AQ. seem to be invalid for this API
+  const aizasyKeys = allKeys.filter(k => k.startsWith("AIzaSy") && !badKeys.has(k));
+  const otherKeys = allKeys.filter(k => !k.startsWith("AIzaSy") && !badKeys.has(k));
+
+  // If we have standard keys, use them. Otherwise fallback to everything that isn't blacklisted.
+  if (aizasyKeys.length > 0) {
+    keysCache = aizasyKeys;
+  } else {
+    keysCache = otherKeys;
+  }
+
+  // If still empty but we have blacklisted keys, try one last time with all keys if needed, 
+  // but better to return empty and let the caller handle it.
+  
   return keysCache;
 }
 
 export function clearKeysCache(): void {
   keysCache = [];
+  badKeys.clear();
   hasSyncedWithFirestore = false;
 }
 
@@ -94,14 +115,27 @@ export async function generateContentWithRotation(
 ): Promise<any> {
   await syncGeminiKeysWithFirestore();
   let pool = getGeminiKeysPool();
+  
   if (pool.length === 0) {
     clearKeysCache();
     await syncGeminiKeysWithFirestore();
     pool = getGeminiKeysPool();
   }
-  if (pool.length === 0) throw new Error("Gemini API kaliti topilmadi.");
+  
+  if (pool.length === 0) {
+     // If pool is empty because of filtering/blacklisting, try one desperation reload without filter
+     const rawKeys = new Set<string>();
+     Object.keys(process.env).forEach(v => {
+       if (v.includes("GEMINI_API_KEY")) {
+         const val = process.env[v]?.trim();
+         if (val) rawKeys.add(val);
+       }
+     });
+     pool = Array.from(rawKeys);
+     if (pool.length === 0) throw new Error("Gemini API kaliti topilmadi.");
+  }
 
-  const maxAttempts = Math.max(5, pool.length * 2);
+  const maxAttempts = Math.max(10, pool.length * 2);
   let attempts = 0;
   let lastError: any = null;
 
@@ -114,43 +148,71 @@ export async function generateContentWithRotation(
 
   while (attempts < maxAttempts) {
     const activeIndex = (currentKeyIndex + attempts) % pool.length;
-    const { client, keyIndex } = getRotationalClient(activeIndex);
+    const apiKey = pool[activeIndex];
+    
+    // Skip if already known bad in this turn's context (though getGeminiKeysPool should have filtered)
+    if (badKeys.has(apiKey) && pool.length > 1) {
+       attempts++;
+       continue;
+    }
 
+    const client = new GoogleGenAI({ apiKey });
     let modelToUse = params.model;
-    // Environment-specific model names found to be working: gemini-3.5-flash, gemini-3.1-flash-lite
-    if (modelToUse.includes("gemini-1.5-flash")) modelToUse = "gemini-3.5-flash";
-    if (modelToUse.includes("gemini-1.5-pro")) modelToUse = "gemini-3.1-pro-preview";
+    
+    // Normalize model names to working ones
+    if (modelToUse.includes("gemini-1.5-flash")) modelToUse = "gemini-1.5-flash"; // Try standard first
+    if (modelToUse.includes("gemini-1.5-pro")) modelToUse = "gemini-1.5-pro";
 
+    // Strategic fallbacks
     if (attempts >= 1) {
-      if (attempts % 2 === 1) modelToUse = "gemini-3.1-flash-lite";
-      else modelToUse = "gemini-3.5-flash";
+       if (attempts % 3 === 1) modelToUse = "gemini-3.5-flash";
+       else if (attempts % 3 === 2) modelToUse = "gemini-3.1-flash-lite";
+       else modelToUse = "gemini-1.5-flash";
     }
 
     try {
-      console.log(`[Gemini Rotator] Attempt ${attempts + 1} with ${modelToUse} (Key ${keyIndex})`);
+      console.log(`[Gemini Rotator] Attempt ${attempts + 1} with ${modelToUse} (Key Index ${activeIndex})`);
       const response = await Promise.race([
         client.models.generateContent({
           model: modelToUse,
           contents: params.contents,
-          config: params.config,
-          safetySettings: params.safetySettings || defaultSafety
+          config: {
+            ...(params.config || {}),
+            safetySettings: params.safetySettings || defaultSafety
+          }
         }),
         new Promise((_, reject) => setTimeout(() => reject(new Error("Request Timeout")), 45000))
       ]);
-      currentKeyIndex = keyIndex;
+      
+      // If we got here, the key is good. Update index.
+      currentKeyIndex = activeIndex;
       return response;
     } catch (error: any) {
       attempts++;
       lastError = error;
       const errorDetail = error.message || JSON.stringify(error);
-      console.log(`[Gemini Rotator] Step ${attempts} failed on index ${keyIndex}: ${errorDetail}`);
+      const statusCode = error.status || error.code;
+      
+      console.log(`[Gemini Rotator] Step ${attempts} failed on index ${activeIndex} (Status: ${statusCode}): ${errorDetail.substring(0, 100)}`);
+      
+      // Blacklist 401 keys permanently for this process
+      if (statusCode === 401 || errorDetail.includes("authentication credentials") || errorDetail.includes("401")) {
+         console.warn(`[Gemini Rotator] Key at index ${activeIndex} is INVALID (401). Blacklisting.`);
+         badKeys.add(apiKey);
+         // Force clear cache so next call doesn't see this key
+         keysCache = []; 
+      }
+
       rotateKeyIndex(pool.length);
       
       const errMsg = errorDetail.toLowerCase();
+      // Don't retry on user errors (400)
       if (errMsg.includes("400") || errMsg.includes("invalid_argument")) throw error;
       
+      // Exponential-ish backoff for rate limits
       if (errMsg.includes("503") || errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("unavailable")) {
-         await new Promise(r => setTimeout(r, 1000 * attempts));
+         const delay = Math.min(2000, 500 * attempts);
+         await new Promise(r => setTimeout(r, delay));
       }
     }
   }
