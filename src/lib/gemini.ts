@@ -159,14 +159,26 @@ export async function generateContentWithRotation(
     const client = new GoogleGenAI({ apiKey });
     let modelToUse = params.model;
     
-    // Normalize model names to working ones
-    if (modelToUse.includes("gemini-1.5") || modelToUse.includes("gemini-3.") || modelToUse.includes("pro")) {
-      modelToUse = "gemini-2.5-flash"; // Force reliable, high-quota standard flash
+    // Normalize model names to working ones recommended by active guidelines
+    if (modelToUse.includes("gemini-1.5") || modelToUse.includes("2.0-flash") || modelToUse.includes("2.5") || modelToUse.includes("3.5-flash")) {
+      modelToUse = "gemini-3.5-flash"; // Default highly robust text/visual model
+    } else if (modelToUse.includes("lite") || modelToUse.includes("flash-lite")) {
+      modelToUse = "gemini-3.1-flash-lite";
+    } else if (modelToUse.includes("pro")) {
+      modelToUse = "gemini-3.1-pro-preview";
+    } else {
+      modelToUse = "gemini-3.5-flash";
     }
 
-    // Strategic fallbacks
-    if (attempts >= 1) {
-       modelToUse = "gemini-2.5-flash";
+    // Strategic, dynamic model rotation on retry attempts to bypass congested endpoints (503 / 429)
+    if (attempts === 1) {
+      modelToUse = "gemini-3.1-flash-lite"; // First fallback: lighter, faster, separate quota/demand pool
+    } else if (attempts === 2) {
+      modelToUse = "gemini-2.5-flash"; // Second fallback: legacy flash pool
+    } else if (attempts >= 3) {
+      // Cycle through active, working models for subsequent retries
+      const cycle = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
+      modelToUse = cycle[(attempts - 3) % cycle.length];
     }
 
     try {
