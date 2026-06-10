@@ -147,7 +147,7 @@ export async function broadcastBotResumed() {
 
 let lastKnownPaused: boolean | null = null;
 
-if (db) {
+if (db && process.env.VERCEL !== "1") {
   onSnapshot(doc(db, "settings", "bot_settings"), (snap) => {
     if (snap.exists()) {
       const data = snap.data();
