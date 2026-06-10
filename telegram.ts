@@ -19,7 +19,16 @@ import {
   orderBy,
   getCountFromServer,
 } from "firebase/firestore";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type as SDKType } from "@google/genai";
+
+const Type = SDKType || {
+  STRING: "STRING",
+  NUMBER: "NUMBER",
+  INTEGER: "INTEGER",
+  BOOLEAN: "BOOLEAN",
+  ARRAY: "ARRAY",
+  OBJECT: "OBJECT",
+};
 import { generateContentWithRotation } from "./src/lib/gemini";
 import dotenv from "dotenv";
 import fs from "fs";
