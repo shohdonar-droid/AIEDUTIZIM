@@ -160,14 +160,14 @@ export async function generateContentWithRotation(
     let modelToUse = params.model;
     
     // Normalize model names to working ones
-    if (modelToUse.includes("gemini-1.5-flash")) modelToUse = "gemini-1.5-flash"; // Try standard first
-    if (modelToUse.includes("gemini-1.5-pro")) modelToUse = "gemini-1.5-pro";
+    if (modelToUse.includes("gemini-1.5-flash")) modelToUse = "gemini-3.5-flash";
+    if (modelToUse.includes("gemini-1.5-pro")) modelToUse = "gemini-3.1-pro-preview";
 
     // Strategic fallbacks
     if (attempts >= 1) {
        if (attempts % 3 === 1) modelToUse = "gemini-3.5-flash";
        else if (attempts % 3 === 2) modelToUse = "gemini-3.1-flash-lite";
-       else modelToUse = "gemini-1.5-flash";
+       else modelToUse = "gemini-3.1-pro-preview";
     }
 
     try {

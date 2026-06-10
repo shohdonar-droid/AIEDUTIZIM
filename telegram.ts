@@ -1107,8 +1107,13 @@ bot.start(async (ctx) => {
         });
         console.log(`[Telegram] Auto-created user profile for ${userId}`);
       }
-    } catch (e) {
-      console.error("Auto-registration error:", e);
+    } catch (e: any) {
+      const errMsg = String(e?.message || "").toLowerCase();
+      if (errMsg.includes("quota") || errMsg.includes("limit") || errMsg.includes("exceeded")) {
+        console.warn(`[Telegram] Quota exceeded on auto-registration for ${userId}. Skipping.`);
+      } else {
+        console.error("Auto-registration error:", e);
+      }
     }
   }
 
@@ -1855,8 +1860,13 @@ async function ensureUserStateSynced(userId: number) {
         userWizardStates.deleteLocalOnly(userId);
       }
     }
-  } catch (err) {
-    console.error(`[ensureUserStateSynced] Error syncing state for ${userId} from Firestore:`, err);
+  } catch (err: any) {
+    const errMsg = String(err?.message || "").toLowerCase();
+    if (errMsg.includes("quota") || errMsg.includes("limit") || errMsg.includes("exceeded")) {
+      console.warn(`[ensureUserStateSynced] Quota limit exceeded for ${userId}. Using local cache.`);
+    } else {
+      console.error(`[ensureUserStateSynced] Error syncing state for ${userId} from Firestore:`, err);
+    }
   }
 }
 

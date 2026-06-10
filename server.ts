@@ -181,7 +181,7 @@ async function startServer() {
         }
       }
 
-      const MODEL_NAME = "gemini-1.5-flash";
+      const MODEL_NAME = "gemini-3.5-flash";
 
       if (action === "generateDynamicTest") {
         const countOptions = options?.optionsCount || 4;
@@ -551,7 +551,7 @@ async function startServer() {
           }
         } else {
           const response = await generateContentWithRotation({
-            model: MODEL_NAME,
+            model: "gemini-3.1-pro-preview", // Use Pro model for higher quality documents
             contents: prompt,
             config: {
               responseMimeType: "application/json",
