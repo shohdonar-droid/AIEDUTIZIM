@@ -5089,7 +5089,7 @@ Foydalanuvchi xabari: ${prompt}`;
                     : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
 
                   const genRes = await generateContentWithRotation({
-                    model: "gemini-3.1-flash-lite",
+                    model: "gemini-2.5-flash",
                     contents: [{ role: "user", parts: [{ text: pText }] }],
                     config: {
                       systemInstruction:

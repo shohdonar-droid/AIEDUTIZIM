@@ -518,7 +518,7 @@ async function startServer() {
           while (attempts < 2 && !isFullyValid) {
             console.log(`[Kurs Ishi Generation] Attempt ${attempts + 1} starting...`);
             const response = await generateContentWithRotation({
-              model: "gemini-3.1-pro-preview",
+              model: "gemini-2.5-flash",
               contents: currentPrompt,
               config: {
                 responseMimeType: "application/json",
@@ -559,7 +559,7 @@ async function startServer() {
           }
         } else {
           const response = await generateContentWithRotation({
-            model: "gemini-3.1-pro-preview", // Use Pro model for higher quality documents
+            model: "gemini-2.5-flash", // Use standard model to avoid quota
             contents: prompt,
             config: {
               responseMimeType: "application/json",

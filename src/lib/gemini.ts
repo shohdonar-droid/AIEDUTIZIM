@@ -161,13 +161,11 @@ export async function generateContentWithRotation(
     
     // Normalize model names to working ones
     if (modelToUse.includes("gemini-1.5-flash")) modelToUse = "gemini-2.5-flash"; // Try standard first
-    if (modelToUse.includes("gemini-1.5-pro")) modelToUse = "gemini-3.1-pro-preview";
+    if (modelToUse.includes("gemini-1.5-pro")) modelToUse = "gemini-2.5-flash"; // Force flash to avoid quota limits
 
     // Strategic fallbacks
     if (attempts >= 1) {
-       if (attempts % 3 === 1) modelToUse = "gemini-2.5-flash";
-       else if (attempts % 3 === 2) modelToUse = "gemini-2.5-flash";
-       else modelToUse = "gemini-3.1-pro-preview";
+       modelToUse = "gemini-2.5-flash";
     }
 
     try {
