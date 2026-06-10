@@ -50,7 +50,7 @@ export function getGeminiKeysPool(): string[] {
   if (keysCache.length > 0) return keysCache;
   const keys = new Set<string>();
   
-  // Collect all potential keys
+  // Collect all potential keys from env
   if (process.env.GEMINI_API_KEYS) {
     process.env.GEMINI_API_KEYS.split(/[,,;]/).forEach(k => {
       const tk = k.trim();
@@ -63,6 +63,19 @@ export function getGeminiKeysPool(): string[] {
       if (val && val.length > 5) keys.add(val);
     }
   });
+
+  // Always include the Firebase configuration API key as a solid, robust fallback (vital for Vercel imports without manually set env keys)
+  try {
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      if (config && config.apiKey && config.apiKey.length > 5) {
+        keys.add(config.apiKey.trim());
+      }
+    }
+  } catch (err) {
+    console.warn("[Gemini Config Fallback] Failed reading firebase-applet-config.json:", err);
+  }
 
   const allKeys = Array.from(keys);
   
