@@ -157,27 +157,26 @@ export async function generateContentWithRotation(
     }
 
     const client = new GoogleGenAI({ apiKey });
-    let modelToUse = params.model;
+    let modelToUse = params.model || "gemini-2.5-flash";
     
-    // Normalize model names to working ones recommended by active guidelines
-    if (modelToUse.includes("gemini-1.5") || modelToUse.includes("2.0-flash") || modelToUse.includes("2.5") || modelToUse.includes("3.5-flash")) {
-      modelToUse = "gemini-3.5-flash"; // Default highly robust text/visual model
+    // Normalize model names to actual existing models in the Google GenAI SDK.
+    // gemini-3.5-flash is not a public developer API model, so we map it to the highly robust gemini-2.5-flash.
+    if (modelToUse.includes("pro")) {
+      modelToUse = "gemini-2.5-pro";
     } else if (modelToUse.includes("lite") || modelToUse.includes("flash-lite")) {
-      modelToUse = "gemini-3.1-flash-lite";
-    } else if (modelToUse.includes("pro")) {
-      modelToUse = "gemini-3.1-pro-preview";
+      modelToUse = "gemini-2.0-flash-lite";
     } else {
-      modelToUse = "gemini-3.5-flash";
+      modelToUse = "gemini-2.5-flash"; // Standard default for robust, high-performance generation
     }
 
-    // Strategic, dynamic model rotation on retry attempts to bypass congested endpoints (503 / 429)
+    // Strategic, dynamic model rotation on retry attempts to bypass congested endpoints or temporary limits
     if (attempts === 1) {
-      modelToUse = "gemini-3.1-flash-lite"; // First fallback: lighter, faster, separate quota/demand pool
+      modelToUse = "gemini-2.0-flash"; // First robust backend fallback (different infrastructure pool)
     } else if (attempts === 2) {
-      modelToUse = "gemini-2.5-flash"; // Second fallback: legacy flash pool
+      modelToUse = "gemini-1.5-flash"; // Second solid fallback (extremely reliable legacy pool)
     } else if (attempts >= 3) {
-      // Cycle through active, working models for subsequent retries
-      const cycle = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
+      // Rotate active, production-grade models
+      const cycle = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
       modelToUse = cycle[(attempts - 3) % cycle.length];
     }
 
