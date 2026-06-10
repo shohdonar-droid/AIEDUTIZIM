@@ -124,18 +124,11 @@ function validateKursIshi(
 
 export const app = express();
 
-async function startServer() {
-  const PORT = 3000;
+// Top-level middleware (mounted immediately for Vercel/serverless environments)
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-  // Launch the Telegram bot silently in the background
-  if (process.env.VERCEL !== "1") {
-    launchBot();
-  }
-
-  app.use(express.json({ limit: "10mb" }));
-  app.use(express.urlencoded({ limit: "10mb", extended: true }));
-
-  app.get("/api/health", (req, res) => {
+app.get("/api/health", (req, res) => {
     // Log for debugging
     const keys = Object.keys(process.env).filter(k => k.includes("GEMINI") || k.includes("API"));
     res.json({ status: "ok", keysFound: keys, poolSize: getGeminiKeysPool().length });
@@ -879,32 +872,41 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
     }
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await import("vite");
-    const viteServer = await vite.createServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(viteServer.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+  // Asynchronous startup helper for launching local processes
+  async function startServer() {
+    const PORT = 3000;
+
+    // Launch the Telegram bot silently in the background (only on local/non-serverless instances)
+    if (process.env.VERCEL !== "1") {
+      launchBot();
+    }
+
+    // Vite middleware for development
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await import("vite");
+      const viteServer = await vite.createServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(viteServer.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    // Start listening only if not on Vercel
+    if (process.env.VERCEL !== "1") {
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+      });
+    }
   }
 
-  // Start listening only if not on Vercel
-  if (process.env.VERCEL !== "1") {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
-}
-
-// Execute startup but catch errors to prevent whole process crash
-startServer().catch(err => {
-  console.error("Startup error:", err);
-});
+  // Execute startup but catch errors to prevent whole process crash
+  startServer().catch(err => {
+    console.error("Startup error:", err);
+  });
 
