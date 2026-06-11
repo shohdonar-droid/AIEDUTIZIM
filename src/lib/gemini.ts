@@ -205,48 +205,49 @@ export async function generateContentWithRotation(
 
     const client = new GoogleGenAI({ apiKey });
     const maskedKey = apiKey.substring(0, 6) + "..." + apiKey.substring(apiKey.length - 4);
-    let requestedModel = params.model || "gemini-3.5-flash";
+    let requestedModel = params.model || "gemini-1.5-flash";
     let modelToUse = requestedModel;
     
     // Valid models for retry logic
-    const modelOptions = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"];
+    const modelOptions = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"];
 
     if (attempts === 0) {
        // On first attempt, use what was requested but sanitize from non-existent versions
-       if (requestedModel.includes("pro")) modelToUse = "gemini-3.1-pro-preview";
-       else if (requestedModel.includes("8b") || requestedModel.includes("lite")) modelToUse = "gemini-3.1-flash-lite";
-       else modelToUse = "gemini-3.5-flash";
+       if (requestedModel.includes("pro")) modelToUse = "gemini-1.5-pro";
+       else if (requestedModel.includes("8b") || requestedModel.includes("lite")) modelToUse = "gemini-1.5-flash-8b";
+       else modelToUse = "gemini-1.5-flash";
     } else if (attempts === 1) {
-       modelToUse = "gemini-3.1-flash-lite";
+       modelToUse = "gemini-1.5-flash-8b";
     } else if (attempts === 2) {
-       modelToUse = "gemini-3.5-flash";
+       modelToUse = "gemini-1.5-flash";
     } else if (attempts === 3) {
-       modelToUse = "gemini-3.1-pro-preview";
+       modelToUse = "gemini-1.5-pro";
     } else {
        modelToUse = modelOptions[attempts % modelOptions.length];
     }
 
     try {
       console.log(`[Gemini Rotator] Attempt ${attempts + 1} with ${modelToUse} (Key: ${maskedKey}, Index: ${activeIndex})`);
+      
+      const genModel = client.getGenerativeModel({ 
+        model: modelToUse,
+        generationConfig: {
+          ...(params.config || {}),
+        },
+        safetySettings: params.safetySettings || defaultSafety
+      });
+
       const response = await Promise.race([
-        client.models.generateContent({
-          model: modelToUse,
+        genModel.generateContent({
           contents: normalizedContents,
-          config: {
-            ...(params.config || {}),
-            safetySettings: params.safetySettings || defaultSafety
-          }
         }),
         new Promise((_, reject) => setTimeout(() => reject(new Error("AI Request Timeout (45s)")), 45000))
       ]);
       
-      // Normalize response object to have a simple .text property for legacy compatibility
-      const res = response as any;
-      if (res && !res.text && res.candidates && res.candidates[0]?.content?.parts?.[0]?.text) {
-         Object.defineProperty(res, 'text', {
-            get: function() { return this.candidates[0].content.parts[0].text; }
-         });
-      }
+      const result = response as any;
+      const res = {
+         text: result.response?.text?.() || ""
+      };
 
       currentKeyIndex = activeIndex;
       return res;
