@@ -42,6 +42,12 @@ export interface UserProfile {
   groupName?: string;
   teacherId?: string;
   teacherName?: string;
+  isBotUser?: boolean;
+  fromTelegram?: boolean;
+  isTelegramUser?: boolean;
+  isBotCreator?: boolean;
+  telegramId?: number;
+  balance?: number;
   isAnonymousContact?: boolean;
   billingHistory?: any[];
   isImpersonated?: boolean;

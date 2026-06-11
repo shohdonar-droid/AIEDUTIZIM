@@ -54,6 +54,19 @@ export default function AdminOverview() {
 
   useEffect(() => {
     async function loadStats() {
+      // Use cached stats if available and fresh (e.g. within last 10 minutes)
+      const cachedTime = localStorage.getItem("admin_overview_stats_time");
+      const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+      
+      if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL)) {
+        const cached = localStorage.getItem("admin_overview_stats");
+        if (cached) {
+          setStats(JSON.parse(cached));
+          setLoading(false);
+          return;
+        }
+      }
+
       try {
         const studentSnap = await getCountFromServer(query(collection(db, "users"), where("role", "==", "student")));
         const teacherSnap = await getCountFromServer(query(collection(db, "users"), where("role", "==", "teacher")));
@@ -75,6 +88,7 @@ export default function AdminOverview() {
 
         setStats(loadedStats);
         localStorage.setItem("admin_overview_stats", JSON.stringify(loadedStats));
+        localStorage.setItem("admin_overview_stats_time", Date.now().toString());
       } catch (err: any) {
         console.error("Stats load error", err);
         const errMsg = String(err?.message || "").toLowerCase();
@@ -139,24 +153,25 @@ export default function AdminOverview() {
       }
     });
 
-    const unsubLogs = onSnapshot(
-      query(collection(db, "activityLogs"), orderBy("loginTime", "desc"), limit(100)),
-      (snap) => {
+    const loadLogs = async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "activityLogs"), orderBy("loginTime", "desc"), limit(30))
+        );
         const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setActivityLogs(logs);
-      },
-      (err: any) => {
-        console.warn("Failed to subscribe to activityLogs", err);
+      } catch (err: any) {
+        console.warn("Failed to load activityLogs", err);
         const errMsg = String(err?.message || "").toLowerCase();
         if (errMsg.includes("quota") || errMsg.includes("limit") || errMsg.includes("exceeded")) {
           setIsQuotaExceeded(true);
         }
       }
-    );
+    };
+    loadLogs();
 
     return () => {
       unsubBot();
-      unsubLogs();
     };
   }, []);
 
@@ -316,7 +331,7 @@ export default function AdminOverview() {
         <div className="lg:col-span-3 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-gray-900 text-lg">Tizimga oxirgi kirib-chiqishlar (Maks. 100 ta)</h3>
+              <h3 className="font-bold text-gray-900 text-lg">Tizimga oxirgi kirib-chiqishlar (Maks. 30 ta)</h3>
               <span className="text-[11px] bg-blue-50 text-blue-600 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
                 Jami: {activityLogs.length} ta hammasi
               </span>

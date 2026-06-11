@@ -3,16 +3,9 @@ dotenv.config();
 
 import express from "express";
 import path from "path";
-import { GoogleGenAI, Type as SDKType } from "@google/genai";
+import { GoogleGenAI, SchemaType } from "@google/genai";
 
-const Type = SDKType || {
-    STRING: "STRING",
-    NUMBER: "NUMBER",
-    INTEGER: "INTEGER",
-    BOOLEAN: "BOOLEAN",
-    ARRAY: "ARRAY",
-    OBJECT: "OBJECT",
-};
+const Type = SchemaType;
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
@@ -158,9 +151,34 @@ app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
+  app.get("/api/health-ai", async (req, res) => {
+    try {
+      console.log("[Health AI] Testing Gemini connectivity...");
+      const pool = getGeminiKeysPool();
+      if (pool.length === 0) {
+        return res.status(500).json({ status: "fail", error: "No API keys found in pool." });
+      }
+      
+      const response = await generateContentWithRotation({
+        model: "gemini-1.5-flash",
+        contents: "Salom, bu test xabari. Iltimos 'OK' deb javob bering."
+      });
+      
+      res.json({ 
+        status: "ok", 
+        keysInPool: pool.length,
+        modelResponse: response.text || "No text property"
+      });
+    } catch (e: any) {
+      console.error("[Health AI] Error:", e);
+      res.status(500).json({ status: "fail", error: e.message, stack: e.stack });
+    }
+  });
+
   app.post("/api/gemini", async (req, res) => {
     try {
       const { action, topic, count, context, docType, options } = req.body;
+      console.log(`[API Gemini] Action: ${action}, Topic: ${topic}`);
       
       syncGeminiKeysWithFirestore().catch(e => console.warn("[API Gemini] Initial sync failed:", e));
       let keysPool = getGeminiKeysPool();
@@ -181,7 +199,7 @@ app.get("/api/health", (req, res) => {
         }
       }
 
-      const MODEL_NAME = "gemini-2.5-flash";
+      const MODEL_NAME = "gemini-1.5-flash";
 
       if (action === "generateDynamicTest") {
         const countOptions = options?.optionsCount || 4;
@@ -510,7 +528,7 @@ app.get("/api/health", (req, res) => {
           while (attempts < 2 && !isFullyValid) {
             console.log(`[Kurs Ishi Generation] Attempt ${attempts + 1} starting...`);
             const response = await generateContentWithRotation({
-              model: "gemini-2.5-flash",
+              model: "gemini-1.5-flash",
               contents: currentPrompt,
               config: {
                 responseMimeType: "application/json",
@@ -551,7 +569,7 @@ app.get("/api/health", (req, res) => {
           }
         } else {
           const response = await generateContentWithRotation({
-            model: "gemini-2.5-flash", // Use standard model to avoid quota
+            model: "gemini-1.5-flash", // Use standard model to avoid quota
             contents: prompt,
             config: {
               responseMimeType: "application/json",
@@ -626,7 +644,7 @@ app.get("/api/health", (req, res) => {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-2.5-flash",
+        model: model || "gemini-1.5-flash",
         contents: prompt
       });
 
@@ -814,7 +832,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-2.5-flash",
+               model: "gemini-1.5-flash",
                contents: contents,
                config: {
                  systemInstruction,

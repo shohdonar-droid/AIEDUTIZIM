@@ -191,16 +191,65 @@ export default function AdminUsers() {
     runCleanup();
   }, []);
 
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [deptsSnap, groupsSnap, studentsSnap, teachersSnap, staffSnap, subadminsSnap, tgSnap, botConfigsSnap] = await Promise.all([
+        getDocs(collection(db, "departments")),
+        getDocs(collection(db, "groups")),
+        getDocs(query(collection(db, "users"), where("role", "==", "student"))),
+        getDocs(query(collection(db, "users"), where("role", "==", "teacher"))),
+        getDocs(query(collection(db, "users"), where("role", "==", "staff"))),
+        getDocs(query(collection(db, "users"), where("role", "==", "subadmin"))),
+        getDocs(collection(db, "telegram_users")),
+        getDocs(query(collection(db, "users"), where("isBotUser", "==", true)))
+      ]);
+
+      const depts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
+      const grps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
+      const students = studentsSnap.docs
+        .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+        .filter(u => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"))
+        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+      const teachersList = teachersSnap.docs
+        .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+      const staffList = staffSnap.docs
+        .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+      const subadminsList = subadminsSnap.docs
+        .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+      const tgUsers = tgSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const botConfigs = botConfigsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      setDepartments(depts);
+      setGroups(grps);
+      setUsers(students);
+      setTeachers(teachersList);
+      setStaffUsers(staffList);
+      setSubadmins(subadminsList);
+      setTelegramUsers(tgUsers);
+      setAllBotUsersConfigs(botConfigs);
+
+      // Save to cache
+      localStorage.setItem("admin_users_depts_cache", JSON.stringify(depts));
+      localStorage.setItem("admin_users_groups_cache", JSON.stringify(grps));
+      localStorage.setItem("admin_users_students_cache", JSON.stringify(students));
+      localStorage.setItem("admin_users_teachers_cache", JSON.stringify(teachersList));
+      localStorage.setItem("admin_users_staff_cache", JSON.stringify(staffList));
+      localStorage.setItem("admin_users_subadmins_cache", JSON.stringify(subadminsList));
+
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, "admin-users-all");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Load from cache first
-    const cacheKeys = [
-      "depts",
-      "groups",
-      "students",
-      "teachers",
-      "staff",
-      "subadmins",
-    ];
+    // Load from cache first for instant UI
+    const cacheKeys = ["depts", "groups", "students", "teachers", "staff", "subadmins"];
     cacheKeys.forEach((k) => {
       const cached = localStorage.getItem(`admin_users_${k}_cache`);
       if (cached) {
@@ -214,134 +263,7 @@ export default function AdminUsers() {
       }
     });
 
-    const unsubDepts = safeOnSnapshot(
-      collection(db, "departments"),
-      (snap) => {
-        const data = snap.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() }) as Department,
-        );
-        setDepartments(data);
-        localStorage.setItem("admin_users_depts_cache", JSON.stringify(data));
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, "departments"),
-    );
-
-    const unsubGroups = safeOnSnapshot(
-      collection(db, "groups"),
-      (snap) => {
-        const data = snap.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() }) as Group,
-        );
-        setGroups(data);
-        localStorage.setItem("admin_users_groups_cache", JSON.stringify(data));
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, "groups"),
-    );
-
-    const unsubStudents = safeOnSnapshot(
-      query(collection(db, "users"), where("role", "==", "student")),
-      (snap) => {
-        const dbUsers = snap.docs
-          .map((doc) => ({ ...doc.data() }) as UserProfile)
-          .filter((u) => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"));
-        dbUsers.sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"),
-        );
-        setUsers(dbUsers);
-        localStorage.setItem(
-          "admin_users_students_cache",
-          JSON.stringify(dbUsers),
-        );
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, "users (student)"),
-    );
-
-    const unsubTeachers = safeOnSnapshot(
-      query(collection(db, "users"), where("role", "==", "teacher")),
-      (snap) => {
-        const dbUsers = snap.docs.map(
-          (doc) => ({ uid: doc.id, ...doc.data() }) as UserProfile,
-        );
-        dbUsers.sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"),
-        );
-        setTeachers(dbUsers);
-        localStorage.setItem(
-          "admin_users_teachers_cache",
-          JSON.stringify(dbUsers),
-        );
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, "users (teacher)"),
-    );
-
-    const unsubStaff = safeOnSnapshot(
-      query(collection(db, "users"), where("role", "==", "staff")),
-      (snap) => {
-        const dbUsers = snap.docs.map(
-          (doc) => ({ uid: doc.id, ...doc.data() }) as UserProfile,
-        );
-        dbUsers.sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"),
-        );
-        setStaffUsers(dbUsers);
-        localStorage.setItem(
-          "admin_users_staff_cache",
-          JSON.stringify(dbUsers),
-        );
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, "users (staff)"),
-    );
-
-    const unsubSubadmins = safeOnSnapshot(
-      query(collection(db, "users"), where("role", "==", "subadmin")),
-      (snap) => {
-        const dbUsers = snap.docs.map(
-          (doc) => ({ uid: doc.id, ...doc.data() }) as UserProfile,
-        );
-        dbUsers.sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"),
-        );
-        setSubadmins(dbUsers);
-        localStorage.setItem(
-          "admin_users_subadmins_cache",
-          JSON.stringify(dbUsers),
-        );
-        setLoading(false);
-      },
-      (err) => {
-        handleFirestoreError(err, OperationType.LIST, "users (subadmin)");
-        setLoading(false);
-      },
-    );
-
-    const unsubTelegramUsers = safeOnSnapshot(
-      collection(db, "telegram_users"),
-      (snap) => {
-        const tgData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTelegramUsers(tgData);
-      },
-      (err) => console.log("telegram_users load error", err)
-    );
-
-    const unsubBotConfigs = safeOnSnapshot(
-      query(collection(db, "users"), where("isBotUser", "==", true)),
-      (snap) => {
-        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setAllBotUsersConfigs(data);
-      },
-      (err) => console.log("users bot configs error", err)
-    );
-
-    return () => {
-      unsubDepts();
-      unsubGroups();
-      unsubStudents();
-      unsubTeachers();
-      unsubStaff();
-      unsubSubadmins();
-      unsubTelegramUsers();
-      unsubBotConfigs();
-    };
+    loadData();
   }, []);
 
   const resetPassword = async (uid: string) => {
@@ -1921,7 +1843,7 @@ export default function AdminUsers() {
                 </div>
               </div>
             </div>
-          )}
+      )}
     </div>
   );
 }

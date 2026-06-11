@@ -3765,7 +3765,7 @@ ${systemAboutText}
 Foydalanuvchi xabari: ${prompt}`;
 
           const aiResponse = await generateContentWithRotation({
-            model: imagePart ? "gemini-2.5-flash" : "gemini-2.5-flash",
+            model: imagePart ? "gemini-1.5-flash" : "gemini-1.5-flash",
             contents: [
               { role: "user", parts: [{ text: systemInstructionText }, ...(imagePart ? [imagePart] : [])] }
             ]
@@ -5085,7 +5085,7 @@ Foydalanuvchi xabari: ${prompt}`;
                     : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
 
                   const genRes = await generateContentWithRotation({
-                    model: "gemini-2.5-flash",
+                    model: "gemini-1.5-flash",
                     contents: [{ role: "user", parts: [{ text: pText }] }],
                     config: {
                       systemInstruction:
@@ -5297,8 +5297,10 @@ export async function launchBot() {
     console.log("[Telegram] Bot already launched on this process. Skipping double launch.");
     return;
   }
+  
   globalT.botLaunched = true;
   fetchTelegramUsersCount();
+  
   bot.telegram
     .setMyDescription(
       "**Assalomu alaykum! AIEDUTIZIM platformasining telegram botiga xush kelibsiz!**\n\n🎓 AIEDUTIZIM — tashkilotlar, o‘qituvchilar va talabalar uchun mo‘ljallangan yagona markazlashgan raqamli ta'lim platformasi bo‘lib, zamonaviy ta'lim jarayonlarini samarali boshqarish imkonini beradi.",
@@ -5312,315 +5314,152 @@ export async function launchBot() {
   if (db) {
     const startupTime = Date.now();
 
-    // Listen for admin notifications
-    let isAdminLogsInit = false;
-    onSnapshot(query(collection(db, "admin_notifications"), orderBy("timestamp", "desc"), limit(10)), async (snapshot) => {
-      if (!isAdminLogsInit) {
-        isAdminLogsInit = true;
-        return;
-      }
-      const newChanges = snapshot
-        .docChanges()
-        .filter((c) => c.type === "added");
-      for (const change of newChanges) {
-        const data = change.doc.data();
-        const msgTime = data.timestamp?.toMillis
-          ? data.timestamp.toMillis()
-          : Date.now();
-        // Ignore if older than 5s from startup
-        if (msgTime < startupTime - 5000) continue;
+    const pollDatabaseNotifications = async () => {
+      try {
+        // [1] Admin Notifications
+        const adminNotifQuery = query(
+          collection(db, "admin_notifications"),
+          where("processedByBot", "==", false),
+          limit(10)
+        );
+        const adminNotifSnap = await getDocs(adminNotifQuery);
+        for (const snapDoc of adminNotifSnap.docs) {
+          const data = snapDoc.data();
+          // Safety: skip if too old and somehow not processed
+          const msgTime = data.timestamp?.toMillis ? data.timestamp.toMillis() : Date.now();
+          if (msgTime < startupTime - 120000) {
+            await updateDoc(doc(db, "admin_notifications", snapDoc.id), { processedByBot: true }).catch(() => {});
+            continue;
+          }
 
-        try {
-          let alreadyProcessed = false;
-          await runTransaction(db, async (transaction) => {
-            const docRef = doc(db, "admin_notifications", change.doc.id);
-            const s = await transaction.get(docRef);
-            if (!s.exists() || s.data().processedByBot) {
-              alreadyProcessed = true;
-              return;
-            }
-            transaction.update(docRef, { processedByBot: true });
-          });
-          if (alreadyProcessed) continue;
-
-          const adminSnap = await getDocs(
-            query(collection(db, "users"), where("role", "==", "admin")),
-          );
-          adminSnap.forEach((d) => {
-            const uData = d.data();
-            if (uData.telegramId) {
-              bot.telegram
-                .sendMessage(
-                  Number(uData.telegramId),
-                  `🚨 Tizim xabari:\n\n${data.text}`,
-                )
-                .catch(() => {});
-            }
-          });
-        } catch (e) {}
-      }
-    }, (error: any) => {
-      if (error?.message?.includes("Quota")) return;
-      console.log("[Telegram] admin_notifications snapshot listener error (quota/network):", error.message || error);
-    });
-
-    // Listen for new messages targeting tg users
-    let isInit = false;
-    onSnapshot(query(collection(db, "messages"), orderBy("timestamp", "desc"), limit(20)), async (snapshot) => {
-      console.log(
-        `TG onSnapshot triggered. isInit:`,
-        isInit,
-        "docChanges:",
-        snapshot.docChanges().length,
-      );
-      if (!isInit) {
-        isInit = true;
-        return;
-      }
-      const newChanges = snapshot
-        .docChanges()
-        .filter((c) => c.type === "added");
-      for (const change of newChanges) {
-        const mData = change.doc.data();
-        const msgTime = mData.timestamp?.toMillis
-          ? mData.timestamp.toMillis()
-          : Date.now();
-        if (msgTime < startupTime - 5000) continue; // safety net for old messages
-        console.log("New message to process:", mData);
-        if (mData.senderId !== mData.receiverId) {
           try {
-            let alreadyProcessed = false;
-            await runTransaction(db, async (transaction) => {
-              const docRef = doc(db, "messages", change.doc.id);
-              const s = await transaction.get(docRef);
-              if (!s.exists() || s.data().processedByBot) {
-                alreadyProcessed = true;
-                return;
+            await updateDoc(doc(db, "admin_notifications", snapDoc.id), { processedByBot: true });
+            const adminSnap = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
+            adminSnap.forEach((d) => {
+              const uData = d.data();
+              if (uData.telegramId) {
+                bot.telegram.sendMessage(Number(uData.telegramId), `🚨 Tizim xabari:\n\n${data.text}`).catch(() => {});
               }
-              transaction.update(docRef, { processedByBot: true });
             });
-            if (alreadyProcessed) continue;
+          } catch (e) {}
+        }
 
-            let recipients: any[] = [];
-            if (mData.receiverRole === "admin" || mData.receiverId === "SYSTEM_ADMIN") {
-              // Load from local file-based admin IDs cache for maximum resilience
-              const localAdminIds = getAdminIds();
-              for (const aId of localAdminIds) {
-                recipients.push({ telegramId: aId, role: "admin" });
-              }
+        // [2] New Messages
+        const messagesQuery = query(
+          collection(db, "messages"),
+          where("processedByBot", "==", false),
+          limit(20)
+        );
+        const messagesSnap = await getDocs(messagesQuery);
+        for (const snapDoc of messagesSnap.docs) {
+          const mData = snapDoc.data();
+          const msgTime = mData.timestamp?.toMillis ? mData.timestamp.toMillis() : Date.now();
+          if (msgTime < startupTime - 120000) {
+            await updateDoc(doc(db, "messages", snapDoc.id), { processedByBot: true }).catch(() => {});
+            continue;
+          }
 
-              // Try database snap as fallback/overlay if possible
-              try {
-                const adminSnap = await getDocs(
-                  query(collection(db, "users"), where("role", "==", "admin")),
-                );
+          if (mData.senderId !== mData.receiverId) {
+            try {
+              await updateDoc(doc(db, "messages", snapDoc.id), { processedByBot: true });
+              let recipients: any[] = [];
+              if (mData.receiverRole === "admin" || mData.receiverId === "SYSTEM_ADMIN") {
+                const localAdminIds = getAdminIds();
+                for (const aId of localAdminIds) {
+                  recipients.push({ telegramId: aId, role: "admin" });
+                }
+                const adminSnap = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
                 adminSnap.forEach((d) => {
                   const data = d.data();
-                  if (data.telegramId) {
-                    const idNum = Number(data.telegramId);
-                    if (!localAdminIds.includes(idNum) && !recipients.some(x => x.telegramId === idNum)) {
-                      recipients.push(data);
-                    }
+                  if (data.telegramId && !localAdminIds.includes(Number(data.telegramId))) {
+                    recipients.push(data);
                   }
                 });
-              } catch (e) {
-                console.warn("[Telegram] users query error (using local fallback is fine):", e);
-              }
-            } else if (
-              mData.receiverId &&
-              mData.receiverId !== "SYSTEM_ADMIN"
-            ) {
-              if (mData.receiverId.startsWith("tg_")) {
-                const tgIdStr = mData.receiverId.replace("tg_", "");
-                recipients.push({
-                  telegramId: Number(tgIdStr),
-                  role: "student",
-                });
-              } else {
-                const uSnap = await getDoc(doc(db, "users", mData.receiverId));
-                if (uSnap.exists()) recipients.push(uSnap.data());
-              }
-            }
-
-            const senderTgIdStr = mData.senderId?.startsWith("tg_") ? mData.senderId.replace("tg_", "") : null;
-            const senderTgId = senderTgIdStr ? Number(senderTgIdStr) : (mData.senderTelegramId ? Number(mData.senderTelegramId) : null);
-
-            const sentAlerts: { chatId: number; messageId: number }[] = [];
-
-            for (const uData of recipients) {
-              if (uData.telegramId) {
-                const tgId = Number(uData.telegramId);
-                // Do not send notification to the message sender themselves
-                if (senderTgId && tgId === senderTgId) {
-                  continue;
-                }
-                let senderDetails = "";
-                if (mData.senderName) {
-                  senderDetails = ` (${mData.senderName})`;
-                }
-
-                let opts: any = {};
-                let messageText = "";
-                const isRecipientAdmin = uData.role === "admin" || uData.role === "teacher";
-                if (isRecipientAdmin) {
-                  opts.reply_markup = {
-                    inline_keyboard: [
-                      [
-                        {
-                          text: "✍️ Javob yozish",
-                          callback_data: `reply_${mData.senderId}`,
-                        },
-                      ],
-                    ],
-                  };
-                  messageText = `📨 Yangi xabar${senderDetails}:\n\n${mData.text}`;
+              } else if (mData.receiverId && mData.receiverId !== "SYSTEM_ADMIN") {
+                if (mData.receiverId.startsWith("tg_")) {
+                  recipients.push({ telegramId: Number(mData.receiverId.replace("tg_", "")), role: "student" });
                 } else {
-                  messageText = `📨 Sizga Admindan xabar keldi:\n\n${mData.text}`;
+                  const uSnap = await getDoc(doc(db, "users", mData.receiverId));
+                  if (uSnap.exists()) recipients.push(uSnap.data());
                 }
-                
-                if (isRecipientAdmin) {
+              }
+
+              const senderTgId = mData.senderId?.startsWith("tg_") ? Number(mData.senderId.replace("tg_", "")) : (mData.senderTelegramId ? Number(mData.senderTelegramId) : null);
+              const sentAlerts: any[] = [];
+
+              for (const uData of recipients) {
+                if (uData.telegramId && (!senderTgId || Number(uData.telegramId) !== senderTgId)) {
+                  const tgId = Number(uData.telegramId);
+                  const isRecipientAdmin = uData.role === "admin" || uData.role === "teacher";
+                  const messageText = isRecipientAdmin ? `📨 Yangi xabar${mData.senderName ? ` (${mData.senderName})` : ""}:\n\n${mData.text}` : `📨 Sizga Admindan xabar keldi:\n\n${mData.text}`;
+                  const opts: any = isRecipientAdmin ? { reply_markup: { inline_keyboard: [[{ text: "✍️ Javob yozish", callback_data: `reply_${mData.senderId}` }]] } } : {};
+                  
                   try {
                     const sentMsg = await bot.telegram.sendMessage(tgId, messageText, opts);
-                    if (sentMsg) {
+                    if (sentMsg && isRecipientAdmin) {
                       sentAlerts.push({ chatId: tgId, messageId: sentMsg.message_id });
                     }
                   } catch (e) {}
-                } else {
-                  bot.telegram
-                    .sendMessage(tgId, messageText, opts)
-                    .catch((e) => {
-                      const msg = e.message || "";
-                      if (!msg.includes("chat not found") && !msg.includes("bot was blocked") && !msg.includes("bot was kicked") && !msg.includes("user is deactivated")) {
-                        console.error("TG MSG: ", e);
-                      }
-                    });
                 }
               }
-            }
-            if (sentAlerts.length > 0) {
-              await updateDoc(doc(db, "messages", change.doc.id), {
-                tgSentMessages: sentAlerts
-              }).catch(() => {});
-            }
-          } catch (e) {
-            console.error("Error sending TG msg", e);
+
+              if (sentAlerts.length > 0) {
+                await updateDoc(doc(db, "messages", snapDoc.id), { tgSentMessages: sentAlerts }).catch(() => {});
+              }
+            } catch (e) {}
           }
         }
-      }
-    }, (error: any) => {
-      if (error?.message?.includes("Quota")) return;
-      console.log("[Telegram] messages snapshot listener error (quota/network):", error.message || error);
-    });
 
-    // Listen for new published tests
-    let testIsInit = false;
-    onSnapshot(query(collection(db, "tests"), orderBy("createdAt", "desc"), limit(10)), async (snapshot) => {
-      if (!testIsInit) {
-        testIsInit = true;
-        return;
-      }
-      const newChanges = snapshot
-        .docChanges()
-        .filter((c) => c.type === "added");
-      for (const change of newChanges) {
-        const tData = change.doc.data();
-        if (tData.isPublished) {
-          try {
-            let alreadyProcessed = false;
-            await runTransaction(db, async (transaction) => {
-              const docRef = doc(db, "tests", change.doc.id);
-              const s = await transaction.get(docRef);
-              if (!s.exists() || s.data().processedByBot) {
-                alreadyProcessed = true;
-                return;
-              }
-              transaction.update(docRef, { processedByBot: true });
-            });
-            if (alreadyProcessed) continue;
-            const uQuery = query(
-              collection(db, "users"),
-              where("role", "==", "student"),
-            );
-            const allStudentsSnap = await getDocs(uQuery);
-            allStudentsSnap.forEach((userDoc) => {
-              const uData = userDoc.data();
-              if (uData.telegramId) {
-                const isMatched =
-                  (tData.groupIds && tData.groupIds.includes(uData.groupId)) ||
-                  (tData.departmentIds &&
-                    tData.departmentIds.includes(uData.departmentId));
-                if (isMatched) {
-                  bot.telegram
-                    .sendMessage(
-                      Number(uData.telegramId),
-                      `📝 Sizning guruhingiz/yo'nalishingiz uchun yangi test(topshiriq) yuklandi: "${tData.title}". Tizimga kirib ishlashingiz mumkin!`,
-                    )
-                    .catch((e) => {
-                      const msg = e.message || "";
-                      if (!msg.includes("chat not found") && !msg.includes("bot was blocked") && !msg.includes("bot was kicked") && !msg.includes("user is deactivated")) {
-                        console.error("TG MSG Test Notif: ", e);
-                      }
-                    });
+        // [3] Published Tests
+        const testsQuery = query(collection(db, "tests"), where("processedByBot", "==", false), limit(10));
+        const testsSnap = await getDocs(testsQuery);
+        for (const snapDoc of testsSnap.docs) {
+          const tData = snapDoc.data();
+          if (tData.isPublished) {
+            try {
+              await updateDoc(doc(db, "tests", snapDoc.id), { processedByBot: true });
+              const allStudentsSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
+              allStudentsSnap.forEach((userDoc) => {
+                const uData = userDoc.data();
+                if (uData.telegramId && ((tData.groupIds && tData.groupIds.includes(uData.groupId)) || (tData.departmentIds && tData.departmentIds.includes(uData.departmentId)))) {
+                  bot.telegram.sendMessage(Number(uData.telegramId), `📝 Yangi test: "${tData.title}". Tizimga kirib ishlashingiz mumkin!`).catch(() => {});
                 }
-              }
-            });
-          } catch (e) {
-            console.error("Test notification error:", e);
+              });
+            } catch (e) {}
+          } else {
+            // If not published but marked for check, just mark processed if old
+            const age = Date.now() - (tData.createdAt?.toMillis?.() || Date.now());
+            if (age > 300000) await updateDoc(doc(db, "tests", snapDoc.id), { processedByBot: true }).catch(() => {});
           }
         }
-      }
-    }, (error: any) => {
-      if (error?.message?.includes("Quota")) return;
-      console.log("[Telegram] tests snapshot listener error (quota/network):", error.message || error);
-    });
 
-    // Certificate listener
-    let certIsInit = false;
-    onSnapshot(query(collection(db, "certificates"), orderBy("createdAt", "desc"), limit(10)), async (snapshot) => {
-      if (!certIsInit) {
-        certIsInit = true;
-        return;
-      }
-      const newChanges = snapshot
-        .docChanges()
-        .filter((c) => c.type === "added");
-      for (const change of newChanges) {
-        const cert = change.doc.data();
-        if (cert.studentId && cert.studentName) {
-          try {
-            let alreadyProcessed = false;
-            await runTransaction(db, async (transaction) => {
-              const docRef = doc(db, "certificates", change.doc.id);
-              const s = await transaction.get(docRef);
-              if (!s.exists() || s.data().processedByBot) {
-                alreadyProcessed = true;
-                return;
+        // [4] Certificates
+        const certsQuery = query(collection(db, "certificates"), where("processedByBot", "==", false), limit(10));
+        const certsSnap = await getDocs(certsQuery);
+        for (const snapDoc of certsSnap.docs) {
+          const cert = snapDoc.data();
+          if (cert.studentId) {
+            try {
+              await updateDoc(doc(db, "certificates", snapDoc.id), { processedByBot: true });
+              const uSnap = await getDoc(doc(db, "users", cert.studentId));
+              if (uSnap.exists() && uSnap.data().telegramId) {
+                const uData = uSnap.data();
+                const msg = `🎉 Tabriklaymiz, ${uData.displayName}!!!\n\nSiz "${cert.courseName || cert.title}" bo'yicha yangi sertifikatni qo'lga kiritdingiz! 🏆`;
+                bot.telegram.sendMessage(Number(uData.telegramId), msg).catch(() => {});
               }
-              transaction.update(docRef, { processedByBot: true });
-            });
-            if (alreadyProcessed) continue;
-            const uSnap = await getDoc(doc(db, "users", cert.studentId));
-            if (uSnap.exists()) {
-              const uData = uSnap.data();
-              if (uData.telegramId) {
-                const msg = `🎉 Tabriklaymiz, ${uData.displayName}!!!\n\nSiz "${cert.courseName || cert.title}" bo'yicha muvaffaqiyatli o'tib, yangi sertifikatni qo'lga kiritdingiz! 🏆\n\nBu sizning tinimsiz mehnatingiz va izlanishlaringiz samarasidir. Tizimga kirib "Sertifikatlar" bo'limidan maxsus sertifikatingizni ko'rib olishingiz mumkin.`;
-                bot.telegram
-                  .sendMessage(Number(uData.telegramId), msg)
-                  .catch((e) => {
-                    const errMsg = e.message || "";
-                    if (!errMsg.includes("chat not found") && !errMsg.includes("bot was blocked") && !errMsg.includes("bot was kicked") && !errMsg.includes("user is deactivated")) {
-                      console.error("TG MSG Cert Notif: ", e);
-                    }
-                  });
-              }
-            }
-          } catch (err) {}
+            } catch (e) {}
+          }
         }
+
+      } catch (err: any) {
+        if (err?.message?.includes("Quota")) return;
+        console.error("[Telegram Poller] Error:", err.message || err);
       }
-    }, (error: any) => {
-      if (error?.message?.includes("Quota")) return;
-      console.log("[Telegram] certificates snapshot listener error (quota/network):", error.message || error);
-    });
+    };
+
+    // Poll every 35 seconds to keep quota usage low but responsive
+    setInterval(pollDatabaseNotifications, 35000);
+    pollDatabaseNotifications();
 
     // Birthday auto-check once every 24h as a safety measure
     const checkBirthdaysTimer = () => {

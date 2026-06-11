@@ -39,28 +39,27 @@ export default function AdminQuizizz() {
     if (!user) return;
     const orgId = user.role === 'staff' ? user.teacherId || user.uid : user.uid;
     
-    const unsub = safeOnSnapshot(collection(db, 'quiz_history'), async (snap) => {
-       try {
-           const uSnap = await getDocs(collection(db, 'users'));
-           const usersMap: any = {};
-           uSnap.docs.forEach(d => {
-              const ud = d.data();
-              usersMap[d.id] = ud;
-           });
-           
-           const qs = snap.docs.map(d => ({ 
-              id: d.id, 
-              ...d.data(), 
-              creatorName: usersMap[d.data().teacherId]?.displayName || usersMap[d.data().teacherId]?.name || 'Noma\'lum',
-              creatorRole: usersMap[d.data().teacherId]?.role || 'Noma\'lum'
-           }));
-           qs.sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-           setQuizzes(qs);
-       } catch (err) {
-           handleFirestoreError(err, OperationType.LIST, 'admin-quizizz');
-       }
-    });
-    return unsub;
+    // Switch to one-time fetch for quiz history to save quota
+    const loadQuizzes = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'quiz_history'), where('teacherId', '==', orgId)));
+        
+        // We only need creator info if there are many teachers. 
+        // For now, let's just identify the creator as the current user or load a small batch.
+        // Optimization: don't load all users.
+        const qs = snap.docs.map(d => ({ 
+           id: d.id, 
+           ...d.data(), 
+           creatorName: user.displayName || 'Siz',
+           creatorRole: user.role
+        }));
+        qs.sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+        setQuizzes(qs);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'admin-quizizz');
+      }
+    };
+    loadQuizzes();
   }, [user]);
 
   // Handle Generate with AI

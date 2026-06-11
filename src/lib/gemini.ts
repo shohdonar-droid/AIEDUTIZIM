@@ -50,30 +50,33 @@ export async function syncGeminiKeysWithFirestore(): Promise<void> {
 export function getGeminiKeysPool(): string[] {
   if (keysCache.length > 0) return keysCache;
   const keys = new Set<string>();
+  const sources: string[] = [];
   
-  // Collect all potential keys from env
   if (process.env.GEMINI_API_KEYS) {
+    sources.push("GEMINI_API_KEYS");
     process.env.GEMINI_API_KEYS.split(/[,,;]/).forEach(k => {
       const tk = k.trim();
       if (tk.length > 5) keys.add(tk);
     });
   }
   Object.keys(process.env).forEach(v => {
-    if (v.includes("GEMINI_API_KEY") || v.includes("GOOGLE_GENAI_API_KEY") || v === "VITE_API_KEY") {
+    if (v.includes("GEMINI_API_KEY") || v.includes("GOOGLE_GENAI_API_KEY") || v === "VITE_API_KEY" || v === "GOOGLE_API_KEY") {
       const val = process.env[v]?.trim();
-      if (val && val.length > 5) keys.add(val);
+      if (val && val.length > 5) {
+        keys.add(val);
+        sources.push(v);
+      }
     }
   });
 
-  // Always include the Firebase configuration API key as a solid, robust fallback (vital for Vercel imports without manually set env keys)
   if (firebaseConfigRaw && firebaseConfigRaw.apiKey && firebaseConfigRaw.apiKey.length > 5) {
     keys.add(firebaseConfigRaw.apiKey.trim());
+    sources.push("Firestore Config API Key");
   }
 
   const allKeys = Array.from(keys);
+  console.log(`[Gemini Keys] Found ${allKeys.length} keys from sources: ${sources.join(", ")}`);
   
-  // Filter out known bad keys and prioritize AIzaSy keys
-  // Many keys provided by the environment starting with AQ. seem to be invalid for this API
   const aizasyKeys = allKeys.filter(k => k.startsWith("AIzaSy") && !badKeys.has(k));
   const otherKeys = allKeys.filter(k => !k.startsWith("AIzaSy") && !badKeys.has(k));
 
@@ -129,7 +132,6 @@ export async function generateContentWithRotation(
   }
   
   if (pool.length === 0) {
-     // If pool is empty because of filtering/blacklisting, try one desperation reload without filter
      const rawKeys = new Set<string>();
      Object.keys(process.env).forEach(v => {
        if (v.includes("GEMINI_API_KEY") || v.includes("GOOGLE_GENAI_API_KEY")) {
@@ -141,7 +143,21 @@ export async function generateContentWithRotation(
      if (pool.length === 0) throw new Error("Gemini API kaliti topilmadi.");
   }
 
-  const maxAttempts = Math.max(10, pool.length * 2);
+  // Normalize contents for SDK v2 (@google/genai)
+  let normalizedContents = params.contents;
+  if (typeof normalizedContents === "string") {
+    normalizedContents = [{ role: "user", parts: [{ text: normalizedContents }] }];
+  } else if (Array.isArray(normalizedContents)) {
+    // If it's an array, ensure it follows the role/parts structure
+    normalizedContents = normalizedContents.map(c => {
+      if (typeof c === "string") return { role: "user", parts: [{ text: c }] };
+      if (c.parts) return c; // Already correct
+      if (c.text) return { role: "user", parts: [{ text: c.text }] };
+      return c;
+    });
+  }
+
+  const maxAttempts = Math.min(10, pool.length * 2);
   let attempts = 0;
   let lastError: any = null;
 
@@ -156,33 +172,28 @@ export async function generateContentWithRotation(
     const activeIndex = (currentKeyIndex + attempts) % pool.length;
     const apiKey = pool[activeIndex];
     
-    // Skip if already known bad in this turn's context (though getGeminiKeysPool should have filtered)
     if (badKeys.has(apiKey) && pool.length > 1) {
        attempts++;
        continue;
     }
 
     const client = new GoogleGenAI({ apiKey });
-    let modelToUse = params.model || "gemini-2.5-flash";
+    let modelToUse = params.model || "gemini-1.5-flash";
     
-    // Normalize model names to actual existing models in the Google GenAI SDK.
-    // gemini-3.5-flash is not a public developer API model, so we map it to the highly robust gemini-2.5-flash.
     if (modelToUse.includes("pro")) {
-      modelToUse = "gemini-2.5-pro";
+      modelToUse = "gemini-1.5-pro";
     } else if (modelToUse.includes("lite") || modelToUse.includes("flash-lite")) {
-      modelToUse = "gemini-2.0-flash-lite";
+      modelToUse = "gemini-1.5-flash";
     } else {
-      modelToUse = "gemini-2.5-flash"; // Standard default for robust, high-performance generation
+      modelToUse = "gemini-1.5-flash";
     }
 
-    // Strategic, dynamic model rotation on retry attempts to bypass congested endpoints or temporary limits
     if (attempts === 1) {
-      modelToUse = "gemini-2.0-flash"; // First robust backend fallback (different infrastructure pool)
+      modelToUse = "gemini-1.5-flash"; 
     } else if (attempts === 2) {
-      modelToUse = "gemini-1.5-flash"; // Second solid fallback (extremely reliable legacy pool)
+      modelToUse = "gemini-1.5-pro"; 
     } else if (attempts >= 3) {
-      // Rotate active, production-grade models
-      const cycle = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+      const cycle = ["gemini-1.5-flash", "gemini-1.5-pro"];
       modelToUse = cycle[(attempts - 3) % cycle.length];
     }
 
@@ -191,41 +202,44 @@ export async function generateContentWithRotation(
       const response = await Promise.race([
         client.models.generateContent({
           model: modelToUse,
-          contents: params.contents,
+          contents: normalizedContents,
           config: {
             ...(params.config || {}),
             safetySettings: params.safetySettings || defaultSafety
           }
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Request Timeout")), 45000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("AI Request Timeout (45s)")), 45000))
       ]);
       
-      // If we got here, the key is good. Update index.
+      // Normalize response object to have a simple .text property for legacy compatibility
+      const res = response as any;
+      if (res && !res.text && res.candidates && res.candidates[0]?.content?.parts?.[0]?.text) {
+         Object.defineProperty(res, 'text', {
+            get: function() { return this.candidates[0].content.parts[0].text; }
+         });
+      }
+
       currentKeyIndex = activeIndex;
-      return response;
+      return res;
     } catch (error: any) {
       attempts++;
       lastError = error;
       const errorDetail = error.message || JSON.stringify(error);
       const statusCode = error.status || error.code;
       
-      console.log(`[Gemini Rotator] Step ${attempts} failed on index ${activeIndex} (Status: ${statusCode}): ${errorDetail.substring(0, 100)}`);
+      console.error(`[Gemini Rotator] Step ${attempts} failed on index ${activeIndex} (Status: ${statusCode}): ${errorDetail}`);
       
-      // Blacklist 401 keys permanently for this process
-      if (statusCode === 401 || errorDetail.includes("authentication credentials") || errorDetail.includes("401")) {
+      if (statusCode === 401 || errorDetail.includes("authentication credentials") || errorDetail.includes("401") || errorDetail.includes("API key not valid")) {
          console.warn(`[Gemini Rotator] Key at index ${activeIndex} is INVALID (401). Blacklisting.`);
          badKeys.add(apiKey);
-         // Force clear cache so next call doesn't see this key
          keysCache = []; 
       }
 
       rotateKeyIndex(pool.length);
       
       const errMsg = errorDetail.toLowerCase();
-      // Don't retry on user errors (400)
       if (errMsg.includes("400") || errMsg.includes("invalid_argument")) throw error;
       
-      // Exponential-ish backoff for rate limits
       if (errMsg.includes("503") || errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("unavailable")) {
          const delay = Math.min(2000, 500 * attempts);
          await new Promise(r => setTimeout(r, delay));
