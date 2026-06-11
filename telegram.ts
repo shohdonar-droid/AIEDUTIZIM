@@ -41,8 +41,8 @@ setLogLevel("error");
 const APP_URL = (process.env.APP_URL || "https://aiedutizim.vercel.app").replace(/\/$/, "");
 
 function getApiUrl(subPath: string): string {
-  const port = process.env.PORT || "3000";
-  return `http://127.0.0.1:${port}${subPath}`;
+  // Use port 3000 as per environment constraints
+  return `http://127.0.0.1:3000${subPath}`;
 }
 
 function mdToHtml(md: string): string {
@@ -58,23 +58,24 @@ function mdToHtml(md: string): string {
 
 // Robust initialization of Firebase Client using static JSON config and safe getApps context
 let db: any = null;
-let firebaseApiKey = firebaseConfigRaw.apiKey;
-let firebaseProjectId = firebaseConfigRaw.projectId;
 
 const firebaseConfig = {
-  apiKey: firebaseConfigRaw.apiKey,
-  authDomain: firebaseConfigRaw.authDomain,
-  projectId: firebaseConfigRaw.projectId,
-  storageBucket: firebaseConfigRaw.storageBucket,
-  messagingSenderId: firebaseConfigRaw.messagingSenderId,
-  appId: firebaseConfigRaw.appId,
+  apiKey: process.env.FIREBASE_API_KEY || firebaseConfigRaw.apiKey,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || firebaseConfigRaw.authDomain,
+  projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfigRaw.projectId,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || firebaseConfigRaw.storageBucket,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || firebaseConfigRaw.messagingSenderId,
+  appId: process.env.FIREBASE_APP_ID || firebaseConfigRaw.appId,
 };
+
+const firebaseApiKey = firebaseConfig.apiKey;
+const firebaseProjectId = firebaseConfig.projectId;
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 db = initializeFirestore(
   app,
   { experimentalForceLongPolling: true },
-  firebaseConfigRaw.firestoreDatabaseId,
+  process.env.FIREBASE_DATABASE_ID || firebaseConfigRaw.firestoreDatabaseId,
 );
 
 export let botPaused = false;
@@ -5169,7 +5170,7 @@ Foydalanuvchi xabari: ${prompt}`;
             }
 
             functionResponses = [{ name: fnName, response: executionResult }];
-            continue; // proceed next
+            continue; // move to next iteration of agent loop
           } else {
             finalReply = data.reply;
             break;
@@ -5181,9 +5182,7 @@ Foydalanuvchi xabari: ${prompt}`;
         }
       }
 
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      if (intervalId) clearInterval(intervalId);
       if (promptMsg) {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, promptMsg.message_id);
@@ -5204,9 +5203,7 @@ Foydalanuvchi xabari: ${prompt}`;
         }
       }
     } catch (e) {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      if (intervalId) clearInterval(intervalId);
       if (promptMsg) {
         try {
           await ctx.telegram.deleteMessage(ctx.chat.id, promptMsg.message_id);
@@ -5222,12 +5219,10 @@ Foydalanuvchi xabari: ${prompt}`;
   }
 });
 
-
 bot.on("my_chat_member", async (ctx) => {
   const chatId = ctx.chat?.id;
   const chatType = ctx.chat?.type;
   const chatTitle = (ctx.chat as any)?.title || "";
-  console.log(`[Telegram] Bot added to/updated in chat ${chatId} of type ${chatType}`);
   if (chatId) {
     await registerTelegramId(chatId, chatType, chatTitle, {
       first_name: ctx.from?.first_name || "",
@@ -5241,7 +5236,6 @@ bot.on("new_chat_members", async (ctx) => {
   const chatId = ctx.chat?.id;
   const chatType = ctx.chat?.type;
   const chatTitle = (ctx.chat as any)?.title || "";
-  console.log(`[Telegram] New members in chat ${chatId}`);
   if (chatId) {
     await registerTelegramId(chatId, chatType, chatTitle, {
       first_name: ctx.from?.first_name || "",
@@ -5265,319 +5259,136 @@ bot.on("supergroup_chat_created", async (ctx) => {
   }
 });
 
-// Global error handler for Telegraf execution pipelines
 bot.catch((err: any, ctx) => {
   console.error(`[Telegraf Global Catch] Fault in processing update ${ctx.update?.update_id || "unknown"}:`, err);
-  try {
-    ctx.reply("⚠️ Tizimda kichik uzilish kuzatildi. Iltimos, xabaringizni qaytadan yuboring.").catch(() => {});
-  } catch (replyErr) {}
+  ctx.reply("⚠️ Tizimda kichik uzilish kuzatildi. Iltimos, xabaringizni qaytadan yuboring.").catch(() => {});
 });
 
-// Active self-referential ping sequence to prevent Cloud Run idle state (scale-to-zero prevention)
 function startSelfPing() {
-  const url = process.env.APP_URL || "http://127.0.0.1:3000";
+  let url = process.env.APP_URL || "http://127.0.0.1:3000";
+  if (url && !url.startsWith("http")) {
+    url = "https://" + url;
+  }
   console.log(`[Self-Ping Check] Initialized with target host: ${url}`);
   
-  // Dynamic self-request loop to trick Cloud Run container lifecycles
   setInterval(() => {
     const targetUrl = `${url.replace(/\/$/, "")}/api/health`;
-    console.log(`[Self-Ping] Triggering HTTP ping to refresh container: ${targetUrl}`);
     fetch(targetUrl)
       .then((res) => {
-        console.log(`[Self-Ping] Ping responded with status: ${res.status}`);
+        if (!res.ok) console.warn(`[Self-Ping] Ping responded with status: ${res.status}`);
       })
       .catch((err) => {
-        console.warn(`[Self-Ping] Ping request could not connect (can be ignored on local environment):`, err.message || err);
+        // Can be ignored if it's just a connection refused on local/dev
+        if (!err.message.includes("ECONNREFUSED")) {
+          console.warn(`[Self-Ping] Ping request failed:`, err.message || err);
+        }
       });
-  }, 120000); // Trigger every 2 minutes
+  }, 120000); // 2 minutes
 }
 
 export async function launchBot() {
-  if (globalT.botLaunched) {
-    console.log("[Telegram] Bot already launched on this process. Skipping double launch.");
-    return;
-  }
-  
+  if (globalT.botLaunched) return;
   globalT.botLaunched = true;
   fetchTelegramUsersCount();
   
-  bot.telegram
-    .setMyDescription(
-      "**Assalomu alaykum! AIEDUTIZIM platformasining telegram botiga xush kelibsiz!**\n\n🎓 AIEDUTIZIM — tashkilotlar, o‘qituvchilar va talabalar uchun mo‘ljallangan yagona markazlashgan raqamli ta'lim platformasi bo‘lib, zamonaviy ta'lim jarayonlarini samarali boshqarish imkonini beradi.",
-    )
-    .catch((e) => console.error("Could not set bot description", e));
+  bot.telegram.setMyDescription(
+    "**Assalomu alaykum! AIEDUTIZIM platformasining telegram botiga xush kelibsiz!**\n\n🎓 AIEDUTIZIM — zamonaviy ta'lim jarayonlarini samarali boshqarish imkonini beradi."
+  ).catch(() => {});
 
-  // Initialize scale-to-zero prevention
   startSelfPing();
-
 
   if (db) {
     const startupTime = Date.now();
-
     const pollDatabaseNotifications = async () => {
       try {
         // [1] Admin Notifications
-        const adminNotifQuery = query(
-          collection(db, "admin_notifications"),
-          where("processedByBot", "==", false),
-          limit(10)
-        );
+        const adminNotifQuery = query(collection(db, "admin_notifications"), where("processedByBot", "==", false), limit(10));
         const adminNotifSnap = await getDocs(adminNotifQuery);
         for (const snapDoc of adminNotifSnap.docs) {
           const data = snapDoc.data();
-          // Safety: skip if too old and somehow not processed
-          const msgTime = data.timestamp?.toMillis ? data.timestamp.toMillis() : Date.now();
-          if (msgTime < startupTime - 120000) {
-            await updateDoc(doc(db, "admin_notifications", snapDoc.id), { processedByBot: true }).catch(() => {});
-            continue;
-          }
-
-          try {
-            await updateDoc(doc(db, "admin_notifications", snapDoc.id), { processedByBot: true });
-            const adminSnap = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
-            adminSnap.forEach((d) => {
-              const uData = d.data();
-              if (uData.telegramId) {
-                bot.telegram.sendMessage(Number(uData.telegramId), `🚨 Tizim xabari:\n\n${data.text}`).catch(() => {});
-              }
-            });
-          } catch (e) {}
+          await updateDoc(doc(db, "admin_notifications", snapDoc.id), { processedByBot: true });
+          const adminSnap = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
+          adminSnap.forEach((d) => {
+            const uData = d.data();
+            if (uData.telegramId) bot.telegram.sendMessage(Number(uData.telegramId), `🚨 Tizim xabari:\n\n${data.text}`).catch(() => {});
+          });
         }
 
-        // [2] New Messages
-        const messagesQuery = query(
-          collection(db, "messages"),
-          where("processedByBot", "==", false),
-          limit(20)
-        );
+        // [2] Messages
+        const messagesQuery = query(collection(db, "messages"), where("processedByBot", "==", false), limit(20));
         const messagesSnap = await getDocs(messagesQuery);
         for (const snapDoc of messagesSnap.docs) {
           const mData = snapDoc.data();
-          const msgTime = mData.timestamp?.toMillis ? mData.timestamp.toMillis() : Date.now();
-          if (msgTime < startupTime - 120000) {
+          if (mData.senderId === mData.receiverId) {
             await updateDoc(doc(db, "messages", snapDoc.id), { processedByBot: true }).catch(() => {});
             continue;
           }
-
-          if (mData.senderId !== mData.receiverId) {
-            try {
-              await updateDoc(doc(db, "messages", snapDoc.id), { processedByBot: true });
-              let recipients: any[] = [];
-              if (mData.receiverRole === "admin" || mData.receiverId === "SYSTEM_ADMIN") {
-                const localAdminIds = getAdminIds();
-                for (const aId of localAdminIds) {
-                  recipients.push({ telegramId: aId, role: "admin" });
-                }
-                const adminSnap = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
-                adminSnap.forEach((d) => {
-                  const data = d.data();
-                  if (data.telegramId && !localAdminIds.includes(Number(data.telegramId))) {
-                    recipients.push(data);
-                  }
-                });
-              } else if (mData.receiverId && mData.receiverId !== "SYSTEM_ADMIN") {
-                if (mData.receiverId.startsWith("tg_")) {
-                  recipients.push({ telegramId: Number(mData.receiverId.replace("tg_", "")), role: "student" });
-                } else {
-                  const uSnap = await getDoc(doc(db, "users", mData.receiverId));
-                  if (uSnap.exists()) recipients.push(uSnap.data());
-                }
-              }
-
-              const senderTgId = mData.senderId?.startsWith("tg_") ? Number(mData.senderId.replace("tg_", "")) : (mData.senderTelegramId ? Number(mData.senderTelegramId) : null);
-              const sentAlerts: any[] = [];
-
-              for (const uData of recipients) {
-                if (uData.telegramId && (!senderTgId || Number(uData.telegramId) !== senderTgId)) {
-                  const tgId = Number(uData.telegramId);
-                  const isRecipientAdmin = uData.role === "admin" || uData.role === "teacher";
-                  const messageText = isRecipientAdmin ? `📨 Yangi xabar${mData.senderName ? ` (${mData.senderName})` : ""}:\n\n${mData.text}` : `📨 Sizga Admindan xabar keldi:\n\n${mData.text}`;
-                  const opts: any = isRecipientAdmin ? { reply_markup: { inline_keyboard: [[{ text: "✍️ Javob yozish", callback_data: `reply_${mData.senderId}` }]] } } : {};
-                  
-                  try {
-                    const sentMsg = await bot.telegram.sendMessage(tgId, messageText, opts);
-                    if (sentMsg && isRecipientAdmin) {
-                      sentAlerts.push({ chatId: tgId, messageId: sentMsg.message_id });
-                    }
-                  } catch (e) {}
-                }
-              }
-
-              if (sentAlerts.length > 0) {
-                await updateDoc(doc(db, "messages", snapDoc.id), { tgSentMessages: sentAlerts }).catch(() => {});
-              }
-            } catch (e) {}
-          }
-        }
-
-        // [3] Published Tests
-        const testsQuery = query(collection(db, "tests"), where("processedByBot", "==", false), limit(10));
-        const testsSnap = await getDocs(testsQuery);
-        for (const snapDoc of testsSnap.docs) {
-          const tData = snapDoc.data();
-          if (tData.isPublished) {
-            try {
-              await updateDoc(doc(db, "tests", snapDoc.id), { processedByBot: true });
-              const allStudentsSnap = await getDocs(query(collection(db, "users"), where("role", "==", "student")));
-              allStudentsSnap.forEach((userDoc) => {
-                const uData = userDoc.data();
-                if (uData.telegramId && ((tData.groupIds && tData.groupIds.includes(uData.groupId)) || (tData.departmentIds && tData.departmentIds.includes(uData.departmentId)))) {
-                  bot.telegram.sendMessage(Number(uData.telegramId), `📝 Yangi test: "${tData.title}". Tizimga kirib ishlashingiz mumkin!`).catch(() => {});
-                }
+          try {
+            await updateDoc(doc(db, "messages", snapDoc.id), { processedByBot: true });
+            let recipients: any[] = [];
+            if (mData.receiverRole === "admin" || mData.receiverId === "SYSTEM_ADMIN") {
+              const localAdminIds = getAdminIds();
+              for (const aId of localAdminIds) recipients.push({ telegramId: aId, role: "admin" });
+              const adminSnap = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
+              adminSnap.forEach((d) => {
+                const data = d.data();
+                if (data.telegramId && !localAdminIds.includes(Number(data.telegramId))) recipients.push(data);
               });
-            } catch (e) {}
-          } else {
-            // If not published but marked for check, just mark processed if old
-            const age = Date.now() - (tData.createdAt?.toMillis?.() || Date.now());
-            if (age > 300000) await updateDoc(doc(db, "tests", snapDoc.id), { processedByBot: true }).catch(() => {});
-          }
-        }
-
-        // [4] Certificates
-        const certsQuery = query(collection(db, "certificates"), where("processedByBot", "==", false), limit(10));
-        const certsSnap = await getDocs(certsQuery);
-        for (const snapDoc of certsSnap.docs) {
-          const cert = snapDoc.data();
-          if (cert.studentId) {
-            try {
-              await updateDoc(doc(db, "certificates", snapDoc.id), { processedByBot: true });
-              const uSnap = await getDoc(doc(db, "users", cert.studentId));
-              if (uSnap.exists() && uSnap.data().telegramId) {
-                const uData = uSnap.data();
-                const msg = `🎉 Tabriklaymiz, ${uData.displayName}!!!\n\nSiz "${cert.courseName || cert.title}" bo'yicha yangi sertifikatni qo'lga kiritdingiz! 🏆`;
-                bot.telegram.sendMessage(Number(uData.telegramId), msg).catch(() => {});
-              }
-            } catch (e) {}
-          }
-        }
-
-      } catch (err: any) {
-        if (err?.message?.includes("Quota")) return;
-        console.error("[Telegram Poller] Error:", err.message || err);
-      }
-    };
-
-    // Poll every 35 seconds to keep quota usage low but responsive
-    setInterval(pollDatabaseNotifications, 35000);
-    pollDatabaseNotifications();
-
-    // Birthday auto-check once every 24h as a safety measure
-    const checkBirthdaysTimer = () => {
-      const todayStr = new Date().toISOString().split("T")[0].substring(5); // MM-DD
-      getDocs(query(collection(db, "users"), limit(500)))
-        .then((snap) => {
-          snap.forEach((d) => {
-            const dt = d.data();
-            if (
-              dt.telegramId &&
-              dt.birthDate &&
-              dt.birthDate.endsWith(todayStr)
-            ) {
-              if (dt.lastBirthdayGreeting !== todayStr) {
-                updateDoc(doc(db, "users", d.id), {
-                  lastBirthdayGreeting: todayStr,
-                });
-                const bMsg = `🎂 Tug'ilgan kuningiz muborak bo'lsin, ${dt.displayName}!\n\nAIEDUTIZIM jamoasi sizga mustahkam sog'liq, bitmas-tuganmas g'ayrat va o'quv ishlaringizda ulkan yutuqlar tilaydi! Har doim eng yuqori marralarga erishib yuring! 🎉 Omad yor bo'lsin!`;
-                bot.telegram
-                  .sendMessage(Number(dt.telegramId), bMsg)
-                  .catch((e) => {
-                    const errMsg = e.message || "";
-                    if (!errMsg.includes("chat not found") && !errMsg.includes("bot was blocked") && !errMsg.includes("bot was kicked") && !errMsg.includes("user is deactivated")) {
-                      console.error("TG MSG BDay: ", e);
-                    }
-                  });
+            } else if (mData.receiverId && mData.receiverId !== "SYSTEM_ADMIN") {
+              if (mData.receiverId.startsWith("tg_")) {
+                recipients.push({ telegramId: Number(mData.receiverId.replace("tg_", "")), role: "student" });
+              } else {
+                const uSnap = await getDoc(doc(db, "users", mData.receiverId));
+                if (uSnap.exists()) recipients.push(uSnap.data());
               }
             }
-          });
-        })
-        .catch(() => {});
+
+            const senderTgId = mData.senderId?.startsWith("tg_") ? Number(mData.senderId.replace("tg_", "")) : (mData.senderTelegramId ? Number(mData.senderTelegramId) : null);
+            const sentAlerts: any[] = [];
+            for (const uData of recipients) {
+              if (uData.telegramId && (!senderTgId || Number(uData.telegramId) !== senderTgId)) {
+                const tgId = Number(uData.telegramId);
+                const isRecipientAdmin = uData.role === "admin" || uData.role === "teacher";
+                const messageText = isRecipientAdmin ? `📨 Yangi xabar${mData.senderName ? ` (${mData.senderName})` : ""}:\n\n${mData.text}` : `📨 Sizga Admindan xabar keldi:\n\n${mData.text}`;
+                const opts: any = isRecipientAdmin ? { reply_markup: { inline_keyboard: [[{ text: "✍️ Javob yozish", callback_data: `reply_${mData.senderId}` }]] } } : {};
+                
+                try {
+                  const sentMsg = await bot.telegram.sendMessage(tgId, messageText, opts);
+                  if (sentMsg && isRecipientAdmin) sentAlerts.push({ chatId: tgId, message_id: sentMsg.message_id });
+                } catch (e) {}
+              }
+            }
+            if (sentAlerts.length > 0) await updateDoc(doc(db, "messages", snapDoc.id), { tgSentMessages: sentAlerts }).catch(() => {});
+          } catch (e) {}
+        }
+      } catch (err: any) {
+        if (!err?.message?.includes("Quota")) console.error("[Telegram Poller] Error:", err.message || err);
+      }
     };
-    checkBirthdaysTimer();
-    setInterval(checkBirthdaysTimer, 24 * 60 * 60 * 1000); // Check once a day
+    setInterval(pollDatabaseNotifications, 35000);
+    pollDatabaseNotifications();
   }
 
-  // Resilient Telegram bot launcher with automatic self-healing, conflict retry and reconnect loops
   function triggerBotLaunch() {
-    console.log("[Telegram] Attempting bot startup...");
-    bot
-      .launch()
-      .then(() => {
-        console.log("[Telegram] Bot started polling successfully.");
-        bot.telegram
-          .setChatMenuButton({
-            menuButton: {
-              type: "web_app",
-              text: "📱 Tizimga kirish",
-              web_app: { url: "https://aiedutizim.vercel.app/login" },
-            },
-          })
-          .catch((e) => console.error("Could not set menu button", e));
-
-        // One-time broadcast of restart & new version info to all registered telegram bot users
-        if (db) {
-          const checkFile = path.join(process.cwd(), "telegram_broadcast_restart_done.json");
-          if (!fs.existsSync(checkFile)) {
-            getDocs(collection(db, "telegram_users"))
-              .then(async (snap) => {
-                console.log(`[Broadcast] Found ${snap.size} telegram users to notify about the new restart and version.`);
-                const userDocs = snap.docs;
-                const broadcastText =
-                  `🚀 <b>AI YORDAMCHI ISHGA TUSHIRILDI!</b>\n\n` +
-                  `AIEDUTIZIM platformasining Telegram boti yanada aqllashdi! Endilikda menyularingizda yangi <b>🤖 AI Yordamchi</b> bo'limi paydo bo'ldi.\n\n` +
-                  `🤖 <b>Yangi imkoniyatlar:</b>\n` +
-                  `• 💬 <b>Har qanday savolga javob:</b> Matematika, dasturlash, tarix yoki til o'rganish — istalgan mavzuda savol bering va AI yordamida aniq javob oling.\n` +
-                  `• 🖼 <b>Rasm va fayllar tahlili:</b> Menga rasm yoki fayl yuboring, men uni ko'rib chiqaman va savollaringizga javob beraman.\n` +
-                  `• 🌐 <b>Saytda ham mavjud:</b> Endi platforma saytidagi chat-widget orqali ham ham Admin bilan, ham AI yordamchi bilan alohida muloqot qilishingiz mumkin.\n\n` +
-                  `💡 <i>Yangi menyuni ko'rish uchun /start buyrug'ini yuboring va "🤖 AI yordamchi" tugmasini bosing!</i>`;
-
-                for (let i = 0; i < userDocs.length; i++) {
-                  const uDoc = userDocs[i];
-                  const userId = Number(uDoc.id);
-                  if (!isNaN(userId) && userId > 0) {
-                    try {
-                      await bot.telegram.sendMessage(userId, broadcastText, {
-                        parse_mode: "HTML"
-                      });
-                      console.log(`[Broadcast] Successfully sent restart notice to user: ${userId}`);
-                    } catch (sendErr: any) {
-                      const msg = sendErr?.message || "";
-                      if (
-                        !msg.includes("chat not found") &&
-                        !msg.includes("bot was blocked") &&
-                        !msg.includes("bot was kicked") &&
-                        !msg.includes("user is deactivated")
-                      ) {
-                        console.error(`[Broadcast] Failed to send restart notice to ${userId}:`, sendErr);
-                      }
-                    }
-                    // Safe rate limiting delay of 100ms
-                    await new Promise((resolve) => setTimeout(resolve, 100));
-                  }
-                }
-                fs.writeFileSync(checkFile, JSON.stringify({ completedAt: new Date().toISOString() }, null, 2), "utf8");
-                console.log("[Broadcast] One-time restart notification process completed.");
-              })
-              .catch((err) => {
-                console.error("[Broadcast] Failed to read telegram_users collection for restart notice:", err);
-              });
-          }
-        }
-      })
-      .catch((err: any) => {
+    const useWebhook = process.env.USE_WEBHOOK === "true";
+    const webhookUrl = `${process.env.APP_URL}/api/telegram-webhook`;
+    if (useWebhook && process.env.APP_URL) {
+      bot.telegram.setWebhook(webhookUrl).catch(() => bot.launch());
+    } else {
+      bot.launch().catch((err: any) => {
         if (err?.response?.error_code === 409) {
-          console.warn("[Telegram] Conflict (409): Another instance is already polling. Will retry launch in 15 seconds...");
           setTimeout(triggerBotLaunch, 15000);
         } else {
-          console.error("[Telegram] Launch failed with error:", err.message || err, "Retrying in 5 seconds...");
           setTimeout(triggerBotLaunch, 5000);
         }
       });
+    }
+    bot.telegram.setChatMenuButton({
+      menuButton: { type: "web_app", text: "📱 Tizimga kirish", web_app: { url: `${process.env.APP_URL}/login` } },
+    }).catch(() => {});
   }
 
-  // Initial trigger start
   triggerBotLaunch();
-
-// Enable graceful stop
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+  process.once("SIGINT", () => bot.stop("SIGINT"));
+  process.once("SIGTERM", () => bot.stop("SIGTERM"));
 }

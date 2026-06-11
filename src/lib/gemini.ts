@@ -1,6 +1,17 @@
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { initializeApp, getApps } from "firebase/app";
 import firebaseConfigRaw from "../../firebase-applet-config.json";
+
+// Environment-based Firebase configuration overrides
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY || firebaseConfigRaw.apiKey,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || firebaseConfigRaw.authDomain,
+  projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfigRaw.projectId,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || firebaseConfigRaw.storageBucket,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || firebaseConfigRaw.messagingSenderId,
+  appId: process.env.FIREBASE_APP_ID || firebaseConfigRaw.appId,
+};
+
 import { initializeFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import fs from "fs";
 import path from "path";
@@ -69,8 +80,8 @@ export function getGeminiKeysPool(): string[] {
     }
   });
 
-  if (firebaseConfigRaw && firebaseConfigRaw.apiKey && firebaseConfigRaw.apiKey.length > 5) {
-    keys.add(firebaseConfigRaw.apiKey.trim());
+  if (firebaseConfig.apiKey && firebaseConfig.apiKey.length > 5) {
+    keys.add(firebaseConfig.apiKey.trim());
     sources.push("Firestore Config API Key");
   }
 
@@ -89,7 +100,7 @@ export function getGeminiKeysPool(): string[] {
 
   // Prioritize keys from environment variables over the Firestore fallback key
   // The Firestore key is often restricted and leads to 403 errors.
-  const fbKey = firebaseConfigRaw?.apiKey;
+  const fbKey = firebaseConfig.apiKey;
   const envKeys = allKeys.filter(k => k !== fbKey && !badKeys.has(k));
   
   if (envKeys.length > 0) {

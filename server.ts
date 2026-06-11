@@ -7,6 +7,7 @@ import { GoogleGenAI, Type as SDKType } from "@google/genai";
 
 const Type = SDKType;
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini.js";
+import { query as dbQuery } from "./src/lib/db.js";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
   if (!text) return defaultOutput;
@@ -126,6 +127,20 @@ app.get("/api/health", (req, res) => {
     res.json({ status: "ok", keysFound: keys, poolSize: getGeminiKeysPool().length });
   });
 
+  app.get("/api/db-health", async (req, res) => {
+    try {
+      const result = await dbQuery("SELECT NOW() as current_time, version()");
+      res.json({ 
+        status: "ok", 
+        databaseTime: result.rows[0].current_time,
+        databaseVersion: result.rows[0].version
+      });
+    } catch (e: any) {
+      console.error("[DB Health] Error:", e);
+      res.status(500).json({ status: "fail", error: e.message });
+    }
+  });
+
   // Payment integration placeholder (Click/Payme)
   app.post("/api/payment/prepare", async (req, res) => {
     const { amount, userId, provider } = req.body;
@@ -190,6 +205,18 @@ app.get("/api/health", (req, res) => {
       poolSize: pool.length,
       maskedKeysInPool: maskedKeys
     });
+  });
+
+  // Telegram Webhook endpoint
+  app.post("/api/telegram-webhook", async (req, res) => {
+    try {
+       const { bot } = await import("./telegram.js");
+       await (bot as any).handleUpdate(req.body, res);
+       if (!res.writableEnded) res.sendStatus(200);
+    } catch (err) {
+       console.error("Telegram Webhook Error:", err);
+       res.sendStatus(500);
+    }
   });
 
   app.post("/api/gemini", async (req, res) => {
