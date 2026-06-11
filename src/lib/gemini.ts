@@ -75,7 +75,14 @@ export function getGeminiKeysPool(): string[] {
   }
 
   const allKeys = Array.from(keys);
-  console.log(`[Gemini Keys] Found ${allKeys.length} potential keys.`);
+  const isVercel = process.env.VERCEL === "1";
+  const isRender = process.env.RENDER === "true" || !!process.env.RENDER_EXTERNAL_URL;
+  const envType = isVercel ? "Vercel" : isRender ? "Render" : "Local/AI Studio";
+
+  if (keysCache.length === 0) {
+    console.log(`[Gemini Keys] Environment: ${envType}. Found ${allKeys.length} potential keys.`);
+    sources.forEach(s => console.log(`   - Source: ${s}`));
+  }
   
   const aizasyKeys = allKeys.filter(k => k.startsWith("AIzaSy") && !badKeys.has(k));
   const otherKeys = allKeys.filter(k => !k.startsWith("AIzaSy") && !badKeys.has(k));
@@ -93,8 +100,10 @@ export function getGeminiKeysPool(): string[] {
     keysCache = allKeys.filter(k => !badKeys.has(k));
   }
 
-  // If still empty but we have blacklisted keys, try one last time with all keys if needed, 
-  // but better to return empty and let the caller handle it.
+  if (keysCache.length === 0 && allKeys.length > 0) {
+     // If all keys are bad, maybe try them anyway as a last resort?
+     keysCache = allKeys;
+  }
   
   return keysCache;
 }
@@ -113,7 +122,7 @@ function rotateKeyIndex(poolSize: number): void {
 export function getRotationalClient(index?: number): { client: GoogleGenAI; keyIndex: number; totalKeys: number } {
   const pool = getGeminiKeysPool();
   if (pool.length === 0) {
-    throw new Error("Gemini API kaliti topilmadi.");
+    throw new Error("Gemini API kaliti topilmadi. Iltimos environment variablelarni tekshiring.");
   }
   const activeIndex = index !== undefined ? index % pool.length : currentKeyIndex % pool.length;
   const client = new GoogleGenAI({ apiKey: pool[activeIndex] });
@@ -146,7 +155,7 @@ export async function generateContentWithRotation(
        }
      });
      pool = Array.from(rawKeys);
-     if (pool.length === 0) throw new Error("Gemini API kaliti topilmadi.");
+     if (pool.length === 0) throw new Error("Gemini API kaliti topilmadi (Rotation).");
   }
 
   // Normalize contents for SDK v2 (@google/genai)
@@ -163,7 +172,7 @@ export async function generateContentWithRotation(
     });
   }
 
-  const maxAttempts = Math.min(10, pool.length * 2);
+  const maxAttempts = Math.min(10, pool.length * 2 + 3);
   let attempts = 0;
   let lastError: any = null;
 
@@ -178,32 +187,32 @@ export async function generateContentWithRotation(
     const activeIndex = (currentKeyIndex + attempts) % pool.length;
     const apiKey = pool[activeIndex];
     
-    if (badKeys.has(apiKey) && pool.length > 1) {
+    if (badKeys.has(apiKey) && pool.length > 1 && attempts < pool.length) {
        attempts++;
        continue;
     }
 
     const client = new GoogleGenAI({ apiKey });
     const maskedKey = apiKey.substring(0, 6) + "..." + apiKey.substring(apiKey.length - 4);
-    let requestedModel = params.model || "gemini-3.5-flash";
+    let requestedModel = params.model || "gemini-1.5-flash";
     let modelToUse = requestedModel;
     
-    // Attempt specific models based on step
+    // Valid models for retry logic
+    const modelOptions = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"];
+
     if (attempts === 0) {
-       // Keep requested model for the first attempt or use 3.5-flash
-       if (requestedModel.includes("pro")) modelToUse = "gemini-3.1-pro-preview";
-       else if (requestedModel.includes("lite") || requestedModel.includes("8b")) modelToUse = "gemini-3.1-flash-lite";
-       else modelToUse = "gemini-3.5-flash";
+       // On first attempt, use what was requested but sanitize from non-existent versions
+       if (requestedModel.includes("pro")) modelToUse = "gemini-1.5-pro";
+       else if (requestedModel.includes("8b")) modelToUse = "gemini-1.5-flash-8b";
+       else modelToUse = "gemini-1.5-flash";
     } else if (attempts === 1) {
-       // On first retry, try flash-lite
-       modelToUse = "gemini-3.1-flash-lite";
+       modelToUse = "gemini-1.5-flash-8b";
     } else if (attempts === 2) {
-       modelToUse = "gemini-3.5-flash";
+       modelToUse = "gemini-1.5-flash";
     } else if (attempts === 3) {
-       modelToUse = "gemini-3.1-pro-preview";
+       modelToUse = "gemini-1.5-pro";
     } else {
-       const cycle = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"];
-       modelToUse = cycle[(attempts - 4) % cycle.length];
+       modelToUse = modelOptions[attempts % modelOptions.length];
     }
 
     try {
