@@ -6,7 +6,7 @@ import path from "path";
 import { GoogleGenAI, Type as SDKType } from "@google/genai";
 
 const Type = SDKType;
-import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini";
+import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini.js";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
   if (!text) return defaultOutput;
@@ -912,7 +912,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
 
     // Launch the Telegram bot silently in the background (only on local/non-serverless instances)
     if (process.env.VERCEL !== "1") {
-      const { launchBot } = await import("./telegram");
+      const { launchBot } = await import("./telegram.js");
       launchBot();
     }
 
@@ -941,8 +941,10 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
     }
   }
 
-  // Execute startup but catch errors to prevent whole process crash
-  startServer().catch(err => {
-    console.error("Startup error:", err);
-  });
+  // Execute startup only if not on Vercel
+  if (process.env.VERCEL !== "1") {
+    startServer().catch(err => {
+      console.error("Startup error:", err);
+    });
+  }
 
