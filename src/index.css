@@ -1,8 +1,6 @@
-@import "tailwindcss";
-
-@theme {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   body {
@@ -43,8 +41,6 @@
     @apply text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium;
   }
 }
-
-/* Removed mesh-bg and blobs */
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;

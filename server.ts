@@ -175,7 +175,7 @@ app.get("/api/health", (req, res) => {
       }
       
       const response = await generateContentWithRotation({
-        model: "gemini-1.5-flash",
+        model: "gemini-3.5-flash",
         contents: "Salom, bu test xabari. Iltimos 'OK' deb javob bering."
       });
       
@@ -243,7 +243,7 @@ app.get("/api/health", (req, res) => {
         }
       }
 
-      const MODEL_NAME = "gemini-1.5-flash";
+      const MODEL_NAME = "gemini-3.5-flash";
 
       if (action === "generateDynamicTest") {
         const countOptions = options?.optionsCount || 4;
@@ -572,7 +572,7 @@ app.get("/api/health", (req, res) => {
           while (attempts < 2 && !isFullyValid) {
             console.log(`[Kurs Ishi Generation] Attempt ${attempts + 1} starting...`);
             const response = await generateContentWithRotation({
-              model: "gemini-1.5-flash",
+              model: "gemini-3.5-flash",
               contents: currentPrompt,
               config: {
                 responseMimeType: "application/json",
@@ -613,7 +613,7 @@ app.get("/api/health", (req, res) => {
           }
         } else {
           const response = await generateContentWithRotation({
-            model: "gemini-1.5-flash", // Use standard model to avoid quota
+            model: "gemini-3.5-flash", // Use standard model to avoid quota
             contents: prompt,
             config: {
               responseMimeType: "application/json",
@@ -688,7 +688,7 @@ app.get("/api/health", (req, res) => {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-1.5-flash",
+        model: model || "gemini-3.5-flash",
         contents: prompt
       });
 
@@ -876,7 +876,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-1.5-flash",
+               model: "gemini-3.5-flash",
                contents: contents,
                config: {
                  systemInstruction,
