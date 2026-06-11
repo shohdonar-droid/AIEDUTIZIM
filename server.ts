@@ -14,7 +14,6 @@ const Type = SDKType || {
     OBJECT: "OBJECT",
 };
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini";
-import { launchBot } from "./telegram";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
   if (!text) return defaultOutput;
@@ -878,6 +877,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
 
     // Launch the Telegram bot silently in the background (only on local/non-serverless instances)
     if (process.env.VERCEL !== "1") {
+      const { launchBot } = await import("./telegram");
       launchBot();
     }
 
