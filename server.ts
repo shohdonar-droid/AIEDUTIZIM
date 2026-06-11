@@ -3,9 +3,9 @@ dotenv.config();
 
 import express from "express";
 import path from "path";
-import { GoogleGenAI, SchemaType } from "@google/genai";
+import { GoogleGenAI, Type as SDKType } from "@google/genai";
 
-const Type = SchemaType;
+const Type = SDKType;
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
@@ -907,7 +907,8 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
         appType: "spa",
       });
       app.use(viteServer.middlewares);
-    } else {
+    } else if (process.env.VERCEL !== "1") {
+      // Static serving only if NOT on Vercel (Vercel handles static via vercel.json rewrites)
       const distPath = path.join(process.cwd(), 'dist');
       app.use(express.static(distPath));
       app.get('*', (req, res) => {
