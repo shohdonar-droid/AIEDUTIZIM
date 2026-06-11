@@ -3765,7 +3765,7 @@ ${systemAboutText}
 Foydalanuvchi xabari: ${prompt}`;
 
           const aiResponse = await generateContentWithRotation({
-            model: imagePart ? "gemini-1.5-flash" : "gemini-1.5-flash",
+            model: imagePart ? "gemini-3.5-flash" : "gemini-3.5-flash",
             contents: [
               { role: "user", parts: [{ text: systemInstructionText }, ...(imagePart ? [imagePart] : [])] }
             ]
@@ -5085,7 +5085,7 @@ Foydalanuvchi xabari: ${prompt}`;
                     : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
 
                   const genRes = await generateContentWithRotation({
-                    model: "gemini-1.5-flash",
+                    model: "gemini-3.5-flash",
                     contents: [{ role: "user", parts: [{ text: pText }] }],
                     config: {
                       systemInstruction:

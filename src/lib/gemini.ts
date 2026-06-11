@@ -75,16 +75,22 @@ export function getGeminiKeysPool(): string[] {
   }
 
   const allKeys = Array.from(keys);
-  console.log(`[Gemini Keys] Found ${allKeys.length} keys from sources: ${sources.join(", ")}`);
+  console.log(`[Gemini Keys] Found ${allKeys.length} potential keys.`);
   
   const aizasyKeys = allKeys.filter(k => k.startsWith("AIzaSy") && !badKeys.has(k));
   const otherKeys = allKeys.filter(k => !k.startsWith("AIzaSy") && !badKeys.has(k));
 
-  // If we have standard keys, use them. Otherwise fallback to everything that isn't blacklisted.
-  if (aizasyKeys.length > 0) {
-    keysCache = aizasyKeys;
+  // Prioritize keys from environment variables over the Firestore fallback key
+  // The Firestore key is often restricted and leads to 403 errors.
+  const fbKey = firebaseConfigRaw?.apiKey;
+  const envKeys = allKeys.filter(k => k !== fbKey && !badKeys.has(k));
+  
+  if (envKeys.length > 0) {
+    keysCache = envKeys;
+  } else if (fbKey && !badKeys.has(fbKey)) {
+    keysCache = [fbKey];
   } else {
-    keysCache = otherKeys;
+    keysCache = allKeys.filter(k => !badKeys.has(k));
   }
 
   // If still empty but we have blacklisted keys, try one last time with all keys if needed, 
@@ -178,27 +184,30 @@ export async function generateContentWithRotation(
     }
 
     const client = new GoogleGenAI({ apiKey });
-    let modelToUse = params.model || "gemini-1.5-flash";
+    const maskedKey = apiKey.substring(0, 6) + "..." + apiKey.substring(apiKey.length - 4);
+    let requestedModel = params.model || "gemini-3.5-flash";
+    let modelToUse = requestedModel;
     
-    if (modelToUse.includes("pro")) {
-      modelToUse = "gemini-1.5-pro";
-    } else if (modelToUse.includes("lite") || modelToUse.includes("flash-lite")) {
-      modelToUse = "gemini-1.5-flash";
-    } else {
-      modelToUse = "gemini-1.5-flash";
-    }
-
-    if (attempts === 1) {
-      modelToUse = "gemini-1.5-flash"; 
+    // Attempt specific models based on step
+    if (attempts === 0) {
+       // Keep requested model for the first attempt or use 3.5-flash
+       if (requestedModel.includes("pro")) modelToUse = "gemini-3.1-pro-preview";
+       else if (requestedModel.includes("lite") || requestedModel.includes("8b")) modelToUse = "gemini-3.1-flash-lite";
+       else modelToUse = "gemini-3.5-flash";
+    } else if (attempts === 1) {
+       // On first retry, try flash-lite
+       modelToUse = "gemini-3.1-flash-lite";
     } else if (attempts === 2) {
-      modelToUse = "gemini-1.5-pro"; 
-    } else if (attempts >= 3) {
-      const cycle = ["gemini-1.5-flash", "gemini-1.5-pro"];
-      modelToUse = cycle[(attempts - 3) % cycle.length];
+       modelToUse = "gemini-3.5-flash";
+    } else if (attempts === 3) {
+       modelToUse = "gemini-3.1-pro-preview";
+    } else {
+       const cycle = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"];
+       modelToUse = cycle[(attempts - 4) % cycle.length];
     }
 
     try {
-      console.log(`[Gemini Rotator] Attempt ${attempts + 1} with ${modelToUse} (Key Index ${activeIndex})`);
+      console.log(`[Gemini Rotator] Attempt ${attempts + 1} with ${modelToUse} (Key: ${maskedKey}, Index: ${activeIndex})`);
       const response = await Promise.race([
         client.models.generateContent({
           model: modelToUse,
@@ -225,20 +234,25 @@ export async function generateContentWithRotation(
       attempts++;
       lastError = error;
       const errorDetail = error.message || JSON.stringify(error);
-      const statusCode = error.status || error.code;
+      const statusCode = error.status || error.code || (errorDetail.includes("403") ? 403 : errorDetail.includes("404") ? 404 : 500);
       
       console.error(`[Gemini Rotator] Step ${attempts} failed on index ${activeIndex} (Status: ${statusCode}): ${errorDetail}`);
       
-      if (statusCode === 401 || errorDetail.includes("authentication credentials") || errorDetail.includes("401") || errorDetail.includes("API key not valid")) {
-         console.warn(`[Gemini Rotator] Key at index ${activeIndex} is INVALID (401). Blacklisting.`);
+      const isBlocked = statusCode === 403 || errorDetail.includes("PERMISSION_DENIED") || errorDetail.includes("API_KEY_SERVICE_BLOCKED") || errorDetail.includes("blocked");
+      const isInvalid = statusCode === 401 || errorDetail.includes("authentication credentials") || errorDetail.includes("API key not valid");
+      const isNotFound = statusCode === 404 || errorDetail.includes("not found");
+
+      if (isBlocked || isInvalid || isNotFound) {
+         console.warn(`[Gemini Rotator] Key at index ${activeIndex} is ${isBlocked ? 'BLOCKED' : isInvalid ? 'INVALID' : 'INCOMPATIBLE'} (${statusCode}). Blacklisting.`);
          badKeys.add(apiKey);
-         keysCache = []; 
+         // Don't clear cache fully, just invalidate the bad key's presence in future rotates
+         // We do currentKeyIndex++ basically by using activeIndex + 1 in next loop
       }
 
       rotateKeyIndex(pool.length);
       
       const errMsg = errorDetail.toLowerCase();
-      if (errMsg.includes("400") || errMsg.includes("invalid_argument")) throw error;
+      if (errMsg.includes("400") && !errMsg.includes("not found")) throw error;
       
       if (errMsg.includes("503") || errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("unavailable")) {
          const delay = Math.min(2000, 500 * attempts);
