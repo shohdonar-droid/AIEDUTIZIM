@@ -175,7 +175,7 @@ app.get("/api/health", (req, res) => {
       }
       
       const response = await generateContentWithRotation({
-        model: "gemini-3.5-flash",
+        model: "gemini-1.5-flash",
         contents: "Salom, bu test xabari. Iltimos 'OK' deb javob bering."
       });
       
@@ -243,23 +243,24 @@ app.get("/api/health", (req, res) => {
         }
       }
 
-      const MODEL_NAME = "gemini-3.5-flash";
+      const MODEL_NAME = "gemini-1.5-flash";
 
       if (action === "generateDynamicTest") {
-        const countOptions = options?.optionsCount || 4;
-        const prompt = context 
-          ? `Mavzu: ${topic}
-              Ushbu matn asosida ${count || 10} ta o'zbek tilidagi test savollarini yarating. 
-              Savollar faqat berilgan matn asosida bo'lishi shart.
-              Natija faqat JSON formatida bo'lsin.
-              Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.
-              
-              Berilgan matn:
-              ${context}`
-          : `Mavzu: ${topic}
-              Ushbu mavzu asosida ${count || 10} ta o'zbek tilidagi umumiy bilimga asoslangan test savollarini yarating. 
-              Natija faqat JSON formatida bo'lsin.
-              Har bir savol ${countOptions} ta variantga ega bo'lishi va bitta to'g'ri javob indeksi (correctIdx, 0-${countOptions - 1}) ko'rsatilishi kerak.`;
+        const countOptions = 4;
+        const prompt = `Siz professional pedagog va testolog-ekspertisiz.
+          Vazifa: "${topic}" mavzusi bo'yicha ${count || 10} ta professional va akademik test savollarini yaratish.
+          
+          QOIDALAR:
+          - Har bir savolda 4 ta variant bo'lsin.
+          - Faqat bitta to'g'ri javob bo'lsin.
+          - Savollar takrorlanmasin.
+          - Oson, o'rta va murakkab darajalar aralash bo'lsin.
+          - Noto'g'ri javoblar ham mantiqiy bo'lsin.
+          - O'zbek tilida, grammatik xatolarsiz.
+          
+          Natija faqat JSON formatida bo'lsin.
+          
+          ${context ? `Asos: Quyidagi matn tahlil qilinsin:\n${context}` : `Asos: Umumiy akademik bilimlar.`}`;
 
       console.log(`[API Gemini] Generating test for topic: ${topic}, count: ${count}`);
       try {
@@ -300,35 +301,30 @@ app.get("/api/health", (req, res) => {
       }
 
       } else if (action === "generatePresentation") {
-        const prompt = `Mavzu: "${topic}".
-          Siz o'ta professional, premium darajadagi (Canva Premium, Beautiful.ai kabi) taqdimot (presentation) ustasisiz. 
-          Ushbu mavzu bo'yicha ${count || 15} ta slide-dan iborat o'ta vizual, infografikali va mukammal taqdimot rejasini va qisqa, tushunarli matnini o'zbek tilida tayyorlang.
+        const slideCount = count || 15;
+        const prompt = `Siz AIEDUTIZIM Telegram Bot ichidagi AI Yordamchi modulida ishlovchi professional taqdimot ustasisiz.
+          Vazifa: "${topic}" mavzusi bo'yicha ${slideCount} ta slayddan iborat o'ta professional, vizual va akademik taqdimot tayyorlash.
           
           QOIDALAR:
-          1. 30% matn, 70% vizual bo'lishi shart. Katta slayd matnga to'lib ketmasin.
-          2. Bir slaydda 5 tadan ortiq bullet point bo'lmasin. Muhim fikrlar qisqa yozilsin.
-          3. Hech qanday "Rasm uchun joy" degan matn bo'lmasin. 
-          4. AI mavzuni chuqur tahlil qilsin va (SWOT, Diagramma, Arxitektura kabi) o'ziga xos vizual bo'limlarni ham mustaqil qo'shib yuborsin.
-
-          TUZILMA:
-          Taqdimot quyidagi qoliplarga asoslanishi kerak: Titul, Mundarija, Kirish, Asosiy qism, Tahlil, Diagrammalar, Statistikalar, Xulosa, Rahmat.
+          1. Har bir slayd professional, vizual va tushunarli bo'lsin.
+          2. 1-slayd titul bo'lsin.
+          3. Oxirgi slayd "E'tiboringiz uchun rahmat" bilan yakunlansin.
+          4. Minimal matn (30% matn, 70% vizual) ishlating.
+          5. Har bir slaydda 3-5 ta qisqa punktlar bo'lsin.
+          6. Slaydlar dizayni "Diplom himoyasi" yoki "Ilmiy konferensiya" uchun mos bo'lsin.
+          7. Har bir slayd uchun 30-50 soniyalik nutq matni (speechNote) ham yarating.
+          8. Diagramma, ikonka va rasm tavsiyalarini aniq bering.
           
-          DIZAYN VA LAYOUTLAR:
-          Mavjud layout turlari:
-          - "cover" - Titul sahifasi (Asosiy sarlavha, fon)
+          LAYOUT TURLARI:
+          - "cover" - Titul
           - "agenda" - Mundarija
-          - "content" - Qisqa matn va ikonka
-          - "image-left" - Rasm chapda, matn o'ngda
-          - "image-right" - Rasm o'ngda, matn chapda
-          - "cards" - Infografika / SmartArt kartochkalari (maqsadlar, etaplar). 3-4 element.
-          - "chart" - QuickChart orqali statistika (Pie, Bar, Line, Radar, Donut).
-          - "summary" - Yakuniy xulosa va rahmat.
+          - "content" - Qisqa matn
+          - "image-left" / "image-right"
+          - "cards" - Infografika
+          - "chart" - Diagrammalar (Pie, Bar, Line)
+          - "summary" - Rahmati bilan xulosa
 
-          Slaydga kiritiladigan Icon nomlari ("iconType") Inglizcha (masalan: mdi:rocket, mdi:chart-bar, mdi:cogs, mdi:account-group) formatda bo'lsin.
-          Agar layout "chart" bo'lsa, "chartType" ("pie", "bar", "line", "radar", "doughnut") va "chartData" obyekti berilsin.
-          Agar layout vizual rasm bo'lsa, "imageKeyword" qidiruviga aniq inglizcha rasm qidirish tushunchasi berilsin.
-
-          Qaytariladigan JSON tarkibida "template" ("Akademik", "Zamonaviy", "Minimalistik", "Korporativ" - kelganida shulardan asosiy designni yozing) va ${count || 15} ta elementdan iborat "slides" ro'yxati qaytarilsin. Javob faqat JSON formatida bo'lsin yopiq (markdown code block ni ishlatmasdan).`;
+          Javob faqat JSON formatida bo'lsin.`;
 
         const response = await generateContentWithRotation({
           model: MODEL_NAME,
@@ -340,11 +336,11 @@ app.get("/api/health", (req, res) => {
               properties: {
                 template: { 
                   type: Type.STRING, 
-                  description: "Design template" 
+                  description: "Design template (Akademik, Zamonaviy, Minimalistik, Korporativ)" 
                 },
                 designPlan: { 
                   type: Type.STRING, 
-                  description: "Design and color planning brief description" 
+                  description: "Design and color planning brief description for defense" 
                 },
                 slides: {
                   type: Type.ARRAY,
@@ -357,11 +353,15 @@ app.get("/api/health", (req, res) => {
                       },
                       title: { type: Type.STRING },
                       subtitle: { type: Type.STRING },
-                      content: { type: Type.STRING, description: "Qisqa, lo'nda 30% matnli ilmiy-ommabop tushuntirish" },
+                      content: { type: Type.STRING, description: "Minimal matnli ilmiy tushuntirish" },
                       bulletPoints: { 
                         type: Type.ARRAY, 
                         items: { type: Type.STRING },
-                        description: "Maksimal 5 ta nuqta."
+                        description: "3-5 ta qisqa punktlar."
+                      },
+                      speechNote: {
+                        type: Type.STRING,
+                        description: "Foydalanuvchi ushbu slaydni himoya qilishda aytishi kerak bo'lgan 30-50 soniyalik nutq matni"
                       },
                       imageKeyword: { 
                         type: Type.STRING, 
@@ -385,10 +385,14 @@ app.get("/api/health", (req, res) => {
                           },
                           required: ["label", "value"]
                         },
-                        description: "Statistik malumotlar uchun oddiy diagramma ma'lumotlari"
+                        description: "Statistik malumotlar uchun diagramma ma'lumotlari"
+                      },
+                      diagramRecommendation: {
+                        type: Type.STRING,
+                        description: "Ushbu slaydda qanday diagramma bo'lishi kerakligi haqida tavsiya"
                       }
                     },
-                    required: ["layout", "title"]
+                    required: ["layout", "title", "speechNote"]
                   }
                 }
               },
@@ -411,150 +415,139 @@ app.get("/api/health", (req, res) => {
           const advisor = options?.advisor || "Dots. Karimov S.A.";
           const pageCount = options?.pageCount || "25-30";
 
-          prompt = `Siz O'zbekiston oliy ta'lim muassasalari standartlari bo'yicha yuqori saviyadagi, mukammal va akademik "Kurs ishi" (Coursework / Term Paper) tayyorlab beruvchi professional ilmiy ekspert-tizimsiz.
+          prompt = `Siz AIEDUTIZIM Telegram Bot ichidagi AI Yordamchi modulida ishlovchi professional sun'iy intellekt yordamchisiz.
+          Vazifa: O'zbekiston oliy ta'lim muassasalari (OAK) standartlari bo'yicha yuqori saviyadagi, mukammal va akademik "Kurs ishi" tayyorlash (Universitetga topshirishga tayyor holatda).
           
-      Mavzu: "${topic}". 
-      Tashkiliy ma'lumotlar:
-      - OTM nomi: ${university}
-      - Fakultet nomi: ${faculty}
-      - Kafedra nomi: ${department}
-      - Yo'nalish: ${direction}
-      - Talaba: ${studentName}
-      - Ilmiy rahbar: ${advisor}
-      - Kutilayotgan umumiy hajm: ${pageCount} sahifa
+          Mavzu: "${topic}". 
+          Tashkiliy ma'lumotlar:
+          - OTM nomi: ${university}
+          - Fakultet nomi: ${faculty}
+          - Kafedra nomi: ${department}
+          - Yo'nalish: ${direction}
+          - Talaba: ${studentName}
+          - Ilmiy rahbar: ${advisor}
+          - Kutilayotgan umumiy hajm: 25-30 sahifa
+          
+          TALABLAR:
+          1. HAR BIR BOB kamida 4-5 ta bo'limdan (paragrafdan) iborat bo'lsin.
+          2. HAR BIR BOB hajmi kamida 1000-1500 so'zdan iborat bo'lib, chuqur ilmiy tahlillarni o'z ichiga olsin.
+          3. Matn tarkibida jadval va diagramma uchun aniq tavsiyalar va statistik ma'lumotlarni kiriting.
+          4. Xulosa va tavsiyalar qismi o'ta batafsil va amaliy asoslangan bo'lsin.
+          5. Akademik uslubda, grammatik xatolarsiz va universitet talablariga mos yozing.
 
-      Ushbu kurs ishi oddiy referat, blog kabi maqolalar yoki sun'iy intellekt tomonidan yuzaki yozilgan umumiy matn ko'rinishida bo'lmasin!
-
-      QUYIDAGI AKADEMIK VA METODIK STANDARTLARGA QAT'IY RIOYA QILING:
-
-      1. ILMIY USLUB:
-         - To'liq ilmiy va rasmiy uslubda, muassasalar tomonidan qabul qilingan akademik atamalar va chuqur tahlillar bilan yozilsin.
-         - Matnda hech qachon "Menimcha", "Mening fikrimcha", "Ushbu mavzu juda qiziqarli", "Bu yaxshi usul", "Men ko'rib chiqdim" kabi noakademik va shaxsiy qarashlarni bildiruvchi yengil iboralar ishlatilmasin!
-         - Buning o'rniga faqat akademik jurnallarga xos iboralardan keng foydalaning:
-           * "Tahlillar natijasida aniqlandiki..."
-           * "Tadqiqotlar shuni ko'rsatadiki..."
-           * "Mazkur yondashuvning afzalligi..."
-           * "Ilmiy manbalar asosida..."
-           * "Tajribalar va nazariy qarashlar qiyosiy tahlil qilinganda..."
-           * "Zaruriy xulosa va hisoblar ko'rsatadiki..."
-
-      2. MUKAMMAL AKADEMIK STRUKTURA (Matn har bir bo'lim va sarlavhalarni o'z ichiga olishi shart):
-         - MUNDARIJA: Mavzuga mos mantiqiy boblar va rejani o'z ichiga oladi.
-         - KIRISH: Quyidagi elementlar albatta alohida bandlar ko'rinishida chuqur tahlil qilinib keng yoritilsin:
-           * Mavzuning dolzarbligi (Dolzarblik qismi kamida 2-3 ta pishiq va uzun paragraf bo'lsin)
-           * Tadqiqot maqsadi
-           * Tadqiqot vazifalari
-           * Tadqiqot obyekti
-           * Tadqiqot predmeti
-           * Tadqiqot metodlari
-           * Tadqiqotning amaliy ahamiyati
-         - I BOB: NAZARIY VA METODOLOGIK ASOSLARI. Kamida 2-3 ta paragrafdan iborat bo'lsin. Mavzuning mohiyati, nazariy tushunchalari, ilmiy izohlar va dunyo tajribasi batafsil tahlil qilinsin.
-         - II BOB: AMALIY TAHLIL VA EKSPERIMENTAL NATIJALAR. Kamida 2-3 ta paragrafdan iborat bo'lsin. Amaliy sohadagi muammolar, tahlillar va olingan natijalar to'laqonli yoritilsin.
-         - III BOB: MAZKUR SOHANING RIVOJLANISH ISTIQBOLLARI. Kamida 2 ta paragraf bo'lib, olingan natijalarning kelajakdagi tatbiqi va takomillashtirish yechimlari yozilsin.
-         - XULOSA: Ilmiy jihatdan mustahkam asoslangan, amaliy tavsiyalar bilan pishiq yakunlovchi umumiy xulosa.
-         - FOYDALANILGAN ADABIYOTLAR: Kamida 10 tadan 20 tagacha mukammal davlat tili va xorijiy tillardagi kitoblar, OAK jurnallari va rasmiy ilmiy manbalar ro'yxati (GOST yoki OTM me'yoriga to'liq mos: Muallif, kitob nomi, nashriyot, yil, masalan: 'Karimov A.B. Sun'iy intellekt asoslari. - Toshkent: Fan, 2023. - 128 b.').
-         - ILOVALAR (agar kerak bo'lsa): Amaliy hisob-kitob, kichik dasturiy kod yoki jadval ko'rinishidagi ilova namunasi.
-
-      3. PLACEHOLDER VA FORMAT CHECK:
-         - Matnda "[OTM]", "[Fakultet]", "[Talaba]", "[Shahar]", "[Mavzu]" kabi to'rtburchak qavsli placeholderlar mutlaqo qoldirilmasin! Ularning o'rniga yuqoridagi haqiqiy ma'lumotlarni ishlating.
-         - Foydalanuvchi ma'lumotlarini matn tarkibiga to'la integratsiya qiling.
-
-      Matnni nihoyatda pishiq, akademik jihatdan eng yuqori baho oladigan darajada, boy va kengaytiruvchi darsliklar hamda mustaqil nazariyaga asoslangan mukammal ilmiy bo'limlar bilan tayyorlang.`;
-        } else if (false) {
-          prompt = `Ma'lumotlar: "${topic}". 
-     Ushbu ma'lumotlar/mavzu asosida juda mukammal, to'liq, mazmun jihatdan doimiy 25-30 sahifalik ilmiy-tadqiqot darajasidagi "Kurs ishi" (Coursework) tayyorlang. O'zbek tilida, rasmiy akademik uslubda yozilishi shart.
-     
-     TARKIBIY QISMI QUYIDAGI TARTIBDA BO'LSIN:
-     1. TITUL VARAQ (NAMUNA):
-        OTM NOMI: [Oliy ta'lim muassasasi nomi]
-        FAKULTET: [Fakultet nomi]
-        KAFEDRA: [Kafedra nomi]
-        KURS ISHI MAVZUSI: "${topic.toUpperCase()}"
-        BAJARDI: [Talaba F.I.Sh.]
-        ILMIY RAHBAR: [Ilmiy rahbar F.I.Sh., ilmiy darajasi]
-        SHAHAR VA YIL: [Shahar] - 2026 (Foydalanuvchi bularni o'zi osongina tahrirlab to'g'irlab olishi mumkin)
-     2. MUNDARIJA (Mavzu darsliklariga mos keladigan rejalar)
-     3. KIRISH (Mavzuning dolzarbligi, obyekti, predmeti, metodlari, maqsad va vazifalari to'liq va keng yoritilgan)
-     4. ASOSIY BOBLAR (Kamida 2-3 ta bob, har bir bobda 1.1, 1.2, 2.1, 2.2 kabi kamida 2 tadan mukammal yozilgan kichik bo'limlar bo'lishi va har biri juda uzun, tahlillar, formulalar, muammolar va yechimlarga boy bo'lishi shart)
-     5. XULOSA VA TAVSIYALAR (Tadqiqot natijalari tahlili asosidagi mustaqil xulosalar)
-     6. FOYDALANILGAN ADABIYOTLAR RO'YXATI (Kamida 10-15 ta ilmiy, rasmiy va zamonaviy adabiyotlar to'liq bibliografik me'yorlarda ro'yxati)
-     
-     Har bir bob va bo'limni o'ta batafsil va batafsil tushuntirishlar bilan, doimiy 25-30 listli (sahifali) akademik hajmga to'liq javob beradigan darajada nihoyatda uzun va qiziqarli yozing.`;
+          ILMIY STRUKTURA:
+          1. Titul varaq (Haqiqiy ma'lumotlar bilan)
+          2. Mundarija
+          3. Kirish (Dolzarblik, maqsad, vazifalar, obyekt, predmet, metodlar, yangilik, amaliy ahamiyat - har biri alohida va juda keng)
+          4. I BOB (Nazariy-metodologik asoslar - 4-5 bo'lim)
+          5. II BOB (Amaliy tahlil va eksperimental natijalar, statistikalar - 4-5 bo'lim)
+          6. III BOB (Rivojlantirish istiqbollari, model va takliflar - 4-5 bo'lim)
+          7. Xulosa (Batafsil tahlil va amaliy takliflar)
+          8. Foydalanilgan adabiyotlar (Kamida 20 ta zamonaviy manba: muallif, kitob, nashriyot, yil)
+          
+          Noto'g'ri placeholder ([...]) qoldirmang! Har bir bo'limni o'ta batafsil va ilmiy boyitib yozing.`;
         } else if (docType === "tezis") {
           const author = options?.author || "Muallif";
           const university = options?.university || "OTM";
           const direction = options?.direction || "Yo'nalish";
-          prompt = `Mavzu: "${topic}". Muallif: ${author}. OTM: ${university}. Yo'nalish: ${direction}.
-          Ushbu mavzu asosida mukammal va professional Ilmiy Tezis (Thesis/Abstract) tayyorlang. O'zbek tilida, ilmiy uslubda.
-          Tarkibi:
-          1. Sarlavha (Mavzu nomi)
-          2. Muallif: ${author}
-          3. Tashkilot: ${university} (${direction})
-          4. Annotatsiya (O'zbek va Ingliz tillarida qisqacha ma'lumot)
-          5. Kalit so'zlar (5-8 ta asosiy ilmiy atama)
-          6. Kirish va O'rganilganlik darajasi
-          7. Asosiy Qism (Metodlar, amaliy natijalar, tahlillar)
-          8. Xulosa (Tadqiqot yakuniy natijalari)
-          9. Foydalanilgan Adabiyotlar ro'yxati (Kamida 3-5 ta asosiy manba)
-          Tezis to'liq va barcha ilmiy me'yorlarga javob beradigan professional darajada yozilsin.`;
-      } else if (docType === "maqola") {
+          prompt = `Siz AIEDUTIZIM Telegram Bot ichidagi AI Yordamchi modulida ishlovchi ilmiy ekspertsiz.
+          Vazifa: OAK talablariga mos ilmiy uslubda professional Tezis yaratish.
+          
+          Mavzu: "${topic}". Muallif: ${author}. OTM: ${university}. Yo'nalish: ${direction}.
+          
+          TIZILISh (OAK STANDARTI):
+          - Kirish
+          - Dolzarblik (Mavzuning bugungi kundagi ahamiyati)
+          - Tadqiqot maqsadi va vazifalari
+          - Tadqiqot obyekti va predmeti
+          - Ilmiy yangilik
+          - I BOB, II BOB, III BOB (Qisqacha mazmuni tezis formatida)
+          - Tajriba-sinov ishlari natijalari
+          - Xulosa va Tavsiyalar
+          - Foydalanilgan adabiyotlar
+
+          MATN: Akademik, professional va darhol nashrga tayyor bo'lsin.`;
+        } else if (docType === "maqola") {
           const author = options?.author || "Muallif";
           const org = options?.org || "Tashkilot";
           const lang = options?.language || "O'zbek";
 
-          prompt = `Mavzu: "${topic}". Muallif: ${author}. Tashkilot: ${org}. Til: ${lang}.
-          Ushbu mavzu asosida nufuzli ilmiy jurnallar (OAK yoki xalqaro Scopus/Web of Science) talablariga mos keladigan professional darajadagi nufuzli ilmiy Maqola yarating. Til: ${lang}, rasmiy va yuqori ilmiy uslubda.
-          Tarkibi (IMRAD standarti asosida):
-          1. Maqola Sarlavha (Mavzu nomi)
-          2. Muallif(lar) va ishlash/o'qish joyi (Namuna sifatida kiritiladi)
-          3. Annotatsiya (O'zbek tilida) va Abstract (Ingliz tilida, mukammal grammatika bilan)
-          4. Kalit so'zlar / Keywords
-          5. Kirish (Introduction) - Mavzuning dolzarbligi, qo'yilgan masala
-          6. Metodologiya (Research Methodology) - Qo'llanilgan ilmiy uslublar
-          7. Natijalar (Results) - Tadqiqot davomida olingan yangi ilmiy natijalar
-          8. Tahlil va Muhokama (Discussion) - Olingan natijalarning qiyosiy tahlili
-          9. Xulosa (Conclusion) - Yakuniy xulosalar va kelajakdagi tadqiqot yo'nalishlari
-          10. Foydalanilgan Adabiyotlar (References) - Kamida 10 ta xalqaro va milliy ilmiy manbalar
-          Maqola juda batafsil, ilmiy g'oyalarga boy va yuqori saviyada yozilsin.`;
+          prompt = `Siz AIEDUTIZIM Telegram Bot ichidagi AI Yordamchi modulida ishlovchi ilmiy ekspertsiz.
+          Vazifa: Nufuzli ilmiy jurnallar (OAK, Scopus) talablariga mos nufuzli ilmiy Maqola yaratish.
+          
+          Mavzu: "${topic}". Muallif: ${author}. Tashkilot: ${org}. Til: ${lang}.
+          
+          TUZILISH (IMRAD):
+          - Annotatsiya (O'zbek va Ingliz tillarida batafsil)
+          - Kalit so'zlar (O'zbek va Inglizcha)
+          - Kirish (Introduction)
+          - Adabiyotlar sharhi (Literature review)
+          - Tadqiqot metodologiyasi (Methodology)
+          - Natijalar (Results)
+          - Muhokama (Discussion)
+          - Xulosa (Conclusion)
+          - Foydalanilgan adabiyotlar (Kamida 10-15 ta manba)
+
+          Uslub: Qat'iy ilmiy, professional va akademik.`;
         } else if (docType === "cv") {
-          prompt = `Foydalanuvchi ma'lumotlari:
-          - Ism Familiya: ${options?.name || "Kiritilmagan"}
-          - Tug'ilgan sana: ${options?.birthDate || "Kiritilmagan"}
+          prompt = `Siz professional HR ekspertisiz.
+          Vazifa: Zamonaviy HR standartlariga mos, professional va jalb qiluvchi CV yaratish.
+          
+          Ma'lumotlar:
+          - F.I.Sh: ${options?.name || "Kiritilmagan"}
           - Telefon: ${options?.phone || "Kiritilmagan"}
           - Email: ${options?.email || "Kiritilmagan"}
-          - Manzil: ${options?.address || "Kiritilmagan"}
+          - Maqsad: ${options?.objective || "Professional rivojlanish"}
           - Ta'lim: ${options?.edu || "Kiritilmagan"}
           - Ish tajribasi: ${options?.exp || "Kiritilmagan"}
           - Ko'nikmalar: ${options?.skills || "Kiritilmagan"}
+          - Sertifikatlar: ${options?.certs || "Kiritilmagan"}
           - Tillar: ${options?.languages || "Kiritilmagan"}
 
-          Ushbu ma'lumotlar asosida professional, zamonaviy va ish beruvchini jalb qiladigan mukammal va to'liq "CV / Rezyume" yarating. O'zbek tilida, rasmiy uslubda bo'lishi shart.
-          Hujjat tarkibi:
-          1. Shaxsiy ma'lumotlar (F.I.Sh., aloqa ma'lumotlari sarlavha qismida)
-          2. Objective / Maqsad (Professional maqsad haqida qisqa va pishiq paragraf)
-          3. Ta'lim (Batafsil yoritilgan)
-          4. Ish tajribasi (Vazifalar va yutuqlar bilan)
-          5. Ko'nikmalar (Texnik va yumshoq ko'nikmalar)
-          6. Tillar (Bilish darajalari bilan)
-          7. Qo'shimcha ma'lumotlar (Sertifikatlar, qiziqishlar bo'lsa)
-          Hujjat vizual jihatdan tartibli va professional ko'rinishda bo'lsin.`;
+          BO'LIMLAR:
+          1. F.I.Sh va Kontaktlar
+          2. Maqsad (Objective)
+          3. Ta'lim (Education)
+          4. Ish tajribasi (Experience)
+          5. Ko'nikmalar (Skills - Hard/Soft)
+          6. Sertifikatlar
+          7. Tillar
+          8. Qo'shimcha ma'lumotlar
+
+          Format: Professional, tartibli va akademik.`;
         } else if (docType === "dars_ishlanma") {
-          prompt = `Ma'lumotlar: "${topic}". 
-          Ushbu ma'lumotlar asosida zamonaviy dars berish metodlari va ilg'or pedagogik texnologiyalar asosida tayyorlangan mukammal va to'liq "Dars ishlanmasi" (Lesson Plan) tayyorlang. O'zbek tilida va pedagogik qoidalarga mos holda yozilishi shart.
-          Tarkibi:
-          1. Umumiy ma'lumotlar (Fan, Mavzu, Sinf yoki Kurs, Dars turi, Dars davomiyligi - Namuna sifatida to'ldirilgan)
-          2. Darsning maqsadi (Ta'limiy, Tarbiyaviy, Rivojlantiruvchi maqsadlar batafsil ko'rsatiladi)
-          3. Kompetensiyalar (Mavzuga doir tayanch va fanga oid kompetensiyalar)
-          4. Jihozlar va Dars metodlari (Ko'rgazmali qurollar, AKT, interaktiv uslublar)
-          5. Darsning borishi / Dars bosqichlari (Tashkiliy qism, o'tilgan mavzuni mustahkamlash, yangi mavzu bayoni - batafsil yondashuv bilan, mustahkamlash bosqichlari)
-          6. Mustahkamlash partiyasi (Mavzu yuzasidan interaktiv savollar, topshiriqlar va keyslar)
-          7. Baholash va Rag'batlantirish (Mezonlar asosida)
-          8. Uyga vazifa (Ijodiy va amaliy topshiriqlar)
-          Dars o'qituvchi va talabalar uchun to'liq yo'riqnoma vazifasini o'taydigan darajada batafsil yozilsin.`;
+          prompt = `Siz professional pedagog-ekspertsiz.
+          Vazifa: Zamonaviy pedagogik texnologiyalar asosida mukammal "Dars ishlanmasi" (Lesson Plan) yaratish.
+          
+          Mavzu: "${topic}".
+          
+          TUZILISH (13 punkt):
+          1. Dars mavzusi
+          2. Dars maqsadi (Ta'limiy, Tarbiyaviy, Rivojlantiruvchi)
+          3. Kutilayotgan natijalar
+          4. Kompetensiyalar (Tayanch va fanga oid)
+          5. Dars turi
+          6. Dars metodi
+          7. Dars jihozlari
+          8. Tashkiliy qism
+          9. O'tilgan mavzuni takrorlash
+          10. Yangi mavzu bayoni
+          11. Mustahkamlash
+          12. Baholash
+          13. Uy vazifasi
+
+          Natija: Pedagogik hujjat shaklida, professional va amaliy foydalanishga to'liq tayyor bo'lsin.`;
         } else if (docType === "tarjimon") {
-          prompt = `Ma'lumotlar: "${topic}".
-          Yuqoridagi ma'lumotlarda "Direction" (Tarjima yo'nalishi) berilgan. 
-          Iltimos, berilgan matnni xalqaro tarjimonlik darajasida, grammatik qoidalarga rioya qilgan holda faqatgina ko'rsatilgan maqsadli tilga tarjima qiling. Qavslarsiz, to'g'ridan to'g'ri tarjimani bering.`;
+          prompt = `Siz professional akademik tarjimonsiz. 
+          Vazifa: Berilgan matnning mazmunini to'liq saqlagan holda professional tarjima qilish.
+          
+          Matn: "${topic}".
+          
+          QOIDALAR:
+          - Terminlarni to'g'ri tarjima qiling.
+          - Akademik uslubni saqlang.
+          - Grammatik xatolarga yo'l qo'ymang.
+          - Faqat tarjima natijasini qaytaring, ortiqcha izohlarsiz.`;
         } else if (docType === 'hisobot') {
           prompt = `Mavzu: "${topic}". 
      Birlamchi ma'lumotlar: "${options?.context || ''}".
@@ -572,7 +565,7 @@ app.get("/api/health", (req, res) => {
           while (attempts < 2 && !isFullyValid) {
             console.log(`[Kurs Ishi Generation] Attempt ${attempts + 1} starting...`);
             const response = await generateContentWithRotation({
-              model: "gemini-3.5-flash",
+              model: "gemini-1.5-flash",
               contents: currentPrompt,
               config: {
                 responseMimeType: "application/json",
@@ -613,7 +606,7 @@ app.get("/api/health", (req, res) => {
           }
         } else {
           const response = await generateContentWithRotation({
-            model: "gemini-3.5-flash",
+            model: "gemini-1.5-flash",
             contents: prompt,
             config: {
               responseMimeType: "application/json",
@@ -688,7 +681,7 @@ app.get("/api/health", (req, res) => {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-3.5-flash",
+        model: model || "gemini-1.5-flash",
         contents: prompt
       });
 
@@ -876,7 +869,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-3.5-flash",
+               model: "gemini-1.5-flash",
                contents: contents,
                config: {
                  systemInstruction,

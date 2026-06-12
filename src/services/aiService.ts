@@ -1,4 +1,4 @@
-const MODEL_NAME = "gemini-3.5-flash";
+const MODEL_NAME = "gemini-1.5-flash";
 
 export type ServiceType = 'course_work' | 'independent_work' | 'presentation' | 'test_builder' | 'article';
 

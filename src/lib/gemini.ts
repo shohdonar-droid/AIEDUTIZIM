@@ -219,23 +219,22 @@ export async function generateContentWithRotation(
       }
     });
     const maskedKey = apiKey.substring(0, 6) + "..." + apiKey.substring(apiKey.length - 4);
-    let requestedModel = params.model || "gemini-3.5-flash";
+    let requestedModel = params.model || "gemini-1.5-flash";
     let modelToUse = requestedModel;
     
     // Valid models for retry logic
-    const modelOptions = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"];
+    const modelOptions = ["gemini-1.5-flash", "gemini-1.5-pro"];
 
     if (attempts === 0) {
        // On first attempt, use what was requested but sanitize from non-existent versions
-       if (requestedModel.includes("pro")) modelToUse = "gemini-3.1-pro-preview";
-       else if (requestedModel.includes("lite") || requestedModel.includes("8b")) modelToUse = "gemini-3.1-flash-lite";
-       else modelToUse = "gemini-3.5-flash";
+       if (requestedModel.includes("pro")) modelToUse = "gemini-1.5-pro";
+       else modelToUse = "gemini-1.5-flash";
     } else if (attempts === 1) {
-       modelToUse = "gemini-3.1-flash-lite";
+       modelToUse = "gemini-1.5-flash";
     } else if (attempts === 2) {
-       modelToUse = "gemini-3.5-flash";
+       modelToUse = "gemini-1.5-flash";
     } else if (attempts === 3) {
-       modelToUse = "gemini-3.1-pro-preview";
+       modelToUse = "gemini-1.5-pro";
     } else {
        modelToUse = modelOptions[attempts % modelOptions.length];
     }
