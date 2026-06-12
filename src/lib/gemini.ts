@@ -136,7 +136,14 @@ export function getRotationalClient(index?: number): { client: GoogleGenAI; keyI
     throw new Error("Gemini API kaliti topilmadi. Iltimos environment variablelarni tekshiring.");
   }
   const activeIndex = index !== undefined ? index % pool.length : currentKeyIndex % pool.length;
-  const client = new GoogleGenAI({ apiKey: pool[activeIndex] });
+  const client = new GoogleGenAI({ 
+    apiKey: pool[activeIndex],
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      }
+    }
+  });
   return { client, keyIndex: activeIndex, totalKeys: pool.length };
 }
 
@@ -203,7 +210,14 @@ export async function generateContentWithRotation(
        continue;
     }
 
-    const client = new GoogleGenAI({ apiKey });
+    const client = new GoogleGenAI({ 
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
     const maskedKey = apiKey.substring(0, 6) + "..." + apiKey.substring(apiKey.length - 4);
     let requestedModel = params.model || "gemini-3.5-flash";
     let modelToUse = requestedModel;
@@ -214,7 +228,7 @@ export async function generateContentWithRotation(
     if (attempts === 0) {
        // On first attempt, use what was requested but sanitize from non-existent versions
        if (requestedModel.includes("pro")) modelToUse = "gemini-3.1-pro-preview";
-       else if (requestedModel.includes("8b") || requestedModel.includes("lite")) modelToUse = "gemini-3.1-flash-lite";
+       else if (requestedModel.includes("lite") || requestedModel.includes("8b")) modelToUse = "gemini-3.1-flash-lite";
        else modelToUse = "gemini-3.5-flash";
     } else if (attempts === 1) {
        modelToUse = "gemini-3.1-flash-lite";

@@ -876,7 +876,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-1.5-flash",
+               model: "gemini-3.5-flash",
                contents: contents,
                config: {
                  systemInstruction,
