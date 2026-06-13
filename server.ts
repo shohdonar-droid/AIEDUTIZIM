@@ -413,10 +413,44 @@ app.get("/api/health", (req, res) => {
           const direction = options?.direction || "Sun'iy intellekt va dasturlash yo'nalishi";
           const studentName = options?.studentName || "Toshpo'latov F.H.";
           const advisor = options?.advisor || "Dots. Karimov S.A.";
-          const pageCount = options?.pageCount || "25-30";
+          const pageCount = options?.pageCount || "25";
 
-          prompt = `Siz AIEDUTIZIM Telegram Bot ichidagi AI Yordamchi modulida ishlovchi professional sun'iy intellekt yordamchisiz.
-          Vazifa: O'zbekiston oliy ta'lim muassasalari (OAK) standartlari bo'yicha yuqori saviyadagi, mukammal va akademik "Kurs ishi" tayyorlash (Universitetga topshirishga tayyor holatda).
+          const targetPages = parseInt(String(pageCount), 10) || 25;
+          let modeDescription = "";
+          let minSources = 20;
+          let additionalGuidelines = "";
+
+          if (targetPages <= 15) {
+            modeDescription = "15 sahifalik qisqartirilgan kurs ishi";
+            minSources = 10;
+          } else if (targetPages <= 20) {
+            modeDescription = "20 sahifalik standart kurs ishi";
+            minSources = 15;
+          } else if (targetPages <= 25) {
+            modeDescription = "25 sahifalik kengaytirilgan kurs ishi";
+            minSources = 20;
+          } else if (targetPages <= 30) {
+            modeDescription = "30 sahifalik chuqurlashtirilgan kurs ishi";
+            minSources = 25;
+          } else if (targetPages <= 40) {
+            modeDescription = "40 sahifalik batafsil ilmiy kurs ishi";
+            minSources = 30;
+          } else {
+            modeDescription = "50 sahifalik maksimal darajadagi to'liq kurs ishi";
+            minSources = 40;
+            additionalGuidelines = `
+            50 SAHIFALIK REJIM UCHUN ALOHIDA MEZONLAR:
+            - Har bir bob kamida 10-15 sahifa hajmida bo'lsin.
+            - Har bir bobda kamida 5 ta bo'lim bo'lsin.
+            - Natija magistratura darajasiga yaqin sifatda bo'lsin.
+            - Zamonaviy ilmiy manbalar, chuqur tahlillar, statistik ma'lumotlar va amaliy misollar juda batafsil keltirilsin.
+            - Diagramma va jadvallar uchun tavsiyalar har bir bobda majburiy bo'lsin.
+            `;
+          }
+
+          prompt = `Siz AIEDUTIZIM Telegram Bot ichidagi AI Yordamchi modulida ishlovchi professional sun'iy intellekt yordamchisiz hamda oliy ta'lim muassasalari uchun professional ilmiy rahbar va akademik ekspertsiz.
+
+          Vazifa: Foydalanuvchi tomonidan kiritilgan mavzu asosida universitet talablariga mos, topshirishga tayyor, ilmiy uslubdagi kurs ishini yarating.
           
           Mavzu: "${topic}". 
           Tashkiliy ma'lumotlar:
@@ -426,27 +460,73 @@ app.get("/api/health", (req, res) => {
           - Yo'nalish: ${direction}
           - Talaba: ${studentName}
           - Ilmiy rahbar: ${advisor}
-          - Kutilayotgan umumiy hajm: 25-60 sahifa
-          
-          TALABLAR:
-          1. HAR BIR BOB kamida 4-5 ta kichik bo'limdan (paragrafdan) iborat bo'lsin.
-          2. HAR BIR BOB hajmi kamida 1000-2000 so'zdan iborat bo'lib, chuqur ilmiy tahlillarni o'z ichiga olsin.
-          3. Matn tarkibida jadval va diagramma uchun aniq tavsiyalar va statistik ma'lumotlarni kiriting.
-          4. Har bir bob oxirida ushbu bob bo'yicha qisqa xulosa yozilsin.
-          5. Xulosa va tavsiyalar qismi o'ta batafsil va amaliy asoslangan bo'lsin.
-          6. Akademik uslubda, grammatik xatolarsiz va universitet talablariga mos yozing.
+          - Tanlangan hajm: ${targetPages} sahifa (${modeDescription})
 
-          ILMIY STRUKTURA:
-          1. Titul varaq (Yuqoridagi haqiqiy ma'lumotlar bilan)
-          2. Mundarija
-          3. Kirish (Dolzarblik, maqsad, vazifalar, obyekt, predmet, metodlar, yangilik, amaliy ahamiyat - har biri alohida va juda keng)
-          4. I BOB (Nazariy-metodologik asoslar - 4-5 bo'lim. Har bir bo'lim oxirida bob xulosasi)
-          5. II BOB (Amaliy tahlil va eksperimental natijalar, statistikalar, tahlillar - 4-5 bo'lim. Har bir bo'lim oxirida bob xulosasi)
-          6. III BOB (Rivojlantirish istiqbollari, model va takliflar - 4-5 bo'lim. Har bir bo'lim oxirida bob xulosasi)
-          7. Xulosa (Batafsil tahlil va amaliy takliflar)
-          8. Foydalanilgan adabiyotlar (Kamida 15-20 ta zamonaviy manba: muallif, kitob, nashriyot, yil)
+          KURS ISHI TALABLARI:
+          - Referat shaklida yozmang.
+          - Akademik uslubga qat'iy amal qiling, xolis ilmiy tildan foydalaning (noakademik va shaxsiy qarashlarni bildiruvchi yengil iboralar ishlatilmasin).
+          - Ilmiy terminlardan professional darajada foydalaning.
+          - Takroriy jumlalardan qoching.
+          - Har bir bob chuqur tahlil asosida yozilsin va kamida 1000-2000 so'zdan iborat bo'lsin.
+          - Statistik ma'lumotlar keltiring.
+          - Zarur joylarda jadval tavsiyalari kiriting.
+          - Zarur joylarda diagramma tavsiyalari kiriting.
+          - Har bir bob yakunida alohida bob xulosasi yozilsin.
+          - Amaliy tavsiyalar kiriting.
+          - Natija universitetga topshirishga to'liq tayyor bo'lsin.
+          ${additionalGuidelines}
+
+          KURS ISHI TUZILISHI:
           
-          Noto'g'ri placeholder ([...]) qoldirmang! Har bir bo'limni o'ta batafsil, mantiqiy va ilmiy boyitib yozing.`;
+          1. TITUL VARAQ
+             - OTM nomi: ${university}
+             - Fakultet: ${faculty}
+             - Kafedra: ${department}
+             - Yo'nalish: ${direction}
+             - Kurs ishi mavzusi: "${topic.toUpperCase()}"
+             - Talaba F.I.Sh.: ${studentName}
+             - Rahbar F.I.Sh.: ${advisor}
+             - Shahar va yil: Toshkent - 2026
+
+          2. MUNDARIJA
+          
+          3. KIRISH:
+             Quyidagilar alohida sarlavhalar ostida juda keng bayon etilsin:
+             - Mavzuning dolzarbligi
+             - Tadqiqot maqsadi
+             - Tadqiqot vazifalari
+             - Tadqiqot obyekti
+             - Tadqiqot predmeti
+             - Tadqiqot metodlari
+             - Nazariy ahamiyati
+             - Amaliy ahamiyati
+             - Ishning tuzilishi
+
+          4. I BOB: NAZARIY VA METODOLOGIK ASOSLARI
+             - Nazariy asoslar, ilmiy qarashlar va asosiy tushunchalar.
+             - Mahalliy va xorijiy tajribalar, mavzuning ilmiy tahlili.
+             - Kamida 4-5 ta bo'lim bo'lishi shart (50 sahifa rejimda kamida 5 ta bo'lim).
+             - Bob yakunida batafsil bob xulosasi yozilsin.
+
+          5. II BOB: AMALIY TAHLIL VA EKSPERIMENTAL NATIJALAR
+             - Amaliy tahlil, mavjud holat, statistik ma'lumotlar va muammolar tahlili.
+             - Excel jadvallari va diagrammalar tavsiyasi/izohi kiritilsin.
+             - Kamida 4-5 ta bo'lim bo'lishi shart (50 sahifa rejimda kamida 5 ta bo'lim).
+             - Bob yakunida batafsil bob xulosasi yozilsin.
+
+          6. III BOB: SOHANI TAKOMILLASHTIRISH VA RIVOJLANISH ISTIQBOLLARI
+             - Takomillashtirish yo'llari, innovatsion yondashuvlar, amaliy tavsiyalar va rivojlanish istiqbollari.
+             - Muallif takliflari va modellari.
+             - Kamida 4-5 ta bo'lim bo'lishi shart (50 sahifa rejimda kamida 5 ta bo'lim).
+             - Bob yakunida batafsil bob xulosasi yozilsin.
+
+          7. UMUMIY XULOSA
+             - Tadqiqot natijalari, asosiy qisqa xulosalar va amaliy tavsiyalar mantiqiy tarzda batafsil yoritilsin.
+
+          8. FOYDALANILGAN ADABIYOTLAR RO'YXATI
+             - Kamida ${minSources} ta zamonaviy ilmiy manbalar (kitoblar, akademik jurnallar, OAK jurnallari), to'liq bibliografik me'yorlarda (Muallif, kitob nomi, nashriyot, yil, sahifalar) ko'rsatilsin.
+
+          Placeholder ([...]) qoldirmang, talabalik ishi me'yorlari va pedagogik/ilmiy me'yorlarga to'liq amal qiling.`;
         } else if (docType === "tezis") {
           const author = options?.author || "Muallif";
           const university = options?.university || "OTM";

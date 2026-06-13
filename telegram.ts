@@ -2671,7 +2671,14 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       userWizardStates.set(userId, { service, step: 9, data });
       return ctx.reply("📄 <b>Sahifalar sonini kiriting:</b>", {
         parse_mode: "HTML",
-        reply_markup: { keyboard: [[{ text: "15" }, { text: "20" }, { text: "25" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+        reply_markup: { 
+          keyboard: [
+            [{ text: "15" }, { text: "20" }, { text: "25" }], 
+            [{ text: "30" }, { text: "40" }, { text: "50" }], 
+            [{ text: "⬅️ Asosiy menyu" }]
+          ], 
+          resize_keyboard: true 
+        }
       });
     } else if (step === 9) {
       data.pageCount = input;
