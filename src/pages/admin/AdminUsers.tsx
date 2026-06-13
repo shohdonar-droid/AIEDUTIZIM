@@ -1694,7 +1694,7 @@ export default function AdminUsers() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {t.role !== 'admin' ? (
+                          {(t.role !== 'admin' || user?.login === 'Elyorbek' || user?.email === 'shohdonar@gmail.com' || user?.email === 'elyorbek@admin.uz') ? (
                             <>
                               <button
                                 onClick={() => setEditingSubadmin(t)}

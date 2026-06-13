@@ -294,13 +294,14 @@ export default function Login() {
             localStorage.setItem('cached_user_profile', JSON.stringify(foundUserDoc));
             
             await refreshUser();
+            console.log("Logged in via offline fallback (Firestore password check passed)");
             const dest = (role === 'admin' || role === 'subadmin') ? '/admin' : (role === 'teacher' || role === 'staff' ? '/teacher' : '/student');
             navigate(dest);
             return;
           } else {
             if (isNetworkErr) {
               setError(`Tarmoq xatoligi aniqlandi (Masalan, iframe cheklovi). Akkauntdan foydalanish uchun saytni yangi tabda oching yoki to'g'ri login kiriting.`);
-            } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+            } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
               setError('Login yoki parol xato kiritildi.');
             } else {
               setError('Xatolik yuz berdi: ' + err.message);
@@ -308,6 +309,7 @@ export default function Login() {
             return;
           }
         } catch (offlineErr: any) {
+          console.error("Critical offline login error:", offlineErr);
           if (isNetworkErr) {
             setError(`Tarmoq ulanishi xatosi. Iltimos, internet aloqasini tekshiring yoki saytni yangi tabda oching.`);
           } else {

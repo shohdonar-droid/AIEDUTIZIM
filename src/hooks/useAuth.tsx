@@ -89,6 +89,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     if (auth.currentUser) {
       await fetchUserDoc(auth.currentUser.uid);
+    } else {
+      const offlineProfile = localStorage.getItem('offline_user_profile');
+      if (offlineProfile) {
+        try {
+          const udata = JSON.parse(offlineProfile);
+          setUser(udata);
+          localStorage.setItem('cached_user_profile', offlineProfile);
+        } catch (e) {
+          console.error("Refresh user offline error:", e);
+        }
+      }
     }
   };
 
