@@ -261,7 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [user?.uid, user?.isImpersonated]);
 
-  const isAdmin = user?.role === 'admin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
+  const isAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
 
   return (
     <AuthContext.Provider value={{ user, loading, isAdmin, refreshUser, logout, stopImpersonation }}>

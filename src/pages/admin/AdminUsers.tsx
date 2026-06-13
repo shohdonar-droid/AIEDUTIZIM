@@ -312,6 +312,11 @@ export default function AdminUsers() {
   };
 
   const deleteSingleUser = async (uid: string, silent = false) => {
+    if (!uid) {
+      if (!silent) alert("Foydalanuvchi ID topilmadi");
+      return;
+    }
+
     if (
       !silent &&
       !confirm(
@@ -319,23 +324,36 @@ export default function AdminUsers() {
       )
     )
       return;
+      
     try {
+      // 1. Delete user document
       await deleteDoc(doc(db, "users", uid));
-      const eQ = query(
-        collection(db, "enrollments"),
-        where("userId", "==", uid),
-      );
-      const eSnap = await getDocs(eQ);
-      for (const d of eSnap.docs) await deleteDoc(doc(db, "enrollments", d.id));
-      const rQ = query(
-        collection(db, "testResults"),
-        where("userId", "==", uid),
-      );
-      const rSnap = await getDocs(rQ);
-      for (const d of rSnap.docs) await deleteDoc(doc(db, "testResults", d.id));
-    } catch (error) {
-      console.error(error);
-      if (!silent) alert("O'chirishda xatolik yuz berdi");
+      
+      // 2. Cleanup related data (enrollments, testResults)
+      // We do these in parallel but catch errors for each so one failure doesn't block the profile deletion from being recognized
+      try {
+        const eQ = query(collection(db, "enrollments"), where("userId", "==", uid));
+        const eSnap = await getDocs(eQ);
+        await Promise.all(eSnap.docs.map(d => deleteDoc(doc(db, "enrollments", d.id))));
+      } catch (err) {
+        console.warn("Error cleaning up enrollments:", err);
+      }
+
+      try {
+        const rQ = query(collection(db, "testResults"), where("userId", "==", uid));
+        const rSnap = await getDocs(rQ);
+        await Promise.all(rSnap.docs.map(d => deleteDoc(doc(db, "testResults", d.id))));
+      } catch (err) {
+        console.warn("Error cleaning up testResults:", err);
+      }
+
+      if (!silent) {
+        alert("Foydalanuvchi muvaffaqiyatli o'chirildi!");
+        loadData(); // Refresh UI
+      }
+    } catch (error: any) {
+      console.error("Delete user error:", error);
+      if (!silent) alert("O'chirishda xatolik yuz berdi: " + (error?.message || error));
     }
   };
 
@@ -1861,6 +1879,7 @@ export default function AdminUsers() {
                                           await deleteDoc(doc(db, "users", matchedUser.id));
                                         }
                                         alert("Foydalanuvchi muvaffaqiyatli o'chirildi!");
+                                        loadData();
                                       } catch (e) {
                                         console.error(e);
                                         alert("Xatolik yuz berdi!");

@@ -7,11 +7,13 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.email != null && (request.auth.token.email == 'shohdonar@gmail.com' || request.auth.token.email == 'elyorbek@admin.uz' || request.auth.token.email == 'elyorbek@gmail.com')) ||
-        getUserRole() == 'admin' ||
-        getUserRole() == 'subadmin'
-      );
+      if (!isSignedIn()) { return false; }
+      let email = request.auth.token.email;
+      if (email != null && (email == 'shohdonar@gmail.com' || email == 'elyorbek@admin.uz' || email == 'elyorbek@gmail.com')) {
+        return true;
+      }
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'subadmin'];
     }
 
     function isOwner(userId) {

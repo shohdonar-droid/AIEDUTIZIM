@@ -236,7 +236,7 @@ export default function Navbar() {
                     }`}
                   >
                     <LayoutDashboard className="h-4 w-4" />
-                    {isAdmin ? 'Admin' : 'Profil'}
+                    {user.displayName || 'Profil'}
                   </Link>
                   <button
                     onClick={handleLogout}
