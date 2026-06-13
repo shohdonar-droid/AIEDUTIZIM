@@ -57,7 +57,12 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
     { name: 'BILDIRISHNOMALAR', path: '/admin/notifications', icon: AlertCircle },
     { name: 'HISOB-KITOB', path: '/admin/billing', icon: Wallet },
     { name: 'CHAT', path: '/admin/chat', icon: MessageSquare, badge: unreadCount },
-  ];
+  ].filter(item => {
+    if (user?.role === 'subadmin') {
+      return !['BANNER', 'MA\'LUMOT', 'FOOTER'].includes(item.name);
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
@@ -81,7 +86,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
                   {user?.displayName || "ELYORBEK (ADMIN)"}
                 </span>
                 <span className="font-bold text-[9px] text-blue-600 tracking-widest uppercase mt-1">
-                  ADMINISTRATOR
+                  {user?.role === 'subadmin' ? 'KICHIK ADMINISTRATOR' : 'ADMINISTRATOR'}
                 </span>
               </div>
             )}
@@ -170,7 +175,9 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
                   <span className="font-extrabold text-slate-800 text-xs uppercase truncate w-36">
                     {user?.displayName || "ADMIN"}
                   </span>
-                  <span className="font-bold text-[9px] text-blue-600 uppercase">ADMINISTRATOR</span>
+                  <span className="font-bold text-[9px] text-blue-600 uppercase">
+                    {user?.role === 'subadmin' ? 'KICHIK ADMINISTRATOR' : 'ADMINISTRATOR'}
+                  </span>
                 </div>
               </div>
               <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 rounded-lg hover:bg-gray-100">

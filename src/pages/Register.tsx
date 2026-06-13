@@ -101,6 +101,8 @@ export default function Register() {
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         setError("Oyna yopildi.");
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError("Xatolik: Ushbu domen Firebase konsolida ruxsat etilgan domenlar ro'yxatiga kiritilmagan. Iltimos, Firebase konsolidan Authentication bo'limiga o'tib, 'Settings' -> 'Authorized domains' qismiga joriy domen va preview domenlarini qo'shing.");
       } else {
         setError('Xatolik yuz berdi: ' + err.message);
       }

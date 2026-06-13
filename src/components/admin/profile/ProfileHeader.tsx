@@ -42,7 +42,9 @@ export function ProfileHeader({ user }: { user: any }) {
         </div>
         <div className="bg-blue-50/50 border border-blue-100/50 rounded-2xl px-6 py-4 text-center md:text-right">
           <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Status</p>
-          <p className="text-blue-600 font-black text-xs uppercase tracking-wider">Tizim administratori</p>
+          <p className="text-blue-600 font-black text-xs uppercase tracking-wider">
+            {user?.role === 'subadmin' ? 'Kichik administrator' : 'Tizim administratori'}
+          </p>
         </div>
       </div>
     </motion.div>
