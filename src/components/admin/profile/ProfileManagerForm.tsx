@@ -43,6 +43,15 @@ export function ProfileManagerForm({ user, formData, setFormData, handleSave, lo
               onChange={(e) => setFormData({...formData, photoURL: e.target.value})}
             />
         </div>
+        <div>
+            <label className="text-xs font-black text-gray-700 uppercase tracking-widest ml-1">Manzil</label>
+            <input 
+              className="w-full px-4 py-3 mt-1.5 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-bold text-sm text-gray-900" 
+              placeholder="Tashkilot yoki yashash manzili"
+              value={formData.address} 
+              onChange={(e) => setFormData({...formData, address: e.target.value})}
+            />
+        </div>
          <button 
            type="submit" 
            disabled={loading} 

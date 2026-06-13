@@ -1,4 +1,4 @@
-import { User, Phone, Mail } from 'lucide-react';
+import { User, Phone, Mail, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
 import { makeDirectImageUrl } from '../../../lib/helpers';
 
@@ -38,6 +38,12 @@ export function ProfileHeader({ user }: { user: any }) {
                <Mail size={14} className="text-blue-600" /> 
                <span>{user?.email || 'admin@aiedutizim.uz'}</span>
              </div>
+             {user?.address && (
+               <div className="flex items-center gap-2 text-gray-500 font-bold bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                 <MapPin size={14} className="text-blue-600" /> 
+                 <span>{user.address}</span>
+               </div>
+             )}
           </div>
         </div>
         <div className="bg-blue-50/50 border border-blue-100/50 rounded-2xl px-6 py-4 text-center md:text-right">

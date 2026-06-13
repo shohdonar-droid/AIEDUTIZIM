@@ -12,6 +12,7 @@ export default function AdminProfile() {
     displayName: '',
     phone: '',
     photoURL: '',
+    address: '',
   });
 
   React.useEffect(() => {
@@ -20,6 +21,7 @@ export default function AdminProfile() {
         displayName: user.displayName || '',
         phone: user.phone || '',
         photoURL: user.photoURL || '',
+        address: user.address || '',
       });
     }
   }, [user]);
