@@ -7,6 +7,39 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { makeDirectImageUrl } from '../lib/helpers';
 
+const systemAboutSection: InfoSection = {
+  id: 'system-about',
+  name: 'Tizim haqida',
+  content: `AIEDUTIZIM — Zamonaviy Sun'iy Intellekt va EdTech Texnologiyalari Integratsiyasi
+
+Ushbu platforma oliy va o'rta maxsus ta'lim tizimida o'qitish va ilmiy tadqiqotlar sifatini oshirish, o'qituvchilar va talabalarning vaqtini tejash hamda o'quv jarayonlarini to'liq avtomatlashtirish maqsadida yaratilgan keng qamrovli ekotizimdir. Loyiha ikki yirik va bir-birini mukammal to'ldiruvchi komponentdan tashkil topgan: Zamonaviy Veb-Platforma hamda Aqlli AI Yordamchi Telegram Boti.
+
+Ushbu har ikki tizim birgalikda ta'lim va ilmiy faoliyatda inqilobiy yondashuvlarni joriy qilish, vaqtni tejash va akademik sifatni mutlaqo yangi bosqichga olib chiqish maqsadida hamkorlikda ishlaydi.
+
+1. ZAMONAVIY VEB-PLATFORMA (WEB-APPLICATION)
+Veb-saytimiz o'qituvchilar, talabalar va ma'muriyat uchun yagona raqamli makon vazifasini o'taydi. Uning asosiy imkoniyatlari quyidagilardan iborat:
+• Onlayn Kurslar va Modullar: O'qituvchilar tomonidan yaratilgan interaktiv darsliklar va o'quv modullari multimedia hamda videodarslar bilan boyitilgan.
+• Aqlli Test va Baholash Tizimi (Quizizz): Sun'iy intellekt yordamida fanlar va ma'ruzalar bo'yicha avtomatik sifatli test savollari shakllantiriladi hamda talabalarning bilimlari xolis baholanadi.
+• QR-Kodli Raqamli Sertifikatlar: Kurs va testlarni muvaffaqiyatli yakunlagan talabalarga tizim tomonidan avtomatlashtirilgan, haqiqiyligi tekshiriladigan xalqaro standartdagi sertifikatlar taqdim etiladi va ularni "Verify Certificate" sahifasida tezkor tekshirish imkoniyati mavjud.
+• Shaxsiy Kabinetlar va Chat: Student, Teacher, Staff va Admin rollari uchun alohida moslashtirilgan qulay shaxsiy panellar hamda guruh ichidagi chat muloqoti. Talabalar o'z ballarini kuzatishi, o'qituvchilar esa guruhlar va ma'ruzalarni boshqarishi mumkin.
+
+2. AQLLI AI YORDAMCHI (TELEGRAM BOT)
+Bizning maxsus Telegram botimiz (@AIEDUTIZIM_bot) o'quvchi va yosh tadqiqotchilarga ilmiy faoliyatda eng yuqori sifatli va tezkor akademik yordam ko'rsatuvchi professional sun'iy intellekt yordamchisidir. Telegram bot tarkibidagi asosiy xizmatlar:
+• Oliy Sifatli Kurs Ishlari (Term Paper): OTM standartlari, OAK va kafedra talablariga mos, doimiy 15 sahifadan 50 sahifagacha bo'lgan, barcha boblari va bo'limlari ilmiy asoslangan mukammal kurs ishlarini avtomatik tayyorlash. Har bir bob kamida 1000-2000 so'zdan iborat bo'lib, o'ta batafsil va jadval hamda diagramma tavsiyalari bilan shakllantiriladi.
+• Ilmiy Maqolalar va Tezislar: IMRAD va xalqaro Scopus standartlari darajasidagi professional ilmiy maqolalar hamda ixcham akademik tezislarni o'zbek va xorijiy tillarda mukammal yozib berish.
+• Zamonaviy Slaydlar va Taqdimotlar: Kurs ishi yoki maqola himoyalariga moslangan, dizayn rejalashtirilgan, minimal matnli hamda har bir slayd uchun 30-50 soniyalik professional nutq ssenariysi (Speech Note) bilan tushunarli bo'lgan taqdimot loyihalarini yaratish.
+• Dars Ishlanmalari (Lesson Plans): Pedagoglar uchun 13 banddan iborat zamonaviy pedagogik texnologiyalarga mos dars rejalari va metodik hujjatlarni taqdim etish.
+• Professional CV / Rezyume: Ish beruvchi va HR mutaxassislarini jalb qiladigan zamonaviy dizayn va strukturali rezyumelarni tezkor yaratish.
+• Tarjimonlar va Akademik Hisobotlar: Murakkab ilmiy va pedagogik matnlarni o'zbek tiliga yoki xorijiy tillarga professional tarjima qilish va tahliliy hisobotlar tuzish.
+
+TIZIMNING ASOSIY AFZALLIKLARI:
+• Vaqt va resurslarni 10 barobargacha tejash: Murakkab ilmiy ishlarni bir necha daqiqada sifatli tayyorlash.
+• Ilmiy va innovatsion yondashuv: O'zbekistondagi eng ilg'or generative AI (Sun'iy intellekt) texnologiyalarini ta'limga faol tatbiq qilish.
+• Foydalanish uchun qulaylik: Istalgan vaqtda va istalgan qurilmada (mobil, planshet, noutbuk) ishlovchi yagona ekotizim.
+
+AIEDUTIZIM — zamonaviy ilm-fan va innovatsion ta'limning mutlaqo yangi kelajagidir!`
+};
+
 export default function InfoDetail() {
   const [content, setContent] = useState<SiteContent['hero'] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,16 +50,37 @@ export default function InfoDetail() {
 
   useEffect(() => {
     async function load() {
-      const snap = await getDoc(doc(db, 'siteContent', 'main'));
-      if (snap.exists()) {
-        const data = snap.data() as SiteContent;
-        if (data.hero) {
-          setContent(data.hero);
-          if (data.hero.infoSections && data.hero.infoSections.length > 0) {
-            setActiveTab(data.hero.infoSections[0].id);
+      let heroData: SiteContent['hero'] | null = null;
+      try {
+        const snap = await getDoc(doc(db, 'siteContent', 'main'));
+        if (snap.exists()) {
+          const data = snap.data() as SiteContent;
+          if (data.hero) {
+            heroData = data.hero;
           }
         }
+      } catch (err) {
+        console.error('Error fetching siteContent:', err);
       }
+
+      if (!heroData) {
+        heroData = {
+          rightImage: '',
+          rightBadge: 'Yangilik',
+          rightText: 'AIEDUTIZIM Tizimi',
+          infoSections: []
+        };
+      }
+
+      const sections = heroData.infoSections || [];
+      const updatedSections = [systemAboutSection, ...sections];
+      const updatedHero = {
+        ...heroData,
+        infoSections: updatedSections
+      };
+
+      setContent(updatedHero);
+      setActiveTab(updatedSections[0].id);
       setLoading(false);
     }
     load();
