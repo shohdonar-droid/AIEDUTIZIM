@@ -128,9 +128,9 @@ export function ChatbotWidget() {
     if (!user || user.role === "admin" || user.role === "subadmin") return;
     const uSnap = await getDoc(doc(db, "users", user.uid));
     if (uSnap.exists()) {
-      await updateDoc(doc(db, "users", user.uid), {
+      await setDoc(doc(db, "users", user.uid), {
         spentBalls: (uSnap.data().spentBalls || 0) + cost,
-      });
+      }, { merge: true });
     }
   };
 

@@ -6,7 +6,7 @@ import {
   query,
   where,
   doc,
-  updateDoc,
+  setDoc,
   serverTimestamp,
   arrayUnion,
 } from "firebase/firestore";
@@ -148,7 +148,7 @@ export default function AdminBilling() {
         updateData.lastIncomeDate = serverTimestamp();
       }
 
-      await updateDoc(doc(db, "users", editingUser.uid), updateData);
+      await setDoc(doc(db, "users", editingUser.uid), updateData, { merge: true });
 
       // Update local state
       const updatedUser = { ...editingUser, ...updateData };

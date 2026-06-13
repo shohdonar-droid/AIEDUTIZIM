@@ -256,12 +256,12 @@ export default function TeacherStudents() {
     try {
        const deptName = teacherDepartments.find(d => d.id === editingStudent.departmentId)?.name || '';
        const grpName = teacherGroups.find(g => g.id === editingStudent.groupId)?.name || '';
-       await updateDoc(doc(db, 'users', editingStudent.uid), {
+       await setDoc(doc(db, 'users', editingStudent.uid), {
           departmentId: editingStudent.departmentId || '',
           departmentName: deptName,
           groupId: editingStudent.groupId || '',
           groupName: grpName
-       });
+       }, { merge: true });
        setEditingStudent(null);
     } catch (err: any) { alert(err.message); } finally { setStudentSaving(false); }
   };
@@ -269,9 +269,9 @@ export default function TeacherStudents() {
   const resetPassword = async (uid: string) => {
     if (!confirm("Talaba parolini '123456' ga reset qilishni xohlaysizmi?")) return;
     try {
-      await updateDoc(doc(db, 'users', uid), {
+      await setDoc(doc(db, 'users', uid), {
         password: '123456'
-      });
+      }, { merge: true });
       alert("Parol muvaffaqiyatli '123456' ga o'zgartirildi!");
     } catch (error) {
       console.error(error);

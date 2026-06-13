@@ -40,7 +40,7 @@ service cloud.firestore {
       allow list: if true;
       allow create: if true;
       allow update: if true;
-      allow delete: if isTeacher();
+      allow delete: if isAdmin();
     }
 
     // --- Core Content Collections ---

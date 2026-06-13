@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, addDoc, collection } from 'firebase/firestore';
 import safeOnSnapshot from '../lib/safeSnapshot';
 import { UserProfile } from '../types';
 
@@ -190,9 +190,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          if (now - parseInt(lastActivityTime) > 3 * 60 * 1000) {
              // Too old, it's a new session. Close old one.
              try {
-                await updateDoc(doc(db, 'activityLogs', sessionId), {
+                await setDoc(doc(db, 'activityLogs', sessionId), {
                     logoutTime: parseInt(lastActivityTime)
-                });
+                }, { merge: true });
              } catch (e) {}
              
              // Create new session
@@ -217,11 +217,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
              try {
                 const sessionStart = localStorage.getItem('sessionStart') || now.toString();
                 const durationMinutes = Math.max(0, Math.round((now - parseInt(sessionStart)) / 60000));
-                await updateDoc(doc(db, 'activityLogs', sessionId), {
+                await setDoc(doc(db, 'activityLogs', sessionId), {
                    lastSeen: now,
                    lastActiveTime: now,
                    durationMinutes
-                });
+                }, { merge: true });
              } catch (e) {}
          }
       } else {

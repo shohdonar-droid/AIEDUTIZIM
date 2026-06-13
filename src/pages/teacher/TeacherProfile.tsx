@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { Camera, Save, Loader2, Mail, Phone, Calendar, User as UserIcon } from 'lucide-react';
 
 export default function TeacherProfile() {
@@ -19,7 +19,7 @@ export default function TeacherProfile() {
     if (!user) return;
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), formData);
+      await setDoc(doc(db, 'users', user.uid), formData, { merge: true });
       alert('Ma\'lumotlar yangilandi!');
     } catch (err) {
       console.error(err);

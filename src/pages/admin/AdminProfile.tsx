@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { ProfileHeader } from '../../components/admin/profile/ProfileHeader';
 import { ProfileManagerForm } from '../../components/admin/profile/ProfileManagerForm';
 
@@ -19,7 +19,7 @@ export default function AdminProfile() {
     if (!user) return;
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), formData);
+      await setDoc(doc(db, 'users', user.uid), formData, { merge: true });
       alert('Ma\'lumotlar muvaffaqiyatli yangilandi!');
     } catch (err) {
       console.error(err);

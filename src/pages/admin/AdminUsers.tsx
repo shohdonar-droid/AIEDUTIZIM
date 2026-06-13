@@ -81,6 +81,9 @@ export default function AdminUsers() {
   // Specific one-time cleanup requested by user for "ortiqov" and "zulqaynar"
   useEffect(() => {
     const runCleanup = async () => {
+      // ONLY run cleanup if the logged in user is the super admin
+      if (user?.email !== 'shohdonar@gmail.com') return;
+
       const key = "cleanup_ortiqov_zulqaynar_v1";
       if (!localStorage.getItem(key)) {
         const loginsToDelete = ["ortiqov", "zulqaynar"];
@@ -222,7 +225,7 @@ export default function AdminUsers() {
         getDocs(query(collection(db, "users"), where("role", "==", "student"))),
         getDocs(query(collection(db, "users"), where("role", "==", "teacher"))),
         getDocs(query(collection(db, "users"), where("role", "==", "staff"))),
-        getDocs(query(collection(db, "users"), where("role", "==", "subadmin"))),
+        getDocs(query(collection(db, "users"), where("role", "in", ["subadmin", "admin"]))),
         getDocs(collection(db, "telegram_users")),
         getDocs(query(collection(db, "users"), where("isBotUser", "==", true)))
       ]);
@@ -241,7 +244,13 @@ export default function AdminUsers() {
         .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
       const subadminsList = subadminsSnap.docs
         .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+        .sort((a, b) => {
+          // Sort by role first ('admin' before 'subadmin')
+          if (a.role === 'admin' && b.role !== 'admin') return -1;
+          if (a.role !== 'admin' && b.role === 'admin') return 1;
+          // Then sort by displayName
+          return (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ");
+        });
       const tgUsers = tgSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const botConfigs = botConfigsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -292,9 +301,9 @@ export default function AdminUsers() {
     if (!confirm("Talaba parolini '123456' ga reset qilishni xohlaysizmi?"))
       return;
     try {
-      await updateDoc(doc(db, "users", uid), {
+      await setDoc(doc(db, "users", uid), {
         password: "123456",
-      });
+      }, { merge: true });
       alert("Parol muvaffaqiyatli '123456' ga o'zgartirildi!");
     } catch (error) {
       console.error(error);
@@ -343,14 +352,14 @@ export default function AdminUsers() {
     setTeacherSaving(true);
     try {
       if (editingTeacher.uid) {
-        await updateDoc(doc(db, "users", editingTeacher.uid), {
+        await setDoc(doc(db, "users", editingTeacher.uid), {
           displayName: editingTeacher.displayName,
           phone: editingTeacher.phone || "",
           login: editingTeacher.login.trim(),
           password: editingTeacher.password,
           ball: Number(editingTeacher.ball) || 0,
           aiTestLimit: Number(editingTeacher.aiTestLimit) || 999999,
-        });
+        }, { merge: true });
       } else {
         const q = query(
           collection(db, "users"),
@@ -414,13 +423,13 @@ export default function AdminUsers() {
     try {
       if (editingSubadmin.uid) {
         const email = `${editingSubadmin.login.trim().toLowerCase()}@subadmin.uz`;
-        await updateDoc(doc(db, "users", editingSubadmin.uid), {
+        await setDoc(doc(db, "users", editingSubadmin.uid), {
           displayName: editingSubadmin.displayName,
           phone: editingSubadmin.phone || "",
           login: editingSubadmin.login.trim(),
           email: email,
           password: editingSubadmin.password,
-        });
+        }, { merge: true });
       } else {
         const q = query(
           collection(db, "users"),
@@ -612,12 +621,12 @@ export default function AdminUsers() {
         "";
       const grpName =
         groups.find((g) => g.id === editingStudent.groupId)?.name || "";
-      await updateDoc(doc(db, "users", editingStudent.uid), {
+      await setDoc(doc(db, "users", editingStudent.uid), {
         departmentId: editingStudent.departmentId || "",
         departmentName: deptName,
         groupId: editingStudent.groupId || "",
         groupName: grpName,
-      });
+      }, { merge: true });
       setEditingStudent(null);
     } catch (err: any) {
       alert(err.message);
@@ -684,7 +693,7 @@ export default function AdminUsers() {
             onClick={() => setActiveTab("subadmins")}
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "subadmins" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
           >
-            Kichik Adminlar ({subadmins.length})
+            Adminlar ({subadmins.length})
           </button>
           <button
             onClick={() => setActiveTab("botUsers")}
@@ -1493,8 +1502,8 @@ export default function AdminUsers() {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-black text-gray-900">
                   {editingSubadmin.uid
-                    ? "Kichik adminni tahrirlash"
-                    : "Yangi Kichik admin"}
+                    ? "Adminni tahrirlash"
+                    : "Yangi admin"}
                 </h2>
                 <button
                   onClick={() => setEditingSubadmin(null)}
@@ -1624,7 +1633,7 @@ export default function AdminUsers() {
                   }
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all text-xs uppercase tracking-wider"
                 >
-                  <Plus className="w-5 h-5" /> YANGI KICHIK ADMIN
+                  <Plus className="w-5 h-5" /> YANGI ADMIN
                 </button>
               </div>
             </div>
@@ -1639,7 +1648,7 @@ export default function AdminUsers() {
                       №
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
-                      Kichik admin ismi
+                      Admin ismi
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
                       Tel raqam
@@ -1665,7 +1674,12 @@ export default function AdminUsers() {
                         {i + 1}
                       </td>
                       <td className="px-6 py-4 font-black text-sm uppercase text-gray-800">
-                        {t.displayName}
+                        <div className="flex flex-col">
+                          <span>{t.displayName}</span>
+                          <span className={`text-[10px] lowercase font-bold ${t.role === 'admin' ? 'text-red-500' : 'text-blue-500'}`}>
+                            {t.role === 'admin' ? 'superadmin' : 'subadmin'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-xs font-medium text-gray-500">
                         {t.phone || "-"}
@@ -1680,18 +1694,24 @@ export default function AdminUsers() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => setEditingSubadmin(t)}
-                            className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteSingleUser(t.uid)}
-                            className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shadow-sm"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {t.role !== 'admin' ? (
+                            <>
+                              <button
+                                onClick={() => setEditingSubadmin(t)}
+                                className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteSingleUser(t.uid)}
+                                className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shadow-sm"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] font-black text-gray-300 uppercase tracking-tighter px-3 py-1 bg-gray-50 rounded-md">Himoyalangan</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1700,7 +1720,7 @@ export default function AdminUsers() {
               </table>
               {filteredSubadmins.length === 0 && (
                 <div className="p-16 text-center text-gray-400 font-bold italic opacity-40">
-                  Hech qanday Kichik admin topilmadi. Yaratish tugmasi orqali
+                  Hech qanday admin topilmadi. Yaratish tugmasi orqali
                   yangisini qo'shing.
                 </div>
               )}
@@ -1804,10 +1824,10 @@ export default function AdminUsers() {
                                       }
                                       try {
                                         if (matchedUser) {
-                                          await updateDoc(doc(db, "users", matchedUser.id), {
+                                          await setDoc(doc(db, "users", matchedUser.id), {
                                             ball: newBall,
                                             balance: newBall
-                                          });
+                                          }, { merge: true });
                                         } else {
                                           await setDoc(doc(db, "users", `tg_${tgId}`), {
                                             telegramId: Number(tgId),
