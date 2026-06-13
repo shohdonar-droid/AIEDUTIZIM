@@ -426,26 +426,27 @@ app.get("/api/health", (req, res) => {
           - Yo'nalish: ${direction}
           - Talaba: ${studentName}
           - Ilmiy rahbar: ${advisor}
-          - Kutilayotgan umumiy hajm: 25-30 sahifa
+          - Kutilayotgan umumiy hajm: 25-60 sahifa
           
           TALABLAR:
-          1. HAR BIR BOB kamida 4-5 ta bo'limdan (paragrafdan) iborat bo'lsin.
-          2. HAR BIR BOB hajmi kamida 1000-1500 so'zdan iborat bo'lib, chuqur ilmiy tahlillarni o'z ichiga olsin.
+          1. HAR BIR BOB kamida 4-5 ta kichik bo'limdan (paragrafdan) iborat bo'lsin.
+          2. HAR BIR BOB hajmi kamida 1000-2000 so'zdan iborat bo'lib, chuqur ilmiy tahlillarni o'z ichiga olsin.
           3. Matn tarkibida jadval va diagramma uchun aniq tavsiyalar va statistik ma'lumotlarni kiriting.
-          4. Xulosa va tavsiyalar qismi o'ta batafsil va amaliy asoslangan bo'lsin.
-          5. Akademik uslubda, grammatik xatolarsiz va universitet talablariga mos yozing.
+          4. Har bir bob oxirida ushbu bob bo'yicha qisqa xulosa yozilsin.
+          5. Xulosa va tavsiyalar qismi o'ta batafsil va amaliy asoslangan bo'lsin.
+          6. Akademik uslubda, grammatik xatolarsiz va universitet talablariga mos yozing.
 
           ILMIY STRUKTURA:
-          1. Titul varaq (Haqiqiy ma'lumotlar bilan)
+          1. Titul varaq (Yuqoridagi haqiqiy ma'lumotlar bilan)
           2. Mundarija
           3. Kirish (Dolzarblik, maqsad, vazifalar, obyekt, predmet, metodlar, yangilik, amaliy ahamiyat - har biri alohida va juda keng)
-          4. I BOB (Nazariy-metodologik asoslar - 4-5 bo'lim)
-          5. II BOB (Amaliy tahlil va eksperimental natijalar, statistikalar - 4-5 bo'lim)
-          6. III BOB (Rivojlantirish istiqbollari, model va takliflar - 4-5 bo'lim)
+          4. I BOB (Nazariy-metodologik asoslar - 4-5 bo'lim. Har bir bo'lim oxirida bob xulosasi)
+          5. II BOB (Amaliy tahlil va eksperimental natijalar, statistikalar, tahlillar - 4-5 bo'lim. Har bir bo'lim oxirida bob xulosasi)
+          6. III BOB (Rivojlantirish istiqbollari, model va takliflar - 4-5 bo'lim. Har bir bo'lim oxirida bob xulosasi)
           7. Xulosa (Batafsil tahlil va amaliy takliflar)
-          8. Foydalanilgan adabiyotlar (Kamida 20 ta zamonaviy manba: muallif, kitob, nashriyot, yil)
+          8. Foydalanilgan adabiyotlar (Kamida 15-20 ta zamonaviy manba: muallif, kitob, nashriyot, yil)
           
-          Noto'g'ri placeholder ([...]) qoldirmang! Har bir bo'limni o'ta batafsil va ilmiy boyitib yozing.`;
+          Noto'g'ri placeholder ([...]) qoldirmang! Har bir bo'limni o'ta batafsil, mantiqiy va ilmiy boyitib yozing.`;
         } else if (docType === "tezis") {
           const author = options?.author || "Muallif";
           const university = options?.university || "OTM";
