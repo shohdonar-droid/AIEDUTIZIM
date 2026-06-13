@@ -14,9 +14,12 @@ import {
   Gamepad2, 
   MessageCircle, 
   Search,
-  Award
+  Award,
+  ChevronDown,
+  Building2,
+  Users2
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -30,7 +33,20 @@ export default function Navbar() {
   const { user, isAdmin } = useAuth();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [isTuzilmaOpen, setIsTuzilmaOpen] = useState(false);
   const [headerConfig, setHeaderConfig] = useState<SiteContent['header']>({});
+  const tuzilmaTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTuzilmaEnter = () => {
+    if (tuzilmaTimeoutRef.current) clearTimeout(tuzilmaTimeoutRef.current);
+    setIsTuzilmaOpen(true);
+  };
+
+  const handleTuzilmaLeave = () => {
+    tuzilmaTimeoutRef.current = setTimeout(() => {
+      setIsTuzilmaOpen(false);
+    }, 150);
+  };
 
   useEffect(() => {
     async function fetchConfig() {
@@ -122,7 +138,72 @@ export default function Navbar() {
 
             {/* Desktop Nav */}
             <div className="hidden md:ml-6 md:flex md:items-center md:space-x-8">
-              {navLinks.map((link) => (
+              <Link
+                to="/"
+                className={`text-sm font-medium transition-colors ${
+                  isActive('/') 
+                    ? (isWhiteText ? 'text-blue-300 font-bold' : 'text-[#007aff]')
+                    : (isWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-[#007aff]')
+                }`}
+              >
+                Asosiy
+              </Link>
+
+              {/* Tuzilma Dropdown */}
+              <div 
+                className="relative"
+                onMouseEnter={handleTuzilmaEnter}
+                onMouseLeave={handleTuzilmaLeave}
+              >
+                <button
+                  className={`flex items-center gap-1 text-sm font-medium transition-colors ${
+                    location.pathname === '/leadership' || location.pathname === '/partners'
+                      ? (isWhiteText ? 'text-blue-300 font-bold' : 'text-[#007aff]')
+                      : (isWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-[#007aff]')
+                  }`}
+                >
+                  Tuzilma
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isTuzilmaOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {isTuzilmaOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className={`absolute left-0 mt-3 w-64 rounded-2xl shadow-2xl border ${
+                        isWhiteText ? 'bg-gray-900/95 border-white/10' : 'bg-white/95 border-gray-100'
+                      } backdrop-blur-xl p-2 overflow-hidden`}
+                    >
+                      <Link
+                        to="/leadership"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                          isActive('/leadership')
+                            ? (isWhiteText ? 'bg-white/10 text-blue-300' : 'bg-blue-50 text-blue-600')
+                            : (isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50')
+                        }`}
+                      >
+                        <Users2 className="h-4 w-4" />
+                        <span className="font-bold text-sm">Rahbariyat</span>
+                      </Link>
+                      <Link
+                        to="/partners"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                          isActive('/partners')
+                            ? (isWhiteText ? 'bg-white/10 text-blue-300' : 'bg-blue-50 text-blue-600')
+                            : (isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50')
+                        }`}
+                      >
+                        <Building2 className="h-4 w-4" />
+                        <span className="font-bold text-sm">Hamkorlar (Tashkilotlar)</span>
+                      </Link>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {navLinks.slice(1).map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
@@ -206,7 +287,44 @@ export default function Navbar() {
               className={`md:hidden border-t ${isWhiteText ? 'border-white/20 bg-gray-900/90' : 'border-gray-200/50 bg-white/90'} backdrop-blur-xl`}
             >
               <div className="space-y-1 pb-3 pt-2">
-                {navLinks.map((link) => (
+                <Link
+                  to="/"
+                  onClick={() => setIsOpen(false)}
+                  className={`block px-4 py-3 text-base font-medium ${
+                    isActive('/') 
+                      ? (isWhiteText ? 'bg-white/10 text-blue-300' : 'bg-[#007aff]/10 text-[#007aff]') 
+                      : (isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50')
+                  }`}
+                >
+                  Asosiy
+                </Link>
+
+                {/* Mobile Tuzilma */}
+                <div className="px-4 py-2">
+                  <p className={`text-xs font-black uppercase tracking-widest mb-2 ${isWhiteText ? 'text-gray-500' : 'text-gray-400'}`}>Tuzilma</p>
+                  <div className="space-y-1 ml-2 border-l-2 border-gray-100 dark:border-white/10">
+                    <Link
+                      to="/leadership"
+                      onClick={() => setIsOpen(false)}
+                      className={`block px-4 py-2 text-sm font-bold ${
+                        isActive('/leadership') ? 'text-[#007aff]' : (isWhiteText ? 'text-gray-400' : 'text-gray-500')
+                      }`}
+                    >
+                      👤 Rahbariyat
+                    </Link>
+                    <Link
+                      to="/partners"
+                      onClick={() => setIsOpen(false)}
+                      className={`block px-4 py-2 text-sm font-bold ${
+                        isActive('/partners') ? 'text-[#007aff]' : (isWhiteText ? 'text-gray-400' : 'text-gray-500')
+                      }`}
+                    >
+                      🏢 Hamkorlar (Tashkilotlar)
+                    </Link>
+                  </div>
+                </div>
+
+                {navLinks.slice(1).map((link) => (
                   <Link
                     key={link.path}
                     to={link.path}

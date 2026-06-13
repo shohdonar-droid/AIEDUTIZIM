@@ -16,6 +16,9 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
+  host: 'firestore.googleapis.com',
+  ssl: true,
+  experimentalLongPollingOptions: { timeoutSeconds: 60 },
 }, firebaseConfigRaw.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);

@@ -82,97 +82,119 @@ export default function AdminUsers() {
   useEffect(() => {
     const runCleanup = async () => {
       const key = "cleanup_ortiqov_zulqaynar_v1";
-      if (localStorage.getItem(key)) return;
-
-      const loginsToDelete = ["ortiqov", "zulqaynar"];
-      try {
-        for (const login of loginsToDelete) {
-          const q = query(
-            collection(db, "users"),
-            where("login", "==", login),
-            where("role", "==", "teacher"),
-          );
-          const snap = await getDocs(q);
-          if (snap.empty) continue;
-
-          const orgDoc = snap.docs[0];
-          const orgUid = orgDoc.id;
-
-          // Delete students
-          const sQ = query(
-            collection(db, "users"),
-            where("teacherId", "==", orgUid),
-            where("role", "==", "student"),
-          );
-          const sSnap = await getDocs(sQ);
-          for (const s of sSnap.docs) {
-            await deleteDoc(doc(db, "users", s.id));
-            // delete student enrollments
-            const eQ = query(
-              collection(db, "enrollments"),
-              where("userId", "==", s.id),
+      if (!localStorage.getItem(key)) {
+        const loginsToDelete = ["ortiqov", "zulqaynar"];
+        try {
+          for (const login of loginsToDelete) {
+            const q = query(
+              collection(db, "users"),
+              where("login", "==", login),
+              where("role", "==", "teacher"),
             );
-            const eSnap = await getDocs(eQ);
-            for (const d of eSnap.docs)
-              await deleteDoc(doc(db, "enrollments", d.id));
-          }
+            const snap = await getDocs(q);
+            if (snap.empty) continue;
 
-          // Delete staff
-          const stQ = query(
-            collection(db, "users"),
-            where("teacherId", "==", orgUid),
-            where("role", "==", "staff"),
-          );
-          const stSnap = await getDocs(stQ);
-          for (const st of stSnap.docs)
-            await deleteDoc(doc(db, "users", st.id));
+            const orgDoc = snap.docs[0];
+            const orgUid = orgDoc.id;
 
-          // Delete courses and their tests
-          const cQ = query(
-            collection(db, "courses"),
-            where("teacherId", "==", orgUid),
-          );
-          const cSnap = await getDocs(cQ);
-          for (const c of cSnap.docs) {
-            const tQ = query(
-              collection(db, "tests"),
-              where("courseId", "==", c.id),
+            // Delete students
+            const sQ = query(
+              collection(db, "users"),
+              where("teacherId", "==", orgUid),
+              where("role", "==", "student"),
             );
-            const tSnap = await getDocs(tQ);
-            for (const t of tSnap.docs) await deleteDoc(doc(db, "tests", t.id));
-            await deleteDoc(doc(db, "courses", c.id));
+            const sSnap = await getDocs(sQ);
+            for (const s of sSnap.docs) {
+              await deleteDoc(doc(db, "users", s.id));
+              // delete student enrollments
+              const eQ = query(
+                collection(db, "enrollments"),
+                where("userId", "==", s.id),
+              );
+              const eSnap = await getDocs(eQ);
+              for (const d of eSnap.docs)
+                await deleteDoc(doc(db, "enrollments", d.id));
+            }
+
+            // Delete staff
+            const stQ = query(
+              collection(db, "users"),
+              where("teacherId", "==", orgUid),
+              where("role", "==", "staff"),
+            );
+            const stSnap = await getDocs(stQ);
+            for (const st of stSnap.docs)
+              await deleteDoc(doc(db, "users", st.id));
+
+            // Delete courses and their tests
+            const cQ = query(
+              collection(db, "courses"),
+              where("teacherId", "==", orgUid),
+            );
+            const cSnap = await getDocs(cQ);
+            for (const c of cSnap.docs) {
+              const tQ = query(
+                collection(db, "tests"),
+                where("courseId", "==", c.id),
+              );
+              const tSnap = await getDocs(tQ);
+              for (const t of tSnap.docs) await deleteDoc(doc(db, "tests", t.id));
+              await deleteDoc(doc(db, "courses", c.id));
+            }
+
+            // Delete other related entities
+            const dQ = query(
+              collection(db, "departments"),
+              where("creatorId", "==", orgUid),
+            );
+            const dSnap = await getDocs(dQ);
+            for (const d of dSnap.docs)
+              await deleteDoc(doc(db, "departments", d.id));
+
+            const gQ = query(
+              collection(db, "groups"),
+              where("creatorId", "==", orgUid),
+            );
+            const gSnap = await getDocs(gQ);
+            for (const g of gSnap.docs) await deleteDoc(doc(db, "groups", g.id));
+
+            const bQ = query(
+              collection(db, "billing"),
+              where("teacherId", "==", orgUid),
+            );
+            const bSnap = await getDocs(bQ);
+            for (const b of bSnap.docs) await deleteDoc(doc(db, "billing", b.id));
+
+            // Delete the organization
+            await deleteDoc(doc(db, "users", orgUid));
+            console.log(`Deleted organization: ${login}`);
           }
-
-          // Delete other related entities
-          const dQ = query(
-            collection(db, "departments"),
-            where("creatorId", "==", orgUid),
-          );
-          const dSnap = await getDocs(dQ);
-          for (const d of dSnap.docs)
-            await deleteDoc(doc(db, "departments", d.id));
-
-          const gQ = query(
-            collection(db, "groups"),
-            where("creatorId", "==", orgUid),
-          );
-          const gSnap = await getDocs(gQ);
-          for (const g of gSnap.docs) await deleteDoc(doc(db, "groups", g.id));
-
-          const bQ = query(
-            collection(db, "billing"),
-            where("teacherId", "==", orgUid),
-          );
-          const bSnap = await getDocs(bQ);
-          for (const b of bSnap.docs) await deleteDoc(doc(db, "billing", b.id));
-
-          // Delete the organization
-          await deleteDoc(doc(db, "users", orgUid));
-          console.log(`Deleted organization: ${login}`);
+          localStorage.setItem(key, "true");
+        } catch (err) {
+          console.error("Auto-cleanup error:", err);
         }
-        localStorage.setItem(key, "true");
-      } catch (err) {
-        console.error("Auto-cleanup error:", err);
+      }
+
+      // Cleanup requested admins: admin@eduai.uz and admin1@admin.uz
+      const keyAdmins = "cleanup_requested_admins_v1";
+      if (!localStorage.getItem(keyAdmins)) {
+        try {
+          const emailsToDelete = ["admin@eduai.uz", "admin1@admin.uz"];
+          for (const email of emailsToDelete) {
+            const q = query(
+              collection(db, "users"),
+              where("email", "==", email)
+            );
+            const snap = await getDocs(q);
+            for (const d of snap.docs) {
+              await deleteDoc(doc(db, "users", d.id));
+              console.log(`Deleted admin by email: ${email}`);
+            }
+          }
+          localStorage.setItem(keyAdmins, "true");
+        } catch (e) {
+          console.error("Requested admin cleanup error:", e);
+        }
       }
 
       try {
