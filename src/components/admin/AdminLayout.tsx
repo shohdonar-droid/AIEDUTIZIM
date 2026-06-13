@@ -22,7 +22,8 @@ import {
   Bell,
   Settings,
   Menu,
-  X
+  X,
+  HardDrive
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -56,6 +57,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
     { name: 'FOOTER', path: '/admin/footer', icon: Dock },
     { name: 'BILDIRISHNOMALAR', path: '/admin/notifications', icon: AlertCircle },
     { name: 'HISOB-KITOB', path: '/admin/billing', icon: Wallet },
+    { name: 'XOTIRA MONITORINGI', path: '/admin/storage', icon: HardDrive },
     { name: 'CHAT', path: '/admin/chat', icon: MessageSquare, badge: unreadCount },
   ].filter(item => {
     if (user?.role === 'subadmin') {

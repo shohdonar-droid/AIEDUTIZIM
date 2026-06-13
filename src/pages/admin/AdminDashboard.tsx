@@ -26,6 +26,7 @@ import SubjectRead from '../SubjectRead';
 import ChatSection from '../ChatSection';
 import AdminProfile from './AdminProfile';
 import AdminAiAssistant from './AdminAiAssistant';
+import AdminStorage from './AdminStorage';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 
 export default function AdminDashboard() {
@@ -84,6 +85,7 @@ export default function AdminDashboard() {
         <Route path="/certificates" element={<AdminCertificates />} />
         <Route path="/services" element={<AdminServices />} />
         <Route path="/billing" element={<AdminBilling />} />
+        <Route path="/storage" element={<AdminStorage />} />
         <Route path="/footer" element={<AdminFooter />} />
         <Route path="/bot-users" element={<AdminBotUsers />} />
         <Route path="/bot" element={<AdminBot />} />
