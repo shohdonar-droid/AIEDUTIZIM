@@ -638,7 +638,7 @@ export async function trackTelegramUserActivity(userId: number, from: any, role:
         const docRef = await addDoc(collection(db, "activityLogs"), {
           userId: `tg_${userId}`,
           userDisplayName: displayName + " (Bot)",
-          role: role || "student",
+          role: role || "bot_user",
           loginTime: now,
           logoutTime: null,
           durationMinutes: 0,
@@ -672,7 +672,7 @@ export async function trackTelegramUserActivity(userId: number, from: any, role:
       const docRef = await addDoc(collection(db, "activityLogs"), {
         userId: `tg_${userId}`,
         userDisplayName: displayName + " (Bot)",
-        role: role || "student",
+        role: role || "bot_user",
         loginTime: now,
         logoutTime: null,
         durationMinutes: 0,
@@ -741,7 +741,7 @@ bot.use(async (ctx, next) => {
 
   // 1. Trace and log the user's action into their active activity session
   const authed = await getAuthedUser(userId);
-  const resolvedRole = authed ? authed.role : "student";
+  const resolvedRole = authed ? authed.role : "bot_user";
   await trackTelegramUserActivity(userId, ctx.from, resolvedRole);
 
   // 2. Pause/Maintenance handling
@@ -1099,9 +1099,9 @@ bot.start(async (ctx) => {
           displayName: `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim(),
           name: ctx.from.first_name || "Foydalanuvchi",
           username: ctx.from.username || "",
-          role: "student",
-          departmentName: "foydalanuvchi",
-          groupName: "bot",
+          role: "bot_user",
+          departmentName: "bot",
+          groupName: "telegram",
           ball: 0,
           balance: 0,
           spentBalls: 0,

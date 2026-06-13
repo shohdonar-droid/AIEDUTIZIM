@@ -216,7 +216,16 @@ export default function AdminUsers() {
     runCleanup();
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (force = false) => {
+    // Only load if forced or if cache is stale (> 20 mins)
+    const cachedTime = localStorage.getItem("admin_users_last_load_time");
+    const CACHE_TTL = 20 * 60 * 1000;
+    if (!force && cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL)) {
+      console.log("AdminUsers: Skip fetch, cache is fresh");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const [deptsSnap, groupsSnap, studentsSnap, teachersSnap, staffSnap, subadminsSnap, tgSnap, botConfigsSnap] = await Promise.all([
@@ -270,9 +279,12 @@ export default function AdminUsers() {
       localStorage.setItem("admin_users_teachers_cache", JSON.stringify(teachersList));
       localStorage.setItem("admin_users_staff_cache", JSON.stringify(staffList));
       localStorage.setItem("admin_users_subadmins_cache", JSON.stringify(subadminsList));
+      localStorage.setItem("admin_users_last_load_time", Date.now().toString());
 
-    } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, "admin-users-all");
+    } catch (err: any) {
+      if (!err?.message?.includes("quota")) {
+        handleFirestoreError(err, OperationType.LIST, "admin-users-all");
+      }
     } finally {
       setLoading(false);
     }

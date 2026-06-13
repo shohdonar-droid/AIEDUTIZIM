@@ -3,6 +3,7 @@ import { db } from "../../lib/firebase";
 import {
   collection,
   getDocs,
+  getCountFromServer,
   query,
   where,
   doc,
@@ -61,11 +62,46 @@ export default function AdminBilling() {
 
   useEffect(() => {
     async function loadData() {
+      // Use cached stats if available and fresh (e.g. within last 15 minutes)
+      const cachedTime = localStorage.getItem('admin_billing_stats_time');
+      const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+      
+      const cachedUsers = localStorage.getItem('admin_billing_users_cache');
+      if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL) && cachedUsers) {
+        try {
+          const users = JSON.parse(cachedUsers);
+          const orgs = users.filter((u: any) => u.role === "teacher").map((org: any) => ({
+              ...org,
+              staffCount: users.filter((s: any) => s.role === "staff" && s.teacherId === org.uid).length,
+          }));
+          setOrganizations(orgs);
+          setStudents(users.filter((u: any) => u.role === "student"));
+          setStaff(users.filter((u: any) => u.role === "staff"));
+          
+          const cachedCounts = localStorage.getItem('admin_billing_counts');
+          if (cachedCounts) {
+             const parsed = JSON.parse(cachedCounts);
+             setStats({
+                totalOrgs: orgs.length,
+                staffCount: users.filter((u: any) => u.role === "staff").length,
+                totalIncome: users.reduce((acc: number, u: any) => acc + (u.totalIncome || 0), 0),
+                totalDocs: parsed.tests + parsed.courses + parsed.results,
+                totalSpentAmount: users.reduce((acc: number, u: any) => acc + (u.totalSpentAmount || 0), 0),
+             });
+             setLoading(false);
+             return;
+          }
+        } catch (e) {
+          console.warn("Failed to parse billing cache", e);
+        }
+      }
+
       try {
         const uSnap = await getDocs(collection(db, "users"));
         const users = uSnap.docs.map(
           (d) => ({ uid: d.id, ...d.data() }) as UserProfile,
         );
+        localStorage.setItem('admin_billing_users_cache', JSON.stringify(users));
 
         const orgs = users
           .filter((u) => u.role === "teacher")
@@ -82,23 +118,41 @@ export default function AdminBilling() {
         setStudents(stds);
         setStaff(stf);
 
-        // Fetch docs count (tests, courses, exams)
-        const testsSnap = await getDocs(collection(db, "tests"));
-        const coursesSnap = await getDocs(collection(db, "courses"));
-        const resultsSnap = await getDocs(collection(db, "testResults"));
+        // Check if we can use cached counts for others
+        let testsCount = 0, coursesCount = 0, resultsCount = 0;
+        const cachedCounts = localStorage.getItem('admin_billing_counts');
+        if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL) && cachedCounts) {
+           const parsed = JSON.parse(cachedCounts);
+           testsCount = parsed.tests;
+           coursesCount = parsed.courses;
+           resultsCount = parsed.results;
+        } else {
+           const [tSnap, cSnap, rSnap] = await Promise.all([
+             getCountFromServer(collection(db, "tests")),
+             getCountFromServer(collection(db, "courses")),
+             getCountFromServer(collection(db, "testResults"))
+           ]);
+           testsCount = tSnap.data().count;
+           coursesCount = cSnap.data().count;
+           resultsCount = rSnap.data().count;
+           localStorage.setItem('admin_billing_counts', JSON.stringify({ tests: testsCount, courses: coursesCount, results: resultsCount }));
+           localStorage.setItem('admin_billing_stats_time', Date.now().toString());
+        }
 
         setStats({
           totalOrgs: orgs.length,
           staffCount: stf.length,
           totalIncome: users.reduce((acc, u) => acc + (u.totalIncome || 0), 0),
-          totalDocs: testsSnap.size + coursesSnap.size + resultsSnap.size,
+          totalDocs: testsCount + coursesCount + resultsCount,
           totalSpentAmount: users.reduce(
             (acc, u) => acc + (u.totalSpentAmount || 0),
             0,
           ),
         });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, "admin-billing-loader");
+      } catch (err: any) {
+        if (!err?.message?.includes("quota")) {
+          handleFirestoreError(err, OperationType.LIST, "admin-billing-loader");
+        }
       } finally {
         setLoading(false);
       }

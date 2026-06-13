@@ -54,27 +54,28 @@ export default function AdminOverview() {
 
   useEffect(() => {
     async function loadStats() {
-      // Use cached stats if available and fresh (e.g. within last 10 minutes)
+      // Use cached stats if available and fresh (e.g. within last 20 minutes)
       const cachedTime = localStorage.getItem("admin_overview_stats_time");
-      const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+      const CACHE_TTL = 20 * 60 * 1000; // 20 minutes
       
       if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL)) {
         const cached = localStorage.getItem("admin_overview_stats");
         if (cached) {
           setStats(JSON.parse(cached));
-          setLoading(false);
-          return;
+          // We still want to load logs if they are not cached
         }
       }
 
       try {
-        const studentSnap = await getCountFromServer(query(collection(db, "users"), where("role", "==", "student")));
-        const teacherSnap = await getCountFromServer(query(collection(db, "users"), where("role", "==", "teacher")));
-        const staffSnap = await getCountFromServer(query(collection(db, "users"), where("role", "==", "staff")));
-        const botSnap = await getCountFromServer(collection(db, "telegram_users"));
-        const deptSnap = await getCountFromServer(collection(db, "departments"));
-        const groupSnap = await getCountFromServer(collection(db, "groups"));
-        const certsSnap = await getCountFromServer(collection(db, "certificates"));
+        const [studentSnap, teacherSnap, staffSnap, botSnap, deptSnap, groupSnap, certsSnap] = await Promise.all([
+          getCountFromServer(query(collection(db, "users"), where("role", "==", "student"))),
+          getCountFromServer(query(collection(db, "users"), where("role", "==", "teacher"))),
+          getCountFromServer(query(collection(db, "users"), where("role", "==", "staff"))),
+          getCountFromServer(collection(db, "telegram_users")),
+          getCountFromServer(collection(db, "departments")),
+          getCountFromServer(collection(db, "groups")),
+          getCountFromServer(collection(db, "certificates"))
+        ]);
 
         const loadedStats = {
           organizations: teacherSnap.data().count || 0,
@@ -90,7 +91,9 @@ export default function AdminOverview() {
         localStorage.setItem("admin_overview_stats", JSON.stringify(loadedStats));
         localStorage.setItem("admin_overview_stats_time", Date.now().toString());
       } catch (err: any) {
-        console.error("Stats load error", err);
+        if (!err?.message?.includes("quota")) {
+          console.error("Stats load error", err);
+        }
         const errMsg = String(err?.message || "").toLowerCase();
         if (errMsg.includes("quota") || errMsg.includes("limit") || errMsg.includes("exceeded")) {
           setIsQuotaExceeded(true);
@@ -154,17 +157,33 @@ export default function AdminOverview() {
     });
 
     const loadLogs = async () => {
+      // Use cached logs if available and fresh (e.g. within last 10 minutes)
+      const cachedLogsTime = localStorage.getItem("admin_overview_logs_time");
+      const logsTTL = 10 * 60 * 1000;
+      if (cachedLogsTime && (Date.now() - Number(cachedLogsTime) < logsTTL)) {
+        const cached = localStorage.getItem("admin_overview_logs");
+        if (cached) {
+          setActivityLogs(JSON.parse(cached));
+          return;
+        }
+      }
+
       try {
         const snap = await getDocs(
           query(collection(db, "activityLogs"), orderBy("loginTime", "desc"), limit(30))
         );
         const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setActivityLogs(logs);
+        localStorage.setItem("admin_overview_logs", JSON.stringify(logs));
+        localStorage.setItem("admin_overview_logs_time", Date.now().toString());
       } catch (err: any) {
-        console.warn("Failed to load activityLogs", err);
         const errMsg = String(err?.message || "").toLowerCase();
         if (errMsg.includes("quota") || errMsg.includes("limit") || errMsg.includes("exceeded")) {
           setIsQuotaExceeded(true);
+          const cached = localStorage.getItem("admin_overview_logs");
+          if (cached) setActivityLogs(JSON.parse(cached));
+        } else {
+          console.warn("Failed to load activityLogs", err);
         }
       }
     };
@@ -355,7 +374,7 @@ export default function AdminOverview() {
 
                 const loginDateStr = formatLogTime(log.loginTime);
                 const logoutDateStr = log.logoutTime ? formatLogTime(log.logoutTime) : null;
-                const roleStr = log.role === "admin" ? "ADMIN" : log.role === "teacher" ? "ORGANIZATOR" : log.role === "staff" ? "XODIM" : "TALABA";
+                const roleStr = log.role === "admin" ? "ADMIN" : log.role === "teacher" ? "ORGANIZATOR" : log.role === "staff" ? "XODIM" : log.role === "bot_user" ? "BOT" : "TALABA";
 
                 return (
                   <div key={log.id || idx} className="flex justify-between items-start border-b border-gray-50 pb-4 last:border-0 last:pb-0">
@@ -380,7 +399,7 @@ export default function AdminOverview() {
                         )}
                       </div>
                     </div>
-                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest ${log.role === "admin" ? "bg-red-50 text-red-500" : log.role === "teacher" ? "bg-cyan-50 text-cyan-600" : "bg-blue-50 text-blue-600"}`}>
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest ${log.role === "admin" ? "bg-red-50 text-red-500" : log.role === "teacher" ? "bg-cyan-50 text-cyan-600" : log.role === "bot_user" ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}>
                       {roleStr}
                     </span>
                   </div>

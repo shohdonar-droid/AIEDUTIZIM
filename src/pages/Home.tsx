@@ -37,10 +37,17 @@ export default function Home() {
       const cachedContent = localStorage.getItem('cache_site_content');
       const cachedCourses = localStorage.getItem('cache_courses');
       const cachedStats = localStorage.getItem('cache_stats');
+      const cachedTime = localStorage.getItem('cache_home_fetch_time');
+      const CACHE_TTL = 30 * 60 * 1000; // 30 minutes for homepage
 
       if (cachedContent) setContent(JSON.parse(cachedContent));
       if (cachedCourses) setCourses(JSON.parse(cachedCourses));
       if (cachedStats) setStats(JSON.parse(cachedStats));
+
+      if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL) && cachedContent && cachedCourses && cachedStats) {
+        console.log("Using fresh home cache");
+        return;
+      }
 
       try {
         const contentDoc = await getDoc(doc(db, 'siteContent', 'main'));
@@ -134,6 +141,7 @@ export default function Home() {
         };
         setStats(newStats);
         localStorage.setItem('cache_stats', JSON.stringify(newStats));
+        localStorage.setItem('cache_home_fetch_time', Date.now().toString());
       } catch (e: any) {
         if (!e?.message?.includes("Quota")) {
           console.error('Stats fetch error:', e);

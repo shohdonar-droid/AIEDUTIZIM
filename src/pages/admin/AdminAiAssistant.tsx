@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, getCountFromServer, query, where } from 'firebase/firestore';
 import { Brain, Send, User, Bot, Loader2, Sparkles, Database, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -39,29 +39,59 @@ Tizimdagi barcha ma'lumotlar, foydalanuvchilar, darslar va sertifikatlar bo'yich
 
   useEffect(() => {
     async function loadStatsForContext() {
+      // Use cached stats if available and fresh (e.g. within last 20 minutes)
+      const cachedTime = localStorage.getItem('admin_ai_stats_time');
+      const CACHE_TTL = 20 * 60 * 1000; // 20 minutes
+      
+      if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL)) {
+        const cached = localStorage.getItem('admin_ai_stats');
+        if (cached) {
+          setDbStats(JSON.parse(cached));
+          return;
+        }
+      }
+
       try {
-        const [usersSnap, coursesSnap, testsSnap, certsSnap] = await Promise.all([
-          getDocs(collection(db, 'users')),
-          getDocs(collection(db, 'courses')),
-          getDocs(collection(db, 'tests')),
-          getDocs(collection(db, 'enrollments'))
+        const [
+          totalSnap,
+          teacherSnap,
+          staffSnap,
+          studentSnap,
+          botUserSnap,
+          coursesSnap,
+          testsSnap,
+          certsSnap
+        ] = await Promise.all([
+          getCountFromServer(collection(db, 'users')),
+          getCountFromServer(query(collection(db, 'users'), where('role', '==', 'teacher'))),
+          getCountFromServer(query(collection(db, 'users'), where('role', '==', 'staff'))),
+          getCountFromServer(query(collection(db, 'users'), where('role', '==', 'student'))),
+          getCountFromServer(query(collection(db, 'users'), where('role', '==', 'bot_user'))),
+          getCountFromServer(collection(db, 'courses')),
+          getCountFromServer(collection(db, 'tests')),
+          getCountFromServer(collection(db, 'enrollments'))
         ]);
         
-        const counts: Record<string, number> = {};
-        usersSnap.forEach(d => {
-          const r = d.data().role || 'student';
-          counts[r] = (counts[r] || 0) + 1;
-        });
+        const newStats = {
+          totalUsers: totalSnap.data().count,
+          byRole: {
+            teacher: teacherSnap.data().count,
+            staff: staffSnap.data().count,
+            student: studentSnap.data().count,
+            bot_user: botUserSnap.data().count,
+          },
+          totalCourses: coursesSnap.data().count,
+          totalTests: testsSnap.data().count,
+          totalCerts: certsSnap.data().count,
+        };
 
-        setDbStats({
-          totalUsers: usersSnap.size,
-          byRole: counts,
-          totalCourses: coursesSnap.size,
-          totalTests: testsSnap.size,
-          totalCerts: certsSnap.size,
-        });
-      } catch (e) {
-        console.error("Failed to load db stats for AI context", e);
+        setDbStats(newStats);
+        localStorage.setItem('admin_ai_stats', JSON.stringify(newStats));
+        localStorage.setItem('admin_ai_stats_time', Date.now().toString());
+      } catch (e: any) {
+        if (!e?.message?.includes("Quota")) {
+           console.error("Failed to load db stats for AI context", e);
+        }
       }
     }
     loadStatsForContext();

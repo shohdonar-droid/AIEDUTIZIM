@@ -115,6 +115,126 @@ function validateKursIshi(
   return { isValid, reason, cleanContent: text };
 }
 
+async function generateKursIshiMultiStep(topic: string, options: any) {
+    const { university, faculty, studentName, advisor } = options;
+    const uni = university || "O'zbekiston Milliy Universiteti";
+    const fac = faculty || "Amaliy matematika va intellektual texnologiyalar fakulteti";
+    const student = studentName || "Toshpo'latov F.H.";
+    const adv = advisor || "Dots. Karimov S.A.";
+
+    console.log(`[Kurs Ishi MultiStep] Starting for: ${topic}`);
+
+    const callAi = async (prompt: string, maxTokens = 16384) => {
+        const res = await generateContentWithRotation({
+            model: "gemini-1.5-flash",
+            contents: prompt,
+            config: {
+                maxOutputTokens: maxTokens,
+                temperature: 0.8,
+                topP: 0.95
+            }
+        });
+        return res.text;
+    };
+
+    // Step 1: Plan
+    const planPrompt = `Siz akademik ekspertsiz. "${topic}" mavzusida 50 sahifalik kurs ishi uchun mukammal va juda batafsil mundarija (reja) yarating.
+    Muallif: ${student}. OTM: ${uni}.
+    Reja o'zbek tilida, quyidagi qismlardan iborat bo'lishi shart:
+    - Mundarija (Table of Contents)
+    - Kirish (Introduction)
+    - I BOB: NAZARIY VA METODOLOGIK ASOSLARI (Kamida 5 ta ichki bo'lim)
+    - II BOB: AMALIY TAHLIL VA EKSPERIMENTAL NATIJALAR (Kamida 5 ta ichki bo'lim)
+    - III BOB: TAKOMILLASHTIRISH YO'LLARI VA RIVOJLANISH ISTIQBOLLARI (Kamida 5 ta ichki bo'lim)
+    - Xulosa (Conclusion)
+    - Foydalanilgan adabiyotlar (Bibliography)
+    
+    Faqat mundarijani Markdown formatida qaytaring, boshqa gap qo'shmang.`;
+    const planText = await callAi(planPrompt, 4096);
+    
+    // Step 2: Introduction
+    const introPrompt = `Mavzu: "${topic}".\nOTM: ${uni}. Fakultet: ${fac}. Muallif: ${student}.\n\nMundarija: ${planText}\n\nUshbu kurs ishi uchun professional, akademik uslubdagi o'zbek tilida "KIRISH" (Introduction) qismini yarating. 
+    Unda mavzuning dolzarbligi, tadqiqot maqsadi, vazifalari, obyekti, predmeti, metodlari, ilmiy yangiligi va amaliy ahamiyati juda keng (bir necha sahifa) bayon etilsin.
+    Markdown formatida qaytaring.`;
+    const introText = await callAi(introPrompt);
+    
+    // Step 3: Chapter 1
+    const ch1Prompt = `Mavzu: "${topic}".\nReja: ${planText}\n\n"I BOB: NAZARIY VA METODOLOGIK ASOSLARI" qismini o'zbek tilida juda batafsil yarating. 
+    Nazariy asoslar, ilmiy qarashlar va asosiy tushunchalarni yoritib bering. Har bir ichki bo'limni (1.1, 1.2 va h.k.) 3-4 sahifadan bayon qiling.
+    Jami bob kamida 15-18 sahifa bo'lishini maqsad qiling. Ilmiy manbalarga tayanib yozing.
+    Markdown formatida qaytaring.`;
+    const ch1Text = await callAi(ch1Prompt);
+    
+    // Step 4: Chapter 2
+    const ch2Prompt = `Mavzu: "${topic}".\nReja: ${planText}\n\n"II BOB: AMALIY TAHLIL VA EKSPERIMENTAL NATIJALAR" qismini o'zbek tilida juda batafsil yarating. 
+    Amaliy tahlil, mavjud holat, statistik ma'lumotlar va muammolar tahlilini yoritib bering. 
+    Har bir ichki bo'limni (2.1, 2.2 va h.k.) 3-4 sahifadan bayon qiling.
+    Jami bob kamida 15-18 sahifa bo'lishini maqsad qiling. Diagrammalar va jadvallar uchun tavsiyalar qo'shing.
+    Markdown formatida qaytaring.`;
+    const ch2Text = await callAi(ch2Prompt);
+    
+    // Step 5: Chapter 3
+    const ch3Prompt = `Mavzu: "${topic}".\nReja: ${planText}\n\n"III BOB: TAKOMILLASHTIRISH YO'LLARI VA RIVOJLANISH ISTIQBOLLARI" qismini o'zbek tilida juda batafsil yarating. 
+    Takomillashtirish yo'llari, innovatsion yondashuvlar, amaliy tavsiyalar va muallif takliflarini yoritib bering. 
+    Har bir ichki bo'limni (3.1, 3.2 va h.k.) 3-4 sahifadan bayon qiling.
+    Markdown formatida qaytaring.`;
+    const ch3Text = await callAi(ch3Prompt);
+    
+    // Step 6: Conclusion
+    const conclusionPrompt = `Mavzu: "${topic}".\n\nBarcha qismlar yakuni sifatida o'zbek tilida professional "XULOSA" (Conclusion) qismini yarating. 
+    Tadqiqot natijalari, asosiy qisqa xulosalar va amaliy tavsiyalar mantiqiy tarzda juda batafsil yoritilsin.
+    Markdown formatida qaytaring.`;
+    const conclusionText = await callAi(conclusionPrompt);
+    
+    // Step 7: Bibliography
+    const bibPrompt = `Mavzu: "${topic}".\n\nUshbu kurs ishi mavzusi bo'yicha o'zbek, rus va ingliz tillarida kamida 50 ta zamonaviy ilmiy manbalar (kitoblar, maqolalar, huquqiy hujjatlar) ro'yxatini yarating. 
+    "FOYDALANILGAN ADABIYOTLAR RO'YXATI" sarlavhasi ostida bibliografik me'yorlarda bo'lsin.
+    Markdown formatida qaytaring.`;
+    const bibText = await callAi(bibPrompt);
+
+    // Step 8: Combine
+    let fullContent = `
+# MUNDARIJA
+${planText}
+
+---
+
+# KIRISH
+${introText}
+
+---
+
+${ch1Text}
+
+---
+
+${ch2Text}
+
+---
+
+${ch3Text}
+
+---
+
+# XULOSA
+${conclusionText}
+
+---
+
+# FOYDALANILGAN ADABIYOTLAR RO'YXATI
+${bibText}
+    `;
+
+    // Validate and Clean
+    const validation = validateKursIshi(fullContent, uni, fac, student, adv, topic);
+    fullContent = validation.cleanContent;
+
+    return {
+        title: topic,
+        content: fullContent
+    };
+}
+
 export const app = express();
 
 // Top-level middleware (mounted immediately for Vercel/serverless environments)
@@ -268,6 +388,9 @@ app.get("/api/health", (req, res) => {
           model: MODEL_NAME,
           contents: prompt,
           config: {
+            maxOutputTokens: 4096,
+            temperature: 0.7,
+            topP: 0.95,
             responseMimeType: "application/json",
             responseSchema: {
               type: Type.ARRAY,
@@ -330,6 +453,9 @@ app.get("/api/health", (req, res) => {
           model: MODEL_NAME,
           contents: prompt,
           config: {
+            maxOutputTokens: 8192,
+            temperature: 0.8,
+            topP: 0.95,
             responseMimeType: "application/json",
             responseSchema: {
               type: Type.OBJECT,
@@ -639,57 +765,15 @@ app.get("/api/health", (req, res) => {
 
         let finalJson: any = {};
         if (docType === "kurs_ishi") {
-          let attempts = 0;
-          let isFullyValid = false;
-          let currentPrompt = prompt;
-
-          while (attempts < 2 && !isFullyValid) {
-            console.log(`[Kurs Ishi Generation] Attempt ${attempts + 1} starting...`);
-            const response = await generateContentWithRotation({
-              model: "gemini-1.5-flash",
-              contents: currentPrompt,
-              config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: Type.OBJECT,
-                  properties: {
-                    title: { type: Type.STRING },
-                    content: { type: Type.STRING, description: "Markdown formatida to'liq matn" }
-                  },
-                  required: ["title", "content"]
-                }
-              }
-            });
-
-            finalJson = parseJSONResponse(response.text, {});
-            const validation = validateKursIshi(
-              finalJson.content,
-              options?.university,
-              options?.faculty,
-              options?.studentName,
-              options?.advisor,
-              topic
-            );
-
-            if (validation.isValid) {
-              isFullyValid = true;
-              finalJson.content = validation.cleanContent;
-              console.log("[Kurs Ishi Generation] Successfully validated and cleared placeholders!");
-            } else {
-              attempts++;
-              console.warn(`[Kurs Ishi Generation Failed Validation] Attempt ${attempts}: ${validation.reason}`);
-              if (attempts >= 2) {
-                finalJson.content = validation.cleanContent;
-                break;
-              }
-              currentPrompt = `${prompt}\n\n⚠️ OLDINGI URINISHDA XATOLAR ANIQLANDI. ILTIMOS QUYIDAGI MUAMMOLARNI TO'LIQ TUZATIB GENERATSIYA QILING:\n${validation.reason}\nSiz taqdim etayotgan kurs ishi barcha talablarga (Mundarija, Kirish, I BOB, II BOB, Xulosa, Foydalanilgan adabiyotlar) javob bersin va hech qanday to'rtburchak qavsli placeholderlar qolib ketmasin!`;
-            }
-          }
+          finalJson = await generateKursIshiMultiStep(topic, options);
         } else {
           const response = await generateContentWithRotation({
             model: "gemini-1.5-flash",
             contents: prompt,
             config: {
+              maxOutputTokens: 16384,
+              temperature: 0.9,
+              topP: 1,
               responseMimeType: "application/json",
               responseSchema: {
                 type: Type.OBJECT,
@@ -717,6 +801,9 @@ app.get("/api/health", (req, res) => {
           model: MODEL_NAME,
           contents: prompt,
           config: {
+            maxOutputTokens: 16384,
+            temperature: 0.8,
+            topP: 0.95,
             responseMimeType: "application/json",
             responseSchema: {
               type: Type.OBJECT,
@@ -953,6 +1040,8 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
                model: "gemini-1.5-flash",
                contents: contents,
                config: {
+                 maxOutputTokens: 4096,
+                 temperature: 0.7,
                  systemInstruction,
                  tools: tools.length > 0 ? tools : undefined
                }

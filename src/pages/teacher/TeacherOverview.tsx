@@ -22,6 +22,19 @@ export default function TeacherOverview() {
     if (!user) return;
 
     async function loadData() {
+      // Use cached stats if available and fresh (e.g. within last 15 minutes)
+      const cachedTime = localStorage.getItem(`teacher_stats_time_${user?.uid}`);
+      const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+      
+      if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL)) {
+        const cached = localStorage.getItem(`teacher_stats_${user?.uid}`);
+        if (cached) {
+          setStats(JSON.parse(cached));
+          setLoading(false);
+          return;
+        }
+      }
+
       try {
         const orgId = user?.role === 'staff' ? user.teacherId : user?.uid;
         if (!orgId) return;
@@ -37,14 +50,18 @@ export default function TeacherOverview() {
           getCountFromServer(query(collection(db, 'enrollments'), where('completed', '==', true), where('teacherId', '==', orgId))).catch(e => handleFirestoreError(e, OperationType.LIST, 'certs count')),
         ] as any[]);
 
-        setStats({
-          departments: deptCount.data().count,
-          groups: groupCount.data().count,
-          students: studentCount.data().count,
-          tests: testCount.data().count,
-          courses: courseCount.data().count,
-          certificates: certCount.data().count, // Note: We might need to adjust what 'certificates' means.
-        });
+        const newStats = {
+          departments: deptCount?.data?.().count || 0,
+          groups: groupCount?.data?.().count || 0,
+          students: studentCount?.data?.().count || 0,
+          tests: testCount?.data?.().count || 0,
+          courses: courseCount?.data?.().count || 0,
+          certificates: certCount?.data?.().count || 0,
+        };
+
+        setStats(newStats);
+        localStorage.setItem(`teacher_stats_${user?.uid}`, JSON.stringify(newStats));
+        localStorage.setItem(`teacher_stats_time_${user?.uid}`, Date.now().toString());
 
         const notifDoc = await getDoc(doc(db, 'siteContent', 'notifications'));
         if (notifDoc.exists()) {
