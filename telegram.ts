@@ -826,10 +826,10 @@ async function getKeyboard(
       const data = menuDoc.data();
       if (data.keyboard) {
         let kb = [...data.keyboard];
-        
+         
         // List of items that should be treated as features rather than generic buttons
-        const alwaysExclude = ["🤖 AI yordamchi", "🤖 AI Yordamchi"];
-        
+        const alwaysExclude = ["🤖 AI yordamchi", "🤖 AI Yordamchi", "💬 Savol-javob"];
+         
         if (authed && (userRole === "admin" || userRole === "subadmin")) {
           const excludeForAdmin = ["💬 Adminga murojaat", "💰 Balans", "💳 Balansni to'ldirish", ...alwaysExclude];
           kb = kb.map(row => row.filter((btn: any) => !excludeForAdmin.includes(btn.text))).filter(row => row.length > 0);
@@ -839,7 +839,7 @@ async function getKeyboard(
 
           const adminHeader = [
             [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
-            [{ text: "🤖 AI Yordamchi" }],
+            [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
             [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
             isPrimary 
               ? [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }]
@@ -858,7 +858,7 @@ async function getKeyboard(
 
           const userHeader = [
             [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
-            [{ text: "🤖 AI Yordamchi" }],
+            [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
             [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
             [{ text: "👥 Do'stlarni taklif qilish" }, { text: "🎁 Bepul ball" }]
           ];
@@ -872,7 +872,7 @@ async function getKeyboard(
 
           const guestHeader = [
             [{ text: "🔑 Kirish" }],
-            [{ text: "🤖 AI Yordamchi" }],
+            [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
             [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
             [{ text: "👥 Do'stlarni taklif qilish" }, { text: "🎁 Bepul ball" }]
           ];
@@ -890,7 +890,7 @@ async function getKeyboard(
   if (authed) {
     if (userRole === "admin" || userRole === "subadmin") {
       rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
-      rows.push([{ text: "🤖 AI Yordamchi" }]);
+      rows.push([{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }]);
       rows.push([{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }]);
       rows.push([{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }]);
       rows.push([{ text: "ℹ️ Tizim haqida" }]);
@@ -898,11 +898,11 @@ async function getKeyboard(
       return rows;
     }
     rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
-    rows.push([{ text: "🤖 AI Yordamchi" }]);
+    rows.push([{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }]);
     rows.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
   } else {
     rows.push([{ text: "🔑 Kirish" }]);
-    rows.push([{ text: "🤖 AI Yordamchi" }]);
+    rows.push([{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }]);
     rows.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
   }
 
@@ -2969,11 +2969,7 @@ bot.on("message", async (ctx) => {
   }
   const normText = userText.trim();
 
-  // If user directly clicked Savol-javob, ensure their AI mode is active
-  if (normText === "💬 Savol-javob") {
-    aiAssistantActiveUsers.set(userId, true);
-  }
-
+  // If user directly clicked Savol-javob, handled below with custom welcome message and keyboard
   // Auto-register current user or group chat to update telegramUsersCount and support broadcasts to groups
   const targetRegisterId = chatId || userId;
   if (targetRegisterId) {
@@ -2990,12 +2986,14 @@ bot.on("message", async (ctx) => {
     "ℹ️ Tizim haqida", "💰 Balans", "💳 Balansni to'ldirish",
     "💬 Adminga murojaat", "🌐 Rasmiy sayt",
     "🔙 Asosiy Menyu", "⬅️ Asosiy menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish",
-    "🤖 AI Yordamchi"
+    "🤖 AI Yordamchi", "💬 Savol-javob"
   ];
   
   if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu" || normText === "⬅️ Asosiy menyu") {
-    aiAssistantActiveUsers.delete(userId);
-    aiServiceStates.delete(userId);
+    if (normText !== "💬 Savol-javob") {
+      aiAssistantActiveUsers.delete(userId);
+      aiServiceStates.delete(userId);
+    }
   }
 
   // Check if user is in an active Wizard state (only check if there is no pending transaction/admin state)
@@ -3010,6 +3008,23 @@ bot.on("message", async (ctx) => {
   }
   
   // Specific AI Services Handler (Runs OUTSIDE of pure AI Chat mode)
+  if (normText === "💬 Savol-javob") {
+    aiAssistantActiveUsers.set(userId, true);
+    aiServiceStates.set(userId, "chat");
+    return ctx.reply(
+      "💬 <b>Savol-javob bo'limiga xush kelibsiz!</b>\n\n" +
+      "Ushbu bo'limda o'quv jarayoniga oid istalgan fan, dars, matematika, tarix, fizika, geografiya, ingliz tili, dasturlash yoki boshqa har qanday o'quv mavzularidagi o'zingizni qiziqtirgan savolingizni yoza olasiz. Sun'iy intellekt savollaringizga batafsil javob beradi.\n\n" +
+      "Chiqish va asosiy menyuga qaytish uchun <b>⬅️ Asosiy menyu</b> tugmasini bosing.",
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [[{ text: "⬅️ Asosiy menyu" }]],
+          resize_keyboard: true
+        }
+      }
+    );
+  }
+
   if (normText === "🤖 AI Yordamchi") {
     return ctx.reply("🤖 <b>AI Yordamchi xizmatlari menyusiga xush kelibsiz!</b>\n\nKerakli xizmatni tanlang:", {
       parse_mode: "HTML",
@@ -3856,28 +3871,31 @@ Foydalanuvchi xabari: ${prompt}`;
           const cleanResponseText = replyText.trim().replace(/[*_`]/g, "");
 
           // Programmatic fallback to guarantee adherence
+          const bypassRestriction = (currentState === "chat");
           if (
-            cleanResponseText.includes("topilmadi") ||
-            cleanResponseText.includes("Administrator bilan bog") ||
-            cleanResponseText.includes("mavjud emas") ||
-            cleanResponseText.includes("I cannot find") ||
-            cleanResponseText.includes("do not have") ||
-            cleanResponseText.includes("not found") ||
-            cleanResponseText.includes("Kechirasiz") ||
-            (!cleanResponseText.toLowerCase().includes("aiedu") && 
-            !cleanResponseText.toLowerCase().includes("tizim") && 
-            !cleanResponseText.toLowerCase().includes("platform") && 
-            !cleanResponseText.toLowerCase().includes("test") && 
-            !cleanResponseText.toLowerCase().includes("sertifikat") && 
-            !cleanResponseText.toLowerCase().includes("quiz") && 
-            !cleanResponseText.toLowerCase().includes("portfolio") && 
-            !cleanResponseText.toLowerCase().includes("jurnal") && 
-            !cleanResponseText.toLowerCase().includes("kurs") && 
-            !cleanResponseText.toLowerCase().includes("dars") && 
-            !cleanResponseText.toLowerCase().includes("slayd") && 
-            !cleanResponseText.toLowerCase().includes("maqola") && 
-            !cleanResponseText.toLowerCase().includes("baho") && 
-            !cleanResponseText.toLowerCase().includes("balans"))
+            !bypassRestriction && (
+              cleanResponseText.includes("topilmadi") ||
+              cleanResponseText.includes("Administrator bilan bog") ||
+              cleanResponseText.includes("mavjud emas") ||
+              cleanResponseText.includes("I cannot find") ||
+              cleanResponseText.includes("do not have") ||
+              cleanResponseText.includes("not found") ||
+              cleanResponseText.includes("Kechirasiz") ||
+              (!cleanResponseText.toLowerCase().includes("aiedu") && 
+              !cleanResponseText.toLowerCase().includes("tizim") && 
+              !cleanResponseText.toLowerCase().includes("platform") && 
+              !cleanResponseText.toLowerCase().includes("test") && 
+              !cleanResponseText.toLowerCase().includes("sertifikat") && 
+              !cleanResponseText.toLowerCase().includes("quiz") && 
+              !cleanResponseText.toLowerCase().includes("portfolio") && 
+              !cleanResponseText.toLowerCase().includes("jurnal") && 
+              !cleanResponseText.toLowerCase().includes("kurs") && 
+              !cleanResponseText.toLowerCase().includes("dars") && 
+              !cleanResponseText.toLowerCase().includes("slayd") && 
+              !cleanResponseText.toLowerCase().includes("maqola") && 
+              !cleanResponseText.toLowerCase().includes("baho") && 
+              !cleanResponseText.toLowerCase().includes("balans"))
+            )
           ) {
             replyText = "❌ Ushbu savol bo'yicha ma'lumot topilmadi.\n📞 Administrator bilan bog'lanishingizni tavsiya qilaman.";
           }
