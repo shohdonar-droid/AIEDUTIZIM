@@ -57,6 +57,11 @@ interface TariffConfig {
   perStaff?: number;
   aiPrice?: number;
   botPrice?: number;
+  perCourse?: number;
+  perTest?: number;
+  perExam?: number;
+  perSubject?: number;
+  perQuizizz?: number;
 }
 
 interface AllTariffsConfig {
@@ -114,13 +119,23 @@ const defaultTariffs: AllTariffsConfig = {
     maxTests: 9999,
     maxExams: 999,
     maxSubjects: 999,
-    maxQuizizz: 999
+    maxQuizizz: 999,
+    perCourse: 40000,
+    perTest: 2000,
+    perExam: 15000,
+    perSubject: 5000,
+    perQuizizz: 5000
   },
   extra: {
     perStudent: 1500,
     perStaff: 15000,
     aiPrice: 350000,
-    botPrice: 250000
+    botPrice: 250000,
+    perCourse: 50000,
+    perTest: 3000,
+    perExam: 20000,
+    perSubject: 6000,
+    perQuizizz: 6000
   }
 };
 
@@ -160,12 +175,22 @@ export default function AdminBilling() {
     staff: 20,
     ai: true,
     bot: true,
+    courses: 50,
+    tests: 300,
+    exams: 50,
+    subjects: 100,
+    quizizz: 100,
   });
   const [extraCalc, setExtraCalc] = useState({
     students: 0,
     staff: 0,
     ai: false,
     bot: false,
+    courses: 0,
+    tests: 0,
+    exams: 0,
+    subjects: 0,
+    quizizz: 0,
   });
 
   const calcCorpPrice = () => {
@@ -174,7 +199,14 @@ export default function AdminBilling() {
     const staffPrice = corpCalc.staff * (tariffsConfig.corporate.perStaff ?? 10000);
     const aiPrice = corpCalc.ai ? (tariffsConfig.corporate.aiPrice ?? 300000) : 0;
     const botPrice = corpCalc.bot ? (tariffsConfig.corporate.botPrice ?? 200000) : 0;
-    return base + stdPrice + staffPrice + aiPrice + botPrice;
+    
+    const coursesPrice = (corpCalc.courses ?? 0) * (tariffsConfig.corporate.perCourse ?? 40000);
+    const testsPrice = (corpCalc.tests ?? 0) * (tariffsConfig.corporate.perTest ?? 2000);
+    const examsPrice = (corpCalc.exams ?? 0) * (tariffsConfig.corporate.perExam ?? 15000);
+    const subjectsPrice = (corpCalc.subjects ?? 0) * (tariffsConfig.corporate.perSubject ?? 5000);
+    const quizizzPrice = (corpCalc.quizizz ?? 0) * (tariffsConfig.corporate.perQuizizz ?? 5000);
+    
+    return base + stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
   const calcExtraPrice = () => {
@@ -182,7 +214,14 @@ export default function AdminBilling() {
     const staffPrice = extraCalc.staff * (tariffsConfig.extra.perStaff ?? 15000);
     const aiPrice = extraCalc.ai ? (tariffsConfig.extra.aiPrice ?? 350000) : 0;
     const botPrice = extraCalc.bot ? (tariffsConfig.extra.botPrice ?? 250000) : 0;
-    return stdPrice + staffPrice + aiPrice + botPrice;
+    
+    const coursesPrice = (extraCalc.courses ?? 0) * (tariffsConfig.extra.perCourse ?? 50000);
+    const testsPrice = (extraCalc.tests ?? 0) * (tariffsConfig.extra.perTest ?? 3000);
+    const examsPrice = (extraCalc.exams ?? 0) * (tariffsConfig.extra.perExam ?? 20000);
+    const subjectsPrice = (extraCalc.subjects ?? 0) * (tariffsConfig.extra.perSubject ?? 6000);
+    const quizizzPrice = (extraCalc.quizizz ?? 0) * (tariffsConfig.extra.perQuizizz ?? 6000);
+    
+    return stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -789,6 +828,54 @@ export default function AdminBilling() {
                           className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
                         />
                      </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Yaratiladigan Kurslar soni</label>
+                        <input 
+                          type="number" 
+                          value={corpCalc.courses}
+                          onChange={(e) => setCorpCalc({...corpCalc, courses: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Testlar soni (mavzu & matn)</label>
+                        <input 
+                          type="number" 
+                          value={corpCalc.tests}
+                          onChange={(e) => setCorpCalc({...corpCalc, tests: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Imtihonlar soni</label>
+                        <input 
+                          type="number" 
+                          value={corpCalc.exams}
+                          onChange={(e) => setCorpCalc({...corpCalc, exams: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Mavzular soni</label>
+                        <input 
+                          type="number" 
+                          value={corpCalc.subjects}
+                          onChange={(e) => setCorpCalc({...corpCalc, subjects: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+
+                     <div className="space-y-2 md:col-span-2">
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Quizizzlar soni</label>
+                        <input 
+                          type="number" 
+                          value={corpCalc.quizizz}
+                          onChange={(e) => setCorpCalc({...corpCalc, quizizz: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
                      <div className="flex items-center gap-4 p-4 bg-indigo-800/30 rounded-2xl border border-indigo-700/50">
                         <input 
                           type="checkbox" 
@@ -863,6 +950,59 @@ export default function AdminBilling() {
                           placeholder="0"
                           value={extraCalc.staff || ""}
                           onChange={(e) => setExtraCalc({...extraCalc, staff: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Kurs qo'shish</label>
+                        <input 
+                          type="number" 
+                          placeholder="0"
+                          value={extraCalc.courses || ""}
+                          onChange={(e) => setExtraCalc({...extraCalc, courses: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Test qo'shish (mavzu & matn)</label>
+                        <input 
+                          type="number" 
+                          placeholder="0"
+                          value={extraCalc.tests || ""}
+                          onChange={(e) => setExtraCalc({...extraCalc, tests: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Imtihon qo'shish</label>
+                        <input 
+                          type="number" 
+                          placeholder="0"
+                          value={extraCalc.exams || ""}
+                          onChange={(e) => setExtraCalc({...extraCalc, exams: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Mavzu qo'shish</label>
+                        <input 
+                          type="number" 
+                          placeholder="0"
+                          value={extraCalc.subjects || ""}
+                          onChange={(e) => setExtraCalc({...extraCalc, subjects: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+
+                     <div className="space-y-2 md:col-span-2">
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Quizizz qo'shish</label>
+                        <input 
+                          type="number" 
+                          placeholder="0"
+                          value={extraCalc.quizizz || ""}
+                          onChange={(e) => setExtraCalc({...extraCalc, quizizz: Number(e.target.value)})}
                           className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
                         />
                      </div>
@@ -1408,6 +1548,68 @@ export default function AdminBilling() {
                       />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        1 ta Kurs narxi/oy (Corporate)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perCourse ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perCourse: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        1 ta Test narxi/oy (Corporate)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perTest ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perTest: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        1 ta Imtihon narxi/oy (Corporate)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perExam ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perExam: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        1 ta Mavzu narxi/oy (Corporate)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perSubject ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perSubject: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                      1 ta Quizizz narxi/oy (Corporate)
+                    </label>
+                    <input
+                      type="number"
+                      value={editingTariffForm.perQuizizz ?? 0}
+                      onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perQuizizz: Number(e.target.value) })}
+                      className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold shadow-sm"
+                    />
+                  </div>
                 </>
               )}
 
@@ -1461,6 +1663,68 @@ export default function AdminBilling() {
                         className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                        Qo'shish: 1 ta Kurs narxi (Extra)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perCourse ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perCourse: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                        Qo'shish: 1 ta Test narxi (Extra)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perTest ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perTest: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                        Qo'shish: 1 ta Imtihon narxi (Extra)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perExam ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perExam: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                        Qo'shish: 1 ta Mavzu narxi (Extra)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perSubject ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perSubject: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                      Qo'shish: 1 ta Quizizz narxi (Extra)
+                    </label>
+                    <input
+                      type="number"
+                      value={editingTariffForm.perQuizizz ?? 0}
+                      onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perQuizizz: Number(e.target.value) })}
+                      className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold shadow-sm"
+                    />
                   </div>
                 </>
               )}

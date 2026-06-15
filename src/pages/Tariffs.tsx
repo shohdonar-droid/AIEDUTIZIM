@@ -35,6 +35,11 @@ interface TariffConfig {
   perStaff?: number;
   aiPrice?: number;
   botPrice?: number;
+  perCourse?: number;
+  perTest?: number;
+  perExam?: number;
+  perSubject?: number;
+  perQuizizz?: number;
 }
 
 interface AllTariffsConfig {
@@ -93,13 +98,23 @@ const defaultTariffs: AllTariffsConfig = {
     maxTests: 9999,
     maxExams: 999,
     maxSubjects: 999,
-    maxQuizizz: 999
+    maxQuizizz: 999,
+    perCourse: 40000,
+    perTest: 2000,
+    perExam: 15000,
+    perSubject: 5000,
+    perQuizizz: 5000
   },
   extra: {
     perStudent: 1500,
     perStaff: 15000,
     aiPrice: 350000,
-    botPrice: 250000
+    botPrice: 250000,
+    perCourse: 50000,
+    perTest: 3000,
+    perExam: 20000,
+    perSubject: 6000,
+    perQuizizz: 6000
   }
 };
 
@@ -113,6 +128,11 @@ export default function Tariffs() {
     staff: 20,
     ai: true,
     bot: true,
+    courses: 50,
+    tests: 300,
+    exams: 50,
+    subjects: 100,
+    quizizz: 100,
   });
 
   // Extra limits calculator state
@@ -121,6 +141,11 @@ export default function Tariffs() {
     staff: 5,
     ai: true,
     bot: true,
+    courses: 5,
+    tests: 20,
+    exams: 5,
+    subjects: 10,
+    quizizz: 10,
   });
 
   useEffect(() => {
@@ -145,7 +170,14 @@ export default function Tariffs() {
     const staffPrice = corpCalc.staff * (configs.corporate.perStaff ?? 10000);
     const aiPrice = corpCalc.ai ? (configs.corporate.aiPrice ?? 300000) : 0;
     const botPrice = corpCalc.bot ? (configs.corporate.botPrice ?? 200000) : 0;
-    return base + stdPrice + staffPrice + aiPrice + botPrice;
+    
+    const coursesPrice = (corpCalc.courses ?? 0) * (configs.corporate.perCourse ?? 40000);
+    const testsPrice = (corpCalc.tests ?? 0) * (configs.corporate.perTest ?? 2000);
+    const examsPrice = (corpCalc.exams ?? 0) * (configs.corporate.perExam ?? 15000);
+    const subjectsPrice = (corpCalc.subjects ?? 0) * (configs.corporate.perSubject ?? 5000);
+    const quizizzPrice = (corpCalc.quizizz ?? 0) * (configs.corporate.perQuizizz ?? 5000);
+    
+    return base + stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
   const calcExtraPrice = () => {
@@ -153,7 +185,14 @@ export default function Tariffs() {
     const staffPrice = extraCalc.staff * (configs.extra.perStaff ?? 15000);
     const aiPrice = extraCalc.ai ? (configs.extra.aiPrice ?? 350000) : 0;
     const botPrice = extraCalc.bot ? (configs.extra.botPrice ?? 250000) : 0;
-    return stdPrice + staffPrice + aiPrice + botPrice;
+    
+    const coursesPrice = (extraCalc.courses ?? 0) * (configs.extra.perCourse ?? 50000);
+    const testsPrice = (extraCalc.tests ?? 0) * (configs.extra.perTest ?? 3000);
+    const examsPrice = (extraCalc.exams ?? 0) * (configs.extra.perExam ?? 20000);
+    const subjectsPrice = (extraCalc.subjects ?? 0) * (configs.extra.perSubject ?? 6000);
+    const quizizzPrice = (extraCalc.quizizz ?? 0) * (configs.extra.perQuizizz ?? 6000);
+    
+    return stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
   return (
@@ -376,6 +415,86 @@ export default function Tariffs() {
                       </div>
                    </div>
 
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                        Kurslar sonini kiriting ({configs.corporate.perCourse ?? 40000} soʻm/ta)
+                      </label>
+                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={corpCalc.courses}
+                          onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
+                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                        />
+                        <span className="text-xs font-black text-slate-400">ta</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                        Testlar sonini kiriting ({configs.corporate.perTest ?? 2000} soʻm/ta)
+                      </label>
+                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={corpCalc.tests}
+                          onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
+                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                        />
+                        <span className="text-xs font-black text-slate-400">ta</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                        Imtihonlar sonini kiriting ({configs.corporate.perExam ?? 15000} soʻm/ta)
+                      </label>
+                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={corpCalc.exams}
+                          onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
+                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                        />
+                        <span className="text-xs font-black text-slate-400">ta</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                        Mavzular sonini kiriting ({configs.corporate.perSubject ?? 5000} soʻm/ta)
+                      </label>
+                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={corpCalc.subjects}
+                          onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
+                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                        />
+                        <span className="text-xs font-black text-slate-400">ta</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-2 md:col-span-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                        Quizizzlar sonini kiriting ({configs.corporate.perQuizizz ?? 5000} soʻm/ta)
+                      </label>
+                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={corpCalc.quizizz}
+                          onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
+                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                        />
+                        <span className="text-xs font-black text-slate-400">ta</span>
+                      </div>
+                   </div>
+
                    {/* AI module */}
                    <div className="flex items-center justify-between p-4 bg-slate-800/40 rounded-2xl border border-slate-700/50 hover:bg-slate-800 transition-all">
                       <span className="text-xs font-bold text-slate-200">AI Test Generator (+{(configs.corporate.aiPrice ?? 300000).toLocaleString()} sum/oy)</span>
@@ -458,6 +577,86 @@ export default function Tariffs() {
                         <span className="text-xs font-black text-emerald-400">ta</span>
                       </div>
                    </div>
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                         Qoʻshimcha kurslar (${(configs.extra.perCourse ?? 50000).toLocaleString()} soʻm/ta)
+                       </label>
+                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                         <input 
+                           type="number" 
+                           min="0"
+                           value={extraCalc.courses}
+                           onChange={(e) => setExtraCalc({...extraCalc, courses: Math.max(0, Number(e.target.value))})}
+                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                         />
+                         <span className="text-xs font-black text-emerald-400">ta</span>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                         Qoʻshimcha testlar (${(configs.extra.perTest ?? 3000).toLocaleString()} soʻm/ta)
+                       </label>
+                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                         <input 
+                           type="number" 
+                           min="0"
+                           value={extraCalc.tests}
+                           onChange={(e) => setExtraCalc({...extraCalc, tests: Math.max(0, Number(e.target.value))})}
+                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                         />
+                         <span className="text-xs font-black text-emerald-400">ta</span>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                         Qoʻshimcha imtihonlar (${(configs.extra.perExam ?? 20000).toLocaleString()} soʻm/ta)
+                       </label>
+                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                         <input 
+                           type="number" 
+                           min="0"
+                           value={extraCalc.exams}
+                           onChange={(e) => setExtraCalc({...extraCalc, exams: Math.max(0, Number(e.target.value))})}
+                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                         />
+                         <span className="text-xs font-black text-emerald-400">ta</span>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                         Qoʻshimcha mavzular (${(configs.extra.perSubject ?? 6000).toLocaleString()} soʻm/ta)
+                       </label>
+                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                         <input 
+                           type="number" 
+                           min="0"
+                           value={extraCalc.subjects}
+                           onChange={(e) => setExtraCalc({...extraCalc, subjects: Math.max(0, Number(e.target.value))})}
+                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                         />
+                         <span className="text-xs font-black text-emerald-400">ta</span>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                         Qoʻshimcha quizizzlar (${(configs.extra.perQuizizz ?? 6000).toLocaleString()} soʻm/ta)
+                       </label>
+                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                         <input 
+                           type="number" 
+                           min="0"
+                           value={extraCalc.quizizz}
+                           onChange={(e) => setExtraCalc({...extraCalc, quizizz: Math.max(0, Number(e.target.value))})}
+                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                         />
+                         <span className="text-xs font-black text-emerald-400">ta</span>
+                       </div>
+                    </div>
 
                    <div className="flex items-center justify-between p-4 bg-emerald-900/40 rounded-2xl border border-emerald-800/50 hover:bg-emerald-900 transition-all">
                       <span className="text-xs font-bold text-emerald-200">AI / Darsliklar qoʻshimcha (+{(configs.extra.aiPrice ?? 350000).toLocaleString()} sum/oy)</span>
