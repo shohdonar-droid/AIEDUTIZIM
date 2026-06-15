@@ -7,15 +7,65 @@ import { GoogleGenAI, Type as SDKType } from "@google/genai";
 
 const Type = SDKType;
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini.js";
+
+const ACADEMIC_PERSONA = `Siz AIEDUTIZIM platformasining "Bosh Akademik Maslahatchisi va Professor"isiz. Siz Oliy Attestatsiya Komissiyasi (OAK), xalqaro Scopus va ilg'or OTM (Oliy ta'lim muassasalari) standartlarini mukammal bilasiz. 
+
+---
+QA'TIY UMUMIY QOIDALAR:
+1. TON / USLUB: Faqat ilmiy, rasmiy va akademik tildan foydalaning. Kundalik, publisistik va jo'n so'zlarni ishlatmang.
+2. INTRO / OUTRO: Javobni to'g'ridan-to'g'ri kontentdan boshlang. Hech qachon kirish va xulosa gaplarni yozmang.
+3. FORMULALAR: Barcha matematik, iqtisodiy yoki statistik formulalar uchun mutlaqo LaTeX formatidan foydalaning. Inline formulalarni $...$, alohida blok formulalarni esa $$...$$ ichiga oling.
+4. TAQIQLANADI: Umumiy, mavhum gaplarni takrorlash qat'iyan taqiqlanadi. Har bir fikr dalil va mantiqqa asoslanishi shart.`;
+
 import { query as dbQuery } from "./src/lib/db.js";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
   if (!text) return defaultOutput;
   try {
-    const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    let cleaned = text.trim();
+    // Remove markdown code blocks
+    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```\s*$/g, "").trim();
+    
+    // Find first and last brackets/braces to extract core JSON
+    const firstBracket = cleaned.indexOf('[');
+    const firstBrace = cleaned.indexOf('{');
+    let start = -1;
+    if (firstBracket !== -1 && firstBrace !== -1) {
+      start = Math.min(firstBracket, firstBrace);
+    } else if (firstBracket !== -1) {
+      start = firstBracket;
+    } else if (firstBrace !== -1) {
+      start = firstBrace;
+    }
+
+    const lastBracket = cleaned.lastIndexOf(']');
+    const lastBrace = cleaned.lastIndexOf('}');
+    const end = Math.max(lastBracket, lastBrace);
+    
+    if (start !== -1 && end !== -1 && end > start) {
+      cleaned = cleaned.substring(start, end + 1);
+    }
+
     return JSON.parse(cleaned);
   } catch (e) {
-    console.error("JSON parse error:", e);
+    console.error("JSON parse error detail:", e);
+    console.error("Offending text snippet:", text?.substring(0, 200) + (text && text.length > 200 ? "..." : ""));
+    
+    // Attempt to fix truncated array of objects
+    if (text && text.trim().startsWith('[')) {
+      try {
+        let partial = text.trim();
+        // Find last complete object }
+        const lastCompleteObject = partial.lastIndexOf('}');
+        if (lastCompleteObject !== -1) {
+           const fixed = partial.substring(0, lastCompleteObject + 1) + ']';
+           return JSON.parse(fixed.replace(/^```json\s*/i, "").replace(/```\s*$/g, "").trim());
+        }
+      } catch (innerE) {
+        // Fallback
+      }
+    }
+    
     return defaultOutput;
   }
 }
@@ -126,7 +176,7 @@ async function generateKursIshiMultiStep(topic: string, options: any) {
 
     const callAi = async (prompt: string, maxTokens = 16384) => {
         const res = await generateContentWithRotation({
-            model: "gemini-1.5-flash",
+            model: "gemini-3.5-flash",
             contents: prompt,
             config: {
                 maxOutputTokens: maxTokens,
@@ -138,58 +188,75 @@ async function generateKursIshiMultiStep(topic: string, options: any) {
     };
 
     // Step 1: Plan
-    const planPrompt = `Siz akademik ekspertsiz. "${topic}" mavzusida 50 sahifalik kurs ishi uchun mukammal va juda batafsil mundarija (reja) yarating.
-    Muallif: ${student}. OTM: ${uni}.
-    Reja o'zbek tilida, quyidagi qismlardan iborat bo'lishi shart:
-    - Mundarija (Table of Contents)
-    - Kirish (Introduction)
-    - I BOB: NAZARIY VA METODOLOGIK ASOSLARI (Kamida 5 ta ichki bo'lim)
-    - II BOB: AMALIY TAHLIL VA EKSPERIMENTAL NATIJALAR (Kamida 5 ta ichki bo'lim)
-    - III BOB: TAKOMILLASHTIRISH YO'LLARI VA RIVOJLANISH ISTIQBOLLARI (Kamida 5 ta ichki bo'lim)
-    - Xulosa (Conclusion)
-    - Foydalanilgan adabiyotlar (Bibliography)
+    const planPrompt = `${ACADEMIC_PERSONA}
+    [TASK: KURS_ISHI_REJA]
+    Mavzu: "${topic}".
+    Mavzu bo'yicha 3 ta bobdan (har bir bobda 2 tadan paragraf) iborat mukammal kurs ishi rejasini tuzing.
+    - Majburiy qismlar: Kirish, I Bob (Nazariy), II Bob (Tahliliy/Amaliy), III Bob (Takliflar), Xulosa, Adabiyotlar ro'yxati.
     
-    Faqat mundarijani Markdown formatida qaytaring, boshqa gap qo'shmang.`;
+    Faqat mundarijani Markdown formatida qaytaring.`;
     const planText = await callAi(planPrompt, 4096);
     
     // Step 2: Introduction
-    const introPrompt = `Mavzu: "${topic}".\nOTM: ${uni}. Fakultet: ${fac}. Muallif: ${student}.\n\nMundarija: ${planText}\n\nUshbu kurs ishi uchun professional, akademik uslubdagi o'zbek tilida "KIRISH" (Introduction) qismini yarating. 
-    Unda mavzuning dolzarbligi, tadqiqot maqsadi, vazifalari, obyekti, predmeti, metodlari, ilmiy yangiligi va amaliy ahamiyati juda keng (bir necha sahifa) bayon etilsin.
+    const introPrompt = `${ACADEMIC_PERSONA}
+    [TASK: KURS_ISHI_BOB]
+    Mavzu: "${topic}".
+    Qism: KIRISH.
+    Mundarija: ${planText}
+    
+    Kamida 1500 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing. Matn ichida ilmiy manbalarga iqtiboslar ([1], [2] ko'rinishida) keltiring.
     Markdown formatida qaytaring.`;
     const introText = await callAi(introPrompt);
     
     // Step 3: Chapter 1
-    const ch1Prompt = `Mavzu: "${topic}".\nReja: ${planText}\n\n"I BOB: NAZARIY VA METODOLOGIK ASOSLARI" qismini o'zbek tilida juda batafsil yarating. 
-    Nazariy asoslar, ilmiy qarashlar va asosiy tushunchalarni yoritib bering. Har bir ichki bo'limni (1.1, 1.2 va h.k.) 3-4 sahifadan bayon qiling.
-    Jami bob kamida 15-18 sahifa bo'lishini maqsad qiling. Ilmiy manbalarga tayanib yozing.
+    const ch1Prompt = `${ACADEMIC_PERSONA}
+    [TASK: KURS_ISHI_BOB]
+    Mavzu: "${topic}".
+    Qism: I BOB.
+    Reja: ${planText}
+    
+    Kamida 2000 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing. Matn ichida ilmiy manbalarga iqtiboslar keltiring.
     Markdown formatida qaytaring.`;
     const ch1Text = await callAi(ch1Prompt);
     
     // Step 4: Chapter 2
-    const ch2Prompt = `Mavzu: "${topic}".\nReja: ${planText}\n\n"II BOB: AMALIY TAHLIL VA EKSPERIMENTAL NATIJALAR" qismini o'zbek tilida juda batafsil yarating. 
-    Amaliy tahlil, mavjud holat, statistik ma'lumotlar va muammolar tahlilini yoritib bering. 
-    Har bir ichki bo'limni (2.1, 2.2 va h.k.) 3-4 sahifadan bayon qiling.
-    Jami bob kamida 15-18 sahifa bo'lishini maqsad qiling. Diagrammalar va jadvallar uchun tavsiyalar qo'shing.
+    const ch2Prompt = `${ACADEMIC_PERSONA}
+    [TASK: KURS_ISHI_BOB]
+    Mavzu: "${topic}".
+    Qism: II BOB.
+    Reja: ${planText}
+    
+    Kamida 2000 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing. Statistik ma'lumotlar uchun tavsiyaviy andozalar kiriting.
     Markdown formatida qaytaring.`;
     const ch2Text = await callAi(ch2Prompt);
     
     // Step 5: Chapter 3
-    const ch3Prompt = `Mavzu: "${topic}".\nReja: ${planText}\n\n"III BOB: TAKOMILLASHTIRISH YO'LLARI VA RIVOJLANISH ISTIQBOLLARI" qismini o'zbek tilida juda batafsil yarating. 
-    Takomillashtirish yo'llari, innovatsion yondashuvlar, amaliy tavsiyalar va muallif takliflarini yoritib bering. 
-    Har bir ichki bo'limni (3.1, 3.2 va h.k.) 3-4 sahifadan bayon qiling.
+    const ch3Prompt = `${ACADEMIC_PERSONA}
+    [TASK: KURS_ISHI_BOB]
+    Mavzu: "${topic}".
+    Qism: III BOB.
+    Reja: ${planText}
+    
+    Kamida 1500 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing. Takliflar va xorijiy tajribani yoritib bering.
     Markdown formatida qaytaring.`;
     const ch3Text = await callAi(ch3Prompt);
     
     // Step 6: Conclusion
-    const conclusionPrompt = `Mavzu: "${topic}".\n\nBarcha qismlar yakuni sifatida o'zbek tilida professional "XULOSA" (Conclusion) qismini yarating. 
-    Tadqiqot natijalari, asosiy qisqa xulosalar va amaliy tavsiyalar mantiqiy tarzda juda batafsil yoritilsin.
-    Markdown formatida qaytaring.`;
+    const conclusionPrompt = `${ACADEMIC_PERSONA}
+    [TASK: KURS_ISHI_BOB]
+    Mavzu: "${topic}".
+    Qism: XULOSA.
+    
+    Yozilgan boblar asosida o'ta batafsil ilmiy xulosa yozing.`;
     const conclusionText = await callAi(conclusionPrompt);
     
     // Step 7: Bibliography
-    const bibPrompt = `Mavzu: "${topic}".\n\nUshbu kurs ishi mavzusi bo'yicha o'zbek, rus va ingliz tillarida kamida 50 ta zamonaviy ilmiy manbalar (kitoblar, maqolalar, huquqiy hujjatlar) ro'yxatini yarating. 
-    "FOYDALANILGAN ADABIYOTLAR RO'YXATI" sarlavhasi ostida bibliografik me'yorlarda bo'lsin.
-    Markdown formatida qaytaring.`;
+    const bibPrompt = `${ACADEMIC_PERSONA}
+    [TASK: KURS_ISHI_BOB]
+    Mavzu: "${topic}".
+    Qism: ADABIYOTLAR RO'YXATI.
+    
+    OAK va xalqaro standartlara mos 15-20 ta ilmiy manba ro'yxatini shakllantiring.`;
     const bibText = await callAi(bibPrompt);
 
     // Step 8: Combine
@@ -295,7 +362,7 @@ app.get("/api/health", (req, res) => {
       }
       
       const response = await generateContentWithRotation({
-        model: "gemini-1.5-flash",
+        model: "gemini-3.5-flash",
         contents: "Salom, bu test xabari. Iltimos 'OK' deb javob bering."
       });
       
@@ -363,7 +430,7 @@ app.get("/api/health", (req, res) => {
         }
       }
 
-      const MODEL_NAME = "gemini-1.5-flash";
+      const MODEL_NAME = "gemini-3.5-flash";
 
       if (action === "generateDynamicTest") {
         const countOptions = 4;
@@ -388,8 +455,8 @@ app.get("/api/health", (req, res) => {
           model: MODEL_NAME,
           contents: prompt,
           config: {
-            maxOutputTokens: 4096,
-            temperature: 0.7,
+            maxOutputTokens: 8192,
+            temperature: 0.1,
             topP: 0.95,
             responseMimeType: "application/json",
             responseSchema: {
@@ -745,22 +812,15 @@ app.get("/api/health", (req, res) => {
 
           Natija: Pedagogik hujjat shaklida, professional va amaliy foydalanishga to'liq tayyor bo'lsin.`;
         } else if (docType === "tarjimon") {
-          prompt = `Siz professional akademik tarjimonsiz. 
-          Vazifa: Berilgan matnning mazmunini to'liq saqlagan holda professional tarjima qilish.
-          
-          Matn: "${topic}".
-          
-          QOIDALAR:
-          - Terminlarni to'g'ri tarjima qiling.
-          - Akademik uslubni saqlang.
-          - Grammatik xatolarga yo'l qo'ymang.
-          - Faqat tarjima natijasini qaytaring, ortiqcha izohlarsiz.`;
+          prompt = `${ACADEMIC_PERSONA}
+          [TASK: TARJIMON]
+          Matn: "${topic}".`;
         } else if (docType === 'hisobot') {
-          prompt = `Mavzu: "${topic}". 
-     Birlamchi ma'lumotlar: "${options?.context || ''}".
-     Ushbu ma'lumotlar asosida mukammal va kengaytirilgan "Hisobot" (Report) tayyorlang. O'zbek tilida, rasmiy uslubda bo'lishi shart.
-     Berilgan qilingan/rejalashtirilgan ishlar haqidagi qisqa matnni professional va ilmiy darajaga ko'taring.
-     Javob faqat JSON formatida bo'lsin.`;
+          prompt = `${ACADEMIC_PERSONA}
+          [TASK: TARJIMON]
+          Mavzu: "${topic}". 
+          Birlamchi ma'lumotlar: "${options?.context || ''}".
+          Ushbu ma'lumotlar asosida professional hisobot tayyorlang.`;
         }
 
         let finalJson: any = {};
@@ -768,7 +828,7 @@ app.get("/api/health", (req, res) => {
           finalJson = await generateKursIshiMultiStep(topic, options);
         } else {
           const response = await generateContentWithRotation({
-            model: "gemini-1.5-flash",
+            model: "gemini-3.5-flash",
             contents: prompt,
             config: {
               maxOutputTokens: 16384,
@@ -849,7 +909,7 @@ app.get("/api/health", (req, res) => {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-1.5-flash",
+        model: model || "gemini-3.5-flash",
         contents: prompt
       });
 
@@ -1037,7 +1097,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-1.5-flash",
+               model: "gemini-3.5-flash",
                contents: contents,
                config: {
                  maxOutputTokens: 4096,

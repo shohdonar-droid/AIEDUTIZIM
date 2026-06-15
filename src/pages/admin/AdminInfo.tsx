@@ -77,6 +77,72 @@ export default function AdminInfo() {
     }
   };
 
+  const handleUploadSectionItem = async (sectionId: string, itemType: 'image' | 'file', file: File) => {
+    if (!content) return;
+    
+    const fileName = file.name;
+    const fileExt = fileName.split('.').pop()?.toLowerCase() || '';
+    
+    if (itemType === 'file') {
+      const allowedExts = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'];
+      if (!allowedExts.includes(fileExt)) {
+        console.error(`Xatolik: Nojo'ya fayl formati yuklanmoqchi bo'lindi: .${fileExt}`);
+        alert("Faqat PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX formatidagi fayllarni yuklash mumkin!");
+        return;
+      }
+    } else if (itemType === 'image') {
+      if (!file.type.startsWith('image/')) {
+        console.error("Xatolik: Nojo'ya rasm formati yuklanmoqchi bo'lindi:", file.type);
+        alert("Faqat rasm fayllarini yuklash mumkin!");
+        return;
+      }
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      const downloadUrl = await uploadFileToStorage(file, false);
+      
+      const updatedSections = (content.hero.infoSections || []).map(s => {
+        if (s.id === sectionId) {
+          if (itemType === 'image') {
+            const currentImages = s.images || [];
+            return { ...s, images: [...currentImages, downloadUrl] };
+          } else {
+            const currentFiles = s.files || [];
+            return { 
+              ...s, 
+              files: [...currentFiles, { name: file.name, url: downloadUrl, type: file.type || 'application/octet-stream' }] 
+            };
+          }
+        }
+        return s;
+      });
+
+      const updatedContent = {
+        ...content,
+        hero: {
+          ...content.hero,
+          infoSections: updatedSections
+        }
+      };
+
+      // Write directly to Firestore and local cache
+      await setDoc(doc(db, 'siteContent', 'main'), updatedContent, { merge: true });
+      
+      console.log(`Muvaffaqiyatli saqlandi. Firestore va Storage yangilandi. Hujjat nomi: ${file.name}`);
+      setContent(updatedContent);
+      localStorage.setItem('site_content_main_cache', JSON.stringify(updatedContent));
+    } catch (err: any) {
+      console.error("Fayl yuklashda xatolik yuz berdi:", err);
+      alert("Yuklashda xatolik yuz berdi: " + err.message);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
   useEffect(() => {
     // Load from cache first
     const cached = localStorage.getItem('site_content_main_cache');
@@ -376,18 +442,34 @@ export default function AdminInfo() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if(!file) return;
-                    const tempUrl = URL.createObjectURL(file);
-                    setContent({ ...content, hero: { ...content.hero, rightImage: tempUrl } });
                     
-                    uploadFileToStorage(file, true).then(url => {
+                    setIsUploading(true);
+                    setUploadProgress(0);
+                    
+                    uploadFileToStorage(file, false).then(url => {
                        setContent(prev => {
                           if (!prev) return prev;
-                          if (prev.hero.rightImage === tempUrl) {
-                             return { ...prev, hero: { ...prev.hero, rightImage: url } };
-                          }
-                          return prev;
+                          const updated = {
+                             ...prev,
+                             hero: {
+                               ...prev.hero,
+                               rightImage: url
+                             }
+                          };
+                          
+                          setDoc(doc(db, 'siteContent', 'main'), updated, { merge: true })
+                            .then(() => console.log("News card image saved to Firestore:", url))
+                            .catch(err => console.error("Error saving news card image to Firestore:", err));
+                          
+                          localStorage.setItem('site_content_main_cache', JSON.stringify(updated));
+                          return updated;
                        });
-                    }).catch(() => {});
+                    }).catch(err => {
+                       console.error("News card image upload failed:", err);
+                       alert("Rasm yuklashda xatolik: " + err.message);
+                    }).finally(() => {
+                       setIsUploading(false);
+                    });
                   }}
                 />
                 
@@ -558,16 +640,15 @@ export default function AdminInfo() {
                           const f = e.target.files?.[0];
                           if (!f) return;
                           
-                          const tempUrl = URL.createObjectURL(f);
-                          const currentImages = currentSection.images || [];
-                          updateSection(currentSection.id, { images: [...currentImages, tempUrl] });
+                          handleUploadSectionItem(currentSection.id, 'image', f);
+                          return;
 
                           uploadFileToStorage(f, true).then(url => {
                              setContent(prev => {
                                 if (!prev) return prev;
                                 const newSections = prev.hero.infoSections?.map(s => {
                                    if (s.id === currentSection.id) {
-                                      return { ...s, images: s.images?.map(img => img === tempUrl ? url : img) };
+                                      return s;
                                    }
                                    return s;
                                 });
@@ -618,23 +699,7 @@ export default function AdminInfo() {
                         file.onchange = (e: any) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          
-                          const tempUrl = URL.createObjectURL(f);
-                          const currentImages = currentSection.images || [];
-                          updateSection(currentSection.id, { images: [...currentImages, tempUrl] });
-
-                          uploadFileToStorage(f, true).then(url => {
-                             setContent(prev => {
-                                if (!prev) return prev;
-                                const newSections = prev.hero.infoSections?.map(s => {
-                                   if (s.id === currentSection.id) {
-                                      return { ...s, images: s.images?.map(img => img === tempUrl ? url : img) };
-                                   }
-                                   return s;
-                                });
-                                return { ...prev, hero: { ...prev.hero, infoSections: newSections } };
-                             });
-                          }).catch(() => {});
+                          handleUploadSectionItem(currentSection.id, 'image', f);
                         };
                         file.click();
                       }}
@@ -667,28 +732,11 @@ export default function AdminInfo() {
                          onClick={() => {
                            const file = document.createElement('input');
                            file.type = 'file';
+                           file.accept = '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                            file.onchange = (e: any) => {
                              const f = e.target.files?.[0];
                              if (!f) return;
-                             
-                             const tempUrl = URL.createObjectURL(f);
-                             const currentFiles = currentSection.files || [];
-                             updateSection(currentSection.id, { 
-                               files: [...currentFiles, { name: f.name, url: tempUrl, type: f.type }] 
-                             });
-
-                             uploadFileToStorage(f, true).then(url => {
-                                setContent(prev => {
-                                   if (!prev) return prev;
-                                   const newSections = prev.hero.infoSections?.map(s => {
-                                      if (s.id === currentSection.id) {
-                                         return { ...s, files: s.files?.map(file => file.url === tempUrl ? { ...file, url } : file) };
-                                      }
-                                      return s;
-                                   });
-                                   return { ...prev, hero: { ...prev.hero, infoSections: newSections } };
-                                });
-                             }).catch(() => {});
+                             handleUploadSectionItem(currentSection.id, 'file', f);
                            };
                            file.click();
                          }}

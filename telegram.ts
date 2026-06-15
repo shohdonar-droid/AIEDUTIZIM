@@ -1876,6 +1876,32 @@ async function ensureUserStateSynced(userId: number) {
   }
 }
 
+function safeParseJSON(text: string | null | undefined, defaultValue: any): any {
+  if (!text) return defaultValue;
+  try {
+    let cleaned = text.trim();
+    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```\s*$/g, "").trim();
+    const start = Math.max(cleaned.indexOf('['), cleaned.indexOf('{'));
+    const end = Math.max(cleaned.lastIndexOf(']'), cleaned.lastIndexOf('}'));
+    if (start !== -1 && end !== -1 && end > start) {
+      cleaned = cleaned.substring(start, end + 1);
+    }
+    return JSON.parse(cleaned);
+  } catch (e) {
+    if (text && text.trim().startsWith('[')) {
+      try {
+        let partial = text.trim();
+        const lastCompleteObject = partial.lastIndexOf('}');
+        if (lastCompleteObject !== -1) {
+           const fixed = partial.substring(0, lastCompleteObject + 1) + ']';
+           return JSON.parse(fixed.replace(/^```json\s*/i, "").replace(/```\s*$/g, "").trim());
+        }
+      } catch (innerE) {}
+    }
+    return defaultValue;
+  }
+}
+
 async function runPresentationGeneration(ctx: any, data: any) {
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
@@ -3753,27 +3779,62 @@ bot.on("message", async (ctx) => {
           }
 
           const systemCtx = await getSystemContextInfo();
-          const systemInstructionText = `Siz AIEDUTIZIM botining aqlli yordamchisiz. Foydalanuvchi ismi: ${authed?.displayName || ctx.from?.first_name || "Foydalanuvchi"}.
+          const systemInstructionText = `Siz AIEDUTIZIM platformasining "Bosh Akademik Maslahatchisi va Professor"isiz. Siz Oliy Attestatsiya Komissiyasi (OAK), xalqaro Scopus va ilg'or OTM (Oliy ta'lim muassasalari) standartlarini mukammal bilasiz. 
 
-Atrof-muhit va joriy statistika (faqat raqamlar bo'yicha savol berilsa foydalaning):
+Sizning vazifangiz — foydalanuvchi yuborgan so'rovdagi maxsus [TASK: ...] tegiga qarab, quyidagi xizmatlardan birini o'ta mukammal va akademik tilda bajarishdir.
+
+---
+QA'TIY UMUMIY QOIDALAR:
+1. TON / USLUB: Faqat ilmiy, rasmiy va akademik tildan foydalaning. Kundalik, publisistik va jo'n so'zlarni ishlatmang. (Masalan: "juda samarali" o'rniga "yuksak samaradorlik ko'rsatkichiga ega" deb yozing).
+2. INTRO / OUTRO: Javobni to'g'ridan-to'g'ri kontentdan boshlang. Hech qachon "Mana siz so'ragan ma'lumot:", "Sizga yordam berishdan xursandman" kabi kirish va xulosa gaplarni yozmang.
+3. FORMULALAR: Barcha matematik, iqtisodiy yoki statistik formulalar uchun mutlaqo LaTeX formatidan foydalaning. Inline formulalarni $...$, alohida blok formulalarni esa $$...$$ ichiga oling. (Masalan: $\sigma = \sqrt{\frac{\sum(x-\mu)^2}{N}}$).
+4. TAQIQLANADI: Umumiy, mavhum gaplarni takrorlash (suv ko'paytirish) qat'iyan taqiqlanadi. Har bir fikr dalil va mantiqqa asoslanishi shart.
+
+---
+[TASK: KURS_ISHI_REJA] bo'lganda bajariladigan algoritm:
+Mavzu bo'yicha 3 ta bobdan (har bir bobda 2 tadan paragraf) iborat mukammal kurs ishi rejasini tuzing.
+- Majburiy qismlar: Kirish, I Bob (Nazariy), II Bob (Tahliliy/Amaliy), III Bob (Takliflar), Xulosa, Adabiyotlar ro'yxati.
+
+[TASK: KURS_ISHI_BOB] bo'lganda bajariladigan algoritm:
+Berilgan bob yoki paragraf bo'yicha kamida 1500-2000 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing.
+- Matn ichida ilmiy manbalarga iqtiboslar ([1], [2] ko'rinishida) keltiring.
+- Xorijiy tajriba, jadvallar yoki statistik ma'lumotlar uchun tavsiyaviy andozalar kiriting.
+
+[TASK: MAQOLA_IMRAD] bo'lganda bajariladigan algoritm:
+Mavzu bo'yicha IMRAD xalqaro standartidagi maqolani to'liq shakllantiring.
+- Tarkibi: Title (Sarlavha), Abstract (O'zbek va ingliz tilida qisqacha mazmun), Keywords (Kalit so'zlar), Introduction (Kirish va adabiyotlar tahlili), Methodology (Metodologiya va LaTeX formulalar), Results (Natijalar), Discussion (Muhokama), Conclusion (Xulosa), References (APA yoki IEEE formatidagi 8-10 ta manba).
+- Maqola hajmi kamida 2500-3000 so'z bo'linger bo'lishi shart.
+
+[TASK: SLAYD_TAQDIMOT] bo'lganda bajariladigan algoritm:
+Berilgan mavzu bo'yicha kamida 8-10 ta slayd strukturasini yarating. Har bir slayd quyidagi qat'iy andozada bo'lsin:
+---
+SLAYD [RAQAM]: [SARLAVHA - max 40 belgi]
+---
+* [Tezis 1 - max 10 ta so'z]
+* [Tezis 2]
+* [Tezis 3]
+* [Visual Tavsiya: Slaydda bo'lishi kerak bo'lgan grafik yoki rasm tavsifi]
+
+[SPEECH NOTE - TAQDIMOTCHI NUTQI]
+"Ma'ruzachining og'zaki gapiradigan, tinglovchini jalb qiluvchi 30-50 soniyalik to'liq o'zbek tilidagi nutq matni."
+---
+
+[TASK: DARS_REJASI] bo'lganda bajariladigan algoritm:
+Pedagoglar uchun zamonaviy pedagogik texnologiyalarga mos, 13 ta majburiy banddan iborat (Mavzu, Maqsad, Kutilayotgan natijalar, Metodlar, Jihozlar, Tashkiliy qism, Mustahkamlash, Uyga vazifa va h.k.) dars ishlanmasini batafsil va dars ssenariysi ko'rinishida yozib bering.
+
+[TASK: CV_REZYUME] bo'lganda bajariladigan algoritm:
+Ish beruvchi va HR mutaxassislarini jalb qiladigan, barcha bo'limlari (Ma'lumoti, Kasbiy ko'nikmalari, Ish tajribasi, Yutuqlari, Portfolioga havolalar) to'liq to'ldirilgan professional rezyume matnini yarating.
+
+[TASK: TARJIMON] bo'lganda bajariladigan algoritm:
+Berilgan murakkab ilmiy yoki pedagogik matnni hech qanday so'zma-so'z tarjima xatolarisiz, o'zbek tilining akademik qoidalariga va kontekstiga mos ravishda professional darajada tarjima qiling.
+
+Atrof-muhit va joriy statistika (faqat platforma haqida savol bo'lsa):
 ${systemCtx}
-
-=== QAT'IY QOIDALAR (AI SAVOL-JAVOB TIZIMI): ===
-1. Siz FAQAT va FAQAT quyidagi "Tizim haqida" ma'lumotlar bazasida taqdim etilgan ma'lumotlar asosida javob bera olasiz.
-2. Internetdan mutlaqo foydalanmang! Saytlarni qidirmang!
-3. Umumiy bilimlaringiz asosida javob bermang! O'zingizdan ma'lumot to'qib chiqarmang!
-4. Agar foydalanuvchining so'zi noaniq bo'lsa yoki "Tizim haqida"gi ma'lumotlar bazasida topilmasa, aynan quyidagi matnni javob tariqasida qaytaring:
-❌ Ushbu savol bo'yicha ma'lumot topilmadi.
-📞 Administrator bilan bog'lanishingizni tavsiya qilaman.
-
-=== TIZIM HAQIDA MA'LUMOT ===
-${systemAboutText}
-=============================
 
 Foydalanuvchi xabari: ${prompt}`;
 
           const aiResponse = await generateContentWithRotation({
-            model: imagePart ? "gemini-1.5-flash" : "gemini-1.5-flash",
+            model: imagePart ? "gemini-3.5-flash" : "gemini-3.5-flash",
             contents: [
               { role: "user", parts: [{ text: systemInstructionText }, ...(imagePart ? [imagePart] : [])] }
             ]
@@ -5093,22 +5154,15 @@ Foydalanuvchi xabari: ${prompt}`;
                     : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
 
                   const genRes = await generateContentWithRotation({
-                    model: "gemini-1.5-flash",
+                    model: "gemini-3.5-flash",
                     contents: [{ role: "user", parts: [{ text: pText }] }],
                     config: {
                       systemInstruction:
-                        'Faqat JSON formatda array qaytar:\n[{ "question": "savol", "options": ["A","B","C","D"], "correctAnswer": "To\'g\'ri javob matni" }]. Boshqa text qo\'shma.',
-                      temperature: 0.7,
+                        'Faqat JSON formatda array qaytar:\n[{ "text": "savol", "options": ["A","B","C","D"], "correctIdx": 0 }]. correctIdx - to\'g\'ri javobning indexi (0-3). Boshqa text qo\'shma.',
+                      temperature: 0.1,
                     },
                   });
-                  try {
-                    let txt = genRes.text || "[]";
-                    txt = txt
-                      .replace(/```json/g, "")
-                      .replace(/```/g, "")
-                      .trim();
-                    questions = JSON.parse(txt);
-                  } catch (e) {}
+                  questions = safeParseJSON(genRes.text, []);
                 } catch (e) {}
 
                 await addDoc(collection(db, "quiz_history"), {
