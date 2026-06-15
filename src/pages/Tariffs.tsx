@@ -23,6 +23,11 @@ interface TariffConfig {
   staff?: number;
   hasAI?: boolean;
   hasBot?: boolean;
+  maxCourses?: number;
+  maxTests?: number;
+  maxExams?: number;
+  maxSubjects?: number;
+  maxQuizizz?: number;
   
   // CORPORATE pricing per unit
   basePrice?: number;
@@ -47,28 +52,48 @@ const defaultTariffs: AllTariffsConfig = {
     students: 50,
     staff: 2,
     hasAI: false,
-    hasBot: false
+    hasBot: false,
+    maxCourses: 3,
+    maxTests: 15,
+    maxExams: 2,
+    maxSubjects: 5,
+    maxQuizizz: 4
   },
   standard: {
     price: 700000,
     students: 200,
     staff: 5,
     hasAI: false,
-    hasBot: true
+    hasBot: true,
+    maxCourses: 10,
+    maxTests: 50,
+    maxExams: 10,
+    maxSubjects: 20,
+    maxQuizizz: 15
   },
   professional: {
     price: 1500000,
     students: 1000,
     staff: 20,
     hasAI: true,
-    hasBot: true
+    hasBot: true,
+    maxCourses: 50,
+    maxTests: 300,
+    maxExams: 50,
+    maxSubjects: 100,
+    maxQuizizz: 100
   },
   corporate: {
     basePrice: 500000,
     perStudent: 1000,
     perStaff: 10000,
     aiPrice: 300000,
-    botPrice: 200000
+    botPrice: 200000,
+    maxCourses: 999,
+    maxTests: 9999,
+    maxExams: 999,
+    maxSubjects: 999,
+    maxQuizizz: 999
   },
   extra: {
     perStudent: 1500,
@@ -139,7 +164,7 @@ export default function Tariffs() {
           Biznesingiz uchun eng yaxshi yechim
         </span>
         <h1 className="text-4xl sm:text-5xl font-black text-gray-900 tracking-tight leading-tight">
-          Tariflar Rejalari & Limitlar
+          Tariflar rejalari & Limitlar
         </h1>
         <p className="text-gray-500 font-bold text-lg leading-relaxed">
           Oʻzingizning tashkilotingiz uchun mos tarifni tanlang. Agarda sizga kattaroq imkoniyatlar kerak boʻlsa, 
@@ -164,21 +189,33 @@ export default function Tariffs() {
             
             <p className="text-gray-400 text-sm font-bold mb-6">Kichik guruhlar va individual oʻqituvchilar uchun ideal boshlang'ich paket.</p>
             
-            <ul className="space-y-4 mb-8">
+            <ul className="space-y-3 mb-8 border-t border-gray-50 pt-4">
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
                 <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.students ?? 50} ta-talabalar
               </li>
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.staff ?? 2} ta-xodimlar (o'qituvchi)
+                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.staff ?? 2} ta-xodimlar
               </li>
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> Murakkab testlar va guruhlar boshqaruvi
+                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxCourses ?? 3} ta kurs
               </li>
-              <li className="text-sm font-bold text-gray-400 flex items-center gap-3 line-through">
-                <XIcon /> Telegram guruh va kanallari uchun bot
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxTests ?? 15} ta test (mavzu va matn asosida)
               </li>
-              <li className="text-sm font-bold text-gray-400 flex items-center gap-3 line-through">
-                <XIcon /> Sun'iy Intellekt orqali test generatsiyasi
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxExams ?? 2} ta imtihon
+              </li>
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxSubjects ?? 5} ta mavzu
+              </li>
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxQuizizz ?? 4} ta quizizz
+              </li>
+              <li className={`text-sm font-bold flex items-center gap-3 ${configs.start.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                {configs.start.hasAI ? <Check className="w-5 h-5 text-orange-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt orqali test generatsiyasi
+              </li>
+              <li className={`text-sm font-bold flex items-center gap-3 ${configs.start.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                {configs.start.hasBot ? <Check className="w-5 h-5 text-orange-500 shrink-0" /> : <XIcon />} Telegram Bot integratsiyasi
               </li>
             </ul>
           </div>
@@ -200,7 +237,7 @@ export default function Tariffs() {
             
             <p className="text-gray-400 text-sm font-bold mb-6">Oʻrta hajmdagi oʻquv markazlari va guruhlar boshqaruvi uchun keng qamrovli tizim.</p>
             
-            <ul className="space-y-4 mb-8">
+            <ul className="space-y-3 mb-8 border-t border-gray-50 pt-4">
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
                 <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.students ?? 200} ta-talabalar
               </li>
@@ -208,13 +245,25 @@ export default function Tariffs() {
                 <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.staff ?? 5} ta-xodimlar
               </li>
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> Excel hisobotlar va tahliliy jadvallar
+                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxCourses ?? 10} ta kurs
               </li>
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> Telegram Bot integratsiyasi (+A'zolar boshqaruvi)
+                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxTests ?? 50} ta test (mavzu va matn asosida)
               </li>
-              <li className="text-sm font-bold text-gray-400 flex items-center gap-3 line-through">
-                <XIcon /> Sun'iy Intellekt orqali test generatsiyasi
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxExams ?? 10} ta imtihon
+              </li>
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxSubjects ?? 20} ta mavzu
+              </li>
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxQuizizz ?? 15} ta quizizz
+              </li>
+              <li className={`text-sm font-bold flex items-center gap-3 ${configs.standard.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                {configs.standard.hasAI ? <Check className="w-5 h-5 text-blue-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt orqali test generatsiyasi
+              </li>
+              <li className={`text-sm font-bold flex items-center gap-3 ${configs.standard.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                {configs.standard.hasBot ? <Check className="w-5 h-5 text-blue-500 shrink-0" /> : <XIcon />} Telegram Bot integratsiyasi
               </li>
             </ul>
           </div>
@@ -235,7 +284,7 @@ export default function Tariffs() {
             
             <p className="text-gray-400 text-sm font-bold mb-6">Katta oʻquv maskanlari va ilgʻor AI-innovatsiyalardan foydalanuvchi brendlar uchun.</p>
             
-            <ul className="space-y-4 mb-8">
+            <ul className="space-y-3 mb-8 border-t border-gray-50 pt-4">
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
                 <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.students ?? 1000} ta-talabalar
               </li>
@@ -243,13 +292,25 @@ export default function Tariffs() {
                 <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.staff ?? 20} ta-xodimlar
               </li>
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> VIP shaxsiy Telegram Bot boshqaruvi
+                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxCourses ?? 50} ta kurs
               </li>
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> Sun'iy Intellekt (AI) yordamida tezkor testlar va darslar yaratish
+                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxTests ?? 300} ta test (mavzu va matn asosida)
               </li>
               <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> Shaxsiy sertifikatlar tizimi va QR kodli tekshirishlar
+                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxExams ?? 50} ta imtihon
+              </li>
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxSubjects ?? 100} ta mavzu
+              </li>
+              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxQuizizz ?? 100} ta quizizz
+              </li>
+              <li className={`text-sm font-bold flex items-center gap-3 ${configs.professional.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                {configs.professional.hasAI ? <Check className="w-5 h-5 text-amber-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt orqali test generatsiyasi
+              </li>
+              <li className={`text-sm font-bold flex items-center gap-3 ${configs.professional.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                {configs.professional.hasBot ? <Check className="w-5 h-5 text-amber-500 shrink-0" /> : <XIcon />} Telegram Bot integratsiyasi
               </li>
             </ul>
           </div>
@@ -261,7 +322,7 @@ export default function Tariffs() {
       {/* Dynamic Interactive Plans Section */}
       <div className="space-y-12">
         <div className="text-center space-y-2">
-           <h2 className="text-3xl font-black text-gray-950">Maxsus Tuziladigan Moslanuvchan Tariflar</h2>
+           <h2 className="text-3xl font-black text-gray-950">Maxsus tuziladigan moslanuvchan tariflar</h2>
            <p className="text-gray-400 font-bold text-sm">Oʻz limitlaringizni kiriting, kalkulyator qolganini hisobladi!</p>
         </div>
 

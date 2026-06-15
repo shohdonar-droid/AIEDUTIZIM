@@ -45,6 +45,11 @@ interface TariffConfig {
   staff?: number;
   hasAI?: boolean;
   hasBot?: boolean;
+  maxCourses?: number;
+  maxTests?: number;
+  maxExams?: number;
+  maxSubjects?: number;
+  maxQuizizz?: number;
   
   // CORPORATE pricing per unit
   basePrice?: number;
@@ -68,28 +73,48 @@ const defaultTariffs: AllTariffsConfig = {
     students: 50,
     staff: 2,
     hasAI: false,
-    hasBot: false
+    hasBot: false,
+    maxCourses: 3,
+    maxTests: 10,
+    maxExams: 2,
+    maxSubjects: 5,
+    maxQuizizz: 4
   },
   standard: {
     price: 700000,
     students: 200,
     staff: 5,
     hasAI: false,
-    hasBot: true
+    hasBot: true,
+    maxCourses: 10,
+    maxTests: 50,
+    maxExams: 10,
+    maxSubjects: 20,
+    maxQuizizz: 15
   },
   professional: {
     price: 1500000,
     students: 1000,
     staff: 20,
     hasAI: true,
-    hasBot: true
+    hasBot: true,
+    maxCourses: 50,
+    maxTests: 300,
+    maxExams: 50,
+    maxSubjects: 100,
+    maxQuizizz: 100
   },
   corporate: {
     basePrice: 500000,
     perStudent: 1000,
     perStaff: 10000,
     aiPrice: 300000,
-    botPrice: 200000
+    botPrice: 200000,
+    maxCourses: 999,
+    maxTests: 9999,
+    maxExams: 999,
+    maxSubjects: 999,
+    maxQuizizz: 999
   },
   extra: {
     perStudent: 1500,
@@ -576,21 +601,33 @@ export default function AdminBilling() {
                <div>
                   <h3 className="text-2xl font-black text-gray-900 mb-2">START</h3>
                   <div className="text-3xl font-black text-orange-600 mb-6 font-mono">{(tariffsConfig.start.price ?? 300000).toLocaleString()} <small className="text-sm">sum/oy</small></div>
-                  <ul className="space-y-4 mb-8">
-                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                        <Check className="w-4 h-4 text-orange-500" /> {tariffsConfig.start.students ?? 50} ta-talabalar
+                  <ul className="space-y-2 mb-8">
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-orange-500" /> {tariffsConfig.start.students ?? 50} ta-talabalar
                      </li>
-                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                        <Check className="w-4 h-4 text-orange-500" /> {tariffsConfig.start.staff ?? 2} ta-xodimlar
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-orange-500" /> {tariffsConfig.start.staff ?? 2} ta-xodimlar
                      </li>
-                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                        <Check className="w-4 h-4 text-orange-500" /> Asosiy testlar moduli
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-orange-500" /> {tariffsConfig.start.maxCourses ?? 3} ta kurs
                      </li>
-                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.start.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                        <Check className={`w-4 h-4 ${tariffsConfig.start.hasAI ? "text-orange-500" : "text-gray-200"}`} /> AI imkoniyatlari
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-orange-500" /> {tariffsConfig.start.maxTests ?? 15} ta test (mavzu & matn)
                      </li>
-                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.start.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                        <Check className={`w-4 h-4 ${tariffsConfig.start.hasBot ? "text-orange-500" : "text-gray-200"}`} /> Telegram Bot integratsiyasi
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-orange-500" /> {tariffsConfig.start.maxExams ?? 2} ta imtihon
+                     </li>
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-orange-500" /> {tariffsConfig.start.maxSubjects ?? 5} ta mavzu
+                     </li>
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-orange-500" /> {tariffsConfig.start.maxQuizizz ?? 4} ta quizizz
+                     </li>
+                     <li className={`text-xs font-bold flex items-center gap-2 ${tariffsConfig.start.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-3.5 h-3.5 ${tariffsConfig.start.hasAI ? "text-orange-500" : "text-gray-200"}`} /> AI imkoniyatlari
+                     </li>
+                     <li className={`text-xs font-bold flex items-center gap-2 ${tariffsConfig.start.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-3.5 h-3.5 ${tariffsConfig.start.hasBot ? "text-orange-500" : "text-gray-200"}`} /> Telegram Bot integratsiyasi
                      </li>
                   </ul>
                </div>
@@ -619,21 +656,33 @@ export default function AdminBilling() {
                <div>
                   <h3 className="text-2xl font-black text-gray-900 mb-2">STANDARD</h3>
                   <div className="text-3xl font-black text-indigo-600 mb-6 font-mono">{(tariffsConfig.standard.price ?? 700000).toLocaleString()} <small className="text-sm">sum/oy</small></div>
-                  <ul className="space-y-4 mb-8">
-                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                        <Check className="w-4 h-4 text-indigo-500" /> {tariffsConfig.standard.students ?? 200} ta-talabalar
+                  <ul className="space-y-2 mb-8">
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-indigo-500" /> {tariffsConfig.standard.students ?? 200} ta-talabalar
                      </li>
-                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                        <Check className="w-4 h-4 text-indigo-500" /> {tariffsConfig.standard.staff ?? 5} ta-xodimlar
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-indigo-500" /> {tariffsConfig.standard.staff ?? 5} ta-xodimlar
                      </li>
-                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                        <Check className="w-4 h-4 text-indigo-500" /> Murakkab testlar va Hisobotlar
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-indigo-500" /> {tariffsConfig.standard.maxCourses ?? 10} ta kurs
                      </li>
-                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.standard.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                        <Check className={`w-4 h-4 ${tariffsConfig.standard.hasAI ? "text-indigo-500" : "text-gray-200"}`} /> AI imkoniyatlari
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-indigo-500" /> {tariffsConfig.standard.maxTests ?? 50} ta test (mavzu & matn)
                      </li>
-                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.standard.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                        <Check className={`w-4 h-4 ${tariffsConfig.standard.hasBot ? "text-indigo-500" : "text-gray-200"}`} /> Telegram Bot integratsiyasi
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-indigo-500" /> {tariffsConfig.standard.maxExams ?? 10} ta imtihon
+                     </li>
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-indigo-500" /> {tariffsConfig.standard.maxSubjects ?? 20} ta mavzu
+                     </li>
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-indigo-500" /> {tariffsConfig.standard.maxQuizizz ?? 15} ta quizizz
+                     </li>
+                     <li className={`text-xs font-bold flex items-center gap-2 ${tariffsConfig.standard.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-3.5 h-3.5 ${tariffsConfig.standard.hasAI ? "text-indigo-500" : "text-gray-200"}`} /> AI imkoniyatlari
+                     </li>
+                     <li className={`text-xs font-bold flex items-center gap-2 ${tariffsConfig.standard.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-3.5 h-3.5 ${tariffsConfig.standard.hasBot ? "text-indigo-500" : "text-gray-200"}`} /> Telegram Bot integratsiyasi
                      </li>
                   </ul>
                </div>
@@ -661,18 +710,33 @@ export default function AdminBilling() {
                <div>
                   <h3 className="text-2xl font-black text-gray-900 mb-2">PROFESSIONAL</h3>
                   <div className="text-3xl font-black text-amber-600 mb-6 font-mono">{(tariffsConfig.professional.price ?? 1500000).toLocaleString()} <small className="text-sm">sum/oy</small></div>
-                  <ul className="space-y-4 mb-8">
-                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                        <Check className="w-4 h-4 text-amber-500" /> {tariffsConfig.professional.students ?? 1000} ta-talabalar
+                  <ul className="space-y-2 mb-8">
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-amber-500" /> {tariffsConfig.professional.students ?? 1000} ta-talabalar
                      </li>
-                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                        <Check className="w-4 h-4 text-amber-500" /> {tariffsConfig.professional.staff ?? 20} ta-xodimlar
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-amber-500" /> {tariffsConfig.professional.staff ?? 20} ta-xodimlar
                      </li>
-                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.professional.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                        <Check className={`w-4 h-4 ${tariffsConfig.professional.hasAI ? "text-amber-500" : "text-gray-200"}`} /> AI orqali test generatori
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-amber-500" /> {tariffsConfig.professional.maxCourses ?? 50} ta kurs
                      </li>
-                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.professional.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                        <Check className={`w-4 h-4 ${tariffsConfig.professional.hasBot ? "text-amber-500" : "text-gray-200"}`} /> Full Telegram Bot Features
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-amber-500" /> {tariffsConfig.professional.maxTests ?? 300} ta test (mavzu & matn)
+                     </li>
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-amber-500" /> {tariffsConfig.professional.maxExams ?? 50} ta imtihon
+                     </li>
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-amber-500" /> {tariffsConfig.professional.maxSubjects ?? 100} ta mavzu
+                     </li>
+                     <li className="text-xs font-bold text-gray-600 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-amber-500" /> {tariffsConfig.professional.maxQuizizz ?? 100} ta quizizz
+                     </li>
+                     <li className={`text-xs font-bold flex items-center gap-2 ${tariffsConfig.professional.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-3.5 h-3.5 ${tariffsConfig.professional.hasAI ? "text-amber-500" : "text-gray-200"}`} /> AI orqali test generatori
+                     </li>
+                     <li className={`text-xs font-bold flex items-center gap-2 ${tariffsConfig.professional.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-3.5 h-3.5 ${tariffsConfig.professional.hasBot ? "text-amber-500" : "text-gray-200"}`} /> Full Telegram Bot Features
                      </li>
                   </ul>
                </div>
@@ -1210,6 +1274,74 @@ export default function AdminBilling() {
                     <label htmlFor="edit_hasBot" className="text-sm font-bold text-gray-700 cursor-pointer">
                       Telegram Bot integratsiyasi kiritilgan
                     </label>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-6 space-y-4">
+                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest pl-1">
+                      Imkoniyatlar limiti cheklovlari
+                    </h4>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 leading-tight block">
+                          Nechta kurs yarata bilishligi
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.maxCourses ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, maxCourses: Number(e.target.value) })}
+                          className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 leading-tight block">
+                          Nechta test (mavzu & matn)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.maxTests ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, maxTests: Number(e.target.value) })}
+                          className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 leading-tight block">
+                          Nechta imtihon yarata olishi
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.maxExams ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, maxExams: Number(e.target.value) })}
+                          className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 leading-tight block">
+                          Nechta mavzu yarata olishi
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.maxSubjects ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, maxSubjects: Number(e.target.value) })}
+                          className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 block">
+                        Nechta quizizz yarata olishligi
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.maxQuizizz ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, maxQuizizz: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                      />
+                    </div>
                   </div>
                 </>
               )}
