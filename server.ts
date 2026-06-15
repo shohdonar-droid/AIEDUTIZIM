@@ -8,14 +8,14 @@ import { GoogleGenAI, Type as SDKType } from "@google/genai";
 const Type = SDKType;
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini.js";
 
-const ACADEMIC_PERSONA = `Siz AIEDUTIZIM platformasining "Bosh Akademik Maslahatchisi va Professor"isiz. Siz Oliy Attestatsiya Komissiyasi (OAK), xalqaro Scopus va ilg'or OTM (Oliy ta'lim muassasalari) standartlarini mukammal bilasiz. 
+const ACADEMIC_PERSONA = `Siz AIEDUTIZIM platformasining "Aqilli yordamchi"si — ta'lim texnologiyalari va pedagogik tadqiqotlar bo'yicha akademik AI hamkorisiz.
 
----
-QA'TIY UMUMIY QOIDALAR:
-1. TON / USLUB: Faqat ilmiy, rasmiy va akademik tildan foydalaning. Kundalik, publisistik va jo'n so'zlarni ishlatmang.
-2. INTRO / OUTRO: Javobni to'g'ridan-to'g'ri kontentdan boshlang. Hech qachon kirish va xulosa gaplarni yozmang.
-3. FORMULALAR: Barcha matematik, iqtisodiy yoki statistik formulalar uchun mutlaqo LaTeX formatidan foydalaning. Inline formulalarni $...$, alohida blok formulalarni esa $$...$$ ichiga oling.
-4. TAQIQLANADI: Umumiy, mavhum gaplarni takrorlash qat'iyan taqiqlanadi. Har bir fikr dalil va mantiqqa asoslanishi shart.`;
+### CORE GUIDELINES:
+1. TON / USLUB: Qat'iy ilmiy, rasmiy va akademik. Faqat yuqori darajadagi o'zbek tili (pedagogik terminologiya)dan foydalaning.
+2. INTRO / OUTRO: Javobni to'g'ridan-to'g'ri kontentdan boshlang. Kirish va xulosa (salomlashish, xayrlashish) gaplarni yozmang.
+3. KURS ISHI MATNI: Word hujjatlari (.docx) uchun LaTeX formatidagi ($...$ yoki $$...$$) formulalardan mutlaqo foydalanmang! Buning o'rniga formulalarni aniq matn yoki Unicode belgilar yordamida yozing (Word Equation editorga mos keladigan tarzda).
+4. O'ZBEKISTON KONTEKSTI: Mazmunni O'zbekiston oliy ta'lim tizimi kontekstiga moslang (Prezident farmonlari, Vazirlik strategiyalari va mahalliy OTMlar misolida).
+5. TAQIQLANADI: Umumiy, mavhum gaplarni takrorlash qat'iyan taqiqlanadi. Har bir fikr dalil va mantiqqa asoslanishi shart.`;
 
 import { query as dbQuery } from "./src/lib/db.js";
 
@@ -492,18 +492,16 @@ app.get("/api/health", (req, res) => {
 
       } else if (action === "generatePresentation") {
         const slideCount = count || 15;
-        const prompt = `Siz AIEDUTIZIM Telegram Bot ichidagi AI Yordamchi modulida ishlovchi professional taqdimot ustasisiz.
-          Vazifa: "${topic}" mavzusi bo'yicha ${slideCount} ta slayddan iborat o'ta professional, vizual va akademik taqdimot tayyorlash.
+        const prompt = `${ACADEMIC_PERSONA}
+          Siz professional taqdimot ustasisiz. "${topic}" mavzusi bo'yicha ${slideCount} ta slayddan iborat o'ta professional va akademik taqdimot strukturasi (outline) tayyorlang.
           
           QOIDALAR:
-          1. Har bir slayd professional, vizual va tushunarli bo'lsin.
-          2. 1-slayd titul bo'lsin.
-          3. Oxirgi slayd "E'tiboringiz uchun rahmat" bilan yakunlansin.
-          4. Minimal matn (30% matn, 70% vizual) ishlating.
-          5. Har bir slaydda 3-5 ta qisqa punktlar bo'lsin.
-          6. Slaydlar dizayni "Diplom himoyasi" yoki "Ilmiy konferensiya" uchun mos bo'lsin.
-          7. Har bir slayd uchun 30-50 soniyalik nutq matni (speechNote) ham yarating.
-          8. Diagramma, ikonka va rasm tavsiyalarini aniq bering.
+          1. STRUCTURE: Faqat slayd sarlavhasi (Title) va uning mazmunini (Content) qaytaring.
+          2. TOZA MATN: Slayd mazmunida "Microsoft PowerPoint Custom Layout Template", "Infografika kartalari" kabi texnik andozalarni mutlaqo ishlatmang.
+          3. BELGILAR: Bullet pointlar uchun ★, ✦, 🔴 kabi maxsus belgilarni ishlatmang. Standart Markdown ro'yxatidan foydalaning.
+          4. HAQIQIY MA'LUMOT: Placeholderlar o'rniga haqiqiy va mantiqiy statistik ma'lumotlar, foizlar va aniq jadvallarni matn ko'rinishida yozing.
+          5. SPEECH NOTES: Har bir slayd uchun 30-50 soniyalik professional nutq matnini (speechNote) ham yarating.
+          6. Slaydlar soni qat'iyan ${slideCount} ta bo'lsin.
           
           LAYOUT TURLARI:
           - "cover" - Titul
