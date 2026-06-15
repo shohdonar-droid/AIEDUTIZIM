@@ -33,6 +33,7 @@ import {
   PlusCircle,
   Calculator,
   Check,
+  Eye,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
