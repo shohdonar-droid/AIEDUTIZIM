@@ -30,7 +30,9 @@ import {
   Zap,
   DollarSign,
   TrendingUp,
-  Eye,
+  PlusCircle,
+  Calculator,
+  Check,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -43,6 +45,37 @@ export default function AdminBilling() {
     "org",
   );
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Custom Calculators
+  const [corpCalc, setCorpCalc] = useState({
+    students: 1000,
+    staff: 20,
+    ai: true,
+    bot: true,
+  });
+  const [extraCalc, setExtraCalc] = useState({
+    students: 0,
+    staff: 0,
+    ai: false,
+    bot: false,
+  });
+
+  const calcCorpPrice = () => {
+    const base = 500000;
+    const stdPrice = corpCalc.students * 1000;
+    const staffPrice = corpCalc.staff * 10000;
+    const aiPrice = corpCalc.ai ? 300000 : 0;
+    const botPrice = corpCalc.bot ? 200000 : 0;
+    return base + stdPrice + staffPrice + aiPrice + botPrice;
+  };
+
+  const calcExtraPrice = () => {
+    const stdPrice = extraCalc.students * 1500; // Higher rate for extra
+    const staffPrice = extraCalc.staff * 15000;
+    const aiPrice = extraCalc.ai ? 350000 : 0;
+    const botPrice = extraCalc.bot ? 250000 : 0;
+    return stdPrice + staffPrice + aiPrice + botPrice;
+  };
 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [viewingHistoryUser, setViewingHistoryUser] =
@@ -58,6 +91,7 @@ export default function AdminBilling() {
     totalIncome: 0,
     totalDocs: 0,
     totalSpentAmount: 0,
+    tgBotUsers: 0,
   });
 
   useEffect(() => {
@@ -87,6 +121,7 @@ export default function AdminBilling() {
                 totalIncome: users.reduce((acc: number, u: any) => acc + (u.totalIncome || 0), 0),
                 totalDocs: parsed.tests + parsed.courses + parsed.results,
                 totalSpentAmount: users.reduce((acc: number, u: any) => acc + (u.totalSpentAmount || 0), 0),
+                tgBotUsers: parsed.tgUsers || 0,
              });
              setLoading(false);
              return;
@@ -119,23 +154,26 @@ export default function AdminBilling() {
         setStaff(stf);
 
         // Check if we can use cached counts for others
-        let testsCount = 0, coursesCount = 0, resultsCount = 0;
+        let testsCount = 0, coursesCount = 0, resultsCount = 0, tgCount = 0;
         const cachedCounts = localStorage.getItem('admin_billing_counts');
         if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL) && cachedCounts) {
            const parsed = JSON.parse(cachedCounts);
            testsCount = parsed.tests;
            coursesCount = parsed.courses;
            resultsCount = parsed.results;
+           tgCount = parsed.tgUsers || 0;
         } else {
-           const [tSnap, cSnap, rSnap] = await Promise.all([
+           const [tSnap, cSnap, rSnap, tgSnap] = await Promise.all([
              getCountFromServer(collection(db, "tests")),
              getCountFromServer(collection(db, "courses")),
-             getCountFromServer(collection(db, "testResults"))
+             getCountFromServer(collection(db, "testResults")),
+             getCountFromServer(collection(db, "telegram_users"))
            ]);
            testsCount = tSnap.data().count;
            coursesCount = cSnap.data().count;
            resultsCount = rSnap.data().count;
-           localStorage.setItem('admin_billing_counts', JSON.stringify({ tests: testsCount, courses: coursesCount, results: resultsCount }));
+           tgCount = tgSnap.data().count;
+           localStorage.setItem('admin_billing_counts', JSON.stringify({ tests: testsCount, courses: coursesCount, results: resultsCount, tgUsers: tgCount }));
            localStorage.setItem('admin_billing_stats_time', Date.now().toString());
         }
 
@@ -148,6 +186,7 @@ export default function AdminBilling() {
             (acc, u) => acc + (u.totalSpentAmount || 0),
             0,
           ),
+          tgBotUsers: tgCount
         });
       } catch (err: any) {
         if (!err?.message?.includes("quota")) {
@@ -306,94 +345,324 @@ export default function AdminBilling() {
         </div>
       </header>
 
-      {/* Stats Board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-            <TrendingUp className="w-20 h-20" />
+      {/* Stats Board - One row redesign */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {/* Tashkilotlar */}
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform">
+            <Users className="w-16 h-16" />
           </div>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-green-50 text-green-600 rounded-2xl">
-              <DollarSign className="w-6 h-6" />
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+              <Users className="w-5 h-5" />
             </div>
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Tashkilotlar
+            </span>
+          </div>
+          <h3 className="text-2xl font-black text-gray-900">
+            {stats.totalOrgs.toLocaleString()}
+          </h3>
+        </div>
+
+        {/* Xodimlar */}
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform">
+            <Users className="w-16 h-16" />
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <Users className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Xodimlar
+            </span>
+          </div>
+          <h3 className="text-2xl font-black text-gray-900">
+            {stats.staffCount.toLocaleString()}
+          </h3>
+        </div>
+
+        {/* Talabalar */}
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform">
+            <Users className="w-16 h-16" />
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-orange-50 text-orange-600 rounded-xl">
+              <Users className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Talabalar
+            </span>
+          </div>
+          <h3 className="text-2xl font-black text-gray-900">
+            {students.length.toLocaleString()}
+          </h3>
+        </div>
+
+        {/* Telegram Bot */}
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform text-blue-400">
+            <Zap className="w-16 h-16" />
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-sky-50 text-sky-600 rounded-xl">
+              <Zap className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Telegram Bot
+            </span>
+          </div>
+          <h3 className="text-2xl font-black text-gray-900">
+            {stats.tgBotUsers.toLocaleString()}{" "}
+            <span className="text-xs font-bold text-gray-400">a'zo</span>
+          </h3>
+        </div>
+
+        {/* Umumiy Tushum */}
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group border-b-4 border-b-green-500">
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform text-green-500">
+            <TrendingUp className="w-16 h-16" />
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 bg-green-50 text-green-600 rounded-xl">
+              <DollarSign className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
               Umumiy Tushum
             </span>
           </div>
-          <h3 className="text-3xl font-black text-gray-900">
-            {stats.totalIncome.toLocaleString()}{" "}
-            <span className="text-sm font-bold text-gray-400">so'm</span>
+          <h3 className="text-2xl font-black text-gray-900">
+            {stats.totalIncome.toLocaleString()}
+            <small className="text-[10px] ml-1 text-gray-400">so'm</small>
           </h3>
         </div>
+      </div>
 
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-            <Users className="w-20 h-20" />
-          </div>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-              <Users className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">
-              Jami Xodimlar
-            </span>
-          </div>
-          <h3 className="text-3xl font-black text-gray-900">
-            {stats.staffCount.toLocaleString()}{" "}
-            <span className="text-sm font-bold text-gray-400">ta</span>
-          </h3>
+      {/* Tariflar Section */}
+      <div className="bg-white p-10 md:p-16 rounded-[50px] border border-gray-100 shadow-sm space-y-16">
+        <div className="text-center space-y-4 max-w-2xl mx-auto">
+           <div className="inline-flex p-4 bg-amber-50 text-amber-600 rounded-3xl mb-2">
+              <Zap className="w-8 h-8 mx-auto" />
+           </div>
+           <h2 className="text-4xl font-black text-gray-900 tracking-tight">Tariflar Rejasi</h2>
+           <p className="text-gray-400 font-bold text-lg">
+             Tizimning kengaytirilgan imkoniyatlaridan foydalanish uchun o'zingizga mos tarifni tanlang. 
+             Har bir tarif tashkilot ehtiyojlariga moslab chiqilgan.
+           </p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+           {/* START */}
+           <div className="p-8 rounded-[40px] border-2 border-gray-50 hover:border-orange-100 transition-all bg-gray-50/30 group">
+              <div className="flex justify-between items-start mb-6">
+                <span className="text-4xl">🥉</span>
+                <span className="px-4 py-1.5 bg-white rounded-full text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 group-hover:border-orange-200">Start</span>
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 mb-2">START</h3>
+              <div className="text-3xl font-black text-orange-600 mb-6 font-mono">300,000 <small className="text-sm">sum/oy</small></div>
+              <ul className="space-y-4 mb-8">
+                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-orange-500" /> 50 tagacha talaba
+                 </li>
+                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-orange-500" /> 2 ta xodim (o'qituvchi)
+                 </li>
+                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-orange-500" /> Asosiy testlar moduli
+                 </li>
+                 <li className="text-sm font-bold text-gray-400 flex items-center gap-3 line-through">
+                    <Check className="w-4 h-4 text-gray-200" /> AI imkoniyatlari
+                 </li>
+              </ul>
+              <button className="w-full py-4 bg-white border-2 border-orange-100 text-orange-600 rounded-2xl font-black hover:bg-orange-600 hover:text-white hover:border-orange-600 transition-all uppercase text-sm tracking-widest">Tanlash</button>
+           </div>
+           
+           {/* STANDARD */}
+           <div className="p-8 rounded-[40px] border-2 border-indigo-100 bg-white shadow-xl shadow-indigo-50 relative group">
+              <div className="absolute -top-4 right-10 bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-lg shadow-indigo-200">Ommabop</div>
+              <div className="flex justify-between items-start mb-6">
+                <span className="text-4xl">🥈</span>
+                <span className="px-4 py-1.5 bg-indigo-50 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest border border-indigo-100 group-hover:border-indigo-200">Standard</span>
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 mb-2">STANDARD</h3>
+              <div className="text-3xl font-black text-indigo-600 mb-6 font-mono">700,000 <small className="text-sm">sum/oy</small></div>
+              <ul className="space-y-4 mb-8">
+                 <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-indigo-500" /> 200 tagacha talaba
+                 </li>
+                 <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-indigo-500" /> 5 ta xodim
+                 </li>
+                 <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-indigo-500" /> Murakkab testlar va Hisobotlar
+                 </li>
+                 <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-indigo-500" /> Telegram Bot integratsiyasi
+                 </li>
+              </ul>
+              <button className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-sm tracking-widest">Tanlash</button>
+           </div>
+           
+           {/* PROFESSIONAL */}
+           <div className="p-8 rounded-[40px] border-2 border-gray-50 hover:border-amber-100 transition-all bg-gray-50/30 group">
+              <div className="flex justify-between items-start mb-6">
+                <span className="text-4xl">🥇</span>
+                <span className="px-4 py-1.5 bg-white rounded-full text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 group-hover:border-amber-200">Pro</span>
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 mb-2">PROFESSIONAL</h3>
+              <div className="text-3xl font-black text-amber-600 mb-6 font-mono">1,500,000 <small className="text-sm">sum/oy</small></div>
+              <ul className="space-y-4 mb-8">
+                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-amber-500" /> 1000 tagacha talaba
+                 </li>
+                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-amber-500" /> 20 ta xodim
+                 </li>
+                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-amber-500" /> AI orqali test generatori
+                 </li>
+                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-amber-500" /> Full Telegram Bot Features
+                 </li>
+              </ul>
+              <button className="w-full py-4 bg-white border-2 border-amber-100 text-amber-600 rounded-2xl font-black hover:bg-amber-600 hover:text-white hover:border-amber-600 transition-all uppercase text-sm tracking-widest">Tanlash</button>
+           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-            <DollarSign className="w-20 h-20" />
-          </div>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-              <DollarSign className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">
-              Ishlatilgan Summa
-            </span>
-          </div>
-          <h3 className="text-3xl font-black text-gray-900">
-            {stats.totalSpentAmount.toLocaleString()}{" "}
-            <span className="text-sm font-bold text-gray-400">so'm</span>
-          </h3>
-        </div>
+        {/* Dynamic Plans Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+           {/* CORPORATE CALCULATOR */}
+           <div className="bg-indigo-900 rounded-[50px] p-10 text-white shadow-2xl relative overflow-hidden group border-4 border-indigo-800">
+              <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:scale-110 transition-transform">
+                 <Calculator className="w-48 h-48" />
+              </div>
+              <div className="relative z-10">
+                 <div className="flex items-center gap-4 mb-6">
+                    <span className="text-4xl">👑</span>
+                    <div>
+                       <h3 className="text-2xl font-black">CORPORATE</h3>
+                       <p className="text-indigo-300 text-xs font-bold uppercase tracking-widest">Kelishuv va hisob-kitob asosida</p>
+                    </div>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Talabalar soni</label>
+                       <input 
+                         type="number" 
+                         value={corpCalc.students}
+                         onChange={(e) => setCorpCalc({...corpCalc, students: Number(e.target.value)})}
+                         className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Xodimlar soni</label>
+                       <input 
+                         type="number" 
+                         value={corpCalc.staff}
+                         onChange={(e) => setCorpCalc({...corpCalc, staff: Number(e.target.value)})}
+                         className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                       />
+                    </div>
+                    <div className="flex items-center gap-4 p-4 bg-indigo-800/30 rounded-2xl border border-indigo-700/50">
+                       <input 
+                         type="checkbox" 
+                         checked={corpCalc.ai}
+                         onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
+                         className="w-6 h-6 rounded-lg accent-white" 
+                       />
+                       <span className="text-sm font-bold text-indigo-100">AI Test Generator</span>
+                    </div>
+                    <div className="flex items-center gap-4 p-4 bg-indigo-800/30 rounded-2xl border border-indigo-700/50">
+                       <input 
+                         type="checkbox" 
+                         checked={corpCalc.bot}
+                         onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
+                         className="w-6 h-6 rounded-lg accent-white" 
+                       />
+                       <span className="text-sm font-bold text-indigo-100">Advanced TG Bot</span>
+                    </div>
+                 </div>
 
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-            <Users className="w-20 h-20" />
-          </div>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-              <Users className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">
-              Tashkilotlar Soni
-            </span>
-          </div>
-          <h3 className="text-3xl font-black text-gray-900">
-            {organizations.length.toLocaleString()}
-          </h3>
-        </div>
+                 <div className="bg-indigo-800/50 p-6 rounded-3xl border-2 border-indigo-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                       <p className="text-xs font-black text-indigo-400 uppercase tracking-widest">Oylik to'lov summasi:</p>
+                       <div className="text-4xl font-black text-white font-mono mt-1">{calcCorpPrice().toLocaleString()} <span className="text-sm text-indigo-400">sum</span></div>
+                    </div>
+                    <button className="px-10 py-4 bg-white text-indigo-900 rounded-2xl font-black hover:bg-indigo-100 transition-all uppercase text-xs tracking-widest shadow-lg">Shartnoma Tuzish</button>
+                 </div>
+              </div>
+           </div>
 
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-            <LayoutDashboard className="w-20 h-20" />
-          </div>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
-              <Users className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">
-              Talabalar Soni
-            </span>
-          </div>
-          <h3 className="text-3xl font-black text-gray-900">
-            {students.length.toLocaleString()}
-          </h3>
+           {/* EXTRA LIMITS */}
+           <div className="bg-emerald-900 rounded-[50px] p-10 text-white shadow-2xl relative overflow-hidden group border-4 border-emerald-800">
+              <div className="absolute top-0 right-0 p-8 opacity-10 -rotate-12 group-hover:scale-110 transition-transform">
+                 <PlusCircle className="w-48 h-48" />
+              </div>
+              <div className="relative z-10">
+                 <div className="flex items-center gap-4 mb-6">
+                    <span className="text-4xl">➕</span>
+                    <div>
+                       <h3 className="text-2xl font-black">EXTRA LIMITS</h3>
+                       <p className="text-emerald-300 text-xs font-bold uppercase tracking-widest">Bir martalik qo'shimcha imkoniyatlar</p>
+                    </div>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Qo'shish (Talaba)</label>
+                       <input 
+                         type="number" 
+                         placeholder="0"
+                         value={extraCalc.students || ""}
+                         onChange={(e) => setExtraCalc({...extraCalc, students: Number(e.target.value)})}
+                         className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Qo'shish (Xodim)</label>
+                       <input 
+                         type="number" 
+                         placeholder="0"
+                         value={extraCalc.staff || ""}
+                         onChange={(e) => setExtraCalc({...extraCalc, staff: Number(e.target.value)})}
+                         className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                       />
+                    </div>
+                    <div className="flex items-center gap-4 p-4 bg-emerald-800/30 rounded-2xl border border-emerald-700/50">
+                       <input 
+                         type="checkbox" 
+                         checked={extraCalc.ai}
+                         onChange={(e) => setExtraCalc({...extraCalc, ai: e.target.checked})}
+                         className="w-6 h-6 rounded-lg accent-white" 
+                       />
+                       <span className="text-sm font-bold text-emerald-100">Darsliklar/AI (1 oy)</span>
+                    </div>
+                    <div className="flex items-center gap-4 p-4 bg-emerald-800/30 rounded-2xl border border-emerald-700/50">
+                       <input 
+                         type="checkbox" 
+                         checked={extraCalc.bot}
+                         onChange={(e) => setExtraCalc({...extraCalc, bot: e.target.checked})}
+                         className="w-6 h-6 rounded-lg accent-white" 
+                       />
+                       <span className="text-sm font-bold text-emerald-100">Xabar yuborish/Bot</span>
+                    </div>
+                 </div>
+
+                 <div className="bg-emerald-800/50 p-6 rounded-3xl border-2 border-emerald-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                       <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Qo'shimcha to'lov summasi:</p>
+                       <div className="text-4xl font-black text-white font-mono mt-1">{calcExtraPrice().toLocaleString()} <span className="text-sm text-emerald-400">sum</span></div>
+                    </div>
+                    <button className="px-10 py-4 bg-white text-emerald-900 rounded-2xl font-black hover:bg-emerald-100 transition-all uppercase text-xs tracking-widest shadow-lg">Sotib olish</button>
+                 </div>
+                 <p className="mt-4 text-[9px] font-bold text-emerald-400 leading-relaxed italic text-center">
+                   * Diqqat: Qo'shimcha imkoniyatlar faqat joriy oy uchun amal qiladi. Keyingi oyda tizim o'zining asosiy tarif limitlariga qaytadi.
+                 </p>
+              </div>
+           </div>
         </div>
       </div>
 

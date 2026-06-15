@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, getDocs, doc, deleteDoc, query, where, updateDoc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, query, where, updateDoc, setDoc, serverTimestamp, getDoc, orderBy, limit } from 'firebase/firestore';
 import safeOnSnapshot from '../../lib/safeSnapshot';
 import { UserProfile, Department, Group } from '../../types';
 import { Search, Trash2, Filter, Key, Plus, X, Save, Loader2, Download, Edit } from 'lucide-react';
@@ -56,26 +56,23 @@ export default function TeacherStudents() {
       const orgId = user.role === 'staff' ? user.teacherId : user.uid;
       const prefix = getPrefix(user.displayName || 'user');
       
-      // Get current student count for this prefix in the WHOLE organization
+      // Get ONLY the latest student login to determine the next number
       const q = query(
         collection(db, 'users'), 
         where('role', '==', 'student'),
-        where('teacherId', '==', orgId)
+        where('teacherId', '==', orgId),
+        orderBy('login', 'desc'),
+        limit(1)
       );
       const snap = await getDocs(q);
       
-      // Filter by those that start with prefix and have 5 digits
-      const studentsWithPrefix = snap.docs
-        .map(d => d.data().login || '')
-        .filter(login => login.startsWith(prefix));
-      
       let nextNum = 1;
-      if (studentsWithPrefix.length > 0) {
-        const nums = studentsWithPrefix.map(l => {
-          const m = l.match(/\d+$/);
-          return m ? parseInt(m[0]) : 0;
-        });
-        nextNum = Math.max(...nums) + 1;
+      if (!snap.empty) {
+        const lastLogin = snap.docs[0].data().login || '';
+        const m = lastLogin.match(/\d+$/);
+        if (m) {
+          nextNum = parseInt(m[0]) + 1;
+        }
       }
 
       const paddedNum = nextNum.toString().padStart(5, '0');
@@ -215,7 +212,8 @@ export default function TeacherStudents() {
         const q = query(
           collection(db, 'users'), 
           where('role', '==', activeTab), 
-          where('teacherId', '==', orgId)
+          where('teacherId', '==', orgId),
+          limit(300) // Limit to prevent excessive reads
         );
         const unsub = safeOnSnapshot(q, (snap) => {
           const dbUsers = snap.docs.map(doc => ({ ...doc.data() } as UserProfile));

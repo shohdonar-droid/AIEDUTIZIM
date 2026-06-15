@@ -10,6 +10,7 @@ import {
   where,
   deleteDoc,
   serverTimestamp,
+  limit,
 } from "firebase/firestore";
 import safeOnSnapshot from "../../lib/safeSnapshot";
 import { handleFirestoreError, OperationType } from "../../lib/firebase";
@@ -239,19 +240,27 @@ export default function AdminUsers() {
 
     setLoading(true);
     try {
-      const [deptsSnap, groupsSnap, studentsSnap, teachersSnap, staffSnap, subadminsSnap, tgSnap, botConfigsSnap] = await Promise.all([
+      // Core metadata (always needed for context)
+      const [deptsSnap, groupsSnap] = await Promise.all([
         getDocs(collection(db, "departments")),
         getDocs(collection(db, "groups")),
-        getDocs(query(collection(db, "users"), where("role", "==", "student"))),
-        getDocs(query(collection(db, "users"), where("role", "==", "teacher"))),
-        getDocs(query(collection(db, "users"), where("role", "==", "staff"))),
-        getDocs(query(collection(db, "users"), where("role", "in", ["subadmin", "admin"]))),
-        getDocs(collection(db, "telegram_users")),
-        getDocs(query(collection(db, "users"), where("isBotUser", "==", true)))
       ]);
-
       const depts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
       const grps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
+      setDepartments(depts);
+      setGroups(grps);
+
+      // Data by role - Fetching with a safety limit to prevent quota drain
+      // We load them sequentially or parallel but with LIMIT(300)
+      const [studentsSnap, teachersSnap, staffSnap, subadminsSnap, tgSnap, botConfigsSnap] = await Promise.all([
+        getDocs(query(collection(db, "users"), where("role", "==", "student"), limit(300))),
+        getDocs(query(collection(db, "users"), where("role", "==", "teacher"), limit(300))),
+        getDocs(query(collection(db, "users"), where("role", "==", "staff"), limit(300))),
+        getDocs(query(collection(db, "users"), where("role", "in", ["subadmin", "admin"]), limit(100))),
+        getDocs(query(collection(db, "telegram_users"), limit(300))),
+        getDocs(query(collection(db, "users"), where("isBotUser", "==", true), limit(100)))
+      ]);
+
       const students = studentsSnap.docs
         .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
         .filter(u => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"))
@@ -740,15 +749,21 @@ export default function AdminUsers() {
     }
   };
 
-  const filteredUsers = users.filter((u) =>
-    u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch = u.displayName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesOrg = !filterOrg || u.teacherId === filterOrg;
+    const matchesDept = !filterDept || u.departmentId === filterDept;
+    const matchesGrp = !filterGrp || u.groupId === filterGrp;
+    return matchesSearch && matchesOrg && matchesDept && matchesGrp;
+  });
   const filteredTeachers = teachers.filter((u) =>
     u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
-  const filteredStaff = staffUsers.filter((u) =>
-    u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredStaff = staffUsers.filter((u) => {
+    const matchesSearch = u.displayName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesOrg = !filterOrg || u.teacherId === filterOrg;
+    return matchesSearch && matchesOrg;
+  });
   const filteredSubadmins = subadmins.filter((u) =>
     u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
