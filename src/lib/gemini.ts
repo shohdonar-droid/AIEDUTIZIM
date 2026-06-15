@@ -223,19 +223,18 @@ export async function generateContentWithRotation(
     let modelToUse = requestedModel;
     
     // Valid models for retry logic
-    const modelOptions = ["gemini-3.5-flash", "gemini-2.5-flash-image", "gemini-3.1-flash-lite"];
+    const modelOptions = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"];
 
     if (attempts === 0) {
        // On first attempt, use what was requested but sanitize from non-existent versions
        if (requestedModel.includes("pro")) modelToUse = "gemini-3.1-pro-preview";
        else if (requestedModel.includes("image")) modelToUse = "gemini-2.5-flash-image";
+       else if (requestedModel.includes("lite")) modelToUse = "gemini-3.1-flash-lite";
        else modelToUse = "gemini-3.5-flash";
     } else if (attempts === 1) {
-       modelToUse = "gemini-3.5-flash";
+       modelToUse = "gemini-3.1-flash-lite";
     } else if (attempts === 2) {
        modelToUse = "gemini-3.1-pro-preview";
-    } else if (attempts === 3) {
-       modelToUse = "gemini-3.5-flash";
     } else {
        modelToUse = modelOptions[attempts % modelOptions.length];
     }

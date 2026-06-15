@@ -196,52 +196,20 @@ async function generateKursIshiMultiStep(topic: string, options: any) {
     
     Faqat mundarijani Markdown formatida qaytaring.`;
     const planText = await callAi(planPrompt, 4096);
+    if (!planText || planText.length < 50) {
+        throw new Error("Kurs ishi rejasini shakllantirishda xatolik (AI javobi juda qisqa).");
+    }
     
-    // Step 2: Introduction
-    const introPrompt = `${ACADEMIC_PERSONA}
-    [TASK: KURS_ISHI_BOB]
-    Mavzu: "${topic}".
-    Qism: KIRISH.
-    Mundarija: ${planText}
+    // Step 2-5 & 7: Intro, Chapters and Bibliography in parallel
+    const [introText, ch1Text, ch2Text, ch3Text, bibText] = await Promise.all([
+        callAi(`${ACADEMIC_PERSONA}\n[TASK: KURS_ISHI_BOB]\nMavzu: "${topic}".\nQism: KIRISH.\nMundarija: ${planText}\n\nKamida 1500 ta so'zdan iborat ilmiy tahlil yozing.`),
+        callAi(`${ACADEMIC_PERSONA}\n[TASK: KURS_ISHI_BOB]\nMavzu: "${topic}".\nQism: I BOB.\nReja: ${planText}\n\nKamida 2000 ta so'zdan iborat ilmiy tahlil yozing.`),
+        callAi(`${ACADEMIC_PERSONA}\n[TASK: KURS_ISHI_BOB]\nMavzu: "${topic}".\nQism: II BOB.\nReja: ${planText}\n\nKamida 2000 ta so'zdan iborat ilmiy tahlil yozing.`),
+        callAi(`${ACADEMIC_PERSONA}\n[TASK: KURS_ISHI_BOB]\nMavzu: "${topic}".\nQism: III BOB.\nReja: ${planText}\n\nKamida 1500 ta so'zdan iborat ilmiy tahlil yozing.`),
+        callAi(`${ACADEMIC_PERSONA}\n[TASK: KURS_ISHI_BOB]\nMavzu: "${topic}".\nQism: ADABIYOTLAR RO'YXATI.\n\nOAK va xalqaro standartlara mos 15-20 ta ilmiy manba ro'yxatini shakllantiring.`)
+    ]);
     
-    Kamida 1500 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing. Matn ichida ilmiy manbalarga iqtiboslar ([1], [2] ko'rinishida) keltiring.
-    Markdown formatida qaytaring.`;
-    const introText = await callAi(introPrompt);
-    
-    // Step 3: Chapter 1
-    const ch1Prompt = `${ACADEMIC_PERSONA}
-    [TASK: KURS_ISHI_BOB]
-    Mavzu: "${topic}".
-    Qism: I BOB.
-    Reja: ${planText}
-    
-    Kamida 2000 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing. Matn ichida ilmiy manbalarga iqtiboslar keltiring.
-    Markdown formatida qaytaring.`;
-    const ch1Text = await callAi(ch1Prompt);
-    
-    // Step 4: Chapter 2
-    const ch2Prompt = `${ACADEMIC_PERSONA}
-    [TASK: KURS_ISHI_BOB]
-    Mavzu: "${topic}".
-    Qism: II BOB.
-    Reja: ${planText}
-    
-    Kamida 2000 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing. Statistik ma'lumotlar uchun tavsiyaviy andozalar kiriting.
-    Markdown formatida qaytaring.`;
-    const ch2Text = await callAi(ch2Prompt);
-    
-    // Step 5: Chapter 3
-    const ch3Prompt = `${ACADEMIC_PERSONA}
-    [TASK: KURS_ISHI_BOB]
-    Mavzu: "${topic}".
-    Qism: III BOB.
-    Reja: ${planText}
-    
-    Kamida 1500 ta so'zdan iborat o'ta batafsil ilmiy tahlil yozing. Takliflar va xorijiy tajribani yoritib bering.
-    Markdown formatida qaytaring.`;
-    const ch3Text = await callAi(ch3Prompt);
-    
-    // Step 6: Conclusion
+    // Step 6: Conclusion (needs all previous parts for best quality, but we can do it after parallel parts done)
     const conclusionPrompt = `${ACADEMIC_PERSONA}
     [TASK: KURS_ISHI_BOB]
     Mavzu: "${topic}".
@@ -249,15 +217,6 @@ async function generateKursIshiMultiStep(topic: string, options: any) {
     
     Yozilgan boblar asosida o'ta batafsil ilmiy xulosa yozing.`;
     const conclusionText = await callAi(conclusionPrompt);
-    
-    // Step 7: Bibliography
-    const bibPrompt = `${ACADEMIC_PERSONA}
-    [TASK: KURS_ISHI_BOB]
-    Mavzu: "${topic}".
-    Qism: ADABIYOTLAR RO'YXATI.
-    
-    OAK va xalqaro standartlara mos 15-20 ta ilmiy manba ro'yxatini shakllantiring.`;
-    const bibText = await callAi(bibPrompt);
 
     // Step 8: Combine
     let fullContent = `

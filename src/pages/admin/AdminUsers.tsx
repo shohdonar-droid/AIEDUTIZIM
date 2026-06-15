@@ -78,6 +78,17 @@ export default function AdminUsers() {
     useState<Partial<UserProfile> | null>(null);
   const [studentSaving, setStudentSaving] = useState(false);
 
+  // Staff Creation
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [newStaff, setNewStaff] = useState({
+    displayName: "",
+    phone: "",
+    login: "",
+    password: "",
+    teacherId: "",
+  });
+  const [staffCreating, setStaffCreating] = useState(false);
+
   // Specific one-time cleanup requested by user for "ortiqov" and "zulqaynar"
   useEffect(() => {
     const runCleanup = async () => {
@@ -570,6 +581,70 @@ export default function AdminUsers() {
     }
   };
 
+  const createStaffAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      !newStaff.displayName ||
+      !newStaff.teacherId ||
+      !newStaff.login ||
+      !newStaff.password
+    ) {
+      alert("Majburiy maydonlarni to'ldiring");
+      return;
+    }
+
+    setStaffCreating(true);
+    try {
+      const gEmail = `${newStaff.login}@teacher.uz`;
+      const signupRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: gEmail,
+            password: newStaff.password,
+            returnSecureToken: false,
+          }),
+        },
+      );
+
+      const d = await signupRes.json();
+      if (!signupRes.ok) throw new Error(d.error.message || "Xato yuz berdi");
+
+      const org = teachers.find((t) => t.uid === newStaff.teacherId);
+
+      await setDoc(doc(db, "users", d.localId), {
+        uid: d.localId,
+        displayName: newStaff.displayName,
+        login: newStaff.login,
+        password: newStaff.password,
+        phone: newStaff.phone,
+        email: gEmail,
+        role: "staff",
+        teacherId: newStaff.teacherId,
+        teacherName: org?.displayName || "",
+        createdAt: serverTimestamp(),
+        spentBalls: 0,
+      });
+
+      setShowStaffModal(false);
+      setNewStaff({
+        displayName: "",
+        phone: "",
+        login: "",
+        password: "",
+        teacherId: "",
+      });
+      alert("Xodim muvaffaqiyatli yaratildi!");
+      loadData();
+    } catch (err: any) {
+      alert("Xatolik: " + err.message);
+    } finally {
+      setStaffCreating(false);
+    }
+  };
+
   const exportToCSV = () => {
     if (filteredUsers.length === 0) {
       alert("Yuklash uchun talabalar mavjud emas.");
@@ -884,6 +959,121 @@ export default function AdminUsers() {
         </div>
       )}
 
+      {showStaffModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h2 className="text-2xl font-black text-gray-900">
+                Yangi Xodim Yaratish
+              </h2>
+              <button
+                onClick={() => setShowStaffModal(false)}
+                className="p-2 hover:bg-gray-200 rounded-xl transition-colors text-gray-500"
+              >
+                <X />
+              </button>
+            </div>
+            <form onSubmit={createStaffAdmin} className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 uppercase ml-1">
+                  FISH (To'liq ism)
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
+                  placeholder="Ism Familiya Sharif"
+                  value={newStaff.displayName}
+                  onChange={(e) =>
+                    setNewStaff({ ...newStaff, displayName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 uppercase ml-1">
+                  Telefon raqam
+                </label>
+                <input
+                  type="tel"
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
+                  placeholder="+998"
+                  value={newStaff.phone}
+                  onChange={(e) =>
+                    setNewStaff({ ...newStaff, phone: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 uppercase ml-1">
+                  Tashkilot
+                </label>
+                <select
+                  required
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
+                  value={newStaff.teacherId}
+                  onChange={(e) =>
+                    setNewStaff({ ...newStaff, teacherId: e.target.value })
+                  }
+                >
+                  <option value="">Tanlang</option>
+                  {teachers.map((t) => (
+                    <option key={t.uid} value={t.uid}>
+                      {t.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 uppercase ml-1">
+                    Login
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
+                    placeholder="xodim_login"
+                    value={newStaff.login}
+                    onChange={(e) =>
+                      setNewStaff({ ...newStaff, login: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 uppercase ml-1">
+                    Parol
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
+                    placeholder="******"
+                    value={newStaff.password}
+                    onChange={(e) =>
+                      setNewStaff({ ...newStaff, password: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="pt-4 flex gap-4">
+                <button
+                  type="submit"
+                  disabled={staffCreating}
+                  className="flex-1 flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
+                >
+                  {staffCreating ? (
+                    <Loader2 className="animate-spin w-5 h-5" />
+                  ) : (
+                    <Save className="w-5 h-5" />
+                  )}
+                  SAQLASH
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {activeTab === "teachers" && (
         <div className="space-y-6">
           {editingTeacher ? (
@@ -1152,12 +1342,20 @@ export default function AdminUsers() {
                 ))}
               </select>
             </div>
-            <button
-              onClick={exportStaffXLSX}
-              className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all"
-            >
-              <Download className="w-5 h-5" /> YUKLAB OLISH
-            </button>
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <button
+                onClick={exportStaffXLSX}
+                className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all"
+              >
+                <Download className="w-5 h-5" /> YUKLAB OLISH
+              </button>
+              <button
+                onClick={() => setShowStaffModal(true)}
+                className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100"
+              >
+                <Plus className="w-5 h-5" /> XODIM YARATISH
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">

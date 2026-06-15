@@ -2426,7 +2426,14 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
         }
       });
     } else {
-      return ctx.reply("❌ Xatolik: Serverdan ma'lumot olish muvaffaqiyatsiz bo'ldi.");
+      let errMsg = "Noma'lum server hatosi";
+      try {
+        const errorData = await res.json();
+        errMsg = errorData.error || errorData.message || errMsg;
+      } catch (e) {
+        errMsg = res.statusText || errMsg;
+      }
+      return ctx.reply(`❌ Xatolik: Serverdan ma'lumot olish muvaffaqiyatsiz bo'ldi.\n\n💬 Sabab: ${errMsg}`);
     }
   } catch (err: any) {
     console.error("Document generation error:", err);
