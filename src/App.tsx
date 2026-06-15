@@ -23,6 +23,7 @@ import VerifyCertificate from './pages/VerifyCertificate';
 import SearchCertificate from './pages/SearchCertificate';
 import Leadership from './pages/Leadership';
 import Partners from './pages/Partners';
+import Tariffs from './pages/Tariffs';
 import { Loader2 } from 'lucide-react';
 
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
@@ -70,6 +71,7 @@ export default function App() {
               <Route path="/info" element={<InfoDetail />} />
               <Route path="/leadership" element={<Leadership />} />
               <Route path="/partners" element={<Partners />} />
+              <Route path="/tariffs" element={<Tariffs />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/courses/:id" element={<ProtectedRoute><CourseView /></ProtectedRoute>} />
               <Route path="/tests" element={<Tests />} />

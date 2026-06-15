@@ -17,7 +17,8 @@ import {
   Award,
   ChevronDown,
   Building2,
-  Users2
+  Users2,
+  CreditCard
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -198,6 +199,17 @@ export default function Navbar() {
                         <Building2 className="h-4 w-4" />
                         <span className="font-bold text-sm">Hamkorlar (Tashkilotlar)</span>
                       </Link>
+                      <Link
+                        to="/tariffs"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                          isActive('/tariffs')
+                            ? (isWhiteText ? 'bg-white/10 text-blue-300' : 'bg-blue-50 text-blue-600')
+                            : (isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50')
+                        }`}
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span className="font-bold text-sm">Tariflar</span>
+                      </Link>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -320,6 +332,15 @@ export default function Navbar() {
                       }`}
                     >
                       🏢 Hamkorlar (Tashkilotlar)
+                    </Link>
+                    <Link
+                      to="/tariffs"
+                      onClick={() => setIsOpen(false)}
+                      className={`block px-4 py-2 text-sm font-bold ${
+                        isActive('/tariffs') ? 'text-[#007aff]' : (isWhiteText ? 'text-gray-400' : 'text-gray-500')
+                      }`}
+                    >
+                      💳 Tariflar
                     </Link>
                   </div>
                 </div>

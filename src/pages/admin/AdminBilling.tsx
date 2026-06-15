@@ -10,6 +10,7 @@ import {
   setDoc,
   serverTimestamp,
   arrayUnion,
+  getDoc,
 } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "../../lib/firebase";
 import { UserProfile } from "../../types";
@@ -34,8 +35,69 @@ import {
   Calculator,
   Check,
   Eye,
+  Settings,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+
+interface TariffConfig {
+  price?: number;
+  students?: number;
+  staff?: number;
+  hasAI?: boolean;
+  hasBot?: boolean;
+  
+  // CORPORATE pricing per unit
+  basePrice?: number;
+  perStudent?: number;
+  perStaff?: number;
+  aiPrice?: number;
+  botPrice?: number;
+}
+
+interface AllTariffsConfig {
+  start: TariffConfig;
+  standard: TariffConfig;
+  professional: TariffConfig;
+  corporate: TariffConfig;
+  extra: TariffConfig;
+}
+
+const defaultTariffs: AllTariffsConfig = {
+  start: {
+    price: 300000,
+    students: 50,
+    staff: 2,
+    hasAI: false,
+    hasBot: false
+  },
+  standard: {
+    price: 700000,
+    students: 200,
+    staff: 5,
+    hasAI: false,
+    hasBot: true
+  },
+  professional: {
+    price: 1500000,
+    students: 1000,
+    staff: 20,
+    hasAI: true,
+    hasBot: true
+  },
+  corporate: {
+    basePrice: 500000,
+    perStudent: 1000,
+    perStaff: 10000,
+    aiPrice: 300000,
+    botPrice: 200000
+  },
+  extra: {
+    perStudent: 1500,
+    perStaff: 15000,
+    aiPrice: 350000,
+    botPrice: 250000
+  }
+};
 
 export default function AdminBilling() {
   const [organizations, setOrganizations] = useState<UserProfile[]>([]);
@@ -46,6 +108,26 @@ export default function AdminBilling() {
     "org",
   );
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Tariff configuration state
+  const [tariffsConfig, setTariffsConfig] = useState<AllTariffsConfig>(defaultTariffs);
+  const [editingTariffKey, setEditingTariffKey] = useState<keyof AllTariffsConfig | null>(null);
+  const [editingTariffForm, setEditingTariffForm] = useState<TariffConfig | null>(null);
+  const [savingTariff, setSavingTariff] = useState(false);
+
+  useEffect(() => {
+    async function loadTariffsConfig() {
+      try {
+        const snap = await getDoc(doc(db, "settings", "tariffs"));
+        if (snap.exists()) {
+          setTariffsConfig({ ...defaultTariffs, ...snap.data() } as AllTariffsConfig);
+        }
+      } catch (err) {
+        console.warn("Failed to load tariffs config from Firestore, using defaults", err);
+      }
+    }
+    loadTariffsConfig();
+  }, []);
   
   // Custom Calculators
   const [corpCalc, setCorpCalc] = useState({
@@ -62,19 +144,19 @@ export default function AdminBilling() {
   });
 
   const calcCorpPrice = () => {
-    const base = 500000;
-    const stdPrice = corpCalc.students * 1000;
-    const staffPrice = corpCalc.staff * 10000;
-    const aiPrice = corpCalc.ai ? 300000 : 0;
-    const botPrice = corpCalc.bot ? 200000 : 0;
+    const base = tariffsConfig.corporate.basePrice ?? 500000;
+    const stdPrice = corpCalc.students * (tariffsConfig.corporate.perStudent ?? 1000);
+    const staffPrice = corpCalc.staff * (tariffsConfig.corporate.perStaff ?? 10000);
+    const aiPrice = corpCalc.ai ? (tariffsConfig.corporate.aiPrice ?? 300000) : 0;
+    const botPrice = corpCalc.bot ? (tariffsConfig.corporate.botPrice ?? 200000) : 0;
     return base + stdPrice + staffPrice + aiPrice + botPrice;
   };
 
   const calcExtraPrice = () => {
-    const stdPrice = extraCalc.students * 1500; // Higher rate for extra
-    const staffPrice = extraCalc.staff * 15000;
-    const aiPrice = extraCalc.ai ? 350000 : 0;
-    const botPrice = extraCalc.bot ? 250000 : 0;
+    const stdPrice = extraCalc.students * (tariffsConfig.extra.perStudent ?? 1500);
+    const staffPrice = extraCalc.staff * (tariffsConfig.extra.perStaff ?? 15000);
+    const aiPrice = extraCalc.ai ? (tariffsConfig.extra.aiPrice ?? 350000) : 0;
+    const botPrice = extraCalc.bot ? (tariffsConfig.extra.botPrice ?? 250000) : 0;
     return stdPrice + staffPrice + aiPrice + botPrice;
   };
 
@@ -270,6 +352,25 @@ export default function AdminBilling() {
     }
   };
 
+  const handleSaveTariff = async () => {
+    if (!editingTariffKey || !editingTariffForm) return;
+    setSavingTariff(true);
+    try {
+      const updatedConfigs = {
+        ...tariffsConfig,
+        [editingTariffKey]: editingTariffForm
+      };
+      await setDoc(doc(db, "settings", "tariffs"), updatedConfigs);
+      setTariffsConfig(updatedConfigs);
+      setEditingTariffKey(null);
+      setEditingTariffForm(null);
+    } catch (e) {
+      console.error("Failed to save tariff", e);
+    } finally {
+      setSavingTariff(false);
+    }
+  };
+
   const exportExcel = () => {
     const data =
       activeTab === "org"
@@ -453,218 +554,289 @@ export default function AdminBilling() {
              Har bir tarif tashkilot ehtiyojlariga moslab chiqilgan.
            </p>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-           {/* START */}
-           <div className="p-8 rounded-[40px] border-2 border-gray-50 hover:border-orange-100 transition-all bg-gray-50/30 group">
-              <div className="flex justify-between items-start mb-6">
-                <span className="text-4xl">🥉</span>
-                <span className="px-4 py-1.5 bg-white rounded-full text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 group-hover:border-orange-200">Start</span>
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 mb-2">START</h3>
-              <div className="text-3xl font-black text-orange-600 mb-6 font-mono">300,000 <small className="text-sm">sum/oy</small></div>
-              <ul className="space-y-4 mb-8">
-                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-orange-500" /> 50 tagacha talaba
-                 </li>
-                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-orange-500" /> 2 ta xodim (o'qituvchi)
-                 </li>
-                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-orange-500" /> Asosiy testlar moduli
-                 </li>
-                 <li className="text-sm font-bold text-gray-400 flex items-center gap-3 line-through">
-                    <Check className="w-4 h-4 text-gray-200" /> AI imkoniyatlari
-                 </li>
-              </ul>
-              <button className="w-full py-4 bg-white border-2 border-orange-100 text-orange-600 rounded-2xl font-black hover:bg-orange-600 hover:text-white hover:border-orange-600 transition-all uppercase text-sm tracking-widest">Tanlash</button>
-           </div>
-           
-           {/* STANDARD */}
-           <div className="p-8 rounded-[40px] border-2 border-indigo-100 bg-white shadow-xl shadow-indigo-50 relative group">
-              <div className="absolute -top-4 right-10 bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-lg shadow-indigo-200">Ommabop</div>
-              <div className="flex justify-between items-start mb-6">
-                <span className="text-4xl">🥈</span>
-                <span className="px-4 py-1.5 bg-indigo-50 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest border border-indigo-100 group-hover:border-indigo-200">Standard</span>
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 mb-2">STANDARD</h3>
-              <div className="text-3xl font-black text-indigo-600 mb-6 font-mono">700,000 <small className="text-sm">sum/oy</small></div>
-              <ul className="space-y-4 mb-8">
-                 <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-indigo-500" /> 200 tagacha talaba
-                 </li>
-                 <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-indigo-500" /> 5 ta xodim
-                 </li>
-                 <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-indigo-500" /> Murakkab testlar va Hisobotlar
-                 </li>
-                 <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-indigo-500" /> Telegram Bot integratsiyasi
-                 </li>
-              </ul>
-              <button className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-sm tracking-widest">Tanlash</button>
-           </div>
-           
-           {/* PROFESSIONAL */}
-           <div className="p-8 rounded-[40px] border-2 border-gray-50 hover:border-amber-100 transition-all bg-gray-50/30 group">
-              <div className="flex justify-between items-start mb-6">
-                <span className="text-4xl">🥇</span>
-                <span className="px-4 py-1.5 bg-white rounded-full text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 group-hover:border-amber-200">Pro</span>
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 mb-2">PROFESSIONAL</h3>
-              <div className="text-3xl font-black text-amber-600 mb-6 font-mono">1,500,000 <small className="text-sm">sum/oy</small></div>
-              <ul className="space-y-4 mb-8">
-                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-amber-500" /> 1000 tagacha talaba
-                 </li>
-                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-amber-500" /> 20 ta xodim
-                 </li>
-                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-amber-500" /> AI orqali test generatori
-                 </li>
-                 <li className="text-sm font-bold text-gray-500 flex items-center gap-3">
-                    <Check className="w-4 h-4 text-amber-500" /> Full Telegram Bot Features
-                 </li>
-              </ul>
-              <button className="w-full py-4 bg-white border-2 border-amber-100 text-amber-600 rounded-2xl font-black hover:bg-amber-600 hover:text-white hover:border-amber-600 transition-all uppercase text-sm tracking-widest">Tanlash</button>
-           </div>
-        </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* START */}
+            <div className="p-8 rounded-[40px] border-2 border-gray-50 hover:border-orange-100 transition-all bg-gray-50/30 group relative flex flex-col justify-between shadow-sm">
+               <div className="flex justify-between items-start mb-6">
+                 <span className="text-4xl">🥉</span>
+                 <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingTariffKey("start");
+                        setEditingTariffForm(tariffsConfig.start);
+                      }}
+                      className="p-2 bg-white text-gray-400 hover:text-orange-500 rounded-xl border border-gray-100 transition-all"
+                      title="Tarifni tahrirlash"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                    <span className="px-4 py-1.5 bg-white rounded-full text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 group-hover:border-orange-200">Start</span>
+                 </div>
+               </div>
+               <div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-2">START</h3>
+                  <div className="text-3xl font-black text-orange-600 mb-6 font-mono">{(tariffsConfig.start.price ?? 300000).toLocaleString()} <small className="text-sm">sum/oy</small></div>
+                  <ul className="space-y-4 mb-8">
+                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                        <Check className="w-4 h-4 text-orange-500" /> {tariffsConfig.start.students ?? 50} ta-talabalar
+                     </li>
+                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                        <Check className="w-4 h-4 text-orange-500" /> {tariffsConfig.start.staff ?? 2} ta-xodimlar
+                     </li>
+                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                        <Check className="w-4 h-4 text-orange-500" /> Asosiy testlar moduli
+                     </li>
+                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.start.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-4 h-4 ${tariffsConfig.start.hasAI ? "text-orange-500" : "text-gray-200"}`} /> AI imkoniyatlari
+                     </li>
+                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.start.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-4 h-4 ${tariffsConfig.start.hasBot ? "text-orange-500" : "text-gray-200"}`} /> Telegram Bot integratsiyasi
+                     </li>
+                  </ul>
+               </div>
+               <button className="w-full py-4 bg-white border-2 border-orange-100 text-orange-600 rounded-2xl font-black hover:bg-orange-600 hover:text-white hover:border-orange-600 transition-all uppercase text-sm tracking-widest mt-auto">Tanlash</button>
+            </div>
+            
+            {/* STANDARD */}
+            <div className="p-8 rounded-[40px] border-2 border-indigo-100 bg-white shadow-xl shadow-indigo-50 relative group flex flex-col justify-between">
+               <div className="absolute -top-4 right-10 bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-lg shadow-indigo-200">Ommabop</div>
+               <div className="flex justify-between items-start mb-6">
+                 <span className="text-4xl">🥈</span>
+                 <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingTariffKey("standard");
+                        setEditingTariffForm(tariffsConfig.standard);
+                      }}
+                      className="p-2 bg-indigo-50 text-indigo-400 hover:text-indigo-600 rounded-xl border border-indigo-100 transition-all"
+                      title="Tarifni tahrirlash"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                    <span className="px-4 py-1.5 bg-indigo-50 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest border border-indigo-100 group-hover:border-indigo-200">Standard</span>
+                 </div>
+               </div>
+               <div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-2">STANDARD</h3>
+                  <div className="text-3xl font-black text-indigo-600 mb-6 font-mono">{(tariffsConfig.standard.price ?? 700000).toLocaleString()} <small className="text-sm">sum/oy</small></div>
+                  <ul className="space-y-4 mb-8">
+                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                        <Check className="w-4 h-4 text-indigo-500" /> {tariffsConfig.standard.students ?? 200} ta-talabalar
+                     </li>
+                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                        <Check className="w-4 h-4 text-indigo-500" /> {tariffsConfig.standard.staff ?? 5} ta-xodimlar
+                     </li>
+                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                        <Check className="w-4 h-4 text-indigo-500" /> Murakkab testlar va Hisobotlar
+                     </li>
+                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.standard.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-4 h-4 ${tariffsConfig.standard.hasAI ? "text-indigo-500" : "text-gray-200"}`} /> AI imkoniyatlari
+                     </li>
+                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.standard.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-4 h-4 ${tariffsConfig.standard.hasBot ? "text-indigo-500" : "text-gray-200"}`} /> Telegram Bot integratsiyasi
+                     </li>
+                  </ul>
+               </div>
+               <button className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-sm tracking-widest mt-auto">Tanlash</button>
+            </div>
+            
+            {/* PROFESSIONAL */}
+            <div className="p-8 rounded-[40px] border-2 border-gray-50 hover:border-amber-100 transition-all bg-gray-50/30 group relative flex flex-col justify-between">
+               <div className="flex justify-between items-start mb-6">
+                 <span className="text-4xl">🥇</span>
+                 <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingTariffKey("professional");
+                        setEditingTariffForm(tariffsConfig.professional);
+                      }}
+                      className="p-2 bg-white text-gray-400 hover:text-amber-500 rounded-xl border border-gray-100 transition-all"
+                      title="Tarifni tahrirlash"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                    <span className="px-4 py-1.5 bg-white rounded-full text-[10px] font-black text-gray-400 uppercase tracking-widest border border-gray-100 group-hover:border-amber-200">Pro</span>
+                 </div>
+               </div>
+               <div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-2">PROFESSIONAL</h3>
+                  <div className="text-3xl font-black text-amber-600 mb-6 font-mono">{(tariffsConfig.professional.price ?? 1500000).toLocaleString()} <small className="text-sm">sum/oy</small></div>
+                  <ul className="space-y-4 mb-8">
+                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                        <Check className="w-4 h-4 text-amber-500" /> {tariffsConfig.professional.students ?? 1000} ta-talabalar
+                     </li>
+                     <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
+                        <Check className="w-4 h-4 text-amber-500" /> {tariffsConfig.professional.staff ?? 20} ta-xodimlar
+                     </li>
+                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.professional.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-4 h-4 ${tariffsConfig.professional.hasAI ? "text-amber-500" : "text-gray-200"}`} /> AI orqali test generatori
+                     </li>
+                     <li className={`text-sm font-bold flex items-center gap-3 ${tariffsConfig.professional.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                        <Check className={`w-4 h-4 ${tariffsConfig.professional.hasBot ? "text-amber-500" : "text-gray-200"}`} /> Full Telegram Bot Features
+                     </li>
+                  </ul>
+               </div>
+               <button className="w-full py-4 bg-white border-2 border-amber-100 text-amber-600 rounded-2xl font-black hover:bg-amber-600 hover:text-white hover:border-amber-600 transition-all uppercase text-sm tracking-widest mt-auto">Tanlash</button>
+            </div>
+         </div>
 
-        {/* Dynamic Plans Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-           {/* CORPORATE CALCULATOR */}
-           <div className="bg-indigo-900 rounded-[50px] p-10 text-white shadow-2xl relative overflow-hidden group border-4 border-indigo-800">
-              <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:scale-110 transition-transform">
-                 <Calculator className="w-48 h-48" />
-              </div>
-              <div className="relative z-10">
-                 <div className="flex items-center gap-4 mb-6">
-                    <span className="text-4xl">👑</span>
-                    <div>
-                       <h3 className="text-2xl font-black">CORPORATE</h3>
-                       <p className="text-indigo-300 text-xs font-bold uppercase tracking-widest">Kelishuv va hisob-kitob asosida</p>
-                    </div>
-                 </div>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Talabalar soni</label>
-                       <input 
-                         type="number" 
-                         value={corpCalc.students}
-                         onChange={(e) => setCorpCalc({...corpCalc, students: Number(e.target.value)})}
-                         className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
-                       />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Xodimlar soni</label>
-                       <input 
-                         type="number" 
-                         value={corpCalc.staff}
-                         onChange={(e) => setCorpCalc({...corpCalc, staff: Number(e.target.value)})}
-                         className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
-                       />
-                    </div>
-                    <div className="flex items-center gap-4 p-4 bg-indigo-800/30 rounded-2xl border border-indigo-700/50">
-                       <input 
-                         type="checkbox" 
-                         checked={corpCalc.ai}
-                         onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
-                         className="w-6 h-6 rounded-lg accent-white" 
-                       />
-                       <span className="text-sm font-bold text-indigo-100">AI Test Generator</span>
-                    </div>
-                    <div className="flex items-center gap-4 p-4 bg-indigo-800/30 rounded-2xl border border-indigo-700/50">
-                       <input 
-                         type="checkbox" 
-                         checked={corpCalc.bot}
-                         onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
-                         className="w-6 h-6 rounded-lg accent-white" 
-                       />
-                       <span className="text-sm font-bold text-indigo-100">Advanced TG Bot</span>
-                    </div>
-                 </div>
-
-                 <div className="bg-indigo-800/50 p-6 rounded-3xl border-2 border-indigo-700 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div>
-                       <p className="text-xs font-black text-indigo-400 uppercase tracking-widest">Oylik to'lov summasi:</p>
-                       <div className="text-4xl font-black text-white font-mono mt-1">{calcCorpPrice().toLocaleString()} <span className="text-sm text-indigo-400">sum</span></div>
-                    </div>
-                    <button className="px-10 py-4 bg-white text-indigo-900 rounded-2xl font-black hover:bg-indigo-100 transition-all uppercase text-xs tracking-widest shadow-lg">Shartnoma Tuzish</button>
-                 </div>
-              </div>
-           </div>
-
-           {/* EXTRA LIMITS */}
-           <div className="bg-emerald-900 rounded-[50px] p-10 text-white shadow-2xl relative overflow-hidden group border-4 border-emerald-800">
-              <div className="absolute top-0 right-0 p-8 opacity-10 -rotate-12 group-hover:scale-110 transition-transform">
-                 <PlusCircle className="w-48 h-48" />
-              </div>
-              <div className="relative z-10">
-                 <div className="flex items-center gap-4 mb-6">
-                    <span className="text-4xl">➕</span>
-                    <div>
-                       <h3 className="text-2xl font-black">EXTRA LIMITS</h3>
-                       <p className="text-emerald-300 text-xs font-bold uppercase tracking-widest">Bir martalik qo'shimcha imkoniyatlar</p>
-                    </div>
-                 </div>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Qo'shish (Talaba)</label>
-                       <input 
-                         type="number" 
-                         placeholder="0"
-                         value={extraCalc.students || ""}
-                         onChange={(e) => setExtraCalc({...extraCalc, students: Number(e.target.value)})}
-                         className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
-                       />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Qo'shish (Xodim)</label>
-                       <input 
-                         type="number" 
-                         placeholder="0"
-                         value={extraCalc.staff || ""}
-                         onChange={(e) => setExtraCalc({...extraCalc, staff: Number(e.target.value)})}
-                         className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
-                       />
-                    </div>
-                    <div className="flex items-center gap-4 p-4 bg-emerald-800/30 rounded-2xl border border-emerald-700/50">
-                       <input 
-                         type="checkbox" 
-                         checked={extraCalc.ai}
-                         onChange={(e) => setExtraCalc({...extraCalc, ai: e.target.checked})}
-                         className="w-6 h-6 rounded-lg accent-white" 
-                       />
-                       <span className="text-sm font-bold text-emerald-100">Darsliklar/AI (1 oy)</span>
-                    </div>
-                    <div className="flex items-center gap-4 p-4 bg-emerald-800/30 rounded-2xl border border-emerald-700/50">
-                       <input 
-                         type="checkbox" 
-                         checked={extraCalc.bot}
-                         onChange={(e) => setExtraCalc({...extraCalc, bot: e.target.checked})}
-                         className="w-6 h-6 rounded-lg accent-white" 
-                       />
-                       <span className="text-sm font-bold text-emerald-100">Xabar yuborish/Bot</span>
-                    </div>
-                 </div>
-
-                 <div className="bg-emerald-800/50 p-6 rounded-3xl border-2 border-emerald-700 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div>
-                       <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Qo'shimcha to'lov summasi:</p>
-                       <div className="text-4xl font-black text-white font-mono mt-1">{calcExtraPrice().toLocaleString()} <span className="text-sm text-emerald-400">sum</span></div>
-                    </div>
-                    <button className="px-10 py-4 bg-white text-emerald-900 rounded-2xl font-black hover:bg-emerald-100 transition-all uppercase text-xs tracking-widest shadow-lg">Sotib olish</button>
-                 </div>
-                 <p className="mt-4 text-[9px] font-bold text-emerald-400 leading-relaxed italic text-center">
-                   * Diqqat: Qo'shimcha imkoniyatlar faqat joriy oy uchun amal qiladi. Keyingi oyda tizim o'zining asosiy tarif limitlariga qaytadi.
-                 </p>
-              </div>
-           </div>
-        </div>
+         {/* Dynamic Plans Row */}
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* CORPORATE CALCULATOR */}
+            <div className="bg-indigo-900 rounded-[50px] p-10 text-white shadow-2xl relative overflow-hidden group border-4 border-indigo-800">
+               <button
+                 onClick={() => {
+                   setEditingTariffKey("corporate");
+                   setEditingTariffForm(tariffsConfig.corporate);
+                 }}
+                 className="absolute top-6 right-6 p-3 bg-indigo-800 hover:bg-indigo-700 text-indigo-300 hover:text-white rounded-2xl transition-all z-20"
+                 title="Korporativ tarif narxlarini sozlash"
+               >
+                 <Settings className="w-5 h-5" />
+               </button>
+               <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 group-hover:scale-110 transition-transform">
+                  <Calculator className="w-48 h-48" />
+               </div>
+               <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-6">
+                     <span className="text-4xl">👑</span>
+                     <div>
+                        <h3 className="text-2xl font-black">CORPORATE</h3>
+                        <p className="text-indigo-300 text-xs font-bold uppercase tracking-widest">Kelishuv va hisob-kitob asosida</p>
+                     </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Talabalar soni</label>
+                        <input 
+                          type="number" 
+                          value={corpCalc.students}
+                          onChange={(e) => setCorpCalc({...corpCalc, students: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest pl-1">Xodimlar soni</label>
+                        <input 
+                          type="number" 
+                          value={corpCalc.staff}
+                          onChange={(e) => setCorpCalc({...corpCalc, staff: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-indigo-800/50 rounded-2xl border-2 border-indigo-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+                     <div className="flex items-center gap-4 p-4 bg-indigo-800/30 rounded-2xl border border-indigo-700/50">
+                        <input 
+                          type="checkbox" 
+                          id="corp_ai"
+                          checked={corpCalc.ai}
+                          onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
+                          className="w-6 h-6 rounded-lg accent-white cursor-pointer" 
+                        />
+                        <label htmlFor="corp_ai" className="text-sm font-bold text-indigo-100 cursor-pointer select-none">AI Test Generator</label>
+                     </div>
+                     <div className="flex items-center gap-4 p-4 bg-indigo-800/30 rounded-2xl border border-indigo-700/50">
+                        <input 
+                          type="checkbox" 
+                          id="corp_bot"
+                          checked={corpCalc.bot}
+                          onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
+                          className="w-6 h-6 rounded-lg accent-white cursor-pointer" 
+                        />
+                        <label htmlFor="corp_bot" className="text-sm font-bold text-indigo-100 cursor-pointer select-none">Advanced TG Bot</label>
+                     </div>
+                  </div>
+ 
+                  <div className="bg-indigo-800/50 p-6 rounded-3xl border-2 border-indigo-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                     <div>
+                        <p className="text-xs font-black text-indigo-400 uppercase tracking-widest">Oylik to'lov summasi:</p>
+                        <div className="text-4xl font-black text-white font-mono mt-1">{calcCorpPrice().toLocaleString()} <span className="text-sm text-indigo-400">sum</span></div>
+                     </div>
+                     <button className="px-10 py-4 bg-white text-indigo-900 rounded-2xl font-black hover:bg-indigo-100 transition-all uppercase text-xs tracking-widest shadow-lg">Shartnoma Tuzish</button>
+                  </div>
+               </div>
+            </div>
+ 
+            {/* EXTRA LIMITS */}
+            <div className="bg-emerald-900 rounded-[50px] p-10 text-white shadow-2xl relative overflow-hidden group border-4 border-emerald-800">
+               <button
+                 onClick={() => {
+                   setEditingTariffKey("extra");
+                   setEditingTariffForm(tariffsConfig.extra);
+                 }}
+                 className="absolute top-6 right-6 p-3 bg-emerald-800 hover:bg-emerald-700 text-emerald-300 hover:text-white rounded-2xl transition-all z-20"
+                 title="Qo'shimcha tarif narxlarini sozlash"
+               >
+                 <Settings className="w-5 h-5" />
+               </button>
+               <div className="absolute top-0 right-0 p-8 opacity-10 -rotate-12 group-hover:scale-110 transition-transform">
+                  <PlusCircle className="w-48 h-48" />
+               </div>
+               <div className="relative z-10">
+                  <div className="flex items-center gap-4 mb-6">
+                     <span className="text-4xl">➕</span>
+                     <div>
+                        <h3 className="text-2xl font-black">EXTRA LIMITS</h3>
+                        <p className="text-emerald-300 text-xs font-bold uppercase tracking-widest">Bir martalik qo'shimcha imkoniyatlar</p>
+                     </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Qo'shish (Talaba)</label>
+                        <input 
+                          type="number" 
+                          placeholder="0"
+                          value={extraCalc.students || ""}
+                          onChange={(e) => setExtraCalc({...extraCalc, students: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Qo'shish (Xodim)</label>
+                        <input 
+                          type="number" 
+                          placeholder="0"
+                          value={extraCalc.staff || ""}
+                          onChange={(e) => setExtraCalc({...extraCalc, staff: Number(e.target.value)})}
+                          className="w-full px-5 py-4 bg-emerald-800/50 rounded-2xl border-2 border-emerald-700 focus:border-white outline-none font-black text-xl transition-all"
+                        />
+                     </div>
+                     <div className="flex items-center gap-4 p-4 bg-emerald-800/30 rounded-2xl border border-emerald-700/50">
+                        <input 
+                          type="checkbox" 
+                          id="extra_ai"
+                          checked={extraCalc.ai}
+                          onChange={(e) => setExtraCalc({...extraCalc, ai: e.target.checked})}
+                          className="w-6 h-6 rounded-lg accent-white cursor-pointer" 
+                        />
+                        <label htmlFor="extra_ai" className="text-sm font-bold text-emerald-100 cursor-pointer select-none">Darsliklar/AI (1 oy)</label>
+                     </div>
+                     <div className="flex items-center gap-4 p-4 bg-emerald-800/30 rounded-2xl border border-emerald-700/50">
+                        <input 
+                          type="checkbox" 
+                          id="extra_bot"
+                          checked={extraCalc.bot}
+                          onChange={(e) => setExtraCalc({...extraCalc, bot: e.target.checked})}
+                          className="w-6 h-6 rounded-lg accent-white cursor-pointer" 
+                        />
+                        <label htmlFor="extra_bot" className="text-sm font-bold text-emerald-100 cursor-pointer select-none">Xabar yuborish/Bot</label>
+                     </div>
+                  </div>
+ 
+                  <div className="bg-emerald-800/50 p-6 rounded-3xl border-2 border-emerald-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                     <div>
+                        <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Qo'shimcha to'lov summasi:</p>
+                        <div className="text-4xl font-black text-white font-mono mt-1">{calcExtraPrice().toLocaleString()} <span className="text-sm text-emerald-400">sum</span></div>
+                     </div>
+                     <button className="px-10 py-4 bg-white text-emerald-950 rounded-2xl font-black hover:bg-emerald-100 transition-all uppercase text-xs tracking-widest shadow-lg">Sotib olish</button>
+                  </div>
+                  <p className="mt-4 text-[9px] font-bold text-emerald-400 leading-relaxed italic text-center">
+                    * Diqqat: Qo'shimcha imkoniyatlar faqat joriy oy uchun amal qiladi. Keyingi oyda tizim o'zining asosiy tarif limitlariga qaytadi.
+                  </p>
+               </div>
+            </div>
+         </div>
       </div>
 
       <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
@@ -948,6 +1120,231 @@ export default function AdminBilling() {
                   </tbody>
                 </table>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingTariffKey && editingTariffForm && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-350">
+          <div className="bg-white max-w-lg w-full rounded-[40px] p-10 shadow-3xl animate-in zoom-in-95 duration-350 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-black text-gray-900 uppercase">
+                  {editingTariffKey} sozlamalari
+                </h3>
+                <p className="text-xs font-bold text-gray-400 mt-1">
+                  Tarif limitlari va narxlarini sozlash
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingTariffKey(null);
+                  setEditingTariffForm(null);
+                }}
+                className="p-3 hover:bg-gray-100 rounded-2xl"
+              >
+                <X className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* For standard tiers */}
+              {(editingTariffKey === "start" || editingTariffKey === "standard" || editingTariffKey === "professional") && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                      Oylik Summa (so'm)
+                    </label>
+                    <input
+                      type="number"
+                      value={editingTariffForm.price ?? 0}
+                      onChange={(e) => setEditingTariffForm({ ...editingTariffForm, price: Number(e.target.value) })}
+                      className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-lg"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        m ta Talaba
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.students ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, students: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        n ta Xodim
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.staff ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, staff: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 py-2 pl-1">
+                    <input
+                      type="checkbox"
+                      id="edit_hasAI"
+                      checked={editingTariffForm.hasAI ?? false}
+                      onChange={(e) => setEditingTariffForm({ ...editingTariffForm, hasAI: e.target.checked })}
+                      className="w-5 h-5 rounded cursor-pointer accent-indigo-600"
+                    />
+                    <label htmlFor="edit_hasAI" className="text-sm font-bold text-gray-700 cursor-pointer">
+                      AI imkoniyatlari kiritilgan
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-4 py-2 pl-1">
+                    <input
+                      type="checkbox"
+                      id="edit_hasBot"
+                      checked={editingTariffForm.hasBot ?? false}
+                      onChange={(e) => setEditingTariffForm({ ...editingTariffForm, hasBot: e.target.checked })}
+                      className="w-5 h-5 rounded cursor-pointer accent-indigo-600"
+                    />
+                    <label htmlFor="edit_hasBot" className="text-sm font-bold text-gray-700 cursor-pointer">
+                      Telegram Bot integratsiyasi kiritilgan
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {/* For Corporate tier */}
+              {editingTariffKey === "corporate" && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                      Asosiy oylik to'lov (Base Price) - so'm
+                    </label>
+                    <input
+                      type="number"
+                      value={editingTariffForm.basePrice ?? 0}
+                      onChange={(e) => setEditingTariffForm({ ...editingTariffForm, basePrice: Number(e.target.value) })}
+                      className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-lg"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        1 ta Talaba narxi/oy
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perStudent ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perStudent: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        1 ta Xodim narxi/oy
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perStaff ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perStaff: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        AI modulu narxi/oy
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.aiPrice ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, aiPrice: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                        Telegram Bot narxi/oy
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.botPrice ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, botPrice: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* For Extra Limits */}
+              {editingTariffKey === "extra" && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                        Qo'shimcha 1 ta Talaba
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perStudent ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perStudent: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                        Qo'shimcha 1 ta Xodim
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.perStaff ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perStaff: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                        Qo'shimcha AI (1 oy)
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.aiPrice ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, aiPrice: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">
+                        Qo'shimcha TG Bot/Xabarlar
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTariffForm.botPrice ?? 0}
+                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, botPrice: Number(e.target.value) })}
+                        className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <button
+                onClick={handleSaveTariff}
+                disabled={savingTariff}
+                className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-xl transition-all flex items-center justify-center gap-2 uppercase tracking-wide text-xs"
+              >
+                {savingTariff ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+                Tarif Ma'lumotlarini Saqlash
+              </button>
             </div>
           </div>
         </div>
