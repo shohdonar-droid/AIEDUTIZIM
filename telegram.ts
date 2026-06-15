@@ -2261,7 +2261,7 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
       }
 
       // Convert content to fully styled Word Document (.docx)
-      const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } = await import("docx");
+      const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, Footer, PageNumber } = await import("docx");
       const children: any[] = [];
 
       // Add a styled Page-1: Beautiful Cover Page for coursework
@@ -2269,41 +2269,41 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
         children.push(new Paragraph({
           children: [new TextRun({ text: data.university.toUpperCase(), bold: true, size: 28, font: "Times New Roman" })],
           alignment: AlignmentType.CENTER,
-          spacing: { after: 120 }
+          spacing: { after: 120, line: 360 }
         }));
         children.push(new Paragraph({
-          children: [new TextRun({ text: `${data.faculty.toUpperCase()} \n ${data.department.toUpperCase()}`, bold: true, size: 24, font: "Times New Roman" })],
+          children: [new TextRun({ text: `${data.faculty.toUpperCase()} \n ${data.department.toUpperCase()}`, bold: true, size: 28, font: "Times New Roman" })],
           alignment: AlignmentType.CENTER,
-          spacing: { after: 1200 }
+          spacing: { after: 1200, line: 360 }
         }));
         children.push(new Paragraph({
           children: [new TextRun({ text: "KURS ISHI", bold: true, size: 48, font: "Times New Roman", color: "1E3A8A" })],
           alignment: AlignmentType.CENTER,
-          spacing: { after: 400 }
+          spacing: { after: 400, line: 360 }
         }));
         children.push(new Paragraph({
           children: [new TextRun({ text: `MAVZU: "${data.topic.toUpperCase()}"`, bold: true, size: 28, font: "Times New Roman" })],
           alignment: AlignmentType.CENTER,
-          spacing: { after: 240 }
+          spacing: { after: 240, line: 360 }
         }));
         children.push(new Paragraph({
-          children: [new TextRun({ text: `Fan: ${data.subject}`, italics: true, size: 24, font: "Times New Roman" })],
+          children: [new TextRun({ text: `Fan: ${data.subject}`, italics: true, size: 28, font: "Times New Roman" })],
           alignment: AlignmentType.CENTER,
-          spacing: { after: 1500 }
+          spacing: { after: 1500, line: 360 }
         }));
         
         children.push(new Paragraph({
           children: [
-            new TextRun({ text: `Bajardi: ${data.studentName}\n`, bold: true, size: 26, font: "Times New Roman" }),
-            new TextRun({ text: `Yo'nalish: ${data.direction}\n`, size: 24, font: "Times New Roman" }),
-            new TextRun({ text: `Ilmiy rahbar: ${data.advisor}`, bold: true, size: 26, font: "Times New Roman" })
+            new TextRun({ text: `Bajardi: ${data.studentName}\n`, bold: true, size: 28, font: "Times New Roman" }),
+            new TextRun({ text: `Yo'nalish: ${data.direction}\n`, size: 28, font: "Times New Roman" }),
+            new TextRun({ text: `Ilmiy rahbar: ${data.advisor}`, bold: true, size: 28, font: "Times New Roman" })
           ],
           alignment: AlignmentType.RIGHT,
-          spacing: { after: 1000 }
+          spacing: { after: 1000, line: 360 }
         }));
 
         children.push(new Paragraph({
-          children: [new TextRun({ text: "TOSHKENT - 2026", bold: true, size: 24, font: "Times New Roman" })],
+          children: [new TextRun({ text: "TOSHKENT - 2026", bold: true, size: 28, font: "Times New Roman" })],
           alignment: AlignmentType.CENTER,
           spacing: { after: 400 }
         }));
@@ -2338,30 +2338,38 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
         }
 
         let p: any;
+        const baseSize = docType === "kurs_ishi" ? 28 : 26;
+        const baseSpacing = { 
+          line: docType === "kurs_ishi" ? 360 : 280, 
+          before: 0, 
+          after: 100 
+        };
+        const baseIndent = docType === "kurs_ishi" ? { firstLine: 708 } : undefined;
+
         if (trimmed.startsWith('# ')) {
           p = new Paragraph({ 
             children: [new TextRun({ text: trimmed.replace('# ', '').replace(/\*\*/g, ''), bold: true, font: "Times New Roman", size: 30, color: "1E3A8A" })], 
             heading: HeadingLevel.HEADING_1, 
             alignment: AlignmentType.LEFT,
-            spacing: { before: 400, after: 250 } 
+            spacing: { ...baseSpacing, before: 400, after: 250 } 
           });
         } else if (trimmed.startsWith('## ')) {
           p = new Paragraph({ 
-            children: [new TextRun({ text: trimmed.replace('## ', '').replace(/\*\*/g, ''), bold: true, font: "Times New Roman", size: 26, color: "2563EB" })], 
+            children: [new TextRun({ text: trimmed.replace('## ', '').replace(/\*\*/g, ''), bold: true, font: "Times New Roman", size: 28, color: "2563EB" })], 
             heading: HeadingLevel.HEADING_2, 
-            spacing: { before: 300, after: 200 } 
+            spacing: { ...baseSpacing, before: 300, after: 200 } 
           });
         } else if (trimmed.startsWith('### ')) {
           p = new Paragraph({ 
-            children: [new TextRun({ text: trimmed.replace('### ', '').replace(/\*\*/g, ''), bold: true, font: "Times New Roman", size: 24, color: "4F46E5" })], 
+            children: [new TextRun({ text: trimmed.replace('### ', '').replace(/\*\*/g, ''), bold: true, font: "Times New Roman", size: 26, color: "4F46E5" })], 
             heading: HeadingLevel.HEADING_3, 
-            spacing: { before: 200, after: 150 } 
+            spacing: { ...baseSpacing, before: 200, after: 150 } 
           });
         } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
           p = new Paragraph({ 
-            children: [new TextRun({ text: trimmed.substring(2).replace(/\*\*/g, ''), font: "Times New Roman", size: 26 })],
+            children: [new TextRun({ text: trimmed.substring(2).replace(/\*\*/g, ''), font: "Times New Roman", size: baseSize })],
             bullet: { level: 0 }, 
-            spacing: { after: 120 } 
+            spacing: { ...baseSpacing, after: 120 } 
           });
         } else {
           const runs: any[] = [];
@@ -2370,22 +2378,23 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
           let match;
           while ((match = regex.exec(trimmed)) !== null) {
             if (match.index > lastIdx) {
-              runs.push(new TextRun({ text: trimmed.substring(lastIdx, match.index), font: "Times New Roman", size: 26 }));
+              runs.push(new TextRun({ text: trimmed.substring(lastIdx, match.index), font: "Times New Roman", size: baseSize }));
             }
-            runs.push(new TextRun({ text: match[1], bold: true, font: "Times New Roman", size: 26 }));
+            runs.push(new TextRun({ text: match[1], bold: true, font: "Times New Roman", size: baseSize }));
             lastIdx = regex.lastIndex;
           }
           if (lastIdx < trimmed.length) {
-            runs.push(new TextRun({ text: trimmed.substring(lastIdx), font: "Times New Roman", size: 26 }));
+            runs.push(new TextRun({ text: trimmed.substring(lastIdx), font: "Times New Roman", size: baseSize }));
           }
           if (runs.length === 0) {
-            runs.push(new TextRun({ text: trimmed, font: "Times New Roman", size: 26 }));
+            runs.push(new TextRun({ text: trimmed, font: "Times New Roman", size: baseSize }));
           }
 
           p = new Paragraph({ 
             children: runs, 
-            spacing: { line: 280, before: 0, after: 100 },
-            alignment: AlignmentType.JUSTIFIED
+            spacing: baseSpacing,
+            alignment: AlignmentType.JUSTIFIED,
+            indent: baseIndent
           });
         }
         children.push(p);
@@ -2394,15 +2403,35 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
       const doc = new Document({
         sections: [{
           properties: {
+            titlePage: docType === "kurs_ishi",
             page: {
               margin: {
                 top: 1440,
                 bottom: 1440,
-                left: 1440,
-                right: 1440
+                left: 1701, // ~3cm
+                right: 850   // ~1.5cm
               }
             }
           },
+          footers: docType === "kurs_ishi" ? {
+            default: new Footer({
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [
+                    new TextRun({
+                      children: [PageNumber.CURRENT],
+                      font: "Times New Roman",
+                      size: 24,
+                    }),
+                  ],
+                }),
+              ],
+            }),
+            first: new Footer({
+              children: [], // No page number on cover
+            }),
+          } : undefined,
           children: children
         }]
       });
