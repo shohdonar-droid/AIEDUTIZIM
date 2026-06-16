@@ -14,7 +14,12 @@ import {
   Award,
   ChevronRight,
   Sparkles,
-  X
+  X,
+  Upload,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  FileText,
+  Trash2
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useAuth } from "../hooks/useAuth";
@@ -139,6 +144,97 @@ export default function Tariffs() {
   const [receiptUrl, setReceiptUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // File Upload states
+  const [receiptTab, setReceiptTab] = useState<'upload' | 'url'>('upload');
+  const [dragActive, setDragActive] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [fileSize, setFileSize] = useState('');
+  const [fileError, setFileError] = useState('');
+
+  const compressImage = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      // If not an image, resolve as-is
+      if (!base64Str.startsWith("data:image")) {
+        resolve(base64Str);
+        return;
+      }
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const MAX_DIM = 800;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+        } else {
+          resolve(base64Str);
+        }
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
+
+  const handleFileChange = async (file: File) => {
+    setFileError('');
+    if (!file) return;
+
+    // Show name and size info
+    setFileName(file.name);
+    setFileSize((file.size / 1024).toFixed(1) + " KB");
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const rawBase64 = e.target?.result as string;
+      if (rawBase64) {
+        try {
+          const compressed = await compressImage(rawBase64);
+          setReceiptUrl(compressed);
+        } catch (err) {
+          setReceiptUrl(rawBase64);
+        }
+      }
+    };
+    reader.onerror = () => {
+      setFileError("Faylni o'qishda xatolik yuz berdi");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      await handleFileChange(e.dataTransfer.files[0]);
+    }
+  };
+
   // Corporate calculator state
   const [corpCalc, setCorpCalc] = useState({
     students: 1000,
@@ -183,25 +279,27 @@ export default function Tariffs() {
 
   const handleSubmitRequest = async () => {
     if (!user) return alert('Iltimos, tizimga kiring');
-    if (!receiptUrl) return alert('Iltimos, chekni yuklang');
+    if (!receiptUrl) return alert('Iltimos, chekni yuklang yoki rasm havolasini kiriting');
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'connection_requests'), {
         userId: user.uid,
         userName: user.displayName || 'Noma\'lum',
-        tariffName: selectedTariff?.name,
-        tariffPrice: selectedTariff?.price,
+        tariffName: selectedTariff?.name || "Noma'lum",
+        tariffPrice: selectedTariff?.price || 0,
         paymentType,
         receiptUrl,
         status: 'pending',
         timestamp: serverTimestamp()
       });
-      alert('Sorov yuborildi! Tez orada admin ko\'rib chiqadi.');
+      alert('Soʻrov yuborildi! Tez orada admin koʻrib chiqadi.');
       setSelectedTariff(null);
       setReceiptUrl('');
+      setFileName('');
+      setFileSize('');
     } catch (err) {
       console.error(err);
-      alert('Xatolik yuz berdi');
+      alert('Soʻrov yuborishda xatolik yuz berdi: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSubmitting(false);
     }
@@ -279,14 +377,124 @@ export default function Tariffs() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">To'lov chekini yuklang (URL)</label>
-                <input 
-                  type="text" 
-                  value={receiptUrl}
-                  onChange={e => setReceiptUrl(e.target.value)}
-                  placeholder="Rasm havolasini kiriting..."
-                  className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
-                />
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">
+                  To'lov chekini jo'natish usuli
+                </label>
+                <div className="flex border border-gray-100 rounded-2xl bg-gray-50 p-1 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptTab('upload');
+                      setReceiptUrl('');
+                      setFileName('');
+                      setFileSize('');
+                      setFileError('');
+                    }}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                      receiptTab === 'upload' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    Fayl yuklash (Chizma/Chek)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptTab('url');
+                      setReceiptUrl('');
+                      setFileName('');
+                      setFileSize('');
+                      setFileError('');
+                    }}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                      receiptTab === 'url' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                    Havola (URL)
+                  </button>
+                </div>
+
+                {receiptTab === 'upload' ? (
+                  <div className="space-y-4">
+                    {!receiptUrl ? (
+                      <div
+                        onDragEnter={handleDrag}
+                        onDragOver={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDrop={handleDrop}
+                        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[140px] relative ${
+                          dragActive 
+                            ? 'border-blue-600 bg-blue-50 text-blue-600' 
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={e => e.target.files?.[0] && handleFileChange(e.target.files[0])}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <Upload className="w-8 h-8 mb-2.5 animate-bounce text-slate-400 group-hover:text-blue-500" />
+                        <p className="text-xs font-bold text-slate-600 mb-1">
+                          Chek rasmi yoki faylni sudrab o'tkazing
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Yoki ustiga bosib kompyuterdan tanlang (Rasm/PDF formatlarida)
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          {receiptUrl.startsWith('data:image') ? (
+                            <img 
+                              src={receiptUrl} 
+                              alt="Chek preview" 
+                              className="w-12 h-12 rounded-lg object-cover bg-white border border-gray-100 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                              <FileText className="w-6 h-6" />
+                            </div>
+                          )}
+                          <div className="overflow-hidden">
+                            <p className="text-xs font-bold text-slate-800 truncate" title={fileName || 'chek_yuklandi.png'}>
+                              {fileName || 'Chek yuklandi'}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-bold font-mono">
+                              {fileSize || 'Oʻlchami nomaʻlum'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReceiptUrl('');
+                            setFileName('');
+                            setFileSize('');
+                          }}
+                          className="p-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl transition-colors"
+                          title="O'chirish"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    {fileError && (
+                      <p className="text-[10px] font-bold text-red-500 px-1">{fileError}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <input 
+                      type="text" 
+                      value={receiptUrl}
+                      onChange={e => setReceiptUrl(e.target.value)}
+                      placeholder="https://example.com/rasm.png yoki google drive havolasi..."
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
+                    />
+                  </div>
+                )}
               </div>
 
               <button 

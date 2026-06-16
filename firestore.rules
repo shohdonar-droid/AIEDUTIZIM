@@ -1,109 +1,85 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // --- Helper Functions ---
+    // Helper to check if signed in
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // Helper to check if admin email
     function isAdmin() {
-      if (!isSignedIn()) { return false; }
-      let email = request.auth.token.email;
-      if (email != null && (email == 'shohdonar@gmail.com' || email == 'elyorbek@admin.uz' || email == 'elyorbek@gmail.com')) {
-        return true;
-      }
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'subadmin'];
+      return isSignedIn() && (
+        request.auth.token != null &&
+        request.auth.token.email != null && (
+          request.auth.token.email == 'shohdonar@gmail.com' || 
+          request.auth.token.email == 'elyorbek@admin.uz' || 
+          request.auth.token.email == 'elyorbek@gmail.com'
+        )
+      );
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Role-based helpers
-    function getUserRole() {
-      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') 
-        : '';
-    }
-
+    // Helper to check if teacher or staff
     function isTeacher() {
-      return isAdmin() || (isSignedIn() && getUserRole() in ['teacher', 'staff']);
+      return isAdmin() || (
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' || 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'subadmin')
+      );
     }
 
-    // --- Global Admin Access ---
+    // Global admin rule
     match /{document=**} {
       allow read, write: if isAdmin();
     }
 
-    // --- Users Collection ---
+    // User profiles
     match /users/{userId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if isAdmin();
-    }
-
-    // --- Core Content Collections ---
-    match /botConfig/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /courses/{id} { allow read: if true; allow write: if isTeacher(); }
-    match /departments/{id} { allow read: if true; allow write: if isTeacher(); }
-    match /groups/{id} { allow read: if true; allow write: if isTeacher(); }
-    match /tests/{id} { allow read: if true; allow update: if true; allow create, delete: if isTeacher(); }
-    match /subjects/{id} { allow read: if true; allow write: if isTeacher(); }
-    match /siteContent/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /settings/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /system_settings/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /billing/{id} { allow read: if isTeacher(); allow write: if isAdmin(); }
-    match /counters/{id} { allow read: if true; allow write: if true; }
-    match /test-connection/{id} { allow read: if true; }
-    match /certificates/{id} { allow read: if true; allow update: if true; allow create, delete: if isSignedIn(); }
-
-    // --- Dynamic Data Collections ---
-    match /enrollments/{id} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /quiz_history/{id} {
-      allow read, write: if true;
-    }
-    match /quiz_sessions/{id} {
-      allow read, write: if true;
-    }
-    match /quiz_participants/{id} {
       allow read, write: if true;
     }
 
-    match /testResults/{id} {
-      allow read: if true;
-      allow write: if true;
+    // Core content
+    match /botConfig/{id} { allow read, write: if true; }
+    match /courses/{id} { allow read, write: if true; }
+    match /departments/{id} { allow read, write: if true; }
+    match /groups/{id} { allow read, write: if true; }
+    match /tests/{id} { allow read, write: if true; }
+    match /subjects/{id} { allow read, write: if true; }
+    match /siteContent/{id} { allow read, write: if true; }
+    match /settings/{id} { allow read, write: if true; }
+    match /system_settings/{id} { allow read, write: if true; }
+    match /billing/{id} { allow read, write: if true; }
+    match /counters/{id} { allow read, write: if true; }
+    match /test-connection/{id} { allow read, write: if true; }
+    match /certificates/{id} { allow read, write: if true; }
+
+    // Dynamic data
+    match /enrollments/{id} { allow read, write: if true; }
+    match /quiz_history/{id} { allow read, write: if true; }
+    match /quiz_sessions/{id} { allow read, write: if true; }
+    match /quiz_participants/{id} { allow read, write: if true; }
+    match /testResults/{id} { allow read, write: if true; }
+
+    // Monitoring & communication
+    match /messages/{id} { allow read, write: if true; }
+    match /telegram_users/{id} { allow read, write: if true; }
+    match /telegram_user_states/{id} { allow read, write: if true; }
+    match /payments/{id} { allow read, write: if true; }
+    match /admin_notifications/{id} { allow read, write: if true; }
+    
+    // Connection requests
+    match /connection_requests/{id} {
+      allow read, write: if isSignedIn();
     }
 
-    // --- Monitoring & Communication ---
-    match /messages/{id} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
+    // Payment history
+    match /payment_history/{id} {
+      allow read, write: if isSignedIn();
     }
 
-    match /telegram_users/{id} {
-      allow read, write: if true;
-    }
-
-    match /telegram_user_states/{id} {
-      allow read, write: if true;
-    }
-
-    match /payments/{id} {
-      allow read, write: if true;
-    }
-
-    match /admin_notifications/{id} {
-      allow read, write: if true;
-    }
-
+    // Activity logs
     match /activityLogs/{document=**} {
       allow read, write: if true;
     }
