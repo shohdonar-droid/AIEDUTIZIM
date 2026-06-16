@@ -9,24 +9,9 @@ service cloud.firestore {
     // Helper to check if admin email
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token != null &&
-        request.auth.token.email != null && (
-          request.auth.token.email == 'shohdonar@gmail.com' || 
-          request.auth.token.email == 'elyorbek@admin.uz' || 
-          request.auth.token.email == 'elyorbek@gmail.com'
-        )
-      );
-    }
-
-    // Helper to check if teacher or staff
-    function isTeacher() {
-      return isAdmin() || (
-        isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' || 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff' ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'subadmin')
+        request.auth.token.email == 'shohdonar@gmail.com' || 
+        request.auth.token.email == 'elyorbek@admin.uz' || 
+        request.auth.token.email == 'elyorbek@gmail.com'
       );
     }
 
