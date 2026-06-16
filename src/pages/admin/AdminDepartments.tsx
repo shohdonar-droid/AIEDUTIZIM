@@ -6,14 +6,20 @@ import { Department, Group } from '../../types';
 import { Plus, Trash2, Layers, Users } from 'lucide-react';
 
 export default function AdminDepartments() {
+  const [faculties, setFaculties] = useState<any[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [newDeptName, setNewDeptName] = useState('');
+  const [selectedFacultyId, setSelectedFacultyId] = useState('');
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedDeptId, setSelectedDeptId] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const unsubFaculty = safeOnSnapshot(query(collection(db, 'faculties')), (snap) => {
+      setFaculties(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => console.error(err));
+
     const unsubDept = safeOnSnapshot(query(collection(db, 'departments')), (snap) => {
       const d = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department));
       d.sort((a, b) => a.name.localeCompare(b.name, 'uz-UZ'));
@@ -27,18 +33,23 @@ export default function AdminDepartments() {
       setLoading(false);
     }, (err) => console.error(err));
 
-    return () => { unsubDept(); unsubGroup(); };
+    return () => { unsubFaculty(); unsubDept(); unsubGroup(); };
   }, []);
 
   const handleAddDept = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDeptName.trim()) return;
+    if (!newDeptName.trim() || !selectedFacultyId) {
+      alert('Nomi va fakultetni tanlang');
+      return;
+    }
     try {
       await addDoc(collection(db, 'departments'), {
         name: newDeptName.trim(),
+        facultyId: selectedFacultyId,
         createdAt: serverTimestamp()
       });
       setNewDeptName('');
+      setSelectedFacultyId('');
     } catch (err) {
       console.error(err);
       alert('Xatolik yuz berdi');
@@ -96,28 +107,44 @@ export default function AdminDepartments() {
             <h3 className="text-lg font-bold text-gray-900">Yo'nalishlar</h3>
           </div>
 
-          <form onSubmit={handleAddDept} className="flex gap-2 mb-6">
-            <input
-              type="text"
-              value={newDeptName}
-              onChange={e => setNewDeptName(e.target.value)}
-              placeholder="Yangi yo'nalish nomi..."
-              className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
-            />
-            <button type="submit" className="bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition-colors">
-              <Plus className="w-4 h-4" /> Yaratish
-            </button>
+          <form onSubmit={handleAddDept} className="flex flex-col gap-3 mb-6">
+            <select
+              value={selectedFacultyId}
+              onChange={e => setSelectedFacultyId(e.target.value)}
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
+            >
+              <option value="">Fakultetni tanlang...</option>
+              {faculties.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newDeptName}
+                onChange={e => setNewDeptName(e.target.value)}
+                placeholder="Yangi yo'nalish nomi..."
+                className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
+              />
+              <button type="submit" className="bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                <Plus className="w-4 h-4" /> Yaratish
+              </button>
+            </div>
           </form>
 
           <div className="space-y-2">
-            {departments.map(d => (
-              <div key={d.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="font-bold text-gray-900">{d.name}</span>
-                <button onClick={() => handleDeleteDept(d.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+            {departments.map(d => {
+              const fac = faculties.find(f => f.id === d.facultyId);
+              return (
+                <div key={d.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <div>
+                    <span className="font-bold text-gray-900">{d.name}</span>
+                    <span className="block text-[10px] font-black text-blue-600 uppercase tracking-tighter mt-0.5">{fac?.name || 'Fakultetsiz'}</span>
+                  </div>
+                  <button onClick={() => handleDeleteDept(d.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
             {departments.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Yo'nalishlar mavjud emas</p>}
           </div>
         </div>

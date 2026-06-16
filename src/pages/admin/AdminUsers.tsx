@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../lib/firebase";
 import {
   collection,
@@ -35,6 +36,8 @@ import { useAuth } from "../../hooks/useAuth";
 
 export default function AdminUsers() {
   const { user } = useAuth();
+  const { tab } = useParams();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [teachers, setTeachers] = useState<UserProfile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -49,6 +52,20 @@ export default function AdminUsers() {
   const [activeTab, setActiveTab] = useState<
     "students" | "teachers" | "staff" | "subadmins" | "botUsers"
   >("teachers");
+
+  useEffect(() => {
+    if (tab === 'students') setActiveTab('students');
+    else if (tab === 'organizations') setActiveTab('teachers');
+    else if (tab === 'staff') setActiveTab('staff');
+    else if (tab === 'admins') setActiveTab('subadmins');
+    else if (tab === 'botUsers') setActiveTab('botUsers');
+  }, [tab]);
+
+  const handleTabChange = (newTab: "students" | "teachers" | "staff" | "subadmins" | "botUsers") => {
+    setActiveTab(newTab);
+    const path = newTab === 'teachers' ? 'organizations' : (newTab === 'subadmins' ? 'admins' : newTab);
+    navigate(`/admin/users/${path}`);
+  };
 
   const [telegramUsers, setTelegramUsers] = useState<any[]>([]);
   const [allBotUsersConfigs, setAllBotUsersConfigs] = useState<any[]>([]);
@@ -792,31 +809,31 @@ export default function AdminUsers() {
         </div>
         <div className="flex bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm overflow-x-auto max-w-full">
           <button
-            onClick={() => setActiveTab("teachers")}
+            onClick={() => handleTabChange("teachers")}
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "teachers" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
           >
             Tashkilotlar ({teachers.length})
           </button>
           <button
-            onClick={() => setActiveTab("staff")}
+            onClick={() => handleTabChange("staff")}
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "staff" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
           >
             Xodimlar ({staffUsers.length})
           </button>
           <button
-            onClick={() => setActiveTab("students")}
+            onClick={() => handleTabChange("students")}
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "students" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
           >
             Talabalar ({users.length})
           </button>
           <button
-            onClick={() => setActiveTab("subadmins")}
+            onClick={() => handleTabChange("subadmins")}
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "subadmins" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
           >
             Adminlar ({subadmins.length})
           </button>
           <button
-            onClick={() => setActiveTab("botUsers")}
+            onClick={() => handleTabChange("botUsers")}
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "botUsers" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
           >
             Bot foydalanuvchilari ({telegramUsers.length})

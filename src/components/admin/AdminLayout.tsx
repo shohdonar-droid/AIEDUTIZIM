@@ -23,7 +23,8 @@ import {
   Settings,
   Menu,
   X,
-  HardDrive
+  HardDrive,
+  Building2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -31,6 +32,7 @@ import { useAuth } from '../../hooks/useAuth';
 export function AdminLayout({ children, unreadCount, user }: { children: React.ReactNode, unreadCount: number, user: any }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['academic', 'users', 'resources', 'monitoring', 'site_mgmt', 'billing', 'settings']);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -40,31 +42,145 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
     }
   };
 
-  const menuItems = [
-    { name: 'UMUMIY', path: '/admin', icon: LayoutGrid },
-    { name: 'PROFIL', path: '/admin/profile', icon: UserIcon },
-    { name: 'AI YORDAMCHI', path: '/admin/ai-assistant', icon: BrainCircuit },
-    { name: 'BANNER', path: '/admin/banner', icon: ImageIcon },
-    { name: 'MA\'LUMOT', path: '/admin/info', icon: Info },
-    { name: 'KURSLAR', path: '/admin/courses', icon: BookOpen },
-    { name: 'TESTLAR', path: '/admin/tests', icon: Brain },
-    { name: 'QUIZIZZ', path: '/admin/quizizz', icon: CheckCircle2 },
-    { name: 'MAVZULAR', path: '/admin/subjects', icon: BookOpen },
-    { name: 'YO\'NALISHLAR', path: '/admin/departments', icon: UsersIcon },
-    { name: 'FOYDALANUVCHILAR', path: '/admin/users', icon: UsersIcon },
-    { name: 'JURNAL', path: '/admin/jurnal', icon: TrendingUp },
-    { name: 'SERTIFIKATLAR', path: '/admin/certificates', icon: Award },
-    { name: 'FOOTER', path: '/admin/footer', icon: Dock },
-    { name: 'BILDIRISHNOMALAR', path: '/admin/notifications', icon: AlertCircle },
-    { name: 'HISOB-KITOB', path: '/admin/billing', icon: Wallet },
-    { name: 'XOTIRA MONITORINGI', path: '/admin/storage', icon: HardDrive },
-    { name: 'CHAT', path: '/admin/chat', icon: MessageSquare, badge: unreadCount },
-  ].filter(item => {
-    if (user?.role === 'subadmin') {
-      return !['BANNER', 'MA\'LUMOT', 'FOOTER'].includes(item.name);
+  const toggleMenu = (id: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const menuStructure = [
+    { id: 'general', name: 'UMUMIY', path: '/admin', icon: LayoutGrid },
+    { id: 'profile', name: 'PROFIL', path: '/admin/profile', icon: UserIcon },
+    { id: 'ai', name: 'AI YORDAMCHI', path: '/admin/ai-assistant', icon: BrainCircuit },
+    { id: 'academic', name: 'Akademik tuzilma', icon: Building2, subItems: [
+        { name: 'Fakultetlar', path: '/admin/faculties' },
+        { name: 'Yo\'nalishlar', path: '/admin/departments' },
+        { name: 'O\'quv yillari', path: '/admin/academic-years' }
+    ]},
+    { id: 'users', name: 'Foydalanuvchilar', icon: UsersIcon, subItems: [
+        { name: 'Adminlar', path: '/admin/users/admins' },
+        { name: 'Tashkilotlar', path: '/admin/users/organizations' },
+        { name: 'Xodimlar', path: '/admin/users/staff' },
+        { name: 'Talabalar', path: '/admin/users/students' }
+    ]},
+    { id: 'resources', name: 'Ta\'lim resurslari', icon: BookOpen, subItems: [
+        { name: 'Kurslar', path: '/admin/courses' },
+        { name: 'Mavzular', path: '/admin/subjects' },
+        { name: 'Imtihonlar', path: '/admin/tests' },
+        { name: 'Quizizz', path: '/admin/quizizz' },
+        { name: 'Sertifikatlar', path: '/admin/certificates' }
+    ]},
+    { id: 'monitoring', name: 'Monitoring', icon: TrendingUp, subItems: [
+        { name: 'Davomat', path: '/admin/attendance' },
+        { name: 'Jurnallar', path: '/admin/jurnal' },
+        { name: 'Hisobot', path: '/admin/reports' }
+    ]},
+    { id: 'site_mgmt', name: 'Sayt boshqaruvi', icon: ImageIcon, subItems: [
+        { name: 'Banner', path: '/admin/banner' },
+        { name: 'Info', path: '/admin/info' },
+        { name: 'Footer', path: '/admin/footer' }
+    ]},
+    { id: 'billing', name: 'Billing', icon: Wallet, subItems: [
+        { name: 'Tariflar', path: '/admin/billing' },
+        { name: 'Faol obunalar', path: '/admin/active-subscriptions' },
+        { name: 'To\'lovlar tarixi', path: '/admin/payment-history' },
+        { name: 'Ulanish so\'rovlari', path: '/admin/connection-requests' },
+        { name: 'Promo kodlar', path: '/admin/promo-codes' }
+    ]},
+    { id: 'notifications', name: 'Bildirishnomalar', path: '/admin/notifications', icon: Bell },
+    { id: 'chat', name: 'Chat', path: '/admin/chat', icon: MessageSquare, badge: unreadCount },
+    { id: 'settings', name: 'Sayt sozlamalari', icon: Settings, subItems: [
+        { name: 'Xavfsizlik', path: '/admin/settings/security' },
+        { name: 'Dizayn', path: '/admin/settings/design' },
+        { name: 'Integratsiyalar', path: '/admin/settings/integrations' },
+        { name: 'Tizim loglari', path: '/admin/system-logs' },
+        { name: 'AI sozlamalari', path: '/admin/settings/ai' },
+        { name: 'To\'lov sozlamalari', path: '/admin/settings/payments' },
+        { name: 'Zaxira nusxa', path: '/admin/backup' }
+    ]}
+  ];
+
+  const renderMenuItem = (item: any, isMobile = false) => {
+    const Icon = item.icon;
+    const isExpanded = expandedMenus.includes(item.id);
+    const hasSubItems = item.subItems && item.subItems.length > 0;
+    const isChat = item.id === 'chat';
+
+    if (hasSubItems) {
+      return (
+        <div key={item.id} className="space-y-1">
+          <button
+            onClick={() => toggleMenu(item.id)}
+            className={cn(
+              "w-full px-5 py-3.5 flex items-center gap-4 rounded-2xl text-[11px] font-black tracking-widest uppercase transition-all duration-200 border border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50/50",
+              !isSidebarOpen && !isMobile && "justify-center px-0 mx-4"
+            )}
+          >
+            <Icon className={cn("h-4.5 w-4.5 shrink-0")} />
+            {(isSidebarOpen || isMobile) && (
+              <>
+                <span className="truncate">{item.name}</span>
+                <ChevronRight className={cn("ml-auto h-3.5 w-3.5 transition-transform duration-200", isExpanded ? "rotate-90" : "")} />
+              </>
+            )}
+          </button>
+          
+          {(isExpanded && (isSidebarOpen || isMobile)) && (
+            <div className={cn("ml-10 space-y-1 border-l-2 border-slate-100 pl-4 mb-2")}>
+              {item.subItems.map((sub: any) => (
+                <NavLink
+                  key={sub.path}
+                  to={sub.path}
+                  onClick={() => isMobile && setIsMobileMenuOpen(false)}
+                  className={({ isActive }) => cn(
+                    "block py-2 text-[10px] font-bold tracking-wider uppercase transition-colors",
+                    isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  {sub.name}
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
+      );
     }
-    return true;
-  });
+
+    return (
+      <NavLink 
+        key={item.id} 
+        to={item.path}
+        end={item.path === '/admin'}
+        onClick={() => isMobile && setIsMobileMenuOpen(false)}
+        className={({ isActive }) => cn(
+          "mx-4 px-5 py-3.5 flex items-center gap-4 rounded-2xl text-[11px] font-black tracking-widest uppercase transition-all duration-200 border border-transparent",
+          isActive 
+            ? "bg-[#EFF6FF] border-[#BFDBFE]/40 text-blue-600 shadow-sm font-black" 
+            : "text-slate-400 hover:text-slate-700 hover:bg-slate-50/50",
+          !isSidebarOpen && !isMobile && "justify-center px-0"
+        )}
+      >
+        {({ isActive }) => (
+          <>
+            <Icon className={cn("h-4.5 w-4.5 shrink-0", isActive ? "text-blue-600" : "text-slate-400")} />
+            {(isSidebarOpen || isMobile) && (
+              <>
+                <span className="truncate">{item.name}</span>
+                {isChat && (
+                  <span className="ml-auto text-slate-400 text-xs font-bold font-sans">
+                    {item.badge !== undefined ? item.badge : 0}
+                  </span>
+                )}
+                {isActive && !isChat && (
+                  <ChevronRight className="ml-auto h-3.5 w-3.5 text-blue-500 animate-pulse" />
+                )}
+              </>
+            )}
+          </>
+        )}
+      </NavLink>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
@@ -88,67 +204,33 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
                   {user?.displayName || "ELYORBEK (ADMIN)"}
                 </span>
                 <span className="font-bold text-[9px] text-blue-600 tracking-widest uppercase mt-1">
-                  {user?.role === 'subadmin' ? 'KICHIK ADMINISTRATOR' : 'ADMINISTRATOR'}
+                  {user?.role === 'superadmin' ? 'SUPER ADMINISTRATOR' : (user?.role === 'subadmin' ? 'KICHIK ADMINISTRATOR' : 'ADMINISTRATOR')}
                 </span>
               </div>
             )}
           </div>
           
-          {/* Slider trigger hovering on the boundary line */}
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="absolute -right-3.5 top-7 w-7 h-7 rounded-full bg-white border border-gray-100 flex items-center justify-center shadow-md text-gray-400 hover:text-gray-900 cursor-pointer z-50 hover:scale-105 transition"
           >
-            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-300", isSidebarOpen ? "rotate-185" : "rotate-0")} />
+            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-300", isSidebarOpen ? "rotate-180" : "rotate-0")} />
           </button>
         </div>
 
         {/* Menu Items List */}
         <div className="flex-1 overflow-y-auto py-5 space-y-1.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isChat = item.name === 'CHAT';
-            
-            return (
-              <NavLink 
-                key={item.path} 
-                to={item.path}
-                end={item.path === '/admin'}
-                className={({ isActive }) => cn(
-                  "mx-4 px-5 py-3.5 flex items-center gap-4 rounded-2xl text-[11px] font-black tracking-widest uppercase transition-all duration-200 border border-transparent",
-                  isActive 
-                    ? "bg-[#EFF6FF] border-[#BFDBFE]/40 text-blue-600 shadow-sm font-black" 
-                    : "text-slate-400 hover:text-slate-700 hover:bg-slate-50/50"
-                )}
-              >
-                {({ isActive }) => (
-                  <>
-                    <Icon className={cn("h-4.5 w-4.5 shrink-0", isActive ? "text-blue-600" : "text-slate-400")} />
-                    {isSidebarOpen && (
-                      <>
-                        <span className="truncate">{item.name}</span>
-                        {isChat && (
-                          <span className="ml-auto text-slate-400 text-xs font-bold font-sans">
-                            {item.badge !== undefined ? item.badge : 0}
-                          </span>
-                        )}
-                        {isActive && !isChat && (
-                          <ChevronRight className="ml-auto h-3.5 w-3.5 text-blue-500 animate-pulse" />
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
+          {menuStructure.map(item => renderMenuItem(item))}
         </div>
 
         {/* Bottom Actions Block */}
         <div className="p-4 border-t border-gray-100 space-y-1 shrink-0 bg-white">
           <NavLink 
             to="/" 
-            className="mx-4 px-5 py-3.5 flex items-center gap-4 rounded-2xl text-[11px] font-black tracking-widest uppercase text-slate-400 hover:text-slate-700 hover:bg-slate-50/50 transition-all"
+            className={cn(
+              "mx-4 px-5 py-3.5 flex items-center gap-4 rounded-2xl text-[11px] font-black tracking-widest uppercase text-slate-400 hover:text-slate-700 hover:bg-slate-50/50 transition-all",
+              !isSidebarOpen && "justify-center px-0"
+            )}
           >
             <Home className="h-4.5 w-4.5 text-slate-400 shrink-0" />
             {isSidebarOpen && <span className="truncate">SAYTGA QAYTISH</span>}
@@ -156,7 +238,10 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
           
           <button 
             onClick={handleLogout}
-            className="w-full mx-4 px-5 py-3.5 flex items-center gap-4 rounded-2xl text-[11px] font-black tracking-widest uppercase text-red-500 hover:text-red-700 hover:bg-red-50/50 transition-all border border-transparent"
+            className={cn(
+              "w-full mx-4 px-5 py-3.5 flex items-center gap-4 rounded-2xl text-[11px] font-black tracking-widest uppercase text-red-500 hover:text-red-700 hover:bg-red-50/50 transition-all border border-transparent",
+              !isSidebarOpen && "justify-center px-0 mx-0 ml-4 hover:bg-red-50"
+            )}
           >
             <LogOut className="h-4.5 w-4.5 text-red-400 shrink-0" />
             {isSidebarOpen && <span className="truncate text-left font-black">CHIQISH</span>}
@@ -178,7 +263,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
                     {user?.displayName || "ADMIN"}
                   </span>
                   <span className="font-bold text-[9px] text-blue-600 uppercase">
-                    {user?.role === 'subadmin' ? 'KICHIK ADMINISTRATOR' : 'ADMINISTRATOR'}
+                    {user?.role === 'superadmin' ? 'SUPER ADMINISTRATOR' : 'ADMINISTRATOR'}
                   </span>
                 </div>
               </div>
@@ -188,32 +273,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-1.5 [scrollbar-width:none]">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                const isChat = item.name === 'CHAT';
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    end={item.path === '/admin'}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={({ isActive }) => cn(
-                      "px-4 py-3 flex items-center gap-3.5 rounded-2xl text-[11px] font-black tracking-widest uppercase transition-all",
-                      isActive
-                        ? "bg-[#EFF6FF] border-[#BFDBFE]/40 text-blue-600 font-extrabold"
-                        : "text-slate-400 hover:text-slate-700 hover:bg-slate-50/50"
-                    )}
-                  >
-                    <Icon className="h-4.5 w-4.5 shrink-0" />
-                    <span className="truncate">{item.name}</span>
-                    {isChat && (
-                      <span className="ml-auto text-slate-400 text-xs font-bold">
-                        {item.badge !== undefined ? item.badge : 0}
-                      </span>
-                    )}
-                  </NavLink>
-                );
-              })}
+              {menuStructure.map(item => renderMenuItem(item, true))}
             </div>
 
             <div className="pt-4 border-t border-gray-100 space-y-1 mt-auto">
@@ -266,8 +326,9 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
           <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
             <span className="font-mono">{new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
             <div className="w-[1px] h-4 bg-gray-100 mx-1"></div>
-            <button className="p-2.5 text-slate-400 hover:text-slate-755 hover:bg-slate-50 rounded-xl transition">
+            <button className="p-2.5 text-slate-400 hover:text-slate-755 hover:bg-slate-50 rounded-xl transition relative">
               <Bell className="h-5 w-5" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
             <button 
               onClick={() => navigate('/admin/profile')}

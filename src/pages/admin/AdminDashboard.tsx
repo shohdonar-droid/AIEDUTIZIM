@@ -27,6 +27,10 @@ import ChatSection from '../ChatSection';
 import AdminProfile from './AdminProfile';
 import AdminAiAssistant from './AdminAiAssistant';
 import AdminStorage from './AdminStorage';
+import AdminFaculties from './AdminFaculties';
+import AdminAcademicYears from './AdminAcademicYears';
+import AdminSystemLogs from './AdminSystemLogs';
+import AdminBackup from './AdminBackup';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 
 export default function AdminDashboard() {
@@ -73,25 +77,53 @@ export default function AdminDashboard() {
         <Route path="/" element={<AdminOverview />} />
         <Route path="/profile" element={<AdminProfile />} />
         <Route path="/ai-assistant" element={<AdminAiAssistant />} />
-        <Route path="/banner" element={<AdminBanner />} />
-        <Route path="/info" element={<AdminInfo />} />
+        
+        {/* Academic Structure */}
+        <Route path="/faculties" element={<AdminFaculties />} />
+        <Route path="/departments" element={<AdminDepartments />} />
+        <Route path="/academic-years" element={<AdminAcademicYears />} />
+        
+        {/* Users */}
+        <Route path="/users" element={<AdminUsers />} />
+        <Route path="/users/:tab" element={<AdminUsers />} />
+        
+        {/* Educational Resources */}
         <Route path="/courses" element={<AdminCourses />} />
-        <Route path="/tests" element={<AdminTests />} />
         <Route path="/subjects" element={<AdminSubjects />} />
         <Route path="/subjects/read/:id" element={<SubjectRead />} />
-        <Route path="/departments" element={<AdminDepartments />} />
-        <Route path="/users" element={<AdminUsers />} />
-        <Route path="/jurnal" element={<AdminJurnal />} />
+        <Route path="/tests" element={<AdminTests />} />
+        <Route path="/quizizz" element={<AdminQuizizz />} />
         <Route path="/certificates" element={<AdminCertificates />} />
-        <Route path="/services" element={<AdminServices />} />
-        <Route path="/billing" element={<AdminBilling />} />
-        <Route path="/storage" element={<AdminStorage />} />
+        
+        {/* Monitoring */}
+        <Route path="/attendance" element={<div className="p-10 font-bold">Davomat (Tez kunda)</div>} />
+        <Route path="/jurnal" element={<AdminJurnal />} />
+        <Route path="/reports" element={<div className="p-10 font-bold">Hisobotlar (Tez kunda)</div>} />
+        
+        {/* Site Management */}
+        <Route path="/banner" element={<AdminBanner />} />
+        <Route path="/info" element={<AdminInfo />} />
         <Route path="/footer" element={<AdminFooter />} />
+        
+        {/* Billing */}
+        <Route path="/billing" element={<AdminBilling />} />
+        <Route path="/active-subscriptions" element={<div className="p-10 font-bold">Faol obunalar (Tez kunda)</div>} />
+        <Route path="/payment-history" element={<div className="p-10 font-bold">To'lovlar tarixi (Tez kunda)</div>} />
+        <Route path="/connection-requests" element={<AdminServices />} />
+        <Route path="/promo-codes" element={<div className="p-10 font-bold">Promo kodlar (Tez kunda)</div>} />
+        
+        <Route path="/notifications" element={<AdminNotifications />} />
+        <Route path="/chat" element={<ChatSection />} />
+        
+        {/* Site Settings */}
+        <Route path="/system-logs" element={<AdminSystemLogs />} />
+        <Route path="/backup" element={<AdminBackup />} />
+        <Route path="/settings/:section" element={<div className="p-10 font-bold">Sozlamalar (Tez kunda)</div>} />
+        
+        {/* Legacy / Others */}
+        <Route path="/storage" element={<AdminStorage />} />
         <Route path="/bot-users" element={<AdminBotUsers />} />
         <Route path="/bot" element={<AdminBot />} />
-        <Route path="/notifications" element={<AdminNotifications />} />
-        <Route path="/quizizz" element={<AdminQuizizz />} />
-        <Route path="/chat" element={<ChatSection />} />
       </Routes>
     </AdminLayout>
   );

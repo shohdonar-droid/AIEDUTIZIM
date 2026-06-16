@@ -1,8 +1,21 @@
 export type UserRole = 'admin' | 'subadmin' | 'student' | 'teacher' | 'staff';
 
+export interface Faculty {
+  id: string;
+  name: string;
+  createdAt: any;
+}
+
+export interface AcademicYear {
+  id: string;
+  name: string;
+  createdAt: any;
+}
+
 export interface Department {
   id: string;
   name: string;
+  facultyId?: string;
   creatorId?: string;
   createdAt: any;
 }

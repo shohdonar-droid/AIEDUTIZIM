@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, User, FileText, Library, CheckCircle2, MessageSquare, LogOut, ChevronRight, GraduationCap, Home, BrainCircuit, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, User, FileText, Library, CheckCircle2, MessageSquare, LogOut, ChevronRight, GraduationCap, Home, BrainCircuit, BookOpen, Building2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../../hooks/useAuth';
 import TeacherProfile from './TeacherProfile';
@@ -55,19 +55,113 @@ export default function TeacherDashboard() {
     return unsub;
   }, [user]);
 
-  const navItems = [
-    { name: 'Asosiy ekran', path: '/teacher', icon: LayoutDashboard, exact: true },
-    { name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
-    { name: 'Yo\'nalishlar', path: '/teacher/departments', icon: Users, hidden: user?.role === 'staff' },
-    { name: 'Testlar', path: '/teacher/tests', icon: CheckCircle2 },
-    { name: 'Mavzular', path: '/teacher/subjects', icon: BookOpen },
-    { name: 'Kurslar', path: '/teacher/courses', icon: Library, hidden: user?.role === 'staff' },
-    { name: 'Talabalar', path: '/teacher/students', icon: Users, hidden: user?.role === 'staff' },
-    { name: 'Jurnal', path: '/teacher/jurnal', icon: FileText },
-    { name: 'Quizizz', path: '/teacher/quizizz', icon: CheckCircle2 },
-    { name: 'Sertifikatlar', path: '/teacher/certificates', icon: FileText },
-    { name: 'Chat', path: '/teacher/chat', icon: MessageSquare, badge: unreadCount },
-  ].filter(item => !item.hidden);
+  const menuStructure = [
+    { id: 'general', name: 'Umumiy', path: '/teacher', icon: LayoutDashboard, exact: true },
+    { id: 'profile', name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
+    { id: 'academic', name: 'Akademik tuzilma', icon: Building2, hidden: user?.role === 'staff', subItems: [
+        { name: 'Yo\'nalishlar', path: '/teacher/departments' },
+    ]},
+    { id: 'users', name: 'Foydalanuvchilar', icon: Users, hidden: user?.role === 'staff', subItems: [
+        { name: 'Talabalar', path: '/teacher/students' },
+    ]},
+    { id: 'resources', name: 'Ta\'lim resurslari', icon: BookOpen, subItems: [
+        { name: 'Kurslar', path: '/teacher/courses', hidden: user?.role === 'staff' },
+        { name: 'Mavzular', path: '/teacher/subjects' },
+        { name: 'Testlar', path: '/teacher/tests' },
+        { name: 'Quizizz', path: '/teacher/quizizz' },
+        { name: 'Sertifikatlar', path: '/teacher/certificates' }
+    ].filter(s => !s.hidden)},
+    { id: 'monitoring', name: 'Monitoring', icon: FileText, subItems: [
+        { name: 'Davomat', path: '/teacher/attendance' },
+        { name: 'Jurnal', path: '/teacher/jurnal' },
+    ]},
+    { id: 'chat', name: 'Chat', path: '/teacher/chat', icon: MessageSquare, badge: unreadCount },
+  ].filter(m => !m.hidden);
+
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['academic', 'users', 'resources', 'monitoring']);
+
+  const toggleMenu = (id: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const renderMenuItem = (item: any, isMobile = false) => {
+    const Icon = item.icon;
+    const isExpanded = expandedMenus.includes(item.id);
+    const hasSubItems = item.subItems && item.subItems.length > 0;
+    const isChat = item.id === 'chat';
+    const isActive = item.exact 
+      ? location.pathname === item.path
+      : location.pathname.startsWith(item.path);
+
+    if (hasSubItems) {
+      return (
+        <div key={item.id} className="space-y-1">
+          <button
+            onClick={() => toggleMenu(item.id)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-bold transition-all text-gray-600 hover:bg-gray-50 hover:text-indigo-600 ${isCollapsed && !isMobile ? 'justify-center' : ''}`}
+          >
+            <Icon className="h-5 w-5 flex-shrink-0" />
+            {(!isCollapsed || isMobile) && (
+              <>
+                <span className="text-sm truncate flex-1 text-left">{item.name}</span>
+                <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+              </>
+            )}
+          </button>
+          
+          {(isExpanded && (!isCollapsed || isMobile)) && (
+            <div className="ml-8 space-y-1 border-l border-gray-100 pl-3 mb-2">
+              {item.subItems.map((sub: any) => (
+                <Link
+                  key={sub.path}
+                  to={sub.path}
+                  className={`block py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                    location.pathname.startsWith(sub.path) ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  {sub.name}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <Link
+        key={item.id}
+        to={item.path}
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-bold transition-all group relative ${
+          isActive 
+            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
+            : 'text-gray-600 hover:bg-gray-50 hover:text-indigo-600'
+        } ${isCollapsed && !isMobile ? 'justify-center' : ''}`}
+        title={isCollapsed && !isMobile ? item.name : ''}
+      >
+        <Icon className={`h-5 w-5 flex-shrink-0 transition-transform ${!isActive && 'group-hover:scale-110'}`} />
+        {(!isCollapsed || isMobile) && (
+          <motion.span 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-sm truncate flex-1"
+          >
+            {item.name}
+          </motion.span>
+        )}
+        {item.badge !== undefined && item.badge > 0 && (
+           <span className={`bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full ${isCollapsed && !isMobile ? 'absolute -top-1 -right-1 w-4 h-4' : 'px-2 py-0.5'}`}>
+              {item.badge}
+           </span>
+        )}
+        {!isCollapsed && !item.badge && !isMobile && (
+          <ChevronRight className={`h-4 w-4 opacity-30 group-hover:opacity-100 transition-all ${isActive ? 'translate-x-1 opacity-100' : ''}`} />
+        )}
+      </Link>
+    );
+  };
 
   return (
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px)] bg-[#f8f9fa] pb-16 md:pb-0">
@@ -116,44 +210,7 @@ export default function TeacherDashboard() {
         </div>
 
         <nav className="flex-1 p-3 overflow-y-auto space-y-1">
-          {navItems.map((item) => {
-            const isActive = item.exact 
-              ? location.pathname === item.path
-              : location.pathname.startsWith(item.path);
-            const Icon = item.icon;
-            
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-bold transition-all group relative ${
-                  isActive 
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-indigo-600'
-                } ${isCollapsed ? 'justify-center' : ''}`}
-                title={isCollapsed ? item.name : ''}
-              >
-                <Icon className={`h-5 w-5 flex-shrink-0 transition-transform ${!isActive && 'group-hover:scale-110'}`} />
-                {!isCollapsed && (
-                  <motion.span 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-sm truncate flex-1"
-                  >
-                    {item.name}
-                  </motion.span>
-                )}
-                {item.badge !== undefined && item.badge > 0 && (
-                   <span className={`bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full ${isCollapsed ? 'absolute -top-1 -right-1 w-4 h-4' : 'px-2 py-0.5'}`}>
-                      {item.badge}
-                   </span>
-                )}
-                {!isCollapsed && !item.badge && (
-                  <ChevronRight className={`h-4 w-4 opacity-30 group-hover:opacity-100 transition-all ${isActive ? 'translate-x-1 opacity-100' : ''}`} />
-                )}
-              </Link>
-            );
-          })}
+          {menuStructure.map((item) => renderMenuItem(item))}
         </nav>
 
         <div className="p-3 border-t border-gray-50 mt-auto bg-gray-50/30 space-y-1">
@@ -179,15 +236,15 @@ export default function TeacherDashboard() {
       {/* Mobile Bottom Bar for Teacher Dashboard */}
       <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-gray-100 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] md:hidden">
         <div className="flex overflow-x-auto scrollbar-hide items-center justify-start gap-1 p-2">
-          {navItems.map((item) => {
+          {menuStructure.map((item) => {
              const isActive = item.exact 
                 ? location.pathname === item.path
                 : location.pathname.startsWith(item.path);
              const Icon = item.icon;
              return (
                <Link
-                 key={item.name}
-                 to={item.path}
+                 key={item.id}
+                 to={item.path || (item.subItems && item.subItems[0].path)}
                  className={`flex flex-col items-center justify-center min-w-[80px] px-2 py-2 rounded-xl transition-all relative ${
                    isActive ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400'
                  }`}
