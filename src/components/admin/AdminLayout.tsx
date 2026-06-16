@@ -52,11 +52,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
     { id: 'general', name: 'UMUMIY', path: '/admin', icon: LayoutGrid },
     { id: 'profile', name: 'PROFIL', path: '/admin/profile', icon: UserIcon },
     { id: 'ai', name: 'AI YORDAMCHI', path: '/admin/ai-assistant', icon: BrainCircuit },
-    { id: 'academic', name: 'Akademik tuzilma', icon: Building2, subItems: [
-        { name: 'Fakultetlar', path: '/admin/faculties' },
-        { name: 'Yo\'nalishlar', path: '/admin/departments' },
-        { name: 'O\'quv yillari', path: '/admin/academic-years' }
-    ]},
+    { id: 'academic', name: 'Akademik tuzilma', path: '/admin/academic', icon: Building2 },
     { id: 'users', name: 'Foydalanuvchilar', icon: UsersIcon, subItems: [
         { name: 'Adminlar', path: '/admin/users/admins' },
         { name: 'Tashkilotlar', path: '/admin/users/organizations' },

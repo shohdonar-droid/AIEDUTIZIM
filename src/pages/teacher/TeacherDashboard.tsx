@@ -7,7 +7,6 @@ import TeacherProfile from './TeacherProfile';
 import TeacherDepartments from './TeacherDepartments';
 import TeacherCourses from './TeacherCourses';
 import TeacherTests from './TeacherTests';
-import TeacherStudents from './TeacherStudents';
 import TeacherJurnal from './TeacherJurnal';
 import TeacherCertificates from './TeacherCertificates';
 import TeacherChat from './TeacherChat';
@@ -21,26 +20,14 @@ import { collection, query, where, getDoc, doc, addDoc, serverTimestamp } from '
 import safeOnSnapshot from '../../lib/safeSnapshot';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 
+import AdminAcademic from '../admin/AdminAcademic';
+import AdminUsers from '../admin/AdminUsers';
+
 export default function TeacherDashboard() {
   const { user, logout, stopImpersonation } = useAuth();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [notificationMsg, setNotificationMsg] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-  useEffect(() => {
-    async function loadNotif() {
-      try {
-        const snap = await getDoc(doc(db, 'siteContent', 'notifications'));
-        if (snap.exists()) {
-          setNotificationMsg(snap.data()?.insufficientFundsMessage || '');
-        }
-      } catch (err) {
-        console.warn('Site content notifications could not be fetched:', err);
-      }
-    }
-    loadNotif();
-  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -58,11 +45,10 @@ export default function TeacherDashboard() {
   const menuStructure = [
     { id: 'general', name: 'Umumiy', path: '/teacher', icon: LayoutDashboard, exact: true },
     { id: 'profile', name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
-    { id: 'academic', name: 'Akademik tuzilma', icon: Building2, hidden: user?.role === 'staff', subItems: [
-        { name: 'Yo\'nalishlar', path: '/teacher/departments' },
-    ]},
+    { id: 'academic', name: 'Akademik tuzilma', path: '/teacher/academic', icon: Building2, hidden: user?.role === 'staff' },
     { id: 'users', name: 'Foydalanuvchilar', icon: Users, hidden: user?.role === 'staff', subItems: [
-        { name: 'Talabalar', path: '/teacher/students' },
+        { name: 'Xodimlar', path: '/teacher/users/staff' },
+        { name: 'Talabalar', path: '/teacher/users/students' },
     ]},
     { id: 'resources', name: 'Ta\'lim resurslari', icon: BookOpen, subItems: [
         { name: 'Kurslar', path: '/teacher/courses', hidden: user?.role === 'staff' },
@@ -90,7 +76,6 @@ export default function TeacherDashboard() {
     const Icon = item.icon;
     const isExpanded = expandedMenus.includes(item.id);
     const hasSubItems = item.subItems && item.subItems.length > 0;
-    const isChat = item.id === 'chat';
     const isActive = item.exact 
       ? location.pathname === item.path
       : location.pathname.startsWith(item.path);
@@ -267,12 +252,13 @@ export default function TeacherDashboard() {
           <Routes>
             <Route path="/" element={<TeacherOverview />} />
             <Route path="/profile" element={<TeacherProfile />} />
+            <Route path="/academic" element={<AdminAcademic />} />
+            <Route path="/users/:tab" element={<AdminUsers />} />
             <Route path="/departments" element={<TeacherDepartments />} />
             <Route path="/courses" element={<TeacherCourses />} />
             <Route path="/tests" element={<TeacherTests />} />
             <Route path="/subjects" element={<TeacherSubjects />} />
             <Route path="/subjects/read/:id" element={<SubjectRead />} />
-            <Route path="/students" element={<TeacherStudents />} />
             <Route path="/jurnal" element={<TeacherJurnal />} />
             <Route path="/quizizz" element={<TeacherQuizizz />} />
             <Route path="/certificates" element={<TeacherCertificates />} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { 
   Zap, 
   Check, 
@@ -13,11 +13,14 @@ import {
   ShieldCheck,
   Award,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  X
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useAuth } from "../hooks/useAuth";
 
 interface TariffConfig {
+  name?: string;
   price?: number;
   students?: number;
   staff?: number;
@@ -53,6 +56,7 @@ interface AllTariffsConfig {
 // Default fallbacks matching user pricing requirements
 const defaultTariffs: AllTariffsConfig = {
   start: {
+    name: "START",
     price: 300000,
     students: 50,
     staff: 2,
@@ -65,6 +69,7 @@ const defaultTariffs: AllTariffsConfig = {
     maxQuizizz: 4
   },
   standard: {
+    name: "STANDARD",
     price: 700000,
     students: 200,
     staff: 5,
@@ -77,6 +82,7 @@ const defaultTariffs: AllTariffsConfig = {
     maxQuizizz: 15
   },
   professional: {
+    name: "PROFESSIONAL",
     price: 1500000,
     students: 1000,
     staff: 20,
@@ -89,6 +95,7 @@ const defaultTariffs: AllTariffsConfig = {
     maxQuizizz: 100
   },
   corporate: {
+    name: "CORPORATE",
     basePrice: 500000,
     perStudent: 1000,
     perStaff: 10000,
@@ -106,6 +113,7 @@ const defaultTariffs: AllTariffsConfig = {
     perQuizizz: 5000
   },
   extra: {
+    name: "EXTRA",
     perStudent: 1500,
     perStaff: 15000,
     aiPrice: 350000,
@@ -118,9 +126,18 @@ const defaultTariffs: AllTariffsConfig = {
   }
 };
 
+const XIcon = () => <X className="w-5 h-5 text-gray-300 shrink-0" />;
+
 export default function Tariffs() {
+  const { user } = useAuth();
   const [configs, setConfigs] = useState<AllTariffsConfig>(defaultTariffs);
   const [loading, setLoading] = useState(true);
+
+  // Connection request state
+  const [selectedTariff, setSelectedTariff] = useState<TariffConfig | null>(null);
+  const [paymentType, setPaymentType] = useState('Click');
+  const [receiptUrl, setReceiptUrl] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Corporate calculator state
   const [corpCalc, setCorpCalc] = useState({
@@ -164,6 +181,32 @@ export default function Tariffs() {
     loadConfig();
   }, []);
 
+  const handleSubmitRequest = async () => {
+    if (!user) return alert('Iltimos, tizimga kiring');
+    if (!receiptUrl) return alert('Iltimos, chekni yuklang');
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, 'connection_requests'), {
+        userId: user.uid,
+        userName: user.displayName || 'Noma\'lum',
+        tariffName: selectedTariff?.name,
+        tariffPrice: selectedTariff?.price,
+        paymentType,
+        receiptUrl,
+        status: 'pending',
+        timestamp: serverTimestamp()
+      });
+      alert('Sorov yuborildi! Tez orada admin ko\'rib chiqadi.');
+      setSelectedTariff(null);
+      setReceiptUrl('');
+    } catch (err) {
+      console.error(err);
+      alert('Xatolik yuz berdi');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const calcCorpPrice = () => {
     const base = configs.corporate.basePrice ?? 500000;
     const stdPrice = corpCalc.students * (configs.corporate.perStudent ?? 1000);
@@ -195,8 +238,69 @@ export default function Tariffs() {
     return stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
+  if (loading) return <div>Yuklanmoqda...</div>;
+
   return (
     <div className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-24">
+      {/* Modal for Connection Request */}
+      {selectedTariff && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Tarifga ulanish so'rovi</h3>
+              <button onClick={() => setSelectedTariff(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Tanlangan tarif</div>
+                <div className="text-lg font-black text-slate-800">{selectedTariff.name} — {(selectedTariff.price || 0).toLocaleString()} UZS / oy</div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">To'lov turini tanlang</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {['Click', 'Payme', 'Uzum Bank', 'Bank'].map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setPaymentType(type)}
+                      className={`py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all ${
+                        paymentType === type ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-200'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">To'lov chekini yuklang (URL)</label>
+                <input 
+                  type="text" 
+                  value={receiptUrl}
+                  onChange={e => setReceiptUrl(e.target.value)}
+                  placeholder="Rasm havolasini kiriting..."
+                  className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
+                />
+              </div>
+
+              <button 
+                onClick={handleSubmitRequest}
+                disabled={isSubmitting}
+                className="w-full py-5 rounded-3xl bg-blue-600 text-white font-black text-sm tracking-widest uppercase hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Yuborilmoqda...' : 'Meni shu tarifga o\'tkazib bering'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Header section with Centered styling */}
       <div className="text-center space-y-6 max-w-3xl mx-auto">
         <span className="px-4 py-2 rounded-full text-xs font-black bg-blue-50 text-blue-600 tracking-widest uppercase inline-block">
@@ -258,7 +362,12 @@ export default function Tariffs() {
               </li>
             </ul>
           </div>
-          <button className="w-full py-4 bg-gray-50 text-gray-800 rounded-2xl font-black hover:bg-orange-600 hover:text-white hover:shadow-lg transition-all uppercase text-sm tracking-wider">Tashkilotga ulash</button>
+          <button 
+            onClick={() => setSelectedTariff(configs.start)}
+            className="w-full py-4 bg-gray-50 text-gray-800 rounded-2xl font-black hover:bg-orange-600 hover:text-white hover:shadow-lg transition-all uppercase text-sm tracking-wider"
+          >
+            Tashkilotga ulash
+          </button>
         </div>
 
         {/* STANDARD */}
@@ -306,7 +415,12 @@ export default function Tariffs() {
               </li>
             </ul>
           </div>
-          <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all uppercase text-sm tracking-wider">Tashkilotga ulash</button>
+          <button 
+            onClick={() => setSelectedTariff(configs.standard)}
+            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all uppercase text-sm tracking-wider"
+          >
+            Tashkilotga ulash
+          </button>
         </div>
 
         {/* PROFESSIONAL */}
@@ -353,7 +467,12 @@ export default function Tariffs() {
               </li>
             </ul>
           </div>
-          <button className="w-full py-4 bg-gray-50 text-gray-800 rounded-2xl font-black hover:bg-amber-500 hover:text-white hover:shadow-lg transition-all uppercase text-sm tracking-wider">Tashkilotga ulash</button>
+          <button 
+            onClick={() => setSelectedTariff(configs.professional)}
+            className="w-full py-4 bg-gray-50 text-gray-800 rounded-2xl font-black hover:bg-amber-500 hover:text-white hover:shadow-lg transition-all uppercase text-sm tracking-wider"
+          >
+            Tashkilotga ulash
+          </button>
         </div>
 
       </div>
@@ -525,7 +644,12 @@ export default function Tariffs() {
                         {calcCorpPrice().toLocaleString()} <span className="text-sm font-black text-slate-300">sum/oy</span>
                       </div>
                    </div>
-                   <button className="w-full md:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all uppercase text-xs tracking-widest shadow-lg">Shartnoma Tuzish</button>
+                   <button 
+                     onClick={() => setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()})}
+                     className="w-full md:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all uppercase text-xs tracking-widest shadow-lg"
+                   >
+                     Shartnoma Tuzish
+                   </button>
                 </div>
              </div>
           </div>
@@ -580,7 +704,7 @@ export default function Tariffs() {
 
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
-                         Qoʻshimcha kurslar (${(configs.extra.perCourse ?? 50000).toLocaleString()} soʻm/ta)
+                         Qoʻshimcha kurslar ({(configs.extra.perCourse ?? 50000).toLocaleString()} soʻm/ta)
                        </label>
                        <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
                          <input 
@@ -596,7 +720,7 @@ export default function Tariffs() {
 
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
-                         Qoʻshimcha testlar (${(configs.extra.perTest ?? 3000).toLocaleString()} soʻm/ta)
+                         Qoʻshimcha testlar ({(configs.extra.perTest ?? 3000).toLocaleString()} soʻm/ta)
                        </label>
                        <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
                          <input 
@@ -612,7 +736,7 @@ export default function Tariffs() {
 
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
-                         Qoʻshimcha imtihonlar (${(configs.extra.perExam ?? 20000).toLocaleString()} soʻm/ta)
+                         Qoʻshimcha imtihonlar ({(configs.extra.perExam ?? 20000).toLocaleString()} soʻm/ta)
                        </label>
                        <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
                          <input 
@@ -628,7 +752,7 @@ export default function Tariffs() {
 
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
-                         Qoʻshimcha mavzular (${(configs.extra.perSubject ?? 6000).toLocaleString()} soʻm/ta)
+                         Qoʻshimcha mavzular ({(configs.extra.perSubject ?? 6000).toLocaleString()} soʻm/ta)
                        </label>
                        <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
                          <input 
@@ -644,7 +768,7 @@ export default function Tariffs() {
 
                     <div className="space-y-2 md:col-span-2">
                        <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
-                         Qoʻshimcha quizizzlar (${(configs.extra.perQuizizz ?? 6000).toLocaleString()} soʻm/ta)
+                         Qoʻshimcha quizizzlar ({(configs.extra.perQuizizz ?? 6000).toLocaleString()} soʻm/ta)
                        </label>
                        <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
                          <input 
@@ -686,10 +810,15 @@ export default function Tariffs() {
                         {calcExtraPrice().toLocaleString()} <span className="text-sm font-black text-emerald-300">sum</span>
                       </div>
                    </div>
-                   <button className="w-full md:w-auto px-8 py-4 bg-white text-emerald-950 font-black rounded-xl transition-all uppercase text-xs tracking-widest shadow-lg">Faollashtirish</button>
+                   <button 
+                     onClick={() => setSelectedTariff({...configs.extra, name: 'EXTRA', price: calcExtraPrice()})}
+                     className="w-full md:w-auto px-8 py-4 bg-white text-emerald-950 font-black rounded-xl transition-all uppercase text-xs tracking-widest shadow-lg"
+                   >
+                     Faollashtirish
+                   </button>
                 </div>
                 <p className="text-[10px] font-medium text-emerald-400 leading-normal italic text-center">
-                  * Diqqat: Qoʻshimcha sotib olinadigan limitlar xarid qilingan oyda amal qiladi va keyingi hisob-kitob davrida ulangan tarif oʻzining standart qiymatlariga qaytadi.
+                   * Diqqat: Qoʻshimcha sotib olinadigan limitlar xarid qilingan oyda amal qiladi va keyingi hisob-kitob davrida ulangan tarif oʻzining standart qiymatlariga qaytadi.
                 </p>
              </div>
           </div>
@@ -698,7 +827,7 @@ export default function Tariffs() {
       </div>
       
       {/* Visual divider design */}
-      <div className="rounded-[40px] border border-gray-100 bg-gray-50/50 p-8 flex flex-col md:flex-row items-center gap-6 justify-between p-8">
+      <div className="rounded-[40px] border border-gray-100 bg-gray-50/50 flex flex-col md:flex-row items-center gap-6 justify-between p-8">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl">
             <ShieldCheck className="w-6 h-6" />
@@ -715,11 +844,5 @@ export default function Tariffs() {
         </div>
       </div>
     </div>
-  );
-}
-
-function XIcon() {
-  return (
-    <span className="w-5 h-5 rounded-full bg-red-50 text-red-500 font-black flex items-center justify-center text-[10px] shrink-0">✕</span>
   );
 }

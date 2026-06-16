@@ -23,6 +23,7 @@ export interface Department {
 export interface Group {
   id: string;
   departmentId: string;
+  facultyId?: string;
   name: string;
   creatorId?: string;
   createdAt: any;

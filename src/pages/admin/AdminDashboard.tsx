@@ -27,8 +27,7 @@ import ChatSection from '../ChatSection';
 import AdminProfile from './AdminProfile';
 import AdminAiAssistant from './AdminAiAssistant';
 import AdminStorage from './AdminStorage';
-import AdminFaculties from './AdminFaculties';
-import AdminAcademicYears from './AdminAcademicYears';
+import AdminAcademic from './AdminAcademic';
 import AdminSystemLogs from './AdminSystemLogs';
 import AdminBackup from './AdminBackup';
 import { AdminLayout } from '../../components/admin/AdminLayout';
@@ -79,9 +78,7 @@ export default function AdminDashboard() {
         <Route path="/ai-assistant" element={<AdminAiAssistant />} />
         
         {/* Academic Structure */}
-        <Route path="/faculties" element={<AdminFaculties />} />
-        <Route path="/departments" element={<AdminDepartments />} />
-        <Route path="/academic-years" element={<AdminAcademicYears />} />
+        <Route path="/academic" element={<AdminAcademic />} />
         
         {/* Users */}
         <Route path="/users" element={<AdminUsers />} />
