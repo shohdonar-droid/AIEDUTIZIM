@@ -21,6 +21,7 @@ import AdminBotUsers from './AdminBotUsers';
 import AdminBot from './AdminBot';
 import AdminQuizizz from './AdminQuizizz';
 import AdminServices from './AdminServices';
+import AdminPaymentHistory from './AdminPaymentHistory';
 import AdminSubjects from '../../components/SubjectsManager';
 import SubjectRead from '../SubjectRead';
 import ChatSection from '../ChatSection';
@@ -105,7 +106,7 @@ export default function AdminDashboard() {
         {/* Billing */}
         <Route path="/billing" element={<AdminBilling />} />
         <Route path="/active-subscriptions" element={<div className="p-10 font-bold">Faol obunalar (Tez kunda)</div>} />
-        <Route path="/payment-history" element={<div className="p-10 font-bold">To'lovlar tarixi (Tez kunda)</div>} />
+        <Route path="/payment-history" element={<AdminPaymentHistory />} />
         <Route path="/connection-requests" element={<AdminServices />} />
         <Route path="/promo-codes" element={<div className="p-10 font-bold">Promo kodlar (Tez kunda)</div>} />
         

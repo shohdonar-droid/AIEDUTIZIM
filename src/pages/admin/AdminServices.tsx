@@ -8,7 +8,8 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
-  addDoc
+  addDoc,
+  getDoc
 } from "firebase/firestore";
 import { Check, X, Eye, Clock, User, CreditCard } from "lucide-react";
 
@@ -40,6 +41,34 @@ export default function AdminServices() {
         startDate: serverTimestamp(),
         paymentType: req.paymentType,
         tariffPrice: req.tariffPrice
+      });
+
+      // Investigate user role to log in payment_history
+      let payerType = "tashkilot";
+      let payerName = req.userName;
+      try {
+        const uSnap = await getDoc(doc(db, "users", req.userId));
+        if (uSnap.exists()) {
+          const uData = uSnap.data();
+          if (uData.displayName) {
+            payerName = uData.displayName;
+          }
+          if (uData.role === "staff") {
+            payerType = "xodim";
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to retrieve user info for payment history classification", err);
+      }
+
+      await addDoc(collection(db, "payment_history"), {
+        userId: req.userId,
+        payerName: payerName,
+        payerType: payerType,
+        amount: req.tariffPrice || 0,
+        tariffName: req.tariffName || "Noma'lum",
+        paymentType: req.paymentType || "Chek",
+        timestamp: serverTimestamp()
       });
 
       alert("So'rov tasdiqlandi va obuna faollashtirildi");
