@@ -17,6 +17,7 @@ import AdminJurnal from './AdminJurnal';
 import AdminCertificates from './AdminCertificates';
 import AdminNotifications from './AdminNotifications';
 import AdminBilling from './AdminBilling';
+import AdminActiveSubscriptions from './AdminActiveSubscriptions';
 import AdminBotUsers from './AdminBotUsers';
 import AdminBot from './AdminBot';
 import AdminQuizizz from './AdminQuizizz';
@@ -105,7 +106,7 @@ export default function AdminDashboard() {
         
         {/* Billing */}
         <Route path="/billing" element={<AdminBilling />} />
-        <Route path="/active-subscriptions" element={<div className="p-10 font-bold">Faol obunalar (Tez kunda)</div>} />
+        <Route path="/active-subscriptions" element={<AdminActiveSubscriptions />} />
         <Route path="/payment-history" element={<AdminPaymentHistory />} />
         <Route path="/connection-requests" element={<AdminServices />} />
         <Route path="/promo-codes" element={<div className="p-10 font-bold">Promo kodlar (Tez kunda)</div>} />

@@ -39,6 +39,10 @@ service cloud.firestore {
     match /counters/{id} { allow read, write: if true; }
     match /test-connection/{id} { allow read, write: if true; }
     match /certificates/{id} { allow read, write: if true; }
+    match /faculties/{id} { allow read, write: if true; }
+    match /academic_years/{id} { allow read, write: if true; }
+    match /trash_bin/{id} { allow read, write: if true; }
+    match /system_logs/{id} { allow read, write: if true; }
 
     // Dynamic data
     match /enrollments/{id} { allow read, write: if true; }
@@ -62,6 +66,10 @@ service cloud.firestore {
     // Payment history
     match /payment_history/{id} {
       allow read, write: if isSignedIn();
+    }
+
+    match /active_subscriptions/{id} {
+      allow read, write: if true;
     }
 
     // Activity logs
