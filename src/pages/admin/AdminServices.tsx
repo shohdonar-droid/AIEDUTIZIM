@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../../lib/firebase";
+import firebaseConfig from "../../../firebase-applet-config.json";
 import {
   collection,
   query,
@@ -9,7 +10,10 @@ import {
   doc,
   serverTimestamp,
   addDoc,
-  getDoc
+  getDoc,
+  setDoc,
+  where,
+  getDocs
 } from "firebase/firestore";
 import { Check, X, Eye, Clock, User, CreditCard } from "lucide-react";
 
@@ -32,11 +36,56 @@ export default function AdminServices() {
   const handleApprove = async (req: any) => {
     if (!confirm("Ushbu so'rovni tasdiqlaysizmi?")) return;
     try {
+      let targetUserId = req.userId;
+
+      if (req.isNewOrgRequest) {
+        // Create new organization user
+        const q = query(
+          collection(db, "users"),
+          where("login", "==", req.login.trim()),
+        );
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          alert("Ushbu login band! Ro'yxatdan o'tish so'rovi tasdiqlanmadi.");
+          return;
+        }
+
+        const email = `${req.login.trim().toLowerCase()}@teacher.uz`;
+        const response = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email,
+              password: req.password,
+              returnSecureToken: false,
+            }),
+          },
+        );
+        if (!response.ok) throw new Error("Yangi foydalanuvchi yaratishda xatolik");
+        const data = await response.json();
+        const uid = data.localId;
+        targetUserId = uid;
+
+        await setDoc(doc(db, "users", uid), {
+          uid: uid,
+          displayName: req.userName,
+          phone: req.phone || "",
+          login: req.login.trim(),
+          password: req.password,
+          role: "teacher",
+          email: email,
+          tariffName: req.tariffName,
+          createdAt: serverTimestamp(),
+        });
+      }
+
       await updateDoc(doc(db, "connection_requests", req.id), { status: 'approved' });
       
       if (req.isLimitsRequest) {
         // Update Independent Teacher limits
-        const userRef = doc(db, "users", req.userId);
+        const userRef = doc(db, "users", targetUserId);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const userData = userSnap.data();
@@ -51,12 +100,18 @@ export default function AdminServices() {
       } else {
         // Standard org subscription
         await addDoc(collection(db, "active_subscriptions"), {
-          userId: req.userId,
+          userId: targetUserId,
           userName: req.userName,
           tariffName: req.tariffName,
           startDate: serverTimestamp(),
           paymentType: req.paymentType,
           tariffPrice: req.tariffPrice
+        });
+
+        // Also update the user's primary tariff info
+        await updateDoc(doc(db, "users", targetUserId), {
+          tariffName: req.tariffName,
+          lastTariffUpdate: serverTimestamp()
         });
       }
 
@@ -64,7 +119,7 @@ export default function AdminServices() {
       let payerType = "tashkilot";
       let payerName = req.userName;
       try {
-        const uSnap = await getDoc(doc(db, "users", req.userId));
+        const uSnap = await getDoc(doc(db, "users", targetUserId));
         if (uSnap.exists()) {
           const uData = uSnap.data();
           if (uData.displayName) {
@@ -81,7 +136,7 @@ export default function AdminServices() {
       }
 
       await addDoc(collection(db, "payment_history"), {
-        userId: req.userId,
+        userId: targetUserId,
         payerName: payerName,
         payerType: payerType,
         amount: req.tariffPrice || req.totalPrice || 0,
@@ -91,7 +146,7 @@ export default function AdminServices() {
       });
 
       alert("So'rov muvaffaqiyatli tasdiqlandi!");
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error(err); alert("Xatolik: " + (err instanceof Error ? err.message : String(err))); }
   };
 
   const handleReject = async () => {

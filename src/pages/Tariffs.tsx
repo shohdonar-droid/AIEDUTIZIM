@@ -144,6 +144,15 @@ export default function Tariffs() {
   const [receiptUrl, setReceiptUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // New Organization Signup Modal states
+  const [showNewOrgModal, setShowNewOrgModal] = useState<TariffConfig | null>(null);
+  const [newOrgData, setNewOrgData] = useState({
+    name: '',
+    phone: '',
+    login: '',
+    password: ''
+  });
+
   // File Upload states
   const [receiptTab, setReceiptTab] = useState<'upload' | 'url'>('upload');
   const [dragActive, setDragActive] = useState(false);
@@ -304,6 +313,39 @@ export default function Tariffs() {
     } catch (err) {
       console.error(err);
       alert('Soʻrov yuborishda xatolik yuz berdi: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNewOrgSignup = async () => {
+    if (!showNewOrgModal) return;
+    if (!newOrgData.name || !newOrgData.phone || !newOrgData.login || !newOrgData.password || !receiptUrl) {
+      return alert("Barcha maydonlarni to'ldiring va chekni yuklang.");
+    }
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, 'connection_requests'), {
+        isNewOrgRequest: true,
+        userName: newOrgData.name,
+        phone: newOrgData.phone,
+        login: newOrgData.login,
+        password: newOrgData.password,
+        tariffName: showNewOrgModal.name,
+        tariffPrice: showNewOrgModal.price || showNewOrgModal.basePrice || 0,
+        paymentType,
+        receiptUrl,
+        status: 'pending',
+        timestamp: serverTimestamp()
+      });
+      alert("Ro'yxatdan o'tish so'rovi yuborildi! Admin tasdiqlagandan so'ng login/parol orqali kirishingiz mumkin.");
+      setShowNewOrgModal(null);
+      setNewOrgData({ name: '', phone: '', login: '', password: '' });
+      setReceiptUrl('');
+      setFileName('');
+    } catch (err) {
+      console.error(err);
+      alert("Xatolik yuz berdi");
     } finally {
       setIsSubmitting(false);
     }
@@ -513,6 +555,137 @@ export default function Tariffs() {
         </div>
       )}
 
+      {/* Modal for New Organization Request (Guest) */}
+      {showNewOrgModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[2rem] w-full max-w-2xl p-8 shadow-2xl overflow-y-auto max-h-[95vh] scrollbar-hide"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Tashkilot sifatida ro'yxatdan o'tish</h3>
+              <button onClick={() => setShowNewOrgModal(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Tashkilot nomi</label>
+                  <input 
+                    type="text" 
+                    value={newOrgData.name}
+                    onChange={e => setNewOrgData({...newOrgData, name: e.target.value})}
+                    placeholder="Masalan: Innovatsiya O'quv Markazi"
+                    className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Tel raqam</label>
+                  <input 
+                    type="text" 
+                    value={newOrgData.phone}
+                    onChange={e => setNewOrgData({...newOrgData, phone: e.target.value})}
+                    placeholder="+998 90 123 45 67"
+                    className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Login</label>
+                  <input 
+                    type="text" 
+                    value={newOrgData.login}
+                    onChange={e => setNewOrgData({...newOrgData, login: e.target.value})}
+                    placeholder="shaxsiy_login"
+                    className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Parol</label>
+                  <input 
+                    type="password" 
+                    value={newOrgData.password}
+                    onChange={e => setNewOrgData({...newOrgData, password: e.target.value})}
+                    placeholder="******"
+                    className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                  <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Tanlangan tarif</div>
+                  <div className="text-sm font-black text-slate-800">{showNewOrgModal.name} — {(showNewOrgModal.price || showNewOrgModal.basePrice || 0).toLocaleString()} UZS</div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">To'lov turini tanlang</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Click', 'Payme', 'Uzum Bank', 'Bank'].map(type => (
+                      <button
+                        key={type}
+                        onClick={() => setPaymentType(type)}
+                        className={`py-2 px-3 rounded-xl border-2 font-bold text-xs transition-all ${
+                          paymentType === type ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-50 text-gray-400 hover:border-gray-100'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                  <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Karta raqami (Humo):</p>
+                  <p className="text-sm font-black font-mono text-gray-800">9860 2109 4567 8901</p>
+                  <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase">S. O. ELYORBEK</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">To'lov chekini yuklang</label>
+              {!receiptUrl ? (
+                <div
+                  onDragEnter={handleDrag}
+                  onDragOver={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[140px] relative ${
+                    dragActive ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-200 bg-slate-50 text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => e.target.files?.[0] && handleFileChange(e.target.files[0])}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <Upload className="w-8 h-8 mb-2 text-slate-400" />
+                  <p className="text-xs font-bold text-slate-600">Chek rasmini yuklang</p>
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <img src={receiptUrl} alt="Receipt" className="w-12 h-12 rounded-lg object-cover" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-widest">Chek yuklandi</span>
+                  </div>
+                  <button onClick={() => setReceiptUrl('')} className="p-2 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={handleNewOrgSignup}
+              disabled={isSubmitting}
+              className="w-full py-4 rounded-2xl bg-blue-600 text-white font-black text-sm tracking-widest uppercase hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50"
+            >
+              {isSubmitting ? 'Yuborilmoqda...' : 'Yuborish va ro\'yxatdan o\'tish'}
+            </button>
+          </motion.div>
+        </div>
+      )}
+
       {/* Header section with Centered styling */}
       <div className="text-center space-y-6 max-w-3xl mx-auto">
         <span className="px-4 py-2 rounded-full text-xs font-black bg-blue-50 text-blue-600 tracking-widest uppercase inline-block">
@@ -586,10 +759,10 @@ export default function Tariffs() {
               </ul>
             </div>
             <button 
-              onClick={() => setSelectedTariff(configs.start)}
+              onClick={() => user ? setSelectedTariff(configs.start) : setShowNewOrgModal(configs.start)}
               className="w-full py-3 bg-gray-50 text-gray-800 rounded-xl font-black hover:bg-orange-600 hover:text-white hover:shadow-lg transition-all uppercase text-xs tracking-wider"
             >
-              Tashkilotga ulash
+              {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
             </button>
           </div>
 
@@ -639,10 +812,10 @@ export default function Tariffs() {
               </ul>
             </div>
             <button 
-              onClick={() => setSelectedTariff(configs.standard)}
+              onClick={() => user ? setSelectedTariff(configs.standard) : setShowNewOrgModal(configs.standard)}
               className="w-full py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all uppercase text-xs tracking-wider"
             >
-              Tashkilotga ulash
+              {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
             </button>
           </div>
 
@@ -691,10 +864,10 @@ export default function Tariffs() {
               </ul>
             </div>
             <button 
-              onClick={() => setSelectedTariff(configs.professional)}
+              onClick={() => user ? setSelectedTariff(configs.professional) : setShowNewOrgModal(configs.professional)}
               className="w-full py-3 bg-gray-50 text-gray-800 rounded-xl font-black hover:bg-amber-500 hover:text-white hover:shadow-lg transition-all uppercase text-xs tracking-wider"
             >
-              Tashkilotga ulash
+              {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
             </button>
           </div>
 
@@ -743,10 +916,10 @@ export default function Tariffs() {
               </ul>
             </div>
             <button 
-              onClick={() => setIsCorpModalOpen(true)}
+              onClick={() => user ? setIsCorpModalOpen(true) : setShowNewOrgModal({...configs.corporate, name: 'CORPORATE'})}
               className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-black hover:from-indigo-700 hover:to-indigo-800 shadow-md transition-all uppercase text-xs tracking-wider"
             >
-              Moslashtirish & Bog'lanish
+              {user ? "Moslashtirish & Bog'lanish" : "Tanlangan tarifga ulanish"}
             </button>
           </div>
 

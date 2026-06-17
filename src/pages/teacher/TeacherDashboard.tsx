@@ -14,6 +14,7 @@ import TeacherOverview from './TeacherOverview';
 import TeacherSubjects from '../../components/SubjectsManager';
 import SubjectRead from '../SubjectRead';
 import TeacherQuizizz from './TeacherQuizizz';
+import TeacherBilling from './TeacherBilling';
 
 // Mustaqil O'qituvchi Independent components
 import IndependentOverview from './independent/IndependentOverview';
@@ -98,6 +99,7 @@ export default function TeacherDashboard() {
         { name: 'Jurnal', path: '/teacher/jurnal' },
     ]},
     { id: 'chat', name: 'Chat', path: '/teacher/chat', icon: MessageSquare, badge: unreadCount },
+    { id: 'billing', name: 'Tarif', path: '/teacher/billing', icon: Award, exact: true },
   ].filter(m => !m.hidden);
 
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['academic', 'users', 'resources', 'monitoring']);
@@ -302,6 +304,7 @@ export default function TeacherDashboard() {
                 <Route path="/jurnal" element={<IndependentJurnal />} />
                 <Route path="/limits" element={<IndependentLimits />} />
                 <Route path="/chat" element={<TeacherChat />} />
+                <Route path="/billing" element={<TeacherBilling />} />
                 <Route path="/contact" element={<IndependentContact />} />
               </>
             ) : (
@@ -319,6 +322,7 @@ export default function TeacherDashboard() {
                 <Route path="/quizizz" element={<TeacherQuizizz />} />
                 <Route path="/certificates" element={<TeacherCertificates />} />
                 <Route path="/chat" element={<TeacherChat />} />
+                <Route path="/billing" element={<TeacherBilling />} />
               </>
             )}
           </Routes>
