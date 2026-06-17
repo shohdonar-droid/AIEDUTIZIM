@@ -466,7 +466,10 @@ export default function AdminBilling() {
                       </div>
                       
                       <div className="pt-4 space-y-2">
-                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Tariflar bo'yicha tahlil (1ta resurs uchun):</p>
+                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Misol: 1 ta test (30 talik):</p>
+                         <p className="text-[9px] text-slate-300 mb-3 leading-tight font-bold italic lowercase">
+                            (yaratish: {systemCosts.perResource} uzs + {systemCosts.interactionUnit} uzs x har bir talaba)
+                         </p>
                          <div className="grid grid-cols-1 gap-2">
                             <div className="flex justify-between items-center px-4 py-2.5 bg-white/5 rounded-xl border border-white/5">
                                <span className="text-[9px] font-bold uppercase">START ({tariffsConfig.start.students} talaba)</span>
