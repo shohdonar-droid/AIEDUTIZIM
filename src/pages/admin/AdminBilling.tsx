@@ -452,23 +452,27 @@ export default function AdminBilling() {
                       <div className="p-2 bg-indigo-500 rounded-lg">
                          <Zap className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-black uppercase tracking-tight">1 ta Resurs Xarajati</h3>
+                      <h3 className="text-lg font-black uppercase tracking-tight">AI & Resurs Xarajati</h3>
                    </div>
                    
                    <div className="space-y-4">
                       <div className="flex justify-between items-center pb-3 border-b border-white/10">
-                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Yaratish & Saqlash</span>
-                         <span className="text-sm font-black font-mono text-indigo-100">{systemCosts.perResource} UZS</span>
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">30 ta AI savol tuzish (Tokens)</span>
+                         <span className="text-sm font-black font-mono text-emerald-400">~35 UZS</span>
                       </div>
                       <div className="flex justify-between items-center pb-3 border-b border-white/10">
-                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">1 ta talaba faolligi</span>
-                         <span className="text-sm font-black font-mono text-indigo-100">{systemCosts.interactionUnit} UZS</span>
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Firebase Writes (30 savol)</span>
+                         <span className="text-sm font-black font-mono text-emerald-400">~5 UZS</span>
+                      </div>
+                      <div className="flex justify-between items-center pb-3 border-b border-white/10">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Saqlash & Trafik (Oylik)</span>
+                         <span className="text-sm font-black font-mono text-indigo-100">{systemCosts.perResource} UZS</span>
                       </div>
                       
                       <div className="pt-4 space-y-2">
-                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Misol: 1 ta test (30 talik):</p>
+                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Maksimal yuklamada (Xarajat):</p>
                          <p className="text-[9px] text-slate-300 mb-3 leading-tight font-bold italic lowercase">
-                            (yaratish: {systemCosts.perResource} uzs + {systemCosts.interactionUnit} uzs x har bir talaba)
+                            (infra: {systemCosts.perResource} uzs + {systemCosts.interactionUnit} uzs x har bir talaba)
                          </p>
                          <div className="grid grid-cols-1 gap-2">
                             <div className="flex justify-between items-center px-4 py-2.5 bg-white/5 rounded-xl border border-white/5">
@@ -489,7 +493,7 @@ export default function AdminBilling() {
                 </div>
                 
                 <p className="mt-8 text-[9px] text-slate-500 leading-relaxed italic uppercase tracking-tighter">
-                   * Resurs xarajati = Saqlash + (Talabalar soni x Faollik birligi). Talaba vazifani ishlaganda yuzaga keladigan CPU/Trafik yuklamasi hisobga olingan.
+                   * RailWay va Firebase oylik to'lovlari "Fixed Costs" bo'lib, ular har bir amaldan qat'iy nazar o'zgarmas qoladi. AI narxi Gemini 1.5 Flash modeli asosida hisoblangan.
                 </p>
              </div>
           </div>
