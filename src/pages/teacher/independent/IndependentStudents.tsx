@@ -90,6 +90,7 @@ export default function IndependentStudents() {
         groupId: selectedGroupId,
         departmentId: groupData?.departmentId || '',
         teacherId: user.uid,
+        organizationId: (user as any).teacherId || "", // Associate independent teacher's student to UY organization
         createdAt: serverTimestamp(),
         balls: 0
       });

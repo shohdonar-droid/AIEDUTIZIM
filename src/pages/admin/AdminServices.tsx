@@ -30,18 +30,35 @@ export default function AdminServices() {
   }, []);
 
   const handleApprove = async (req: any) => {
-    if (!confirm("Ushbu tarif so'rovini tasdiqlaysizmi?")) return;
+    if (!confirm("Ushbu so'rovni tasdiqlaysizmi?")) return;
     try {
       await updateDoc(doc(db, "connection_requests", req.id), { status: 'approved' });
       
-      await addDoc(collection(db, "active_subscriptions"), {
-        userId: req.userId,
-        userName: req.userName,
-        tariffName: req.tariffName,
-        startDate: serverTimestamp(),
-        paymentType: req.paymentType,
-        tariffPrice: req.tariffPrice
-      });
+      if (req.isLimitsRequest) {
+        // Update Independent Teacher limits
+        const userRef = doc(db, "users", req.userId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          const targetLimits = req.requestedLimits || req.requestedItems || {};
+          const updates: any = {};
+          Object.entries(targetLimits).forEach(([key, val]) => {
+            const currentVal = userData[key] ?? 0;
+            updates[key] = currentVal + Number(val);
+          });
+          await updateDoc(userRef, updates);
+        }
+      } else {
+        // Standard org subscription
+        await addDoc(collection(db, "active_subscriptions"), {
+          userId: req.userId,
+          userName: req.userName,
+          tariffName: req.tariffName,
+          startDate: serverTimestamp(),
+          paymentType: req.paymentType,
+          tariffPrice: req.tariffPrice
+        });
+      }
 
       // Investigate user role to log in payment_history
       let payerType = "tashkilot";
@@ -55,6 +72,8 @@ export default function AdminServices() {
           }
           if (uData.role === "staff") {
             payerType = "xodim";
+          } else if (uData.role === "mustaqil_o_qituvchi") {
+            payerType = "mustaqil_o_qituvchi";
           }
         }
       } catch (err) {
@@ -65,13 +84,13 @@ export default function AdminServices() {
         userId: req.userId,
         payerName: payerName,
         payerType: payerType,
-        amount: req.tariffPrice || 0,
+        amount: req.tariffPrice || req.totalPrice || 0,
         tariffName: req.tariffName || "Noma'lum",
         paymentType: req.paymentType || "Chek",
         timestamp: serverTimestamp()
       });
 
-      alert("So'rov tasdiqlandi va obuna faollashtirildi");
+      alert("So'rov muvaffaqiyatli tasdiqlandi!");
     } catch (err) { console.error(err); }
   };
 

@@ -34,11 +34,35 @@ export default function Register() {
 
         if (emailSnap.empty) {
           // New Independent Teacher / Mustaqil O'qituvchi
+          let uyOrgId = '';
+          const q = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
+          const uySnap = await getDocs(q);
+          if (!uySnap.empty) {
+            uyOrgId = uySnap.docs[0].id;
+          } else {
+            const uyRef = await addDoc(collection(db, 'users'), {
+              displayName: 'UY',
+              role: 'teacher',
+              status: 'active',
+              createdAt: serverTimestamp(),
+              limit_departments: 9999,
+              limit_groups: 9999,
+              limit_students: 9999,
+              limit_subjects: 9999,
+              limit_tests: 9999,
+              limit_quizizz: 9999,
+              limit_exams: 9999,
+              limit_certificates: 9999
+            });
+            uyOrgId = uyRef.id;
+          }
+
           await setDoc(userDocRef, {
             uid: user.uid,
             displayName: user.displayName || "Mustaqil O'qituvchi",
             email: user.email,
             role: 'mustaqil_o_qituvchi',
+            teacherId: uyOrgId, // Associate independent teacher with the UY home organization
             createdAt: serverTimestamp(),
             
             // Boshlang'ich limitlar

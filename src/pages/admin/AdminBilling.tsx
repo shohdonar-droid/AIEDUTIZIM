@@ -62,6 +62,16 @@ interface TariffConfig {
   perExam?: number;
   perSubject?: number;
   perQuizizz?: number;
+
+  // Independent Teacher service unit prices
+  limit_departments_price?: number;
+  limit_groups_price?: number;
+  limit_students_price?: number;
+  limit_subjects_price?: number;
+  limit_tests_price?: number;
+  limit_quizizz_price?: number;
+  limit_exams_price?: number;
+  limit_certificates_price?: number;
 }
 
 interface AllTariffsConfig {
@@ -83,7 +93,15 @@ const defaultTariffs: AllTariffsConfig = {
     maxTests: 10,
     maxExams: 2,
     maxSubjects: 5,
-    maxQuizizz: 4
+    maxQuizizz: 4,
+    limit_departments_price: 15000,
+    limit_groups_price: 20000,
+    limit_students_price: 5000,
+    limit_subjects_price: 15000,
+    limit_tests_price: 3000,
+    limit_quizizz_price: 4000,
+    limit_exams_price: 20000,
+    limit_certificates_price: 10000
   },
   standard: {
     price: 700000,
@@ -95,7 +113,15 @@ const defaultTariffs: AllTariffsConfig = {
     maxTests: 50,
     maxExams: 10,
     maxSubjects: 20,
-    maxQuizizz: 15
+    maxQuizizz: 15,
+    limit_departments_price: 12000,
+    limit_groups_price: 15000,
+    limit_students_price: 4000,
+    limit_subjects_price: 12000,
+    limit_tests_price: 2500,
+    limit_quizizz_price: 3000,
+    limit_exams_price: 15000,
+    limit_certificates_price: 8000
   },
   professional: {
     price: 1500000,
@@ -107,7 +133,15 @@ const defaultTariffs: AllTariffsConfig = {
     maxTests: 300,
     maxExams: 50,
     maxSubjects: 100,
-    maxQuizizz: 100
+    maxQuizizz: 100,
+    limit_departments_price: 10000,
+    limit_groups_price: 12000,
+    limit_students_price: 3000,
+    limit_subjects_price: 10000,
+    limit_tests_price: 2000,
+    limit_quizizz_price: 2500,
+    limit_exams_price: 12000,
+    limit_certificates_price: 6000
   },
   corporate: {
     basePrice: 500000,
@@ -124,7 +158,15 @@ const defaultTariffs: AllTariffsConfig = {
     perTest: 2000,
     perExam: 15000,
     perSubject: 5000,
-    perQuizizz: 5000
+    perQuizizz: 5000,
+    limit_departments_price: 8000,
+    limit_groups_price: 10000,
+    limit_students_price: 2000,
+    limit_subjects_price: 8000,
+    limit_tests_price: 1500,
+    limit_quizizz_price: 2000,
+    limit_exams_price: 10000,
+    limit_certificates_price: 5000
   },
   extra: {
     perStudent: 1500,
@@ -135,7 +177,15 @@ const defaultTariffs: AllTariffsConfig = {
     perTest: 3000,
     perExam: 20000,
     perSubject: 6000,
-    perQuizizz: 6000
+    perQuizizz: 6000,
+    limit_departments_price: 15000,
+    limit_groups_price: 20000,
+    limit_students_price: 5000,
+    limit_subjects_price: 15000,
+    limit_tests_price: 4000,
+    limit_quizizz_price: 4500,
+    limit_exams_price: 20000,
+    limit_certificates_price: 10000
   }
 };
 
@@ -1722,6 +1772,111 @@ export default function AdminBilling() {
                   </div>
                 </>
               )}
+
+                  <div className="border-t border-gray-150 pt-6 mt-6 space-y-4">
+                    <h4 className="text-[11px] font-black text-indigo-600 uppercase tracking-widest pl-1">
+                      Mustaqil o'qituvchi 1 birlik limit narxlari (so'm)
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
+                          Yo'nalish (+1 ta)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.limit_departments_price ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_departments_price: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
+                          Guruhlar (+1 ta)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.limit_groups_price ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_groups_price: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
+                          Talabalar (+1 ta)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.limit_students_price ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_students_price: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
+                          Mavzular (+1 ta)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.limit_subjects_price ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_subjects_price: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
+                          Testlar (+1 ta)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.limit_tests_price ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_tests_price: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
+                          Quizizz (+1 ta)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.limit_quizizz_price ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_quizizz_price: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
+                          Imtihonlar (+1 ta)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.limit_exams_price ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_exams_price: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
+                          Sertifikatlar (+1 ta)
+                        </label>
+                        <input
+                          type="number"
+                          value={editingTariffForm.limit_certificates_price ?? 0}
+                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_certificates_price: Number(e.target.value) })}
+                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
               <button
                 onClick={handleSaveTariff}
