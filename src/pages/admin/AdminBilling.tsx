@@ -42,7 +42,11 @@ import {
   Check,
   Eye,
   Settings,
-  ArrowRight
+  ArrowRight,
+  Server,
+  Database,
+  HardDrive,
+  Bot
 } from "lucide-react";
 import { motion } from "motion/react";
 import * as XLSX from "xlsx";
@@ -520,13 +524,16 @@ export default function AdminBilling() {
     const O = 200;    // Tashkilotlar
     const R = 62500;  // Jami resurslar (50k test + 3k kurs + 3k quiz + 3k imtihon + 3.5k mavzu)
     
+    // Platform Fixed Fees (Railway, Firebase Subscriptions, Domains)
+    const platformFixedFees = 450000; // Oylik Railway + Firebase Pro + Domain xarajatlari
+    
     // Xarajatlar
     const infraCost = (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
     const storageCost = R * systemCosts.perResource;
-    const fixedCost = O * (systemCosts.aiFixed + systemCosts.botFixed);
-    const interactionCost = S * (R / T) * systemCosts.interactionUnit; // Har bir talaba o'z xodimining resurslarini ishlaydi
+    const aiAndBotCost = O * (systemCosts.aiFixed + systemCosts.botFixed);
+    const interactionCost = S * (R / T) * systemCosts.interactionUnit;
     
-    const totalGlobalCost = infraCost + storageCost + fixedCost + interactionCost;
+    const totalGlobalCost = infraCost + storageCost + aiAndBotCost + interactionCost + platformFixedFees;
 
     return (
       <div className="mt-16 space-y-8 pb-10">
@@ -536,7 +543,7 @@ export default function AdminBilling() {
           </div>
           <div>
             <h2 className="text-2xl font-black text-gray-900 tracking-tight">Global Tizim Proyeksiyasi (Masshtab)</h2>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">50,000 talaba va 5,000 xodim uchun oylik prognoz</p>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">200 Tashkilot va 50,000 Talaba uchun To'liq Tahlil</p>
           </div>
         </div>
 
@@ -563,7 +570,7 @@ export default function AdminBilling() {
             </div>
             <div className="space-y-1">
               <p className="text-2xl font-black text-gray-900">{R.toLocaleString()} ta</p>
-              <p className="text-xs font-bold text-gray-500">Oylik saqlash & CDN</p>
+              <p className="text-xs font-bold text-gray-500">Jami faol resurslar</p>
             </div>
           </div>
 
@@ -572,59 +579,105 @@ export default function AdminBilling() {
               <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center font-black">
                 <Activity className="w-5 h-5" />
               </div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Interaktivlik</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Oylik Yuklama</p>
             </div>
             <div className="space-y-1">
-              <p className="text-2xl font-black text-gray-900">100% Faollik</p>
-              <p className="text-xs font-bold text-gray-500">Maksimal yuklama</p>
+              <p className="text-2xl font-black text-gray-900">Maksimal (100%)</p>
+              <p className="text-xs font-bold text-gray-500">Eng faol senariy</p>
             </div>
           </div>
 
           <div className="bg-slate-900 p-6 rounded-[32px] border border-slate-800 shadow-2xl space-y-4">
-            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Umumiy Oylik Xarajat</p>
+            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Jami Oylik Xarajat</p>
             <div className="space-y-1">
               <p className="text-2xl font-black text-white font-mono">{Math.round(totalGlobalCost).toLocaleString()} <span className="text-xs">UZS</span></p>
-              <p className="text-[9px] font-bold text-slate-500 uppercase">Haqiqiy holatga yaqinlashgan prognoz</p>
+              <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-tight">Taxminiy oylik budget</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-           <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm">
-              <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-6">Xarajatlar strukturasi</h3>
-              <div className="space-y-4">
-                 <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
-                    <span className="text-xs font-bold text-gray-500 uppercase">Infra (Auth/DB/Server)</span>
-                    <span className="text-sm font-black text-gray-900">{infraCost.toLocaleString()} UZS</span>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+           <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm xl:col-span-2">
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-6">Xarajatlar Strukturasi (Breakdown)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors">
+                       <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                             <Server className="w-4 h-4 text-slate-500" />
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Railway (Server Hosting)</span>
+                       </div>
+                       <span className="text-sm font-black text-gray-900">150,000 UZS</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors">
+                       <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                             <Database className="w-4 h-4 text-slate-500" />
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Firebase (Firestore/Auth)</span>
+                       </div>
+                       <span className="text-sm font-black text-gray-900">300,000 UZS</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                       <div className="flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-indigo-600" />
+                          <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">Traffic & Interaction</span>
+                       </div>
+                       <span className="text-sm font-black text-indigo-700">{interactionCost.toLocaleString()} UZS</span>
+                    </div>
                  </div>
-                 <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
-                    <span className="text-xs font-bold text-gray-500 uppercase">Storage & Hosting (CDN)</span>
-                    <span className="text-sm font-black text-gray-900">{storageCost.toLocaleString()} UZS</span>
-                 </div>
-                 <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
-                    <span className="text-xs font-bold text-gray-500 uppercase">Fixed (AI/Bot/Gateway)</span>
-                    <span className="text-sm font-black text-gray-900">{fixedCost.toLocaleString()} UZS</span>
-                 </div>
-                 <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                    <span className="text-xs font-bold text-indigo-600 uppercase">Interfaollik (Traffic/IO)</span>
-                    <span className="text-sm font-black text-indigo-700">{interactionCost.toLocaleString()} UZS</span>
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors">
+                       <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                             <Zap className="w-4 h-4 text-indigo-500" />
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Gemini AI API (200 Org)</span>
+                       </div>
+                       <span className="text-sm font-black text-gray-900">{(O * systemCosts.aiFixed).toLocaleString()} UZS</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors">
+                       <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                             <Bot className="w-4 h-4 text-indigo-500" />
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Telegram Bots Gateway</span>
+                       </div>
+                       <span className="text-sm font-black text-gray-900">{(O * systemCosts.botFixed).toLocaleString()} UZS</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors">
+                       <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                             <HardDrive className="w-4 h-4 text-slate-500" />
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Resurslar Saqlash (62.5k)</span>
+                       </div>
+                       <span className="text-sm font-black text-gray-900">{storageCost.toLocaleString()} UZS</span>
+                    </div>
                  </div>
               </div>
            </div>
 
            <div className="bg-emerald-900 p-8 rounded-[40px] shadow-2xl relative overflow-hidden group">
               <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 blur-[80px] rounded-full" />
-              <div className="relative z-10">
-                 <h3 className="text-xs font-black text-emerald-300 uppercase tracking-widest mb-6">Prognoz qilinayotgan daromad</h3>
-                 <div className="space-y-6">
+              <div className="relative z-10 flex flex-col h-full">
+                 <h3 className="text-xs font-black text-emerald-300 uppercase tracking-widest mb-6">Masshtabli Foyda Prognozi</h3>
+                 <div className="space-y-6 flex-grow">
                     <div>
-                       <p className="text-[10px] font-black text-emerald-400/70 uppercase mb-2">O'rtacha oylik tushum (Hamma tariflarda)</p>
-                       <p className="text-4xl font-black text-white font-mono">1,100,000,000 <span className="text-lg">UZS</span></p>
+                       <p className="text-[10px] font-black text-emerald-400/70 uppercase mb-2">Jami Oylik Tushum (200 Org)</p>
+                       <p className="text-4xl font-black text-white font-mono tracking-tighter">1,100,000,000 <span className="text-lg">UZS</span></p>
                     </div>
-                    <div className="pt-6 border-t border-white/10">
-                       <p className="text-[10px] font-black text-emerald-400 capitalize mb-1">Maksimal yuklamadagi sof foyda</p>
-                       <p className="text-2xl font-black text-white font-mono">{(1100000000 - totalGlobalCost).toLocaleString()} UZS</p>
+                    <div className="pt-6 border-t border-white/10 uppercase">
+                       <p className="text-[10px] font-black text-emerald-400 mb-1">Maksimal yuklamada sof foyda</p>
+                       <p className="text-2xl font-black text-white font-mono tracking-tight">{(1100000000 - totalGlobalCost).toLocaleString()} UZS</p>
                     </div>
+                 </div>
+                 
+                 <div className="mt-8 p-4 bg-emerald-800/50 rounded-2xl border border-emerald-700/50">
+                    <p className="text-[9px] font-bold text-emerald-200/60 leading-relaxed uppercase">
+                       * Ushbu proyeksiyada barcha tashkilotlar o'z limitlaridan 100% foydalanishi va barcha talabalar to'liq faol bo'lishi hisobga olingan.
+                    </p>
                  </div>
               </div>
            </div>
@@ -632,6 +685,7 @@ export default function AdminBilling() {
       </div>
     );
   };
+
 
 
 
