@@ -150,6 +150,7 @@ export default function Tariffs() {
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
   const [fileError, setFileError] = useState('');
+  const [isCorpModalOpen, setIsCorpModalOpen] = useState(false);
 
   const compressImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -164,7 +165,7 @@ export default function Tariffs() {
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-        const MAX_DIM = 800;
+        const MAX_DIM = 400; // Aggressive compression for Firestore 1MB limits safety
         if (width > MAX_DIM || height > MAX_DIM) {
           if (width > height) {
             height = Math.round((height * MAX_DIM) / width);
@@ -179,7 +180,7 @@ export default function Tariffs() {
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", 0.7));
+          resolve(canvas.toDataURL("image/jpeg", 0.4)); // Space optimization
         } else {
           resolve(base64Str);
         }
@@ -280,6 +281,9 @@ export default function Tariffs() {
   const handleSubmitRequest = async () => {
     if (!user) return alert('Iltimos, tizimga kiring');
     if (!receiptUrl) return alert('Iltimos, chekni yuklang yoki rasm havolasini kiriting');
+    if (receiptUrl.length > 800 * 1024) {
+      return alert("Yuklangan chek rasmi hajmi juda katta! Iltimos, boshqa kichikroq o'lchamdagi chek rasmini yuklang.");
+    }
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'connection_requests'), {
@@ -523,510 +527,627 @@ export default function Tariffs() {
         </p>
       </div>
 
-      {/* Grid of Standard Tariffs : START, STANDARD, PROFESSIONAL */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        
-        {/* START */}
-        <div className="p-8 rounded-[40px] border-2 border-gray-100 hover:border-orange-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
-          <div>
-            <div className="flex justify-between items-start mb-6">
-              <span className="text-4xl">🥉</span>
-              <span className="px-3 py-1 bg-orange-50 rounded-full text-[10px] font-black text-orange-500 uppercase tracking-widest border border-orange-100">START</span>
-            </div>
-            <h3 className="text-2xl font-black text-gray-950 mb-2">START TARIF</h3>
-            <div className="text-3xl font-black text-orange-600 mb-6 font-mono">
-              {(configs.start.price ?? 300000).toLocaleString()} <span className="text-sm font-black text-gray-400">so'm/oy</span>
-            </div>
-            
-            <p className="text-gray-400 text-sm font-bold mb-6">Kichik guruhlar va individual oʻqituvchilar uchun ideal boshlang'ich paket.</p>
-            
-            <ul className="space-y-3 mb-8 border-t border-gray-50 pt-4">
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.students ?? 50} ta-talabalar
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.staff ?? 2} ta-xodimlar
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxCourses ?? 3} ta kurs
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxTests ?? 15} ta test (mavzu va matn asosida)
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxExams ?? 2} ta imtihon
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxSubjects ?? 5} ta mavzu
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-orange-500 shrink-0" /> {configs.start.maxQuizizz ?? 4} ta quizizz
-              </li>
-              <li className={`text-sm font-bold flex items-center gap-3 ${configs.start.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                {configs.start.hasAI ? <Check className="w-5 h-5 text-orange-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt orqali test generatsiyasi
-              </li>
-              <li className={`text-sm font-bold flex items-center gap-3 ${configs.start.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                {configs.start.hasBot ? <Check className="w-5 h-5 text-orange-500 shrink-0" /> : <XIcon />} Telegram Bot integratsiyasi
-              </li>
-            </ul>
-          </div>
-          <button 
-            onClick={() => setSelectedTariff(configs.start)}
-            className="w-full py-4 bg-gray-50 text-gray-800 rounded-2xl font-black hover:bg-orange-600 hover:text-white hover:shadow-lg transition-all uppercase text-sm tracking-wider"
-          >
-            Tashkilotga ulash
-          </button>
+      {/* SECTION 1: TASHKILOT UCHUN TARIFLAR */}
+      <div className="space-y-6 pt-4">
+        <div className="border-b border-gray-100 pb-4">
+          <h2 className="text-2xl sm:text-3xl font-black text-gray-950 tracking-tight">
+            🏢 Tashkilot uchun tariflar
+          </h2>
+          <p className="text-gray-400 text-sm font-semibold mt-1">
+            Tashkilotingiz o'lchami va ehtiyojlariga mos keladigan tariflar to'plami.
+          </p>
         </div>
 
-        {/* STANDARD */}
-        <div className="p-8 rounded-[40px] border-2 border-blue-600 bg-white relative group flex flex-col justify-between shadow-xl shadow-blue-50">
-          <div className="absolute -top-4 right-10 bg-blue-600 text-white text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-md">Ommabop</div>
-          <div>
-            <div className="flex justify-between items-start mb-6">
-              <span className="text-4xl">🥈</span>
-              <span className="px-3 py-1 bg-blue-50 rounded-full text-[10px] font-black text-blue-600 uppercase tracking-widest border border-blue-100">STANDARD</span>
+        {/* Grid of 4 Tariffs in one row on desktop: START, STANDARD, PROFESSIONAL, CORPORATE */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          
+          {/* START */}
+          <div className="p-6 rounded-[32px] border-2 border-gray-100 hover:border-orange-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-3xl">🥉</span>
+                <span className="px-2.5 py-1 bg-orange-50 rounded-full text-[9px] font-black text-orange-500 uppercase tracking-widest border border-orange-100">START</span>
+              </div>
+              <h3 className="text-xl font-black text-gray-950 mb-1">START TARIF</h3>
+              <div className="text-2xl font-black text-orange-600 mb-4 font-mono">
+                {(configs.start.price ?? 300000).toLocaleString()} <span className="text-xs font-black text-gray-400">so'm/oy</span>
+              </div>
+              
+              <p className="text-gray-400 text-xs font-bold mb-4 line-clamp-2">Kichik guruhlar va individual oʻqituvchilar uchun ideal boshlang'ich paket.</p>
+              
+              <ul className="space-y-2.5 mb-6 border-t border-gray-50 pt-3">
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.students ?? 50} ta-talabalar
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.staff ?? 2} ta-xodimlar
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxCourses ?? 3} ta kurs
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxTests ?? 15} ta test
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxExams ?? 2} ta imtihon
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxSubjects ?? 5} ta mavzu
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxQuizizz ?? 4} ta quizizz
+                </li>
+                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.start.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                  {configs.start.hasAI ? <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt
+                </li>
+                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.start.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                  {configs.start.hasBot ? <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> : <XIcon />} Telegram Bot
+                </li>
+              </ul>
             </div>
-            <h3 className="text-2xl font-black text-gray-950 mb-2">STANDARD TARIF</h3>
-            <div className="text-3xl font-black text-blue-600 mb-6 font-mono">
-              {(configs.standard.price ?? 700000).toLocaleString()} <span className="text-sm font-black text-gray-400">so'm/oy</span>
-            </div>
-            
-            <p className="text-gray-400 text-sm font-bold mb-6">Oʻrta hajmdagi oʻquv markazlari va guruhlar boshqaruvi uchun keng qamrovli tizim.</p>
-            
-            <ul className="space-y-3 mb-8 border-t border-gray-50 pt-4">
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.students ?? 200} ta-talabalar
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.staff ?? 5} ta-xodimlar
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxCourses ?? 10} ta kurs
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxTests ?? 50} ta test (mavzu va matn asosida)
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxExams ?? 10} ta imtihon
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxSubjects ?? 20} ta mavzu
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-blue-500 shrink-0" /> {configs.standard.maxQuizizz ?? 15} ta quizizz
-              </li>
-              <li className={`text-sm font-bold flex items-center gap-3 ${configs.standard.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                {configs.standard.hasAI ? <Check className="w-5 h-5 text-blue-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt orqali test generatsiyasi
-              </li>
-              <li className={`text-sm font-bold flex items-center gap-3 ${configs.standard.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                {configs.standard.hasBot ? <Check className="w-5 h-5 text-blue-500 shrink-0" /> : <XIcon />} Telegram Bot integratsiyasi
-              </li>
-            </ul>
+            <button 
+              onClick={() => setSelectedTariff(configs.start)}
+              className="w-full py-3 bg-gray-50 text-gray-800 rounded-xl font-black hover:bg-orange-600 hover:text-white hover:shadow-lg transition-all uppercase text-xs tracking-wider"
+            >
+              Tashkilotga ulash
+            </button>
           </div>
-          <button 
-            onClick={() => setSelectedTariff(configs.standard)}
-            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all uppercase text-sm tracking-wider"
-          >
-            Tashkilotga ulash
-          </button>
-        </div>
 
-        {/* PROFESSIONAL */}
-        <div className="p-8 rounded-[40px] border-2 border-gray-100 hover:border-amber-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
-          <div>
-            <div className="flex justify-between items-start mb-6">
-              <span className="text-4xl">🥇</span>
-              <span className="px-3 py-1 bg-amber-50 rounded-full text-[10px] font-black text-amber-500 uppercase tracking-widest border border-amber-100">PROFESSIONAL</span>
+          {/* STANDARD */}
+          <div className="p-6 rounded-[32px] border-2 border-blue-600 bg-white relative group flex flex-col justify-between shadow-xl shadow-blue-50">
+            <div className="absolute -top-3.5 right-6 bg-blue-600 text-white text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-md">Ommabop</div>
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-3xl">🥈</span>
+                <span className="px-2.5 py-1 bg-blue-50 rounded-full text-[9px] font-black text-blue-600 uppercase tracking-widest border border-blue-100">STANDARD</span>
+              </div>
+              <h3 className="text-xl font-black text-gray-950 mb-1">STANDARD TARIF</h3>
+              <div className="text-2xl font-black text-blue-600 mb-4 font-mono">
+                {(configs.standard.price ?? 700000).toLocaleString()} <span className="text-xs font-black text-gray-400">so'm/oy</span>
+              </div>
+              
+              <p className="text-gray-400 text-xs font-bold mb-4 line-clamp-2">Oʻrta hajmdagi oʻquv markazlari va guruhlar boshqaruvi uchun keng qamrovli tizim.</p>
+              
+              <ul className="space-y-2.5 mb-6 border-t border-gray-50 pt-3">
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.students ?? 200} ta-talabalar
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.staff ?? 5} ta-xodimlar
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxCourses ?? 10} ta kurs
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxTests ?? 50} ta test
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxExams ?? 10} ta imtihon
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxSubjects ?? 20} ta mavzu
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxQuizizz ?? 15} ta quizizz
+                </li>
+                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.standard.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                  {configs.standard.hasAI ? <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt
+                </li>
+                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.standard.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                  {configs.standard.hasBot ? <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> : <XIcon />} Telegram Bot
+                </li>
+              </ul>
             </div>
-            <h3 className="text-2xl font-black text-gray-950 mb-2">PROFESSIONAL TARIF</h3>
-            <div className="text-3xl font-black text-amber-500 mb-6 font-mono">
-              {(configs.professional.price ?? 1500000).toLocaleString()} <span className="text-sm font-black text-gray-400">so'm/oy</span>
-            </div>
-            
-            <p className="text-gray-400 text-sm font-bold mb-6">Katta oʻquv maskanlari va ilgʻor AI-innovatsiyalardan foydalanuvchi brendlar uchun.</p>
-            
-            <ul className="space-y-3 mb-8 border-t border-gray-50 pt-4">
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.students ?? 1000} ta-talabalar
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.staff ?? 20} ta-xodimlar
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxCourses ?? 50} ta kurs
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxTests ?? 300} ta test (mavzu va matn asosida)
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxExams ?? 50} ta imtihon
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxSubjects ?? 100} ta mavzu
-              </li>
-              <li className="text-sm font-bold text-gray-600 flex items-center gap-3">
-                <Check className="w-5 h-5 text-amber-500 shrink-0" /> {configs.professional.maxQuizizz ?? 100} ta quizizz
-              </li>
-              <li className={`text-sm font-bold flex items-center gap-3 ${configs.professional.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                {configs.professional.hasAI ? <Check className="w-5 h-5 text-amber-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt orqali test generatsiyasi
-              </li>
-              <li className={`text-sm font-bold flex items-center gap-3 ${configs.professional.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                {configs.professional.hasBot ? <Check className="w-5 h-5 text-amber-500 shrink-0" /> : <XIcon />} Telegram Bot integratsiyasi
-              </li>
-            </ul>
+            <button 
+              onClick={() => setSelectedTariff(configs.standard)}
+              className="w-full py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all uppercase text-xs tracking-wider"
+            >
+              Tashkilotga ulash
+            </button>
           </div>
-          <button 
-            onClick={() => setSelectedTariff(configs.professional)}
-            className="w-full py-4 bg-gray-50 text-gray-800 rounded-2xl font-black hover:bg-amber-500 hover:text-white hover:shadow-lg transition-all uppercase text-sm tracking-wider"
-          >
-            Tashkilotga ulash
-          </button>
-        </div>
 
+          {/* PROFESSIONAL */}
+          <div className="p-6 rounded-[32px] border-2 border-gray-100 hover:border-amber-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-3xl">🥇</span>
+                <span className="px-2.5 py-1 bg-amber-50 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest border border-amber-100">PROFESSIONAL</span>
+              </div>
+              <h3 className="text-xl font-black text-gray-950 mb-1">PROFESSIONAL TARIF</h3>
+              <div className="text-2xl font-black text-amber-500 mb-4 font-mono">
+                {(configs.professional.price ?? 1500000).toLocaleString()} <span className="text-xs font-black text-gray-400">so'm/oy</span>
+              </div>
+              
+              <p className="text-gray-400 text-xs font-bold mb-4 line-clamp-2">Katta oʻquv maskanlari va ilgʻor AI-innovatsiyalardan foydalanuvchi brendlar.</p>
+              
+              <ul className="space-y-2.5 mb-6 border-t border-gray-50 pt-3">
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.students ?? 1000} ta-talabalar
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.staff ?? 20} ta-xodimlar
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxCourses ?? 50} ta kurs
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxTests ?? 300} ta test
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxExams ?? 50} ta imtihon
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxSubjects ?? 100} ta mavzu
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxQuizizz ?? 100} ta quizizz
+                </li>
+                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.professional.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                  {configs.professional.hasAI ? <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt
+                </li>
+                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.professional.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                  {configs.professional.hasBot ? <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> : <XIcon />} Telegram Bot
+                </li>
+              </ul>
+            </div>
+            <button 
+              onClick={() => setSelectedTariff(configs.professional)}
+              className="w-full py-3 bg-gray-50 text-gray-800 rounded-xl font-black hover:bg-amber-500 hover:text-white hover:shadow-lg transition-all uppercase text-xs tracking-wider"
+            >
+              Tashkilotga ulash
+            </button>
+          </div>
+
+          {/* 👑 CORPORATE */}
+          <div className="p-6 rounded-[32px] border-2 border-indigo-100 hover:border-indigo-300 transition-all bg-gradient-to-b from-indigo-50/10 to-indigo-50/40 relative group flex flex-col justify-between shadow-sm">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-3xl">👑</span>
+                <span className="px-2.5 py-1 bg-indigo-50 rounded-full text-[9px] font-black text-indigo-600 uppercase tracking-widest border border-indigo-100">CORPORATE</span>
+              </div>
+              <h3 className="text-xl font-black text-gray-950 mb-1">👑 CORPORATE</h3>
+              <div className="text-2xl font-black text-indigo-600 mb-4 font-mono">
+                {calcCorpPrice().toLocaleString()} <span className="text-xs font-black text-gray-400">so'm/oy</span>
+              </div>
+              
+              <p className="text-gray-400 text-xs font-bold mb-4 line-clamp-2">Eng moslashuvchan, istalgan limitlar asosida o'zingiz tuzadigan maxsus yirik reja.</p>
+              
+              <ul className="space-y-2.5 mb-6 border-t border-indigo-100/60 pt-3">
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.students} ta-talabalar
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.staff} ta-xodimlar
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.courses} ta kurs
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.tests} ta test
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.exams} ta imtihon
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.subjects} ta mavzu
+                </li>
+                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.quizizz} ta quizizz
+                </li>
+                <li className={`text-xs font-bold flex items-center gap-2.5 ${corpCalc.ai ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                  {corpCalc.ai ? <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt
+                </li>
+                <li className={`text-xs font-bold flex items-center gap-2.5 ${corpCalc.bot ? "text-gray-600" : "text-gray-400 line-through"}`}>
+                  {corpCalc.bot ? <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> : <XIcon />} Telegram Bot
+                </li>
+              </ul>
+            </div>
+            <button 
+              onClick={() => setIsCorpModalOpen(true)}
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-black hover:from-indigo-700 hover:to-indigo-800 shadow-md transition-all uppercase text-xs tracking-wider"
+            >
+              Moslashtirish & Bog'lanish
+            </button>
+          </div>
+
+        </div>
       </div>
 
-      {/* Dynamic Interactive Plans Section */}
-      <div className="space-y-12">
-        <div className="text-center space-y-2">
-           <h2 className="text-3xl font-black text-gray-950">Maxsus tuziladigan moslanuvchan tariflar</h2>
-           <p className="text-gray-400 font-bold text-sm">Oʻz limitlaringizni kiriting, kalkulyator qolganini hisobladi!</p>
+      {/* SECTION 2: TASHKILOT XODIMLARI VA MUSTAQIL O'QITUVCHILAR UCHUN TARIFLAR */}
+      <div className="space-y-6 pt-4">
+        <div className="border-b border-gray-100 pb-4">
+          <h2 className="text-2xl sm:text-3xl font-black text-gray-950 tracking-tight">
+            tashkilot xodimlari va mustaqil o'qituvchilar uchun tarif
+          </h2>
+          <p className="text-gray-400 text-sm font-semibold mt-1">
+            Qo'shimcha resursga ehtiyoji bor joriy foydalanuvchilar va mustaqil o'qituvchilar uchun ideal qo'shimcha limitlar.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-
-          {/* 👑 CORPORATE CALCULATOR */}
-          <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-sm relative overflow-hidden group border border-slate-200">
-             
-             <div className="relative z-10 space-y-6">
-                <div className="flex items-center gap-3.5">
-                   <span className="text-2xl">👑</span>
-                   <div>
-                      <h3 className="text-xl font-bold text-slate-900">CORPORATE</h3>
-                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Istagan miqdordagi limitlarni kiriting</p>
-                   </div>
+        {/* ➕ EXTRA LIMITS: Beautiful Horizontal Dynamic Card */}
+        <div className="bg-white rounded-[40px] border-2 border-emerald-500/80 shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+          
+          {/* Left panel: Info about EXTRA LIMITS */}
+          <div className="lg:col-span-4 bg-emerald-50/20 p-8 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-emerald-100/60 font-sans">
+            <div className="space-y-6">
+              <div className="flex items-center gap-3.5">
+                <span className="text-3xl">➕</span>
+                <div>
+                  <h3 className="text-2xl font-black text-gray-950">EXTRA LIMITS</h3>
+                  <span className="px-2.5 py-1 bg-emerald-100 rounded-full text-[10px] font-black text-emerald-800 uppercase tracking-widest border border-emerald-200 block mt-1 w-max">
+                    MOSLASHUVCHAN
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Talabalar soni ({configs.corporate.perStudent ?? 1000} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={corpCalc.students}
-                          onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Xodimlar soni ({configs.corporate.perStaff ?? 10000} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={corpCalc.staff}
-                          onChange={(e) => setCorpCalc({...corpCalc, staff: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Kurslar soni ({configs.corporate.perCourse ?? 40000} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={corpCalc.courses}
-                          onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Testlar soni ({configs.corporate.perTest ?? 2000} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={corpCalc.tests}
-                          onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Imtihonlar soni ({configs.corporate.perExam ?? 15000} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={corpCalc.exams}
-                          onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Mavzular soni ({configs.corporate.perSubject ?? 5000} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={corpCalc.subjects}
-                          onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                   <div className="space-y-1.5 md:col-span-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Quizizzlar soni ({configs.corporate.perQuizizz ?? 5000} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={corpCalc.quizizz}
-                          onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                   {/* AI module */}
-                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
-                      <span className="text-xs font-bold text-slate-700">AI Test Generator (+{(configs.corporate.aiPrice ?? 300000).toLocaleString()} sum/oy)</span>
-                      <input 
-                        type="checkbox" 
-                        checked={corpCalc.ai}
-                        onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
-                        className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
-                      />
-                   </div>
-
-                   {/* Bot module */}
-                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
-                      <span className="text-xs font-bold text-slate-700">Shaxsiy Telegram Bot (+{(configs.corporate.botPrice ?? 200000).toLocaleString()} sum/oy)</span>
-                      <input 
-                        type="checkbox" 
-                        checked={corpCalc.bot}
-                        onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
-                        className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
-                      />
-                   </div>
-                </div>
-
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-4">
-                   <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Jami oylik to'lov:</p>
-                      <div className="text-2xl sm:text-3xl font-mono font-black text-slate-800 mt-0.5">
-                        {calcCorpPrice().toLocaleString()} <span className="text-xs font-bold text-slate-400">sum/oy</span>
-                      </div>
-                   </div>
-                   <button 
-                     onClick={() => setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()})}
-                     className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-indigo-100"
-                   >
-                     Shartnoma Tuzish
-                   </button>
-                </div>
-             </div>
-          </div>
-
-          {/* ➕ EXTRA LIMITS CALCULATOR */}
-          <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-sm relative overflow-hidden group border border-slate-200">
-             
-             <div className="relative z-10 space-y-6">
-                <div className="flex items-center gap-3.5">
-                   <span className="text-2xl">➕</span>
-                   <div>
-                      <h3 className="text-xl font-bold text-slate-900">EXTRA LIMITS</h3>
-                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Joriy oyingizga qoʻshimcha limit sotib oling</p>
-                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Qoʻshimcha talabalar ({configs.extra.perStudent ?? 1500} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={extraCalc.students}
-                          onChange={(e) => setExtraCalc({...extraCalc, students: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                        Qoʻshimcha xodimi ({configs.extra.perStaff ?? 15000} soʻm/ta)
-                      </label>
-                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                        <input 
-                          type="number" 
-                          min="0"
-                          value={extraCalc.staff}
-                          onChange={(e) => setExtraCalc({...extraCalc, staff: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                        />
-                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                      </div>
-                   </div>
-
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                         Qoʻshimcha kurslar ({(configs.extra.perCourse ?? 50000).toLocaleString()} soʻm/ta)
-                       </label>
-                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                         <input 
-                           type="number" 
-                           min="0"
-                           value={extraCalc.courses}
-                           onChange={(e) => setExtraCalc({...extraCalc, courses: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                         />
-                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                       </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                         Qoʻshimcha testlar ({(configs.extra.perTest ?? 3000).toLocaleString()} soʻm/ta)
-                       </label>
-                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                         <input 
-                           type="number" 
-                           min="0"
-                           value={extraCalc.tests}
-                           onChange={(e) => setExtraCalc({...extraCalc, tests: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                         />
-                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                       </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                         Qoʻshimcha imtihonlar ({(configs.extra.perExam ?? 20000).toLocaleString()} soʻm/ta)
-                       </label>
-                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                         <input 
-                           type="number" 
-                           min="0"
-                           value={extraCalc.exams}
-                           onChange={(e) => setExtraCalc({...extraCalc, exams: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                         />
-                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                       </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                         Qoʻshimcha mavzular ({(configs.extra.perSubject ?? 6000).toLocaleString()} soʻm/ta)
-                       </label>
-                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                         <input 
-                           type="number" 
-                           min="0"
-                           value={extraCalc.subjects}
-                           onChange={(e) => setExtraCalc({...extraCalc, subjects: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                         />
-                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                       </div>
-                    </div>
-
-                    <div className="space-y-1.5 md:col-span-2">
-                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                         Qoʻshimcha quizizzlar ({(configs.extra.perQuizizz ?? 6000).toLocaleString()} soʻm/ta)
-                       </label>
-                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                         <input 
-                           type="number" 
-                           min="0"
-                           value={extraCalc.quizizz}
-                           onChange={(e) => setExtraCalc({...extraCalc, quizizz: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                         />
-                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                       </div>
-                    </div>
-
-                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
-                      <span className="text-xs font-bold text-slate-700">AI / Darsliklar qoʻshimcha (+{(configs.extra.aiPrice ?? 350000).toLocaleString()} sum/oy)</span>
-                      <input 
-                        type="checkbox" 
-                        checked={extraCalc.ai}
-                        onChange={(e) => setExtraCalc({...extraCalc, ai: e.target.checked})}
-                        className="w-5 h-5 rounded-md accent-emerald-600 shrink-0 cursor-pointer" 
-                      />
-                   </div>
-
-                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
-                      <span className="text-xs font-bold text-slate-700">Xabar yuborish / Bot (+{(configs.extra.botPrice ?? 250000).toLocaleString()} sum/oy)</span>
-                      <input 
-                        type="checkbox" 
-                        checked={extraCalc.bot}
-                        onChange={(e) => setExtraCalc({...extraCalc, bot: e.target.checked})}
-                        className="w-5 h-5 rounded-md accent-emerald-600 shrink-0 cursor-pointer" 
-                      />
-                   </div>
-                </div>
-
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-4">
-                   <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Bir martalik jami summa:</p>
-                      <div className="text-2xl sm:text-3xl font-mono font-black text-emerald-600 mt-0.5">
-                        {calcExtraPrice().toLocaleString()} <span className="text-xs font-bold text-slate-400">sum</span>
-                      </div>
-                   </div>
-                   <button 
-                     onClick={() => setSelectedTariff({...configs.extra, name: 'EXTRA', price: calcExtraPrice()})}
-                     className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-emerald-100"
-                   >
-                     Faollashtirish
-                   </button>
-                </div>
-                <p className="text-[9px] font-semibold text-slate-400 leading-normal italic text-center">
-                   * Diqqat: Qoʻshimcha sotib olinadigan limitlar xarid qilingan oyda amal qiladi va keyingi hisob-kitob davrida ulangan tarif oʻzining standart qiymatlariga qaytadi.
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-gray-500 text-sm font-bold leading-relaxed">
+                  Tashkilotingizning joriy tarifiga qo'shimcha ravishda faqatgina kerakli resurslarni sotib oling.
                 </p>
-             </div>
+                <div className="p-4 bg-white/80 rounded-2xl border border-emerald-100/70 space-y-2">
+                  <div className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Qo'shimcha Tarifstavkalari</div>
+                  <ul className="text-xs font-bold text-gray-600 space-y-1">
+                    <li>• Talaba: {(configs.extra.perStudent ?? 1500).toLocaleString()} so'm</li>
+                    <li>• Xodim: {(configs.extra.perStaff ?? 15000).toLocaleString()} so'm</li>
+                    <li>• Kurs/Darslik: {(configs.extra.perCourse ?? 50000).toLocaleString()} so'm</li>
+                    <li>• Test materiallari: {(configs.extra.perTest ?? 3000).toLocaleString()} so'm</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-emerald-100/60">
+              <p className="text-[10px] font-semibold text-emerald-600 leading-normal italic">
+                * Diqqat: Qoʻshimcha sotib olinadigan limitlar faqat xarid qilingan joriy oy ichida amal qiladi. Keyingi oydan tarif standart qiymatiga qaytadi.
+              </p>
+            </div>
+          </div>
+
+          {/* Right panel: Active sliders & Inputs for EXTRA LIMITS */}
+          <div className="lg:col-span-8 p-8 space-y-6">
+            <div className="text-slate-900 font-bold text-sm border-b border-gray-100 pb-3 flex items-center justify-between">
+              <span>Limitlarni qo'shish paneli</span>
+              <span className="text-xs text-gray-400 font-semibold font-mono">Real-vaqtda hisoblanadi</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                  Qoʻshimcha talabalar ({configs.extra.perStudent ?? 1500} soʻm/ta)
+                </label>
+                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={extraCalc.students}
+                    onChange={(e) => setExtraCalc({...extraCalc, students: Math.max(0, Number(e.target.value))})}
+                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                  />
+                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                  Qoʻshimcha xodimi ({configs.extra.perStaff ?? 15000} soʻm/ta)
+                </label>
+                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={extraCalc.staff}
+                    onChange={(e) => setExtraCalc({...extraCalc, staff: Math.max(0, Number(e.target.value))})}
+                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                  />
+                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                  Qoʻshimcha kurslar ({(configs.extra.perCourse ?? 50000).toLocaleString()} soʻm/ta)
+                </label>
+                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={extraCalc.courses}
+                    onChange={(e) => setExtraCalc({...extraCalc, courses: Math.max(0, Number(e.target.value))})}
+                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                  />
+                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                  Qoʻshimcha testlar ({(configs.extra.perTest ?? 3000).toLocaleString()} soʻm/ta)
+                </label>
+                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={extraCalc.tests}
+                    onChange={(e) => setExtraCalc({...extraCalc, tests: Math.max(0, Number(e.target.value))})}
+                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                  />
+                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                  Qoʻshimcha imtihonlar ({(configs.extra.perExam ?? 20000).toLocaleString()} soʻm/ta)
+                </label>
+                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={extraCalc.exams}
+                    onChange={(e) => setExtraCalc({...extraCalc, exams: Math.max(0, Number(e.target.value))})}
+                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                  />
+                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                  Qoʻshimcha mavzular ({(configs.extra.perSubject ?? 6000).toLocaleString()} soʻm/ta)
+                </label>
+                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={extraCalc.subjects}
+                    onChange={(e) => setExtraCalc({...extraCalc, subjects: Math.max(0, Number(e.target.value))})}
+                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                  />
+                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                  Qoʻshimcha quizizzlar ({(configs.extra.perQuizizz ?? 6000).toLocaleString()} soʻm/ta)
+                </label>
+                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={extraCalc.quizizz}
+                    onChange={(e) => setExtraCalc({...extraCalc, quizizz: Math.max(0, Number(e.target.value))})}
+                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                  />
+                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
+                <span className="text-xs font-bold text-slate-700">AI / Darsliklar qoʻshimcha (+{(configs.extra.aiPrice ?? 350000).toLocaleString()} sum/oy)</span>
+                <input 
+                  type="checkbox" 
+                  checked={extraCalc.ai}
+                  onChange={(e) => setExtraCalc({...extraCalc, ai: e.target.checked})}
+                  className="w-5 h-5 rounded-md accent-emerald-600 shrink-0 cursor-pointer" 
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
+                <span className="text-xs font-bold text-slate-700">Xabar yuborish / Bot (+{(configs.extra.botPrice ?? 250000).toLocaleString()} sum/oy)</span>
+                <input 
+                  type="checkbox" 
+                  checked={extraCalc.bot}
+                  onChange={(e) => setExtraCalc({...extraCalc, bot: e.target.checked})}
+                  className="w-5 h-5 rounded-md accent-emerald-600 shrink-0 cursor-pointer" 
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Bir martalik jami summa:</p>
+                <div className="text-2xl sm:text-3xl font-mono font-black text-emerald-600 mt-0.5">
+                  {calcExtraPrice().toLocaleString()} <span className="text-xs font-bold text-slate-400">sum</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedTariff({...configs.extra, name: 'EXTRA', price: calcExtraPrice()})}
+                className="w-full sm:w-auto px-8 py-3 bg-emerald-600 text-white font-black rounded-xl hover:bg-emerald-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-emerald-100"
+              >
+                Faollashtirish
+              </button>
+            </div>
           </div>
 
         </div>
       </div>
+
+      {/* 👑 SPECIAL MODAL: CORPORATE CALCULATOR DESIGN */}
+      {isCorpModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[40px] w-full max-w-2xl p-8 shadow-3xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setIsCorpModalOpen(false)}
+              className="absolute top-6 right-6 p-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-3.5 mb-6">
+              <span className="text-3xl">👑</span>
+              <div>
+                <h3 className="text-2xl font-black text-gray-950">CORPORATE CALCULATOR</h3>
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider">Erkin ravishda istagan limitlarni hisoblang</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                    Talabalar soni ({configs.corporate.perStudent ?? 1000} soʻm/ta)
+                  </label>
+                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={corpCalc.students}
+                      onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
+                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                    />
+                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                    Xodimlar soni ({configs.corporate.perStaff ?? 10000} soʻm/ta)
+                  </label>
+                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={corpCalc.staff}
+                      onChange={(e) => setCorpCalc({...corpCalc, staff: Math.max(0, Number(e.target.value))})}
+                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                    />
+                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                    Kurslar soni ({configs.corporate.perCourse ?? 40000} soʻm/ta)
+                  </label>
+                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={corpCalc.courses}
+                      onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
+                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                    />
+                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                    Testlar soni ({configs.corporate.perTest ?? 2000} soʻm/ta)
+                  </label>
+                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={corpCalc.tests}
+                      onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
+                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                    />
+                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                    Imtihonlar soni ({configs.corporate.perExam ?? 15000} soʻm/ta)
+                  </label>
+                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={corpCalc.exams}
+                      onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
+                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                    />
+                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                    Mavzular soni ({configs.corporate.perSubject ?? 5000} soʻm/ta)
+                  </label>
+                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={corpCalc.subjects}
+                      onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
+                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                    />
+                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                    Quizizzlar soni ({configs.corporate.perQuizizz ?? 5000} soʻm/ta)
+                  </label>
+                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={corpCalc.quizizz}
+                      onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
+                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                    />
+                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  </div>
+                </div>
+
+                {/* AI module */}
+                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100 transition-all">
+                  <span className="text-xs font-bold text-slate-700">AI Test Generator (+{(configs.corporate.aiPrice ?? 300000).toLocaleString()} sum/oy)</span>
+                  <input 
+                    type="checkbox" 
+                    checked={corpCalc.ai}
+                    onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
+                    className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
+                  />
+                </div>
+
+                {/* Bot module */}
+                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100 transition-all">
+                  <span className="text-xs font-bold text-slate-700">Shaxsiy Telegram Bot (+{(configs.corporate.botPrice ?? 200000).toLocaleString()} sum/oy)</span>
+                  <input 
+                    type="checkbox" 
+                    checked={corpCalc.bot}
+                    onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
+                    className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-4 mt-6">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Jami oylik to'lov:</p>
+                  <div className="text-2xl sm:text-3xl font-mono font-black text-indigo-700 mt-0.5">
+                    {calcCorpPrice().toLocaleString()} <span className="text-xs font-bold text-slate-400">sum/oy</span>
+                  </div>
+                </div>
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <button 
+                    onClick={() => setIsCorpModalOpen(false)}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-all uppercase text-xs tracking-wider"
+                  >
+                    Yopish
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()});
+                      setIsCorpModalOpen(false);
+                    }}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-indigo-100"
+                  >
+                    Shartnoma Tuzish
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Visual divider design */}
       <div className="rounded-[40px] border border-gray-100 bg-gray-50/50 flex flex-col md:flex-row items-center gap-6 justify-between p-8">

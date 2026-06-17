@@ -88,6 +88,7 @@ export default function IndependentLimits() {
   const compressImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
       if (!base64Str.startsWith("data:image")) {
+        // If it exceeds safe firestore size, truncate or alert later
         resolve(base64Str);
         return;
       }
@@ -97,7 +98,7 @@ export default function IndependentLimits() {
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-        const MAX_DIM = 800;
+        const MAX_DIM = 400; // Aggressively compress width/height down to fit within Firestore 1MB limits
         if (width > MAX_DIM || height > MAX_DIM) {
           if (width > height) {
             height = Math.round((height * MAX_DIM) / width);
@@ -112,7 +113,7 @@ export default function IndependentLimits() {
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", 0.7));
+          resolve(canvas.toDataURL("image/jpeg", 0.4)); // Save space
         } else {
           resolve(base64Str);
         }
@@ -170,14 +171,21 @@ export default function IndependentLimits() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     if (totalCost === 0 || !user) {
       alert("Iltimos, kamida bitta limit miqdorini tanlang!");
       return;
     }
     if (!receiptBase64) {
       alert("Iltimos, to'lov chekini yuklang!");
+      return;
+    }
+
+    if (receiptBase64.length > 800 * 1024) {
+      alert("Yuklangan chek rasmi hajmi juda katta! Iltimos, boshqa kichikroq o'lchamdagi chek rasmini yuklang.");
       return;
     }
 

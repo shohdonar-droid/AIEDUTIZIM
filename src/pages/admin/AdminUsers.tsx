@@ -246,10 +246,12 @@ export default function AdminUsers() {
   }, []);
 
   const loadData = async (force = false) => {
+    const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
+    
     // Only load if forced or if cache is stale (> 20 mins)
     const cachedTime = localStorage.getItem("admin_users_last_load_time");
     const CACHE_TTL = 20 * 60 * 1000;
-    if (!force && cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL)) {
+    if (isSuperAdmin && !force && cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL)) {
       console.log("AdminUsers: Skip fetch, cache is fresh");
       setLoading(false);
       return;
@@ -257,66 +259,89 @@ export default function AdminUsers() {
 
     setLoading(true);
     try {
-      // Core metadata (always needed for context)
-      const [deptsSnap, groupsSnap] = await Promise.all([
-        getDocs(collection(db, "departments")),
-        getDocs(collection(db, "groups")),
-      ]);
-      const depts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
-      const grps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
-      setDepartments(depts);
-      setGroups(grps);
+      if (isSuperAdmin) {
+        // Core metadata (always needed for context)
+        const [deptsSnap, groupsSnap] = await Promise.all([
+          getDocs(collection(db, "departments")),
+          getDocs(collection(db, "groups")),
+        ]);
+        const depts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
+        const grps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
+        setDepartments(depts);
+        setGroups(grps);
 
-      // Data by role - Fetching with a safety limit to prevent quota drain
-      // We load them sequentially or parallel but with LIMIT(300)
-      const [studentsSnap, teachersSnap, staffSnap, subadminsSnap, tgSnap, botConfigsSnap] = await Promise.all([
-        getDocs(query(collection(db, "users"), where("role", "==", "student"), limit(300))),
-        getDocs(query(collection(db, "users"), where("role", "==", "teacher"), limit(300))),
-        getDocs(query(collection(db, "users"), where("role", "==", "staff"), limit(300))),
-        getDocs(query(collection(db, "users"), where("role", "in", ["subadmin", "admin"]), limit(100))),
-        getDocs(query(collection(db, "telegram_users"), limit(300))),
-        getDocs(query(collection(db, "users"), where("isBotUser", "==", true), limit(100)))
-      ]);
+        // Data by role - Fetching with a safety limit to prevent quota drain
+        // We load them sequentially or parallel but with LIMIT(300)
+        const [studentsSnap, teachersSnap, staffSnap, subadminsSnap, tgSnap, botConfigsSnap] = await Promise.all([
+          getDocs(query(collection(db, "users"), where("role", "==", "student"), limit(300))),
+          getDocs(query(collection(db, "users"), where("role", "==", "teacher"), limit(300))),
+          getDocs(query(collection(db, "users"), where("role", "==", "staff"), limit(300))),
+          getDocs(query(collection(db, "users"), where("role", "in", ["subadmin", "admin"]), limit(100))),
+          getDocs(query(collection(db, "telegram_users"), limit(300))),
+          getDocs(query(collection(db, "users"), where("isBotUser", "==", true), limit(100)))
+        ]);
 
-      const students = studentsSnap.docs
-        .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-        .filter(u => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"))
-        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
-      const teachersList = teachersSnap.docs
-        .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
-      const staffList = staffSnap.docs
-        .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
-      const subadminsList = subadminsSnap.docs
-        .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-        .sort((a, b) => {
-          // Sort by role first ('admin' before 'subadmin')
-          if (a.role === 'admin' && b.role !== 'admin') return -1;
-          if (a.role !== 'admin' && b.role === 'admin') return 1;
-          // Then sort by displayName
-          return (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ");
-        });
-      const tgUsers = tgSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const botConfigs = botConfigsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const students = studentsSnap.docs
+          .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+          .filter(u => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"))
+          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+        const teachersList = teachersSnap.docs
+          .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+        const staffList = staffSnap.docs
+          .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+        const subadminsList = subadminsSnap.docs
+          .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+          .sort((a, b) => {
+            // Sort by role first ('admin' before 'subadmin')
+            if (a.role === 'admin' && b.role !== 'admin') return -1;
+            if (a.role !== 'admin' && b.role === 'admin') return 1;
+            // Then sort by displayName
+            return (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ");
+          });
+        const tgUsers = tgSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const botConfigs = botConfigsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      setDepartments(depts);
-      setGroups(grps);
-      setUsers(students);
-      setTeachers(teachersList);
-      setStaffUsers(staffList);
-      setSubadmins(subadminsList);
-      setTelegramUsers(tgUsers);
-      setAllBotUsersConfigs(botConfigs);
+        setUsers(students);
+        setTeachers(teachersList);
+        setStaffUsers(staffList);
+        setSubadmins(subadminsList);
+        setTelegramUsers(tgUsers);
+        setAllBotUsersConfigs(botConfigs);
 
-      // Save to cache
-      localStorage.setItem("admin_users_depts_cache", JSON.stringify(depts));
-      localStorage.setItem("admin_users_groups_cache", JSON.stringify(grps));
-      localStorage.setItem("admin_users_students_cache", JSON.stringify(students));
-      localStorage.setItem("admin_users_teachers_cache", JSON.stringify(teachersList));
-      localStorage.setItem("admin_users_staff_cache", JSON.stringify(staffList));
-      localStorage.setItem("admin_users_subadmins_cache", JSON.stringify(subadminsList));
-      localStorage.setItem("admin_users_last_load_time", Date.now().toString());
+        // Save to cache
+        localStorage.setItem("admin_users_depts_cache", JSON.stringify(depts));
+        localStorage.setItem("admin_users_groups_cache", JSON.stringify(grps));
+        localStorage.setItem("admin_users_students_cache", JSON.stringify(students));
+        localStorage.setItem("admin_users_teachers_cache", JSON.stringify(teachersList));
+        localStorage.setItem("admin_users_staff_cache", JSON.stringify(staffList));
+        localStorage.setItem("admin_users_subadmins_cache", JSON.stringify(subadminsList));
+        localStorage.setItem("admin_users_last_load_time", Date.now().toString());
+      } else {
+        // Teacher/Staff of organization fetch (filtered to single organization)
+        const orgUid = user?.role === 'teacher' ? user?.uid : (user?.teacherId || '');
+        const [deptsSnap, groupsSnap, studentsSnap, staffSnap] = await Promise.all([
+          getDocs(query(collection(db, "departments"), where("creatorId", "==", orgUid))),
+          getDocs(query(collection(db, "groups"), where("creatorId", "==", orgUid))),
+          getDocs(query(collection(db, "users"), where("role", "==", "student"), where("teacherId", "==", orgUid))),
+          getDocs(query(collection(db, "users"), where("role", "==", "staff"), where("teacherId", "==", orgUid)))
+        ]);
+
+        const depts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
+        const grps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
+        const students = studentsSnap.docs
+          .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+        const staffList = staffSnap.docs
+          .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+
+        setDepartments(depts);
+        setGroups(grps);
+        setUsers(students);
+        setStaffUsers(staffList);
+      }
 
     } catch (err: any) {
       if (!err?.message?.includes("quota")) {
@@ -328,23 +353,37 @@ export default function AdminUsers() {
   };
 
   useEffect(() => {
-    // Load from cache first for instant UI
-    const cacheKeys = ["depts", "groups", "students", "teachers", "staff", "subadmins"];
-    cacheKeys.forEach((k) => {
-      const cached = localStorage.getItem(`admin_users_${k}_cache`);
-      if (cached) {
-        const data = JSON.parse(cached);
-        if (k === "depts") setDepartments(data);
-        else if (k === "groups") setGroups(data);
-        else if (k === "students") setUsers(data);
-        else if (k === "teachers") setTeachers(data);
-        else if (k === "staff") setStaffUsers(data);
-        else if (k === "subadmins") setSubadmins(data);
-      }
-    });
+    const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
+    if (isSuperAdmin) {
+      // Load from cache first for instant UI
+      const cacheKeys = ["depts", "groups", "students", "teachers", "staff", "subadmins"];
+      cacheKeys.forEach((k) => {
+        const cached = localStorage.getItem(`admin_users_${k}_cache`);
+        if (cached) {
+          const data = JSON.parse(cached);
+          if (k === "depts") setDepartments(data);
+          else if (k === "groups") setGroups(data);
+          else if (k === "students") setUsers(data);
+          else if (k === "teachers") setTeachers(data);
+          else if (k === "staff") setStaffUsers(data);
+          else if (k === "subadmins") setSubadmins(data);
+        }
+      });
+    }
 
-    loadData();
-  }, []);
+    if (user) {
+      loadData();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
+    const orgUid = user?.role === 'teacher' ? user?.uid : (user?.teacherId || '');
+    if (user && !isSuperAdmin) {
+      setNewStudent((prev) => ({ ...prev, teacherId: orgUid }));
+      setNewStaff((prev) => ({ ...prev, teacherId: orgUid }));
+    }
+  }, [user]);
 
   const resetPassword = async (uid: string) => {
     if (!confirm("Talaba parolini '123456' ga reset qilishni xohlaysizmi?"))
@@ -552,9 +591,13 @@ export default function AdminUsers() {
 
   const createStudentAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
+    const orgUid = user?.role === 'teacher' ? user?.uid : (user?.teacherId || '');
+    const targetTeacherId = isSuperAdmin ? newStudent.teacherId : orgUid;
+
     if (
       !newStudent.displayName ||
-      !newStudent.teacherId ||
+      !targetTeacherId ||
       !newStudent.departmentId ||
       !newStudent.groupId
     ) {
@@ -563,7 +606,8 @@ export default function AdminUsers() {
     }
     setStudentCreating(true);
     try {
-      const org = teachers.find((t) => t.uid === newStudent.teacherId);
+      const org = isSuperAdmin ? teachers.find((t) => t.uid === targetTeacherId) : user;
+      const orgName = org?.displayName || "";
       const login = `std_${Math.random().toString(36).substr(2, 6)}`;
       const email = `${login}@student.uz`;
       const pass = "123456";
@@ -589,8 +633,8 @@ export default function AdminUsers() {
         password: pass,
         email: email,
         role: "student",
-        teacherId: newStudent.teacherId,
-        teacherName: org?.displayName || "",
+        teacherId: targetTeacherId,
+        teacherName: orgName,
         departmentId: newStudent.departmentId,
         departmentName: departments.find(
           (dep) => dep.id === newStudent.departmentId,
@@ -600,6 +644,7 @@ export default function AdminUsers() {
         createdAt: serverTimestamp(),
       });
       setShowStudentModal(false);
+      loadData(true);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -609,9 +654,13 @@ export default function AdminUsers() {
 
   const createStaffAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
+    const orgUid = user?.role === 'teacher' ? user?.uid : (user?.teacherId || '');
+    const targetTeacherId = isSuperAdmin ? newStaff.teacherId : orgUid;
+
     if (
       !newStaff.displayName ||
-      !newStaff.teacherId ||
+      !targetTeacherId ||
       !newStaff.login ||
       !newStaff.password
     ) {
@@ -638,7 +687,8 @@ export default function AdminUsers() {
       const d = await signupRes.json();
       if (!signupRes.ok) throw new Error(d.error.message || "Xato yuz berdi");
 
-      const org = teachers.find((t) => t.uid === newStaff.teacherId);
+      const org = isSuperAdmin ? teachers.find((t) => t.uid === targetTeacherId) : user;
+      const orgName = org?.displayName || "";
 
       await setDoc(doc(db, "users", d.localId), {
         uid: d.localId,
@@ -648,8 +698,8 @@ export default function AdminUsers() {
         phone: newStaff.phone,
         email: gEmail,
         role: "staff",
-        teacherId: newStaff.teacherId,
-        teacherName: org?.displayName || "",
+        teacherId: targetTeacherId,
+        teacherName: orgName,
         createdAt: serverTimestamp(),
         spentBalls: 0,
       });
@@ -663,7 +713,7 @@ export default function AdminUsers() {
         teacherId: "",
       });
       alert("Xodim muvaffaqiyatli yaratildi!");
-      loadData();
+      loadData(true);
     } catch (err: any) {
       alert("Xatolik: " + err.message);
     } finally {
@@ -789,6 +839,8 @@ export default function AdminUsers() {
     (g) => !filterDept || g.departmentId === filterDept,
   );
 
+  const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
+
   if (loading)
     return (
       <div className="p-10 flex items-center gap-2">
@@ -799,46 +851,59 @@ export default function AdminUsers() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-10">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">
-            Foydalanuvchilar
-          </h1>
-          <p className="text-gray-500 mt-2 text-lg">
-            Tashkilotlar va Talabalar boshqaruvi.
-          </p>
-        </div>
-        <div className="flex bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm overflow-x-auto max-w-full">
-          <button
-            onClick={() => handleTabChange("teachers")}
-            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "teachers" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            Tashkilotlar ({teachers.length})
-          </button>
-          <button
-            onClick={() => handleTabChange("staff")}
-            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "staff" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            Xodimlar ({staffUsers.length})
-          </button>
-          <button
-            onClick={() => handleTabChange("students")}
-            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "students" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            Talabalar ({users.length})
-          </button>
-          <button
-            onClick={() => handleTabChange("subadmins")}
-            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "subadmins" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            Adminlar ({subadmins.length})
-          </button>
-          <button
-            onClick={() => handleTabChange("botUsers")}
-            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "botUsers" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            Bot foydalanuvchilari ({telegramUsers.length})
-          </button>
-        </div>
+        {isSuperAdmin ? (
+          <>
+            <div>
+              <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+                Foydalanuvchilar
+              </h1>
+              <p className="text-gray-500 mt-2 text-lg">
+                Tashkilotlar va Talabalar boshqaruvi.
+              </p>
+            </div>
+            <div className="flex bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm overflow-x-auto max-w-full">
+              <button
+                onClick={() => handleTabChange("teachers")}
+                className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "teachers" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
+              >
+                Tashkilotlar ({teachers.length})
+              </button>
+              <button
+                onClick={() => handleTabChange("staff")}
+                className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "staff" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
+              >
+                Xodimlar ({staffUsers.length})
+              </button>
+              <button
+                onClick={() => handleTabChange("students")}
+                className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "students" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
+              >
+                Talabalar ({users.length})
+              </button>
+              <button
+                onClick={() => handleTabChange("subadmins")}
+                className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "subadmins" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
+              >
+                Adminlar ({subadmins.length})
+              </button>
+              <button
+                onClick={() => handleTabChange("botUsers")}
+                className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === "botUsers" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-600"}`}
+              >
+                Bot foydalanuvchilari ({telegramUsers.length})
+              </button>
+            </div>
+          </>
+        ) : (
+          <div>
+            <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+              {activeTab === "staff" ? "Xodimlar boshqaruvi" : "Talabalar boshqaruvi"}
+            </h1>
+            <p className="text-gray-500 mt-2 text-lg">
+              {activeTab === "staff" ? "O'zingizga tegishli xodimlar ro'yxati va boshqaruvi." : "O'zingizning talabalaringiz ro'yxati va boshqaruvi."}
+            </p>
+          </div>
+        )}
       </header>
 
       {showStudentModal && (
@@ -1361,18 +1426,20 @@ export default function AdminUsers() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <select
-                value={filterOrg}
-                onChange={(e) => setFilterOrg(e.target.value)}
-                className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-blue-600 w-full md:w-auto outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                <option value="">Barcha tashkilotlar</option>
-                {teachers.map((t, idx) => (
-                  <option key={`${t.uid || "teacher"}_${idx}`} value={t.uid}>
-                    {t.displayName}
-                  </option>
-                ))}
-              </select>
+              {isSuperAdmin && (
+                <select
+                  value={filterOrg}
+                  onChange={(e) => setFilterOrg(e.target.value)}
+                  className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-blue-600 w-full md:w-auto outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  <option value="">Barcha tashkilotlar</option>
+                  {teachers.map((t, idx) => (
+                    <option key={`${t.uid || "teacher"}_${idx}`} value={t.uid}>
+                      {t.displayName}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <button
@@ -1400,9 +1467,11 @@ export default function AdminUsers() {
                   <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
                     F.I.SH (Xodim)
                   </th>
-                  <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
-                    Tashkilot
-                  </th>
+                  {isSuperAdmin && (
+                    <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
+                      Tashkilot
+                    </th>
+                  )}
                   <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
                     Tel/Email
                   </th>
@@ -1426,14 +1495,16 @@ export default function AdminUsers() {
                     <td className="px-6 py-4 font-black uppercase text-sm">
                       {s.displayName}
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-tight">
-                        {s.teacherName ||
-                          teachers.find((t) => t.uid === s.teacherId)
-                            ?.displayName ||
-                          "-"}
-                      </span>
-                    </td>
+                    {isSuperAdmin && (
+                      <td className="px-6 py-4">
+                        <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-tight">
+                          {s.teacherName ||
+                            teachers.find((t) => t.uid === s.teacherId)
+                              ?.displayName ||
+                            "-"}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-6 py-4 text-xs font-medium text-gray-500">
                       <div>{s.phone || "-"}</div>
                       <div className="text-gray-400 mt-0.5">
@@ -1483,22 +1554,24 @@ export default function AdminUsers() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto flex-1">
-              <select
-                value={filterOrg}
-                onChange={(e) => {
-                  setFilterOrg(e.target.value);
-                  setFilterDept("");
-                  setFilterGrp("");
-                }}
-                className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-blue-600 w-full md:w-auto outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                <option value="">Barcha tashkilotlar</option>
-                {teachers.map((t, idx) => (
-                  <option key={`${t.uid || "teacher"}_${idx}`} value={t.uid}>
-                    {t.displayName}
-                  </option>
-                ))}
-              </select>
+              {isSuperAdmin && (
+                <select
+                  value={filterOrg}
+                  onChange={(e) => {
+                    setFilterOrg(e.target.value);
+                    setFilterDept("");
+                    setFilterGrp("");
+                  }}
+                  className="px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-blue-600 w-full md:w-auto outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  <option value="">Barcha tashkilotlar</option>
+                  {teachers.map((t, idx) => (
+                    <option key={`${t.uid || "teacher"}_${idx}`} value={t.uid}>
+                      {t.displayName}
+                    </option>
+                  ))}
+                </select>
+              )}
               <select
                 value={filterDept}
                 onChange={(e) => {
@@ -1554,9 +1627,11 @@ export default function AdminUsers() {
                     <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase whitespace-nowrap">
                       №
                     </th>
-                    <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase">
-                      Tashkilot
-                    </th>
+                    {isSuperAdmin && (
+                      <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase">
+                        Tashkilot
+                      </th>
+                    )}
                     <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase whitespace-nowrap">
                       FISH (Talaba)
                     </th>
@@ -1588,11 +1663,13 @@ export default function AdminUsers() {
                         <td className="px-6 py-4 font-bold text-gray-400 whitespace-nowrap">
                           {i + 1}
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-tight">
-                            {org?.displayName || "-"}
-                          </span>
-                        </td>
+                        {isSuperAdmin && (
+                          <td className="px-6 py-4">
+                            <span className="bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-tight">
+                              {org?.displayName || "-"}
+                            </span>
+                          </td>
+                        )}
                         <td className="px-6 py-4 font-black uppercase text-sm">
                           {u.displayName}
                         </td>
