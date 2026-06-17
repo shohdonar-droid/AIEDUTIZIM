@@ -1157,139 +1157,225 @@ export default function Tariffs() {
             </div>
 
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-5">
+                {/* Base price row */}
+                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block">Tizimdan foydalanish (Base)</span>
+                    <span className="text-xs font-bold text-slate-400">Xizmat ko'rsatish va server xarajatlari</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black text-indigo-700">{(configs.corporate.basePrice ?? 500000).toLocaleString()} UZS</span>
+                  </div>
+                </div>
+
+                {/* Students */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Talabalar soni</label>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perStudent ?? 1000).toLocaleString()} UZS</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={corpCalc.students}
+                        onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
+                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                      />
+                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                    </div>
+                    <div className="text-right shrink-0 min-w-[120px]">
+                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perStudent ?? 1000).toLocaleString()} x {corpCalc.students}</span>
+                      <span className="text-sm font-black text-slate-700">{(corpCalc.students * (configs.corporate.perStudent ?? 1000)).toLocaleString()} UZS</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Staff */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                    Talabalar soni ({configs.corporate.perStudent ?? 1000} soʻm/ta)
-                  </label>
-                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={corpCalc.students}
-                      onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
-                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                    />
-                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Xodimlar soni</label>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perStaff ?? 10000).toLocaleString()} UZS</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={corpCalc.staff}
+                        onChange={(e) => setCorpCalc({...corpCalc, staff: Math.max(0, Number(e.target.value))})}
+                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                      />
+                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                    </div>
+                    <div className="text-right shrink-0 min-w-[120px]">
+                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perStaff ?? 10000).toLocaleString()} x {corpCalc.staff}</span>
+                      <span className="text-sm font-black text-slate-700">{(corpCalc.staff * (configs.corporate.perStaff ?? 10000)).toLocaleString()} UZS</span>
+                    </div>
                   </div>
                 </div>
 
+                {/* Courses */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                    Xodimlar soni ({configs.corporate.perStaff ?? 10000} soʻm/ta)
-                  </label>
-                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={corpCalc.staff}
-                      onChange={(e) => setCorpCalc({...corpCalc, staff: Math.max(0, Number(e.target.value))})}
-                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                    />
-                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kurslar soni</label>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perCourse ?? 40000).toLocaleString()} UZS</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={corpCalc.courses}
+                        onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
+                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                      />
+                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                    </div>
+                    <div className="text-right shrink-0 min-w-[120px]">
+                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perCourse ?? 40000).toLocaleString()} x {corpCalc.courses}</span>
+                      <span className="text-sm font-black text-slate-700">{(corpCalc.courses * (configs.corporate.perCourse ?? 40000)).toLocaleString()} UZS</span>
+                    </div>
                   </div>
                 </div>
 
+                {/* Tests */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                    Kurslar soni ({configs.corporate.perCourse ?? 40000} soʻm/ta)
-                  </label>
-                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={corpCalc.courses}
-                      onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
-                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                    />
-                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Testlar soni</label>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perTest ?? 2000).toLocaleString()} UZS</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={corpCalc.tests}
+                        onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
+                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                      />
+                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                    </div>
+                    <div className="text-right shrink-0 min-w-[120px]">
+                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perTest ?? 2000).toLocaleString()} x {corpCalc.tests}</span>
+                      <span className="text-sm font-black text-slate-700">{(corpCalc.tests * (configs.corporate.perTest ?? 2000)).toLocaleString()} UZS</span>
+                    </div>
                   </div>
                 </div>
 
+                {/* Exams */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                    Testlar soni ({configs.corporate.perTest ?? 2000} soʻm/ta)
-                  </label>
-                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={corpCalc.tests}
-                      onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
-                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                    />
-                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Imtihonlar soni</label>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perExam ?? 15000).toLocaleString()} UZS</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={corpCalc.exams}
+                        onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
+                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                      />
+                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                    </div>
+                    <div className="text-right shrink-0 min-w-[120px]">
+                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perExam ?? 15000).toLocaleString()} x {corpCalc.exams}</span>
+                      <span className="text-sm font-black text-slate-700">{(corpCalc.exams * (configs.corporate.perExam ?? 15000)).toLocaleString()} UZS</span>
+                    </div>
                   </div>
                 </div>
 
+                {/* Subjects */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                    Imtihonlar soni ({configs.corporate.perExam ?? 15000} soʻm/ta)
-                  </label>
-                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={corpCalc.exams}
-                      onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
-                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                    />
-                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Mavzular soni</label>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perSubject ?? 5000).toLocaleString()} UZS</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={corpCalc.subjects}
+                        onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
+                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                      />
+                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                    </div>
+                    <div className="text-right shrink-0 min-w-[120px]">
+                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perSubject ?? 5000).toLocaleString()} x {corpCalc.subjects}</span>
+                      <span className="text-sm font-black text-slate-700">{(corpCalc.subjects * (configs.corporate.perSubject ?? 5000)).toLocaleString()} UZS</span>
+                    </div>
                   </div>
                 </div>
 
+                {/* Quizizz */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                    Mavzular soni ({configs.corporate.perSubject ?? 5000} soʻm/ta)
-                  </label>
-                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={corpCalc.subjects}
-                      onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
-                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                    />
-                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Quizizzlar soni</label>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perQuizizz ?? 5000).toLocaleString()} UZS</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={corpCalc.quizizz}
+                        onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
+                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
+                      />
+                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                    </div>
+                    <div className="text-right shrink-0 min-w-[120px]">
+                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perQuizizz ?? 5000).toLocaleString()} x {corpCalc.quizizz}</span>
+                      <span className="text-sm font-black text-slate-700">{(corpCalc.quizizz * (configs.corporate.perQuizizz ?? 5000)).toLocaleString()} UZS</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                    Quizizzlar soni ({configs.corporate.perQuizizz ?? 5000} soʻm/ta)
-                  </label>
-                  <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={corpCalc.quizizz}
-                      onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
-                      className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                    />
-                    <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
+                {/* Modules */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* AI module */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div>
+                      <span className="text-xs font-bold text-slate-700 block">AI Test Generator</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Narxi: {(configs.corporate.aiPrice ?? 300000).toLocaleString()} sum/oy</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="checkbox" 
+                        checked={corpCalc.ai}
+                        onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
+                        className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
+                      />
+                      <div className="text-right shrink-0 min-w-[100px]">
+                        <span className="text-sm font-black text-slate-700">{corpCalc.ai ? (configs.corporate.aiPrice ?? 300000).toLocaleString() : 0} UZS</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* AI module */}
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100 transition-all">
-                  <span className="text-xs font-bold text-slate-700">AI Test Generator (+{(configs.corporate.aiPrice ?? 300000).toLocaleString()} sum/oy)</span>
-                  <input 
-                    type="checkbox" 
-                    checked={corpCalc.ai}
-                    onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
-                    className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
-                  />
-                </div>
-
-                {/* Bot module */}
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100 transition-all">
-                  <span className="text-xs font-bold text-slate-700">Shaxsiy Telegram Bot (+{(configs.corporate.botPrice ?? 200000).toLocaleString()} sum/oy)</span>
-                  <input 
-                    type="checkbox" 
-                    checked={corpCalc.bot}
-                    onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
-                    className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
-                  />
+                  {/* Bot module */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div>
+                      <span className="text-xs font-bold text-slate-700 block">Shaxsiy Telegram Bot</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Narxi: {(configs.corporate.botPrice ?? 200000).toLocaleString()} sum/oy</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="checkbox" 
+                        checked={corpCalc.bot}
+                        onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
+                        className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
+                      />
+                      <div className="text-right shrink-0 min-w-[100px]">
+                        <span className="text-sm font-black text-slate-700">{corpCalc.bot ? (configs.corporate.botPrice ?? 200000).toLocaleString() : 0} UZS</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
