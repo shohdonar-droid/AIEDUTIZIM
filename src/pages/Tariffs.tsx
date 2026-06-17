@@ -901,29 +901,91 @@ export default function Tariffs() {
                 {calcCorpPrice().toLocaleString()} <span className="text-sm font-black text-gray-400">sum/oy</span>
               </div>
 
-              <div className="space-y-3 mb-6 bg-white/40 p-4 rounded-2xl border border-indigo-100/50">
-                <div className="flex justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-indigo-50">
-                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Talabalar</span>
+              <div className="space-y-2 mb-6 bg-white/40 p-3 rounded-2xl border border-indigo-100/50">
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="0" value={corpCalc.students} 
+                        onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
+                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">nafar talaba</span>
+                   </div>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="0" value={corpCalc.staff} 
+                        onChange={(e) => setCorpCalc({...corpCalc, staff: Math.max(0, Number(e.target.value))})}
+                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">nafar xodimlar</span>
+                   </div>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="0" value={corpCalc.courses} 
+                        onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
+                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta kurs</span>
+                   </div>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="0" value={corpCalc.tests} 
+                        onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
+                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta test</span>
+                   </div>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="0" value={corpCalc.exams} 
+                        onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
+                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta imtihon</span>
+                   </div>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="0" value={corpCalc.subjects} 
+                        onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
+                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta mavzu</span>
+                   </div>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="0" value={corpCalc.quizizz} 
+                        onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
+                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta quizizz</span>
+                   </div>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Sun'iy Intellekt</span>
                    <input 
-                      type="number" min="0" value={corpCalc.students} 
-                      onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
-                      className="w-16 bg-slate-50 rounded-lg text-center font-black text-xs py-1 outline-none border border-transparent focus:border-indigo-400"
+                      type="checkbox" checked={corpCalc.ai} 
+                      onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
+                      className="w-4 h-4 accent-indigo-600"
                    />
                 </div>
-                <div className="flex justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-indigo-50">
-                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Kurslar</span>
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Telegram Bot</span>
                    <input 
-                      type="number" min="0" value={corpCalc.courses} 
-                      onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
-                      className="w-16 bg-slate-50 rounded-lg text-center font-black text-xs py-1 outline-none border border-transparent focus:border-indigo-400"
-                   />
-                </div>
-                <div className="flex justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-indigo-50">
-                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Testlar</span>
-                   <input 
-                      type="number" min="0" value={corpCalc.tests} 
-                      onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
-                      className="w-16 bg-slate-50 rounded-lg text-center font-black text-xs py-1 outline-none border border-transparent focus:border-indigo-400"
+                      type="checkbox" checked={corpCalc.bot} 
+                      onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
+                      className="w-4 h-4 accent-indigo-600"
                    />
                 </div>
               </div>
