@@ -31,6 +31,9 @@ import {
   Zap,
   DollarSign,
   TrendingUp,
+  TrendingDown,
+  ShieldAlert,
+  Info,
   PlusCircle,
   Calculator,
   Check,
@@ -309,21 +312,21 @@ export default function AdminBilling() {
     return stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
-  // Tariff economics / Cost model defaults
+  // Tariff economics / Cost model defaults (Maximum Stress Scenario)
   const systemCosts = {
-    perStudent: 400,   // Har bir talaba uchun baza infra (db/session/auth)
-    perStaff: 2000,    // Har bir xodim uchun boshqaruv paneli xarajati
-    perResource: 150,  // Har bir yaratilgan resurs (kurs/vazifa) hostingi
-    interactionUnit: 0.05, // Talabaning 1ta resurs bilan ishlash xarajati (trafik/cpu)
-    aiFixed: 50000,    // AI modulu uchun oylik rezerv
-    botFixed: 30000,   // Bot serveri xarajatlari
+    perStudent: 500,     // Oylik baza parvarishi (auth/sessions)
+    perStaff: 3000,      // Boshqaruv paneli infra xarajati
+    perResource: 200,    // Har bir resursni (test/kurs) bir marta yaratish va saqlash
+    interactionUnit: 1.0, // Talaba 1ta resursni (test/imtihon) ishlashi xarajati (db-writes/traffic)
+    aiFixed: 50000,      
+    botFixed: 30000,     
   };
 
   const calculatePlanCost = (tariff: TariffConfig) => {
     const S = tariff.students || 0;
     const T = tariff.staff || 0;
     
-    // Resurslar har bir xodimga hisoblanadi
+    // Har bir xodim yaratadigan limitlar yig'indisi
     const resPerStaff = 
       (tariff.maxCourses || 0) + 
       (tariff.maxTests || 0) + 
@@ -333,17 +336,16 @@ export default function AdminBilling() {
       
     const totalResources = T * resPerStaff;
     
-    // 1. Infra bazasi
+    // 1. Tizim asosi (Infra maintenance)
     const infraBase = (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
     
-    // 2. Resurslar sig'imi (Storage/DB space)
+    // 2. Limitlardan maksimal foydalanish (Storage/Cloud-Resources)
     const storageCost = totalResources * systemCosts.perResource;
     
-    // 3. Talabalar faoliyati (Interaction load)
-    // Har bir talaba o'rtacha barcha resurslarning 20% bilan aloqa qiladi deb hisoblaymiz
-    const activityLoad = (S * totalResources * 0.2 * systemCosts.interactionUnit);
+    // 3. Maksimal interaktivlik (Har bir talaba har bir resursni ishlaydi)
+    const interactionLoad = (S * totalResources * systemCosts.interactionUnit);
     
-    let total = infraBase + storageCost + activityLoad;
+    let total = infraBase + storageCost + interactionLoad;
     
     if (tariff.hasAI) total += systemCosts.aiFixed;
     if (tariff.hasBot) total += systemCosts.botFixed;
@@ -361,12 +363,12 @@ export default function AdminBilling() {
     return (
       <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-100">
-            <TrendingUp className="w-6 h-6" />
+          <div className="p-3 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-100">
+            <TrendingDown className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tariflar Iqtisodiyoti & Xarajatlar</h2>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Resurslar xarajatlari har bir xodim bo'yicha ko'paytirib hisoblangan</p>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tariflar Iqtisodiyoti (Maksimal Yuklama)</h2>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Limitlardan 100% foydalanish va maksimal interaktivlik tahlili</p>
           </div>
         </div>
 
@@ -388,52 +390,51 @@ export default function AdminBilling() {
 
             return (
               <div key={plan.id} className="bg-white rounded-[40px] border border-gray-100 p-8 hover:shadow-2xl hover:shadow-indigo-50 transition-all group overflow-hidden relative">
-                {/* Background Decor */}
                 <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-gray-50 rounded-full opacity-50 group-hover:scale-150 transition-transform" />
                 
                 <div className="relative z-10 space-y-6">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">{plan.name}</h3>
                     <div className={`px-3 py-1 ${profit > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} rounded-full text-[10px] font-black uppercase tracking-widest`}>
-                      {profit > 0 ? `+${margin}% Foyda` : `${margin}% Zarar`}
+                      {profit > 0 ? `+${margin}% ROI` : `${margin}% Defitsit`}
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex justify-between items-end border-b border-gray-50 pb-3">
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Reja Narxi</p>
-                        <p className="text-2xl font-black text-slate-900 font-mono">{price.toLocaleString()} <span className="text-xs text-slate-400 font-bold uppercase tracking-tight">UZS</span></p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Tarif Narxi</p>
+                        <p className="text-2xl font-black text-slate-900 font-mono">{price.toLocaleString()} <span className="text-xs text-slate-400 font-bold uppercase">UZS</span></p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Tizim Xarajati</p>
+                        <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Maks. Xarajat</p>
                         <p className="text-lg font-black text-red-500 font-mono">-{Math.round(cost).toLocaleString()} <span className="text-[10px]">UZS</span></p>
                       </div>
                     </div>
 
                     <div className="bg-slate-50 p-4 rounded-2xl space-y-3">
                       <div className="flex justify-between items-center">
-                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Xodimlar uchun limitlar</span>
-                         <span className="text-xs font-black text-indigo-600">{resPerStaff} tadan</span>
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Har bir xodim yaratadi</span>
+                         <span className="text-xs font-black text-indigo-600">{resPerStaff} tagacha</span>
                       </div>
                       <div className="flex justify-between items-center">
-                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Jami resurslar (Staff x Limit)</span>
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Tizimdagi jami resurslar</span>
                          <span className="text-xs font-black text-indigo-600">{totalRes} ta</span>
                       </div>
                       <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Talaba sig'imi & faolligi</span>
-                         <span className="text-xs font-black text-orange-600">{plan.config.students} nafar</span>
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Talaba faolligi (100%)</span>
+                         <span className="text-xs font-black text-orange-600">{plan.config.students} x {totalRes}</span>
                       </div>
-                      <p className="text-[9px] font-bold text-center text-slate-400 uppercase tracking-tighter">
-                        {plan.config.students} nafar talaba {totalRes} ta resursdan foydalanishi hisobga olingan.
+                      <p className="text-[9px] font-bold text-center text-slate-400 leading-tight uppercase tracking-tighter">
+                        Xodimlarning barcha resurslarini har bir talaba ishlaydi deb hisoblangan
                       </p>
                     </div>
                   </div>
 
                   <div className="pt-2">
-                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Sof Foyda (Oylik)</p>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Sof Foyda (Maksimal yuklamada)</p>
                     <div className={`p-4 rounded-2xl flex items-center justify-between border ${profit > 0 ? 'bg-emerald-50 border-emerald-100/50' : 'bg-red-50 border-red-100/50'}`}>
-                       <DollarSign className={`w-5 h-5 ${profit > 0 ? 'text-emerald-600' : 'text-red-600'}`} />
+                       <ShieldAlert className={`w-5 h-5 ${profit > 0 ? 'text-emerald-600' : 'text-red-600'}`} />
                        <span className={`text-xl font-black font-mono ${profit > 0 ? 'text-emerald-700' : 'text-red-700'}`}>{Math.round(profit).toLocaleString()} UZS</span>
                     </div>
                   </div>
@@ -442,9 +443,19 @@ export default function AdminBilling() {
             );
           })}
         </div>
+        
+        <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex gap-4 items-center">
+           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shrink-0 shadow-sm border border-indigo-100">
+             <Info className="w-5 h-5" />
+           </div>
+           <p className="text-[10px] leading-relaxed font-bold text-indigo-900/70 uppercase">
+             Ushbu tahlil tizimning "eng yomon senariy" (worst-case scenario) xarajatlarini ko'rsatadi. Haqiqiy xarajatlar ko'p hollarda interaktivlik 100% dan past bo'lganligi sababli kamroq bo'ladi.
+           </p>
+        </div>
       </div>
     );
   };
+
 
 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
