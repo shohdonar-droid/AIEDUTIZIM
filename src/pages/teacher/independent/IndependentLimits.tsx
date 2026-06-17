@@ -84,10 +84,47 @@ export default function IndependentLimits() {
     loadData();
   }, [user]);
 
-  // Determine pricing dynamically based on current user plan, fallback to "start" or fallback static list
-  const activePlanKey = (user as any)?.tariff || "start";
+  // Determine pricing dynamically based on extra (EXTRA LIMITS) tariff plan
+  const compressImage = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!base64Str.startsWith("data:image")) {
+        resolve(base64Str);
+        return;
+      }
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const MAX_DIM = 800;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+        } else {
+          resolve(base64Str);
+        }
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
+
   const getUnitPrice = (key: string) => {
-    const activePlan = tariffsConfig?.[activePlanKey] || tariffsConfig?.["start"];
+    const activePlan = tariffsConfig?.["extra"];
     // Check if the price field exists in the plan, e.g. "limit_departments_price"
     const priceField = `${key}_price`;
     if (activePlan && activePlan[priceField] !== undefined) {
@@ -120,8 +157,14 @@ export default function IndependentLimits() {
     if (file) {
       setReceiptFileName(file.name);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setReceiptBase64(reader.result as string);
+      reader.onloadend = async () => {
+        const rawBase = reader.result as string;
+        try {
+          const comp = await compressImage(rawBase);
+          setReceiptBase64(comp);
+        } catch (err) {
+          setReceiptBase64(rawBase);
+        }
       };
       reader.readAsDataURL(file);
     }

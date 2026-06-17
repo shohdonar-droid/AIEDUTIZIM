@@ -533,128 +533,13 @@ export default function AdminBilling() {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">
-            Moliyaviy Hisobot (Billing)
+            Tariflar Sozlamalari (Plan Settings)
           </h1>
           <p className="text-gray-500 mt-2 text-lg">
-            Tushumlar, ballar va foydalanuvchilar balansi boshqaruvi.
+            Sotiladigan tarif rejalari, limit qiymatlari va xizmat narxlarini boshqarish.
           </p>
         </div>
-        <div className="flex bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm">
-          <button
-            onClick={() => setActiveTab("org")}
-            className={`px-8 py-3 rounded-xl font-bold transition-all ${activeTab === "org" ? "bg-indigo-600 text-white shadow-lg" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            Tashkilotlar ({organizations.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("student")}
-            className={`px-8 py-3 rounded-xl font-bold transition-all ${activeTab === "student" ? "bg-indigo-600 text-white shadow-lg" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            Talabalar ({students.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("staff")}
-            className={`px-8 py-3 rounded-xl font-bold transition-all ${activeTab === "staff" ? "bg-indigo-600 text-white shadow-lg" : "text-gray-400 hover:text-gray-600"}`}
-          >
-            Xodimlar ({staff.length})
-          </button>
-        </div>
       </header>
-
-      {/* Stats Board - One row redesign */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* Tashkilotlar */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform">
-            <Users className="w-16 h-16" />
-          </div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-              <Users className="w-5 h-5" />
-            </div>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Tashkilotlar
-            </span>
-          </div>
-          <h3 className="text-2xl font-black text-gray-900">
-            {stats.totalOrgs.toLocaleString()}
-          </h3>
-        </div>
-
-        {/* Xodimlar */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform">
-            <Users className="w-16 h-16" />
-          </div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <Users className="w-5 h-5" />
-            </div>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Xodimlar
-            </span>
-          </div>
-          <h3 className="text-2xl font-black text-gray-900">
-            {stats.staffCount.toLocaleString()}
-          </h3>
-        </div>
-
-        {/* Talabalar */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform">
-            <Users className="w-16 h-16" />
-          </div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-orange-50 text-orange-600 rounded-xl">
-              <Users className="w-5 h-5" />
-            </div>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Talabalar
-            </span>
-          </div>
-          <h3 className="text-2xl font-black text-gray-900">
-            {students.length.toLocaleString()}
-          </h3>
-        </div>
-
-        {/* Telegram Bot */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform text-blue-400">
-            <Zap className="w-16 h-16" />
-          </div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-sky-50 text-sky-600 rounded-xl">
-              <Zap className="w-5 h-5" />
-            </div>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Telegram Bot
-            </span>
-          </div>
-          <h3 className="text-2xl font-black text-gray-900">
-            {stats.tgBotUsers.toLocaleString()}{" "}
-            <span className="text-xs font-bold text-gray-400">a'zo</span>
-          </h3>
-        </div>
-
-        {/* Umumiy Tushum */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group border-b-4 border-b-green-500">
-          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:scale-110 transition-transform text-green-500">
-            <TrendingUp className="w-16 h-16" />
-          </div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-green-50 text-green-600 rounded-xl">
-              <DollarSign className="w-5 h-5" />
-            </div>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Umumiy Tushum
-            </span>
-          </div>
-          <h3 className="text-2xl font-black text-gray-900">
-            {stats.totalIncome.toLocaleString()}
-            <small className="text-[10px] ml-1 text-gray-400">so'm</small>
-          </h3>
-        </div>
-      </div>
 
       {/* Tariflar Section */}
       <div className="bg-white p-10 md:p-16 rounded-[50px] border border-gray-100 shadow-sm space-y-16">
@@ -1085,109 +970,6 @@ export default function AdminBilling() {
                </div>
             </div>
          </div>
-      </div>
-
-      <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <input
-            type="text"
-            className="w-full pl-12 pr-6 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-indigo-600 font-bold"
-            placeholder={`${activeTab === "org" ? "Tashkilot" : activeTab === "student" ? "Talaba" : "Xodim"} nomini yozing...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <button
-          onClick={exportExcel}
-          className="w-full md:w-auto px-8 py-4 bg-green-600 text-white rounded-2xl font-black shadow-lg shadow-green-100 hover:bg-green-700 transition-all flex items-center justify-center gap-2 uppercase tracking-tight"
-        >
-          <CreditCard className="w-5 h-5" /> Excelga Yuklash
-        </button>
-      </div>
-
-      <div className="bg-white rounded-[40px] border border-gray-100 shadow-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-50">
-                <th className="px-6 py-8 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
-                  №
-                </th>
-                <th className="px-6 py-8 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
-                  Nomi / F.I.SH
-                </th>
-                {activeTab === "org" && (
-                  <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
-                    Xodimlar soni
-                  </th>
-                )}
-                <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
-                  Jami tushum
-                </th>
-                <th className="px-6 py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
-                  Ishlatilgan Summa
-                </th>
-                <th className="px-6 py-8 text-right text-xs font-black text-gray-400 uppercase tracking-widest">
-                  Amallar
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredList.map((u, i) => (
-                <tr
-                  key={`${u.uid || "user"}_${i}`}
-                  className="hover:bg-gray-50/30 transition-colors group"
-                >
-                  <td className="px-6 py-6 font-bold text-gray-400">{i + 1}</td>
-                  <td className="px-6 py-6">
-                    <div className="font-black text-gray-900">
-                      {u.displayName}
-                    </div>
-                    <div className="text-xs font-bold text-gray-400">
-                      {u.login || u.email}
-                    </div>
-                  </td>
-                  {activeTab === "org" && (
-                    <td className="px-6 py-6 text-center font-bold text-sm">
-                      <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg">
-                        {(u as any).staffCount || 0} ta
-                      </span>
-                    </td>
-                  )}
-                  <td className="px-6 py-6 text-center font-black text-green-600 bg-green-50/20">
-                    {u.totalIncome?.toLocaleString() || "0"}
-                  </td>
-                  <td className="px-6 py-6 text-center font-bold text-red-500 bg-red-50/20">
-                    {u.totalSpentAmount?.toLocaleString() || "0"}
-                  </td>
-                  <td className="px-6 py-6 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setViewingHistoryUser(u);
-                        }}
-                        className="p-3 text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingUser(u);
-                          setEditIncome(0);
-                          setEditExpense(0);
-                        }}
-                        className="p-3 text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       {editingUser && (
@@ -1770,9 +1552,6 @@ export default function AdminBilling() {
                       className="w-full px-5 py-4 bg-emerald-50/20 rounded-2xl border-2 border-emerald-50 focus:border-emerald-600 outline-none font-bold shadow-sm"
                     />
                   </div>
-                </>
-              )}
-
                   <div className="border-t border-gray-150 pt-6 mt-6 space-y-4">
                     <h4 className="text-[11px] font-black text-indigo-600 uppercase tracking-widest pl-1">
                       Mustaqil o'qituvchi 1 birlik limit narxlari (so'm)
@@ -1877,6 +1656,8 @@ export default function AdminBilling() {
                       </div>
                     </div>
                   </div>
+                </>
+              )}
 
               <button
                 onClick={handleSaveTariff}

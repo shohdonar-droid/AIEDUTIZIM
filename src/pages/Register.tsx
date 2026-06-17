@@ -27,84 +27,117 @@ export default function Register() {
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
       
-      
-      if (!userDoc.exists()) {
-        const qEmail = query(collection(db, 'users'), where('email', '==', user.email));
-        const emailSnap = await getDocs(qEmail);
+      const ADMIN_EMAILS = ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'];
+      const isUserAdmin = ADMIN_EMAILS.includes(user.email || '');
 
-        if (emailSnap.empty) {
-          // New Independent Teacher / Mustaqil O'qituvchi
-          let uyOrgId = '';
-          const q = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
-          const uySnap = await getDocs(q);
-          if (!uySnap.empty) {
-            uyOrgId = uySnap.docs[0].id;
-          } else {
-            const uyRef = await addDoc(collection(db, 'users'), {
-              displayName: 'UY',
-              role: 'teacher',
-              status: 'active',
-              createdAt: serverTimestamp(),
-              limit_departments: 9999,
-              limit_groups: 9999,
-              limit_students: 9999,
-              limit_subjects: 9999,
-              limit_tests: 9999,
-              limit_quizizz: 9999,
-              limit_exams: 9999,
-              limit_certificates: 9999
-            });
-            uyOrgId = uyRef.id;
-          }
+      // Get UY Home account ID
+      let uyOrgId = '';
+      const q = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
+      const uySnap = await getDocs(q);
+      if (!uySnap.empty) {
+        uyOrgId = uySnap.docs[0].id;
+      } else {
+        const uyRef = await addDoc(collection(db, 'users'), {
+          displayName: 'UY',
+          role: 'teacher',
+          status: 'active',
+          createdAt: serverTimestamp(),
+          limit_departments: 9999,
+          limit_groups: 9999,
+          limit_students: 9999,
+          limit_subjects: 9999,
+          limit_tests: 9999,
+          limit_quizizz: 9999,
+          limit_exams: 9999,
+          limit_certificates: 9999
+        });
+        uyOrgId = uyRef.id;
+      }
 
+      if (isUserAdmin) {
+        // If it's an admin, just write default admin document if it doesn't exist
+        if (!userDoc.exists()) {
           await setDoc(userDocRef, {
             uid: user.uid,
-            displayName: user.displayName || "Mustaqil O'qituvchi",
+            displayName: user.displayName || "Admin",
             email: user.email,
-            role: 'mustaqil_o_qituvchi',
-            teacherId: uyOrgId, // Associate independent teacher with the UY home organization
+            role: 'admin',
             createdAt: serverTimestamp(),
-            
-            // Boshlang'ich limitlar
-            limit_departments: 1,
-            limit_groups: 1,
-            limit_students: 5,
-            limit_subjects: 2,
-            limit_tests: 2,
-            limit_quizizz: 1,
-            limit_exams: 1,
-            limit_courses: 0,
-            limit_certificates: 5,
-            
-            // Har bir resurs miqdori qoidalari
-            limit_tests_per_subject: 10,
-            limit_questions_per_test: 10,
-            limit_questions_per_quizizz: 5,
-            limit_questions_per_exam: 10,
-            
-            total_spent: 0,
             status: 'active'
-          });
-        } else {
-          // Linking to pre-created student or staff record
-          const existingUserDoc = emailSnap.docs[0];
-          await setDoc(userDocRef, {
-            ...existingUserDoc.data(),
-            uid: user.uid
           });
         }
       } else {
-         const existingData = userDoc.data();
-         if (existingData?.role === 'staff' && !existingData.teacherId) {
-            let uyOrgId = '';
-            const q = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
-            const uySnap = await getDocs(q);
-            if (!uySnap.empty) uyOrgId = uySnap.docs[0].id;
-            
-            if (uyOrgId) {
-               await setDoc(userDocRef, { teacherId: uyOrgId }, { merge: true });
-            }
-         }
+        // If they are not admin, force them to mustaqil_o_qituvchi with teacherId = uyOrgId!
+        // Whether they exist or not, update or merge key properties.
+        const defaultLimits = {
+          limit_departments: 1,
+          limit_groups: 1,
+          limit_students: 5,
+          limit_subjects: 2,
+          limit_tests: 2,
+          limit_quizizz: 1,
+          limit_exams: 1,
+          limit_courses: 0,
+          limit_certificates: 5,
+          limit_tests_per_subject: 10,
+          limit_questions_per_test: 10,
+          limit_questions_per_quizizz: 5,
+          limit_questions_per_exam: 10,
+        };
+
+        if (!userDoc.exists()) {
+          // Check if this email exists as a pre-created staff/student doc that hasn't registered with Auth UID yet
+          const qEmail = query(collection(db, 'users'), where('email', '==', user.email));
+          const emailSnap = await getDocs(qEmail);
+
+          if (!emailSnap.empty) {
+            const existingData = emailSnap.docs[0].data();
+            await setDoc(userDocRef, {
+              ...existingData,
+              uid: user.uid,
+              role: 'mustaqil_o_qituvchi',
+              teacherId: uyOrgId,
+              ...defaultLimits // ensure limits are set
+            });
+          } else {
+            await setDoc(userDocRef, {
+              uid: user.uid,
+              displayName: user.displayName || "Mustaqil O'qituvchi",
+              email: user.email,
+              role: 'mustaqil_o_qituvchi',
+              teacherId: uyOrgId,
+              createdAt: serverTimestamp(),
+              status: 'active',
+              total_spent: 0,
+              ...defaultLimits
+            });
+          }
+        } else {
+          // Document exists, update it to be a mustaqil_o_qituvchi and assign to UY
+          const existingData = userDoc.data();
+          const mergedLimits = {
+            limit_departments: existingData.limit_departments ?? defaultLimits.limit_departments,
+            limit_groups: existingData.limit_groups ?? defaultLimits.limit_groups,
+            limit_students: existingData.limit_students ?? defaultLimits.limit_students,
+            limit_subjects: existingData.limit_subjects ?? defaultLimits.limit_subjects,
+            limit_tests: existingData.limit_tests ?? defaultLimits.limit_tests,
+            limit_quizizz: existingData.limit_quizizz ?? defaultLimits.limit_quizizz,
+            limit_exams: existingData.limit_exams ?? defaultLimits.limit_exams,
+            limit_certificates: existingData.limit_certificates ?? defaultLimits.limit_certificates,
+            limit_courses: existingData.limit_courses ?? defaultLimits.limit_courses,
+            limit_tests_per_subject: existingData.limit_tests_per_subject ?? defaultLimits.limit_tests_per_subject,
+            limit_questions_per_test: existingData.limit_questions_per_test ?? defaultLimits.limit_questions_per_test,
+            limit_questions_per_quizizz: existingData.limit_questions_per_quizizz ?? defaultLimits.limit_questions_per_quizizz,
+            limit_questions_per_exam: existingData.limit_questions_per_exam ?? defaultLimits.limit_questions_per_exam,
+          };
+          
+          await setDoc(userDocRef, {
+            ...existingData,
+            role: 'mustaqil_o_qituvchi',
+            teacherId: uyOrgId,
+            ...mergedLimits
+          }, { merge: true });
+        }
       }
 
 

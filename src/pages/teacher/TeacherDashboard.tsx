@@ -69,7 +69,6 @@ export default function TeacherDashboard() {
         { name: 'Mavzular', path: '/teacher/subjects' },
         { name: 'Testlar', path: '/teacher/tests' },
         { name: 'Quizizz', path: '/teacher/quizizz' },
-        { name: 'Imtihonlar', path: '/teacher/exams' },
         { name: 'Sertifikatlar', path: '/teacher/certificates' }
     ]},
     { id: 'monitoring', name: 'Monitoring', icon: FileText, subItems: [
@@ -294,11 +293,11 @@ export default function TeacherDashboard() {
                 <Route path="/departments" element={<IndependentDepartments />} />
                 <Route path="/groups" element={<IndependentGroups />} />
                 <Route path="/students" element={<IndependentStudents />} />
-                <Route path="/subjects" element={<IndependentSubjects />} />
-                <Route path="/tests" element={<IndependentTests />} />
-                <Route path="/quizizz" element={<IndependentQuizizz />} />
-                <Route path="/exams" element={<IndependentExams />} />
-                <Route path="/certificates" element={<IndependentCertificates />} />
+                <Route path="/subjects" element={<TeacherSubjects />} />
+                <Route path="/subjects/read/:id" element={<SubjectRead />} />
+                <Route path="/tests" element={<TeacherTests />} />
+                <Route path="/quizizz" element={<TeacherQuizizz />} />
+                <Route path="/certificates" element={<TeacherCertificates />} />
                 <Route path="/attendance" element={<IndependentAttendance />} />
                 <Route path="/jurnal" element={<IndependentJurnal />} />
                 <Route path="/limits" element={<IndependentLimits />} />
