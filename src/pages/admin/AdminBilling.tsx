@@ -36,7 +36,9 @@ import {
   Check,
   Eye,
   Settings,
+  ArrowRight
 } from "lucide-react";
+import { motion } from "motion/react";
 import * as XLSX from "xlsx";
 
 interface TariffConfig {
@@ -205,19 +207,52 @@ export default function AdminBilling() {
   const [editingTariffForm, setEditingTariffForm] = useState<TariffConfig | null>(null);
   const [savingTariff, setSavingTariff] = useState(false);
 
+  // Card Settings state
+  const [cardSettings, setCardSettings] = useState({ number: "9860 0000 0000 0000", owner: "ADMIN NAME", type: "Humo" });
+  const [isEditingCard, setIsEditingCard] = useState(false);
+  const [cardForm, setCardForm] = useState({ number: "", owner: "", type: "Humo" });
+
   useEffect(() => {
-    async function loadTariffsConfig() {
+    async function loadConfigs() {
       try {
-        const snap = await getDoc(doc(db, "settings", "tariffs"));
-        if (snap.exists()) {
-          setTariffsConfig({ ...defaultTariffs, ...snap.data() } as AllTariffsConfig);
+        const [tSnap, cSnap] = await Promise.all([
+          getDoc(doc(db, "settings", "tariffs")),
+          getDoc(doc(db, "settings", "payment_card"))
+        ]);
+        
+        if (tSnap.exists()) {
+          setTariffsConfig({ ...defaultTariffs, ...tSnap.data() } as AllTariffsConfig);
+        }
+        if (cSnap.exists()) {
+          const data = cSnap.data();
+          setCardSettings({ 
+            number: data.number || "9860 0000 0000 0000", 
+            owner: data.owner || "ADMIN NAME", 
+            type: data.type || "Humo" 
+          });
         }
       } catch (err) {
-        console.warn("Failed to load tariffs config from Firestore, using defaults", err);
+        console.warn("Failed to load configs from Firestore", err);
       }
     }
-    loadTariffsConfig();
+    loadConfigs();
   }, []);
+
+  const handleSaveCard = async () => {
+    setLoading(true);
+    try {
+      await setDoc(doc(db, "settings", "payment_card"), {
+        ...cardForm,
+        updatedAt: serverTimestamp()
+      });
+      setCardSettings(cardForm);
+      setIsEditingCard(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Custom Calculators
   const [corpCalc, setCorpCalc] = useState({
@@ -540,6 +575,122 @@ export default function AdminBilling() {
           </p>
         </div>
       </header>
+
+      {/* Card Info and Stats Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+        {/* Card Information Component */}
+        <div className="lg:col-span-1 bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm flex flex-col justify-between group h-full">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest pl-1">To'lov kartasi</h2>
+            <button 
+              onClick={() => {
+                setCardForm(cardSettings);
+                setIsEditingCard(true);
+              }}
+              className="p-2 hover:bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all border border-transparent hover:border-slate-100"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="relative w-full aspect-[1.6/1] rounded-[24px] bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 text-white shadow-2xl shadow-indigo-200 overflow-hidden group-hover:scale-[1.02] transition-transform duration-500">
+            {/* Glossy overlay */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full" />
+            
+            <div className="h-full flex flex-col justify-between relative z-10">
+              <div className="flex justify-between items-start">
+                <div className="w-12 h-8 bg-slate-300/20 rounded-md backdrop-blur-sm border border-white/20" />
+                <span className="text-xs font-black tracking-widest text-indigo-200 uppercase">{cardSettings.type}</span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="text-[22px] font-black tracking-[0.2em] font-mono drop-shadow-md">
+                  {cardSettings.number}
+                </div>
+                
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-[8px] font-black text-indigo-300 uppercase tracking-widest mb-1">Karta egasi</p>
+                    <p className="text-xs font-black uppercase tracking-wider">{cardSettings.owner}</p>
+                  </div>
+                  <div className="flex -space-x-2">
+                    <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm" />
+                    <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-6 text-[10px] font-bold text-slate-400 text-center uppercase tracking-tighter">
+            Ushbu karta ma'lumotlari foydalanuvchilarga to'lov qilish vaqtida ko'rsatiladi.
+          </p>
+        </div>
+
+        {/* Quick Stats Grid */}
+        <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
+           <div className="bg-white p-6 rounded-[32px] border border-gray-100 flex flex-col justify-between group hover:border-indigo-100 transition-all">
+              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <Users className="w-5 h-5" />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tashkilotlar</p>
+                 <h4 className="text-2xl font-black text-gray-900 leading-none">{stats.totalOrgs}</h4>
+              </div>
+           </div>
+           
+           <div className="bg-white p-6 rounded-[32px] border border-gray-100 flex flex-col justify-between group hover:border-emerald-100 transition-all">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <DollarSign className="w-5 h-5" />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Jami Tushum</p>
+                 <h4 className="text-xl font-black text-gray-900 leading-none truncate" title={stats.totalIncome.toLocaleString() + " sum"}>{stats.totalIncome.toLocaleString()}</h4>
+              </div>
+           </div>
+
+           <div className="bg-white p-6 rounded-[32px] border border-gray-100 flex flex-col justify-between group hover:border-blue-100 transition-all">
+              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Materiallar</p>
+                 <h4 className="text-2xl font-black text-gray-900 leading-none truncate" title={stats.totalDocs.toLocaleString()}>{stats.totalDocs.toLocaleString()}</h4>
+              </div>
+           </div>
+
+           <div className="bg-white p-6 rounded-[32px] border border-gray-100 flex flex-col justify-between group hover:border-amber-100 transition-all">
+              <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Bot A'zolari</p>
+                 <h4 className="text-2xl font-black text-gray-900 leading-none">{stats.tgBotUsers}</h4>
+              </div>
+           </div>
+
+           <div className="bg-white p-6 rounded-[32px] border border-gray-100 flex flex-col justify-between group hover:border-red-100 transition-all">
+              <div className="w-10 h-10 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <ArrowUpRight className="w-5 h-5" />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ishlatilgan</p>
+                 <h4 className="text-xl font-black text-gray-900 leading-none truncate" title={stats.totalSpentAmount.toLocaleString() + " sum"}>{stats.totalSpentAmount.toLocaleString()}</h4>
+              </div>
+           </div>
+
+           <div className="bg-white p-6 rounded-[32px] border border-gray-100 flex flex-col justify-between group hover:border-slate-100 transition-all">
+              <div className="w-10 h-10 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <Check className="w-5 h-5" />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Xodimlar</p>
+                 <h4 className="text-2xl font-black text-gray-900 leading-none">{stats.staffCount}</h4>
+              </div>
+           </div>
+        </div>
+      </div>
 
       {/* Tariflar Section */}
       <div className="bg-white p-10 md:p-16 rounded-[50px] border border-gray-100 shadow-sm space-y-16">
@@ -1152,6 +1303,75 @@ export default function AdminBilling() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Card Edit Modal */}
+      {isEditingCard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Karta tahrirlash</h3>
+              <button 
+                onClick={() => setIsEditingCard(false)} 
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                disabled={loading}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Karta raqami</label>
+                <input
+                  type="text"
+                  value={cardForm.number}
+                  onChange={(e) => setCardForm({ ...cardForm, number: e.target.value })}
+                  placeholder="9860 0000 0000 0000"
+                  className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-black font-mono transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Karta egasi (F.I.SH)</label>
+                <input
+                  type="text"
+                  value={cardForm.owner}
+                  onChange={(e) => setCardForm({ ...cardForm, owner: e.target.value })}
+                  placeholder="S.O. ELYORBEK"
+                  className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-black uppercase transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Karta turi (Humo/Uzcard)</label>
+                <select
+                  value={cardForm.type}
+                  onChange={(e) => setCardForm({ ...cardForm, type: e.target.value })}
+                  className="w-full px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none text-sm font-black transition-all"
+                >
+                  <option value="Humo">Humo</option>
+                  <option value="Uzcard">Uzcard</option>
+                  <option value="Visa">Visa</option>
+                  <option value="Mastercard">Mastercard</option>
+                </select>
+              </div>
+
+              <button
+                onClick={handleSaveCard}
+                disabled={loading}
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-sm tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                Saqlash
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 

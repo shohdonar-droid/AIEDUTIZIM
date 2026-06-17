@@ -19,7 +19,8 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   FileText,
-  Trash2
+  Trash2,
+  ArrowRight
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useAuth } from "../hooks/useAuth";
@@ -137,6 +138,7 @@ export default function Tariffs() {
   const { user } = useAuth();
   const [configs, setConfigs] = useState<AllTariffsConfig>(defaultTariffs);
   const [loading, setLoading] = useState(true);
+  const [cardSettings, setCardSettings] = useState({ number: "9860 0000 0000 0000", owner: "ADMIN NAME", type: "Humo" });
 
   // Connection request state
   const [selectedTariff, setSelectedTariff] = useState<TariffConfig | null>(null);
@@ -160,6 +162,7 @@ export default function Tariffs() {
   const [fileSize, setFileSize] = useState('');
   const [fileError, setFileError] = useState('');
   const [isCorpModalOpen, setIsCorpModalOpen] = useState(false);
+  const [editingCard, setEditingCard] = useState(false); // Used in some other context? No.
 
   const compressImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -247,15 +250,15 @@ export default function Tariffs() {
 
   // Corporate calculator state
   const [corpCalc, setCorpCalc] = useState({
-    students: 1000,
-    staff: 20,
+    students: 1,
+    staff: 1,
     ai: true,
     bot: true,
-    courses: 50,
-    tests: 300,
-    exams: 50,
-    subjects: 100,
-    quizizz: 100,
+    courses: 1,
+    tests: 1,
+    exams: 1,
+    subjects: 1,
+    quizizz: 1,
   });
 
   // Extra limits calculator state
@@ -274,12 +277,24 @@ export default function Tariffs() {
   useEffect(() => {
     async function loadConfig() {
       try {
-        const snap = await getDoc(doc(db, "settings", "tariffs"));
-        if (snap.exists()) {
-          setConfigs({ ...defaultTariffs, ...snap.data() } as AllTariffsConfig);
+        const [tSnap, cSnap] = await Promise.all([
+          getDoc(doc(db, "settings", "tariffs")),
+          getDoc(doc(db, "settings", "payment_card"))
+        ]);
+        
+        if (tSnap.exists()) {
+          setConfigs({ ...defaultTariffs, ...tSnap.data() } as AllTariffsConfig);
+        }
+        if (cSnap.exists()) {
+          const data = cSnap.data();
+          setCardSettings({ 
+            number: data.number || "9860 0000 0000 0000", 
+            owner: data.owner || "ADMIN NAME", 
+            type: data.type || "Humo" 
+          });
         }
       } catch (err) {
-        console.warn("Failed to load tariffs config from Firestore, using defaults", err);
+        console.warn("Failed to load configs from Firestore", err);
       } finally {
         setLoading(false);
       }
@@ -637,9 +652,9 @@ export default function Tariffs() {
                 </div>
 
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                  <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Karta raqami (Humo):</p>
-                  <p className="text-sm font-black font-mono text-gray-800">9860 2109 4567 8901</p>
-                  <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase">S. O. ELYORBEK</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Karta raqami ({cardSettings.type}):</p>
+                  <p className="text-sm font-black font-mono text-gray-800">{cardSettings.number}</p>
+                  <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase">{cardSettings.owner}</p>
                 </div>
               </div>
             </div>
@@ -872,56 +887,61 @@ export default function Tariffs() {
             </button>
           </div>
 
-          {/* 👑 CORPORATE */}
+          {/* CORPORATE */}
           <div className="p-6 rounded-[32px] border-2 border-indigo-100 hover:border-indigo-300 transition-all bg-gradient-to-b from-indigo-50/10 to-indigo-50/40 relative group flex flex-col justify-between shadow-sm">
             <div>
               <div className="flex justify-between items-start mb-4">
-                <span className="text-3xl">👑</span>
+                <div className="w-10 h-10 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
+                  <Calculator className="w-6 h-6" />
+                </div>
                 <span className="px-2.5 py-1 bg-indigo-50 rounded-full text-[9px] font-black text-indigo-600 uppercase tracking-widest border border-indigo-100">CORPORATE</span>
               </div>
-              <h3 className="text-xl font-black text-gray-950 mb-1">👑 CORPORATE</h3>
-              <div className="text-2xl font-black text-indigo-600 mb-4 font-mono">
-                {calcCorpPrice().toLocaleString()} <span className="text-xs font-black text-gray-400">so'm/oy</span>
+              <h3 className="text-xl font-black text-gray-950 mb-1">CORPORATE</h3>
+              <div className="text-3xl font-black text-indigo-600 mb-6 font-mono">
+                {calcCorpPrice().toLocaleString()} <span className="text-sm font-black text-gray-400">sum/oy</span>
               </div>
-              
-              <p className="text-gray-400 text-xs font-bold mb-4 line-clamp-2">Eng moslashuvchan, istalgan limitlar asosida o'zingiz tuzadigan maxsus yirik reja.</p>
-              
-              <ul className="space-y-2.5 mb-6 border-t border-indigo-100/60 pt-3">
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.students} ta-talabalar
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.staff} ta-xodimlar
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.courses} ta kurs
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.tests} ta test
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.exams} ta imtihon
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.subjects} ta mavzu
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> {corpCalc.quizizz} ta quizizz
-                </li>
-                <li className={`text-xs font-bold flex items-center gap-2.5 ${corpCalc.ai ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                  {corpCalc.ai ? <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt
-                </li>
-                <li className={`text-xs font-bold flex items-center gap-2.5 ${corpCalc.bot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                  {corpCalc.bot ? <Check className="w-4.5 h-4.5 text-indigo-500 shrink-0" /> : <XIcon />} Telegram Bot
-                </li>
-              </ul>
+
+              <div className="space-y-3 mb-6 bg-white/40 p-4 rounded-2xl border border-indigo-100/50">
+                <div className="flex justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-indigo-50">
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Talabalar</span>
+                   <input 
+                      type="number" min="0" value={corpCalc.students} 
+                      onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
+                      className="w-16 bg-slate-50 rounded-lg text-center font-black text-xs py-1 outline-none border border-transparent focus:border-indigo-400"
+                   />
+                </div>
+                <div className="flex justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-indigo-50">
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Kurslar</span>
+                   <input 
+                      type="number" min="0" value={corpCalc.courses} 
+                      onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
+                      className="w-16 bg-slate-50 rounded-lg text-center font-black text-xs py-1 outline-none border border-transparent focus:border-indigo-400"
+                   />
+                </div>
+                <div className="flex justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-indigo-50">
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Testlar</span>
+                   <input 
+                      type="number" min="0" value={corpCalc.tests} 
+                      onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
+                      className="w-16 bg-slate-50 rounded-lg text-center font-black text-xs py-1 outline-none border border-transparent focus:border-indigo-400"
+                   />
+                </div>
+              </div>
+
+              <button 
+                onClick={() => user ? setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()}) : setShowNewOrgModal({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()})}
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest flex items-center justify-center gap-2"
+              >
+                Tanlangan tarifga ulanish
+              </button>
+
+              <button 
+                 onClick={() => setIsCorpModalOpen(true)}
+                 className="w-full mt-3 py-3 bg-white/60 text-indigo-600 border border-indigo-200 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-white transition-all"
+              >
+                 To'liq kalkulyator <ArrowRight className="w-3 h-3 inline ml-1" />
+              </button>
             </div>
-            <button 
-              onClick={() => setIsCorpModalOpen(true)}
-              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-black hover:from-indigo-700 hover:to-indigo-800 shadow-md transition-all uppercase text-xs tracking-wider"
-            >
-              Ulanish & Hisoblash
-            </button>
           </div>
 
         </div>
@@ -1149,7 +1169,9 @@ export default function Tariffs() {
             </button>
 
             <div className="flex items-center gap-3.5 mb-6">
-              <span className="text-3xl">👑</span>
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black">
+                 <Calculator className="w-7 h-7" />
+              </div>
               <div>
                 <h3 className="text-2xl font-black text-gray-950">CORPORATE CALCULATOR</h3>
                 <p className="text-gray-400 text-xs font-bold uppercase tracking-wider">Erkin ravishda istagan limitlarni hisoblang</p>

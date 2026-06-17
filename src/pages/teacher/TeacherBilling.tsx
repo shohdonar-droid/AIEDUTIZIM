@@ -66,7 +66,8 @@ export default function TeacherBilling() {
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configs, setConfigs] = useState<any>(defaultTariffs);
-  
+  const [cardSettings, setCardSettings] = useState({ number: "9860 0000 0000 0000", owner: "ADMIN NAME", type: "Humo" });
+
   // Modal states
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedTariff, setSelectedTariff] = useState<any>(null);
@@ -83,9 +84,22 @@ export default function TeacherBilling() {
       if (!user) return;
       try {
         // Load latest tariffs config
-        const configSnap = await getDoc(doc(db, "settings", "tariffs"));
+        const [configSnap, cardSnap] = await Promise.all([
+          getDoc(doc(db, "settings", "tariffs")),
+          getDoc(doc(db, "settings", "payment_card"))
+        ]);
+        
         if (configSnap.exists()) {
           setConfigs({ ...defaultTariffs, ...configSnap.data() });
+        }
+        
+        if (cardSnap.exists()) {
+          const data = cardSnap.data();
+          setCardSettings({
+            number: data.number || "9860 0000 0000 0000",
+            owner: data.owner || "ADMIN NAME",
+            type: data.type || "Humo"
+          });
         }
 
         // Load current subscription
