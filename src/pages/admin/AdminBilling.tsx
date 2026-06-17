@@ -311,26 +311,44 @@ export default function AdminBilling() {
 
   // Tariff economics / Cost model defaults
   const systemCosts = {
-    perStudent: 600,  // Monthly infrastructure/db per active student
-    perStaff: 2500,   // Management interface cost
-    perResource: 500, // Storage/CDN for files/tests
-    aiFixed: 50000,   // API overhead per org
-    botFixed: 30000,  // Polling/Server cost per bot
+    perStudent: 400,   // Har bir talaba uchun baza infra (db/session/auth)
+    perStaff: 2000,    // Har bir xodim uchun boshqaruv paneli xarajati
+    perResource: 150,  // Har bir yaratilgan resurs (kurs/vazifa) hostingi
+    interactionUnit: 0.05, // Talabaning 1ta resurs bilan ishlash xarajati (trafik/cpu)
+    aiFixed: 50000,    // AI modulu uchun oylik rezerv
+    botFixed: 30000,   // Bot serveri xarajatlari
   };
 
   const calculatePlanCost = (tariff: TariffConfig) => {
-    const studentCount = tariff.students || 0;
-    const staffCount = tariff.staff || 0;
-    const resources = (tariff.maxCourses || 0) + (tariff.maxTests || 0) + (tariff.maxExams || 0);
+    const S = tariff.students || 0;
+    const T = tariff.staff || 0;
     
-    let cost = (studentCount * systemCosts.perStudent) + 
-               (staffCount * systemCosts.perStaff) + 
-               (resources * systemCosts.perResource);
+    // Resurslar har bir xodimga hisoblanadi
+    const resPerStaff = 
+      (tariff.maxCourses || 0) + 
+      (tariff.maxTests || 0) + 
+      (tariff.maxExams || 0) + 
+      (tariff.maxSubjects || 0) + 
+      (tariff.maxQuizizz || 0);
+      
+    const totalResources = T * resPerStaff;
     
-    if (tariff.hasAI) cost += systemCosts.aiFixed;
-    if (tariff.hasBot) cost += systemCosts.botFixed;
+    // 1. Infra bazasi
+    const infraBase = (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
     
-    return cost;
+    // 2. Resurslar sig'imi (Storage/DB space)
+    const storageCost = totalResources * systemCosts.perResource;
+    
+    // 3. Talabalar faoliyati (Interaction load)
+    // Har bir talaba o'rtacha barcha resurslarning 20% bilan aloqa qiladi deb hisoblaymiz
+    const activityLoad = (S * totalResources * 0.2 * systemCosts.interactionUnit);
+    
+    let total = infraBase + storageCost + activityLoad;
+    
+    if (tariff.hasAI) total += systemCosts.aiFixed;
+    if (tariff.hasBot) total += systemCosts.botFixed;
+    
+    return total;
   };
 
   const renderEconomics = () => {
@@ -348,7 +366,7 @@ export default function AdminBilling() {
           </div>
           <div>
             <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tariflar Iqtisodiyoti & Xarajatlar</h2>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Tizim harajatlari va sof foyda tahlili</p>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Resurslar xarajatlari har bir xodim bo'yicha ko'paytirib hisoblangan</p>
           </div>
         </div>
 
@@ -357,13 +375,16 @@ export default function AdminBilling() {
             const cost = calculatePlanCost(plan.config);
             const price = plan.config.price || 0;
             const profit = price - cost;
-            const margin = ((profit / price) * 100).toFixed(1);
+            const margin = price > 0 ? ((profit / price) * 100).toFixed(1) : 0;
             
-            // 1 staff = 50-100 students efficiency
-            const capacityMin = (plan.config.staff || 0) * 50;
-            const capacityMax = (plan.config.staff || 0) * 100;
-            const currentRatio = (plan.config.students || 0);
-            const efficiency = Math.round((currentRatio / capacityMax) * 100);
+            const resPerStaff = 
+              (plan.config.maxCourses || 0) + 
+              (plan.config.maxTests || 0) + 
+              (plan.config.maxExams || 0) + 
+              (plan.config.maxSubjects || 0) + 
+              (plan.config.maxQuizizz || 0);
+            
+            const totalRes = (plan.config.staff || 0) * resPerStaff;
 
             return (
               <div key={plan.id} className="bg-white rounded-[40px] border border-gray-100 p-8 hover:shadow-2xl hover:shadow-indigo-50 transition-all group overflow-hidden relative">
@@ -373,45 +394,47 @@ export default function AdminBilling() {
                 <div className="relative z-10 space-y-6">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">{plan.name}</h3>
-                    <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                      +{margin}% Foyda
+                    <div className={`px-3 py-1 ${profit > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} rounded-full text-[10px] font-black uppercase tracking-widest`}>
+                      {profit > 0 ? `+${margin}% Foyda` : `${margin}% Zarar`}
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex justify-between items-end border-b border-gray-50 pb-3">
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Sotuv Narxi</p>
-                        <p className="text-2xl font-black text-slate-900 font-mono">{price.toLocaleString()} <span className="text-xs">uzs</span></p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Reja Narxi</p>
+                        <p className="text-2xl font-black text-slate-900 font-mono">{price.toLocaleString()} <span className="text-xs text-slate-400 font-bold uppercase tracking-tight">UZS</span></p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Xarajat (EST)</p>
-                        <p className="text-lg font-black text-red-500 font-mono">-{cost.toLocaleString()} <span className="text-[10px]">uzs</span></p>
+                        <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Tizim Xarajati</p>
+                        <p className="text-lg font-black text-red-500 font-mono">-{Math.round(cost).toLocaleString()} <span className="text-[10px]">UZS</span></p>
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="bg-slate-50 p-4 rounded-2xl space-y-3">
                       <div className="flex justify-between items-center">
-                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Xodim Sig'imi (1:100)</span>
-                         <span className="text-[10px] font-black text-indigo-600">{efficiency}% Band</span>
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Xodimlar uchun limitlar</span>
+                         <span className="text-xs font-black text-indigo-600">{resPerStaff} tadan</span>
                       </div>
-                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all duration-1000 ${efficiency > 80 ? 'bg-orange-500' : 'bg-emerald-500'}`} 
-                          style={{ width: `${Math.min(100, efficiency)}%` }} 
-                        />
+                      <div className="flex justify-between items-center">
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Jami resurslar (Staff x Limit)</span>
+                         <span className="text-xs font-black text-indigo-600">{totalRes} ta</span>
                       </div>
-                      <p className="text-[9px] font-bold text-gray-400 text-center">
-                         Ushbu reja {capacityMin}-{capacityMax} nafar talabaga xizmat ko'rsata oladi.
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Talaba sig'imi & faolligi</span>
+                         <span className="text-xs font-black text-orange-600">{plan.config.students} nafar</span>
+                      </div>
+                      <p className="text-[9px] font-bold text-center text-slate-400 uppercase tracking-tighter">
+                        {plan.config.students} nafar talaba {totalRes} ta resursdan foydalanishi hisobga olingan.
                       </p>
                     </div>
                   </div>
 
                   <div className="pt-2">
-                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Kutilayotgan Sof Foyda (Har bir reja uchun)</p>
-                    <div className="bg-emerald-50 p-4 rounded-2xl flex items-center justify-between border border-emerald-100/50">
-                       <DollarSign className="w-5 h-5 text-emerald-600" />
-                       <span className="text-xl font-black text-emerald-700 font-mono">{(profit).toLocaleString()} UZS</span>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Sof Foyda (Oylik)</p>
+                    <div className={`p-4 rounded-2xl flex items-center justify-between border ${profit > 0 ? 'bg-emerald-50 border-emerald-100/50' : 'bg-red-50 border-red-100/50'}`}>
+                       <DollarSign className={`w-5 h-5 ${profit > 0 ? 'text-emerald-600' : 'text-red-600'}`} />
+                       <span className={`text-xl font-black font-mono ${profit > 0 ? 'text-emerald-700' : 'text-red-700'}`}>{Math.round(profit).toLocaleString()} UZS</span>
                     </div>
                   </div>
                 </div>
@@ -422,6 +445,7 @@ export default function AdminBilling() {
       </div>
     );
   };
+
 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [viewingHistoryUser, setViewingHistoryUser] =
