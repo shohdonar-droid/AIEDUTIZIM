@@ -374,17 +374,22 @@ export default function AdminBilling() {
             <TrendingDown className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tariflar Iqtisodiyoti (Maksimal Yuklama)</h2>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Limitlardan 100% foydalanish va maksimal interaktivlik tahlili</p>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tariflar Iqtisodiyoti (20 ta Obuna Uchun)</h2>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Har bir tarifda 20 tadan tashkilot obuna bo'lgan holatdagi jami tahlil</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {plans.map((plan) => {
-            const cost = calculatePlanCost(plan.config);
-            const price = plan.config.price || 0;
-            const profit = price - cost;
-            const margin = price > 0 ? ((profit / price) * 100).toFixed(1) : 0;
+            const ORGS_PER_PLAN = 20;
+            const singleCost = calculatePlanCost(plan.config);
+            const singlePrice = plan.config.price || 0;
+            
+            const totalCost = singleCost * ORGS_PER_PLAN;
+            const totalRevenue = singlePrice * ORGS_PER_PLAN;
+            const totalProfit = totalRevenue - totalCost;
+            
+            const margin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
             
             const resPerStaff = 
               (plan.config.maxCourses || 0) + 
@@ -393,7 +398,7 @@ export default function AdminBilling() {
               (plan.config.maxSubjects || 0) + 
               (plan.config.maxQuizizz || 0);
             
-            const totalRes = (plan.config.staff || 0) * resPerStaff;
+            const totalResPerOrg = (plan.config.staff || 0) * resPerStaff;
 
             return (
               <div key={plan.id} className="bg-white rounded-[40px] border border-gray-100 p-8 hover:shadow-2xl hover:shadow-indigo-50 transition-all group overflow-hidden relative">
@@ -401,48 +406,47 @@ export default function AdminBilling() {
                 
                 <div className="relative z-10 space-y-6">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">{plan.name}</h3>
-                    <div className={`px-3 py-1 ${profit > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} rounded-full text-[10px] font-black uppercase tracking-widest`}>
-                      {profit > 0 ? `+${margin}% ROI` : `${margin}% Defitsit`}
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">{plan.name}</h3>
+                      <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">20 ta tashkilot uchun</p>
+                    </div>
+                    <div className={`px-3 py-1 ${totalProfit > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} rounded-full text-[10px] font-black uppercase tracking-widest`}>
+                      {totalProfit > 0 ? `+${margin}% ROI` : `${margin}% Defitsit`}
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex justify-between items-end border-b border-gray-50 pb-3">
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Tarif Narxi</p>
-                        <p className="text-2xl font-black text-slate-900 font-mono">{price.toLocaleString()} <span className="text-xs text-slate-400 font-bold uppercase">UZS</span></p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Jami Tushum</p>
+                        <p className="text-2xl font-black text-slate-900 font-mono">{totalRevenue.toLocaleString()} <span className="text-xs text-slate-400 font-bold uppercase">UZS</span></p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Maks. Xarajat</p>
-                        <p className="text-lg font-black text-red-500 font-mono">-{Math.round(cost).toLocaleString()} <span className="text-[10px]">UZS</span></p>
+                        <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Jami Xarajat</p>
+                        <p className="text-lg font-black text-red-500 font-mono">-{Math.round(totalCost).toLocaleString()} <span className="text-[10px]">UZS</span></p>
                       </div>
                     </div>
 
                     <div className="bg-slate-50 p-4 rounded-2xl space-y-3">
                       <div className="flex justify-between items-center">
-                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Har bir xodim yaratadi</span>
-                         <span className="text-xs font-black text-indigo-600">{resPerStaff} tagacha</span>
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Jami talabalar (+20)</span>
+                         <span className="text-xs font-black text-indigo-600">{(plan.config.students ? plan.config.students * ORGS_PER_PLAN : 0).toLocaleString()} nafar</span>
                       </div>
                       <div className="flex justify-between items-center">
-                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Tizimdagi jami resurslar</span>
-                         <span className="text-xs font-black text-indigo-600">{totalRes} ta</span>
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Jami resurslar (+20)</span>
+                         <span className="text-xs font-black text-indigo-600">{(totalResPerOrg * ORGS_PER_PLAN).toLocaleString()} ta</span>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Talaba faolligi (100%)</span>
-                         <span className="text-xs font-black text-orange-600">{plan.config.students} x {totalRes}</span>
-                      </div>
-                      <p className="text-[9px] font-bold text-center text-slate-400 leading-tight uppercase tracking-tighter">
-                        Xodimlarning barcha resurslarini har bir talaba ishlaydi deb hisoblangan
+                      <p className="text-[9px] font-bold text-center text-slate-400 leading-tight uppercase tracking-tighter pt-2 border-t border-slate-100">
+                        Hamma organizatsiyalar limitlardan 100% foydalanmoqda
                       </p>
                     </div>
                   </div>
 
                   <div className="pt-2">
-                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Sof Foyda (Maksimal yuklamada)</p>
-                    <div className={`p-4 rounded-2xl flex items-center justify-between border ${profit > 0 ? 'bg-emerald-50 border-emerald-100/50' : 'bg-red-50 border-red-100/50'}`}>
-                       <ShieldAlert className={`w-5 h-5 ${profit > 0 ? 'text-emerald-600' : 'text-red-600'}`} />
-                       <span className={`text-xl font-black font-mono ${profit > 0 ? 'text-emerald-700' : 'text-red-700'}`}>{Math.round(profit).toLocaleString()} UZS</span>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Guruh Sof Foydasi (Oylik)</p>
+                    <div className={`p-4 rounded-2xl flex items-center justify-between border ${totalProfit > 0 ? 'bg-emerald-50 border-emerald-100/50' : 'bg-red-50 border-red-100/50'}`}>
+                       <ShieldAlert className={`w-5 h-5 ${totalProfit > 0 ? 'text-emerald-600' : 'text-red-600'}`} />
+                       <span className={`text-xl font-black font-mono ${totalProfit > 0 ? 'text-emerald-700' : 'text-red-700'}`}>{Math.round(totalProfit).toLocaleString()} UZS</span>
                     </div>
                   </div>
                 </div>
