@@ -333,6 +333,7 @@ export default function Tariffs() {
         password: newOrgData.password,
         tariffName: showNewOrgModal.name,
         tariffPrice: showNewOrgModal.price || showNewOrgModal.basePrice || 0,
+        limits: showNewOrgModal.name === 'CORPORATE' ? corpCalc : null,
         paymentType,
         receiptUrl,
         status: 'pending',
@@ -916,10 +917,10 @@ export default function Tariffs() {
               </ul>
             </div>
             <button 
-              onClick={() => user ? setIsCorpModalOpen(true) : setShowNewOrgModal({...configs.corporate, name: 'CORPORATE'})}
+              onClick={() => setIsCorpModalOpen(true)}
               className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-black hover:from-indigo-700 hover:to-indigo-800 shadow-md transition-all uppercase text-xs tracking-wider"
             >
-              {user ? "Moslashtirish & Bog'lanish" : "Tanlangan tarifga ulanish"}
+              Ulanish & Hisoblash
             </button>
           </div>
 
@@ -1308,7 +1309,12 @@ export default function Tariffs() {
                   </button>
                   <button 
                     onClick={() => {
-                      setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()});
+                      const finalPrice = calcCorpPrice();
+                      if (user) {
+                        setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: finalPrice});
+                      } else {
+                        setShowNewOrgModal({...configs.corporate, name: 'CORPORATE', price: finalPrice});
+                      }
                       setIsCorpModalOpen(false);
                     }}
                     className="flex-1 sm:flex-none px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-indigo-100"

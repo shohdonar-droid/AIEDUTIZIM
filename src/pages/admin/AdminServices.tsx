@@ -68,6 +68,20 @@ export default function AdminServices() {
         const uid = data.localId;
         targetUserId = uid;
 
+        // Map limits if provided (CORPORATE calculator)
+        const customLimits: any = {};
+        if (req.limits) {
+          customLimits.studentLimit = Number(req.limits.students) || 0;
+          customLimits.staffLimit = Number(req.limits.staff) || 0;
+          customLimits.courseLimit = Number(req.limits.courses) || 0;
+          customLimits.testLimit = Number(req.limits.tests) || 0;
+          customLimits.examLimit = Number(req.limits.exams) || 0;
+          customLimits.subjectLimit = Number(req.limits.subjects) || 0;
+          customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
+          customLimits.hasAi = !!req.limits.ai;
+          customLimits.hasBot = !!req.limits.bot;
+        }
+
         await setDoc(doc(db, "users", uid), {
           uid: uid,
           displayName: req.userName,
@@ -78,6 +92,7 @@ export default function AdminServices() {
           email: email,
           tariffName: req.tariffName,
           createdAt: serverTimestamp(),
+          ...customLimits
         });
       }
 
@@ -98,20 +113,35 @@ export default function AdminServices() {
           await updateDoc(userRef, updates);
         }
       } else {
-        // Standard org subscription
+        // Standard org subscription or Corporate
+        const customLimits: any = {};
+        if (req.limits) {
+          customLimits.studentLimit = Number(req.limits.students) || 0;
+          customLimits.staffLimit = Number(req.limits.staff) || 0;
+          customLimits.courseLimit = Number(req.limits.courses) || 0;
+          customLimits.testLimit = Number(req.limits.tests) || 0;
+          customLimits.examLimit = Number(req.limits.exams) || 0;
+          customLimits.subjectLimit = Number(req.limits.subjects) || 0;
+          customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
+          customLimits.hasAi = !!req.limits.ai;
+          customLimits.hasBot = !!req.limits.bot;
+        }
+
         await addDoc(collection(db, "active_subscriptions"), {
           userId: targetUserId,
           userName: req.userName,
           tariffName: req.tariffName,
           startDate: serverTimestamp(),
           paymentType: req.paymentType,
-          tariffPrice: req.tariffPrice
+          tariffPrice: req.tariffPrice,
+          limits: req.limits || null
         });
 
         // Also update the user's primary tariff info
         await updateDoc(doc(db, "users", targetUserId), {
           tariffName: req.tariffName,
-          lastTariffUpdate: serverTimestamp()
+          lastTariffUpdate: serverTimestamp(),
+          ...customLimits
         });
       }
 
@@ -233,9 +263,16 @@ export default function AdminServices() {
                   </td>
                   <td className="px-6 py-4 font-bold text-gray-900 text-sm">{req.userName}</td>
                   <td className="px-6 py-4">
-                    <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded uppercase tracking-tighter">
-                      {req.tariffName}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded uppercase tracking-tighter w-fit">
+                        {req.tariffName}
+                      </span>
+                      {req.limits && (
+                        <div className="text-[9px] font-bold text-slate-400 leading-tight">
+                          {req.limits.students} talaba / {req.limits.staff} xodim / {req.limits.courses} kurs...
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-black font-mono whitespace-nowrap">
                     {(req.tariffPrice || 0).toLocaleString()} UZS
