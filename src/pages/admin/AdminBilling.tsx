@@ -442,6 +442,54 @@ export default function AdminBilling() {
               </div>
             );
           })}
+
+          {/* Unit Economics Analysis Card */}
+          <div className="bg-slate-900 text-white p-8 rounded-[40px] border border-slate-800 shadow-2xl overflow-hidden relative group">
+             <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full" />
+             <div className="relative z-10 h-full flex flex-col justify-between">
+                <div className="space-y-6">
+                   <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-indigo-500 rounded-lg">
+                         <Zap className="w-5 h-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-black uppercase tracking-tight">1 ta Resurs Xarajati</h3>
+                   </div>
+                   
+                   <div className="space-y-4">
+                      <div className="flex justify-between items-center pb-3 border-b border-white/10">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Yaratish & Saqlash</span>
+                         <span className="text-sm font-black font-mono text-indigo-100">{systemCosts.perResource} UZS</span>
+                      </div>
+                      <div className="flex justify-between items-center pb-3 border-b border-white/10">
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">1 ta talaba faolligi</span>
+                         <span className="text-sm font-black font-mono text-indigo-100">{systemCosts.interactionUnit} UZS</span>
+                      </div>
+                      
+                      <div className="pt-4 space-y-2">
+                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Tariflar bo'yicha tahlil (1ta resurs uchun):</p>
+                         <div className="grid grid-cols-1 gap-2">
+                            <div className="flex justify-between items-center px-4 py-2.5 bg-white/5 rounded-xl border border-white/5">
+                               <span className="text-[9px] font-bold uppercase">START ({tariffsConfig.start.students} talaba)</span>
+                               <span className="text-xs font-black text-indigo-300">{(systemCosts.perResource + ((tariffsConfig.start.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
+                            </div>
+                            <div className="flex justify-between items-center px-4 py-2.5 bg-white/5 rounded-xl border border-white/5">
+                               <span className="text-[9px] font-bold uppercase">STANDARD ({tariffsConfig.standard.students} talaba)</span>
+                               <span className="text-xs font-black text-indigo-300">{(systemCosts.perResource + ((tariffsConfig.standard.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
+                            </div>
+                            <div className="flex justify-between items-center px-4 py-2.5 bg-white/5 rounded-xl border border-white/5">
+                               <span className="text-[9px] font-bold uppercase">PROFESSIONAL ({tariffsConfig.professional.students} talaba)</span>
+                               <span className="text-xs font-black text-indigo-300">{(systemCosts.perResource + ((tariffsConfig.professional.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
+                            </div>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+                
+                <p className="mt-8 text-[9px] text-slate-500 leading-relaxed italic uppercase tracking-tighter">
+                   * Resurs xarajati = Saqlash + (Talabalar soni x Faollik birligi). Talaba vazifani ishlaganda yuzaga keladigan CPU/Trafik yuklamasi hisobga olingan.
+                </p>
+             </div>
+          </div>
         </div>
         
         <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex gap-4 items-center">
