@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, User, FileText, Library, CheckCircle2, MessageSquare, LogOut, ChevronRight, GraduationCap, Home, BrainCircuit, BookOpen, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, User, FileText, Library, CheckCircle2, MessageSquare, LogOut, ChevronRight, GraduationCap, Home, BrainCircuit, BookOpen, Building2, Phone, Award } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../../hooks/useAuth';
 import TeacherProfile from './TeacherProfile';
@@ -14,6 +14,21 @@ import TeacherOverview from './TeacherOverview';
 import TeacherSubjects from '../../components/SubjectsManager';
 import SubjectRead from '../SubjectRead';
 import TeacherQuizizz from './TeacherQuizizz';
+
+// Mustaqil O'qituvchi Independent components
+import IndependentOverview from './independent/IndependentOverview';
+import IndependentDepartments from './independent/IndependentDepartments';
+import IndependentGroups from './independent/IndependentGroups';
+import IndependentStudents from './independent/IndependentStudents';
+import IndependentSubjects from './independent/IndependentSubjects';
+import IndependentTests from './independent/IndependentTests';
+import IndependentQuizizz from './independent/IndependentQuizizz';
+import IndependentExams from './independent/IndependentExams';
+import IndependentCertificates from './independent/IndependentCertificates';
+import IndependentAttendance from './independent/IndependentAttendance';
+import IndependentJurnal from './independent/IndependentJurnal';
+import IndependentLimits from './independent/IndependentLimits';
+import IndependentContact from './independent/IndependentContact';
 
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -42,7 +57,29 @@ export default function TeacherDashboard() {
     return unsub;
   }, [user]);
 
-  const menuStructure = [
+  const isIndependent = (user?.role as string) === 'mustaqil_o_qituvchi';
+
+  const menuStructure = isIndependent ? [
+    { id: 'general', name: 'Asosiy', path: '/teacher', icon: LayoutDashboard, exact: true },
+    { id: 'profile', name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
+    { id: 'departments', name: 'Yo\'nalishlar', path: '/teacher/departments', icon: Building2, exact: true },
+    { id: 'groups', name: 'Guruhlar', path: '/teacher/groups', icon: Users, exact: true },
+    { id: 'students', name: 'Talabalar', path: '/teacher/students', icon: GraduationCap, exact: true },
+    { id: 'resources', name: 'Ta\'lim resurslari', icon: BookOpen, subItems: [
+        { name: 'Mavzular', path: '/teacher/subjects' },
+        { name: 'Testlar', path: '/teacher/tests' },
+        { name: 'Quizizz', path: '/teacher/quizizz' },
+        { name: 'Imtihonlar', path: '/teacher/exams' },
+        { name: 'Sertifikatlar', path: '/teacher/certificates' }
+    ]},
+    { id: 'monitoring', name: 'Monitoring', icon: FileText, subItems: [
+        { name: 'Davomat', path: '/teacher/attendance' },
+        { name: 'Jurnal', path: '/teacher/jurnal' },
+    ]},
+    { id: 'limits', name: 'Limitlar', path: '/teacher/limits', icon: Award, exact: true },
+    { id: 'chat', name: 'Chat', path: '/teacher/chat', icon: MessageSquare, badge: unreadCount },
+    { id: 'contact', name: 'Bog\'lanish', path: '/teacher/contact', icon: Phone, exact: true }
+  ] : [
     { id: 'general', name: 'Umumiy', path: '/teacher', icon: LayoutDashboard, exact: true },
     { id: 'profile', name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
     { id: 'academic', name: 'Akademik tuzilma', path: '/teacher/academic', icon: Building2, hidden: user?.role === 'staff' },
@@ -179,7 +216,7 @@ export default function TeacherDashboard() {
                 {user?.displayName}
               </h2>
               <p className="text-[8px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-0.5">
-                {user?.role === 'staff' ? 'Xodim' : (user?.role === 'admin' ? 'Administrator' : 'Tashkilot')}
+                {user?.role === 'staff' ? 'Xodim' : (user?.role === 'admin' ? 'Administrator' : ((user?.role as string) === 'mustaqil_o_qituvchi' ? "Mustaqil O'qituvchi" : 'Tashkilot'))}
               </p>
             </motion.div>
           )}
@@ -250,19 +287,41 @@ export default function TeacherDashboard() {
       <main className="flex-1 p-4 md:p-8 md:pl-10 w-full overflow-hidden flex flex-col items-center">
         <div className="w-full max-w-[1200px]">
           <Routes>
-            <Route path="/" element={<TeacherOverview />} />
-            <Route path="/profile" element={<TeacherProfile />} />
-            <Route path="/academic" element={<AdminAcademic />} />
-            <Route path="/users/:tab" element={<AdminUsers />} />
-            <Route path="/departments" element={<TeacherDepartments />} />
-            <Route path="/courses" element={<TeacherCourses />} />
-            <Route path="/tests" element={<TeacherTests />} />
-            <Route path="/subjects" element={<TeacherSubjects />} />
-            <Route path="/subjects/read/:id" element={<SubjectRead />} />
-            <Route path="/jurnal" element={<TeacherJurnal />} />
-            <Route path="/quizizz" element={<TeacherQuizizz />} />
-            <Route path="/certificates" element={<TeacherCertificates />} />
-            <Route path="/chat" element={<TeacherChat />} />
+            {isIndependent ? (
+              <>
+                <Route path="/" element={<IndependentOverview />} />
+                <Route path="/profile" element={<TeacherProfile />} />
+                <Route path="/departments" element={<IndependentDepartments />} />
+                <Route path="/groups" element={<IndependentGroups />} />
+                <Route path="/students" element={<IndependentStudents />} />
+                <Route path="/subjects" element={<IndependentSubjects />} />
+                <Route path="/tests" element={<IndependentTests />} />
+                <Route path="/quizizz" element={<IndependentQuizizz />} />
+                <Route path="/exams" element={<IndependentExams />} />
+                <Route path="/certificates" element={<IndependentCertificates />} />
+                <Route path="/attendance" element={<IndependentAttendance />} />
+                <Route path="/jurnal" element={<IndependentJurnal />} />
+                <Route path="/limits" element={<IndependentLimits />} />
+                <Route path="/chat" element={<TeacherChat />} />
+                <Route path="/contact" element={<IndependentContact />} />
+              </>
+            ) : (
+              <>
+                <Route path="/" element={<TeacherOverview />} />
+                <Route path="/profile" element={<TeacherProfile />} />
+                <Route path="/academic" element={<AdminAcademic />} />
+                <Route path="/users/:tab" element={<AdminUsers />} />
+                <Route path="/departments" element={<TeacherDepartments />} />
+                <Route path="/courses" element={<TeacherCourses />} />
+                <Route path="/tests" element={<TeacherTests />} />
+                <Route path="/subjects" element={<TeacherSubjects />} />
+                <Route path="/subjects/read/:id" element={<SubjectRead />} />
+                <Route path="/jurnal" element={<TeacherJurnal />} />
+                <Route path="/quizizz" element={<TeacherQuizizz />} />
+                <Route path="/certificates" element={<TeacherCertificates />} />
+                <Route path="/chat" element={<TeacherChat />} />
+              </>
+            )}
           </Routes>
         </div>
       </main>

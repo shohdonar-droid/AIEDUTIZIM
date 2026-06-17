@@ -240,7 +240,7 @@ export default function Navbar() {
                     ID
                   </Link>
                   <Link
-                    to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' ? '/teacher' : '/student')}
+                    to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' || (user.role as string) === 'mustaqil_o_qituvchi' ? '/teacher' : '/student')}
                     className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all border ${
                       isWhiteText 
                         ? 'bg-white/10 text-white border-white/20 hover:bg-white/20' 
@@ -375,7 +375,7 @@ export default function Navbar() {
                 {user ? (
                   <>
                     <Link
-                      to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' ? '/teacher' : '/student')}
+                      to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' || (user.role as string) === 'mustaqil_o_qituvchi' ? '/teacher' : '/student')}
                       onClick={() => setIsOpen(false)}
                       className={`block px-4 py-3 text-base font-medium flex items-center gap-2 ${
                         isWhiteText ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50'

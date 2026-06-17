@@ -29,39 +29,46 @@ export default function Register() {
       
       
       if (!userDoc.exists()) {
-        let uyOrgId = '';
-        const q = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
-        const uySnap = await getDocs(q);
-        if (!uySnap.empty) {
-          uyOrgId = uySnap.docs[0].id;
-        } else {
-          try {
-            const orgRef = doc(collection(db, 'users'));
-            await setDoc(orgRef, {
-               uid: orgRef.id,
-               displayName: 'UY',
-               role: 'teacher',
-               createdAt: serverTimestamp(),
-               login: 'uy_admin',
-               password: 'uy_password',
-               maxStudents: 99999,
-               teachersCount: 99999,
-               status: 'active'
-            });
-            uyOrgId = orgRef.id;
-          } catch(e) { console.error(e) }
-        }
+        const qEmail = query(collection(db, 'users'), where('email', '==', user.email));
+        const emailSnap = await getDocs(qEmail);
 
-        // Create new staff
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          displayName: user.displayName || 'Xodim',
-          email: user.email,
-          role: 'staff',
-          teacherId: uyOrgId,
-          createdAt: serverTimestamp(),
-          spentBalls: 0
-        });
+        if (emailSnap.empty) {
+          // New Independent Teacher / Mustaqil O'qituvchi
+          await setDoc(userDocRef, {
+            uid: user.uid,
+            displayName: user.displayName || "Mustaqil O'qituvchi",
+            email: user.email,
+            role: 'mustaqil_o_qituvchi',
+            createdAt: serverTimestamp(),
+            
+            // Boshlang'ich limitlar
+            limit_departments: 1,
+            limit_groups: 1,
+            limit_students: 5,
+            limit_subjects: 2,
+            limit_tests: 2,
+            limit_quizizz: 1,
+            limit_exams: 1,
+            limit_courses: 0,
+            limit_certificates: 5,
+            
+            // Har bir resurs miqdori qoidalari
+            limit_tests_per_subject: 10,
+            limit_questions_per_test: 10,
+            limit_questions_per_quizizz: 5,
+            limit_questions_per_exam: 10,
+            
+            total_spent: 0,
+            status: 'active'
+          });
+        } else {
+          // Linking to pre-created student or staff record
+          const existingUserDoc = emailSnap.docs[0];
+          await setDoc(userDocRef, {
+            ...existingUserDoc.data(),
+            uid: user.uid
+          });
+        }
       } else {
          const existingData = userDoc.data();
          if (existingData?.role === 'staff' && !existingData.teacherId) {
@@ -93,9 +100,9 @@ export default function Register() {
       } catch (e) {}
 
       await refreshUser();
-      const finalRole = userDoc.exists() ? userDoc.data()?.role : 'staff';
+      const finalRole = userDoc.exists() ? userDoc.data()?.role : 'mustaqil_o_qituvchi';
       if (finalRole === 'admin') navigate('/admin');
-      else if (finalRole === 'teacher' || finalRole === 'staff') navigate('/teacher');
+      else if (finalRole === 'teacher' || finalRole === 'staff' || finalRole === 'mustaqil_o_qituvchi') navigate('/teacher');
       else navigate('/student');
       
     } catch (err: any) {

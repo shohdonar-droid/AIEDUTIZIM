@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'subadmin' | 'student' | 'teacher' | 'staff';
+export type UserRole = 'admin' | 'subadmin' | 'student' | 'teacher' | 'staff' | 'mustaqil_o_qituvchi';
 
 export interface Faculty {
   id: string;
@@ -65,6 +65,17 @@ export interface UserProfile {
   isAnonymousContact?: boolean;
   billingHistory?: any[];
   isImpersonated?: boolean;
+  limit_departments?: number;
+  limit_groups?: number;
+  limit_students?: number;
+  limit_subjects?: number;
+  limit_tests?: number;
+  limit_quizizz?: number;
+  limit_questions_per_quizizz?: number;
+  limit_questions_per_test?: number;
+  limit_exams?: number;
+  limit_questions_per_exam?: number;
+  limit_certificates?: number;
   createdAt: any;
 }
 

@@ -30,7 +30,9 @@ import TeacherDashboard from './pages/teacher/TeacherDashboard';
 
 import Quizizz from './pages/Quizizz';
 
-function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 'admin' | 'subadmin' | 'student' | 'teacher' | 'staff' }) {
+import { UserRole } from './types';
+
+function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: UserRole }) {
   const { user, loading } = useAuth();
 
   if (loading) return (
@@ -42,7 +44,7 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 
   if (!user) return <Navigate to="/login" />;
   if (role) {
     let allowed = false;
-    if (role === 'teacher' && (user.role === 'teacher' || user.role === 'staff')) {
+    if (role === 'teacher' && (user.role === 'teacher' || user.role === 'staff' || user.role === 'mustaqil_o_qituvchi')) {
       allowed = true;
     } else if (role === 'admin' && (user.role === 'admin' || user.role === 'subadmin')) {
       allowed = true;
