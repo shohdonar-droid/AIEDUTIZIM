@@ -751,6 +751,10 @@ export default function Tariffs() {
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.staff ?? 2} ta-xodimlar
                 </li>
+                <div className="mx-7 py-1.5 px-3 bg-orange-50 rounded-lg border border-orange-100/50 flex items-center gap-2 mb-2">
+                   <Users className="w-3.5 h-3.5 text-orange-600" />
+                   <span className="text-[9px] font-black text-orange-700 uppercase tracking-tighter">Sig'imi: 100-200 nafar talaba</span>
+                </div>
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxCourses ?? 3} ta kurs
                 </li>
@@ -804,6 +808,10 @@ export default function Tariffs() {
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.staff ?? 5} ta-xodimlar
                 </li>
+                <div className="mx-7 py-1.5 px-3 bg-blue-50 rounded-lg border border-blue-100/50 flex items-center gap-2 mb-2">
+                   <Users className="w-3.5 h-3.5 text-blue-600" />
+                   <span className="text-[9px] font-black text-blue-700 uppercase tracking-tighter">Sig'imi: 250-500 nafar talaba</span>
+                </div>
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxCourses ?? 10} ta kurs
                 </li>
@@ -856,6 +864,10 @@ export default function Tariffs() {
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.staff ?? 20} ta-xodimlar
                 </li>
+                <div className="mx-7 py-1.5 px-3 bg-amber-50 rounded-lg border border-amber-100/50 flex items-center gap-2 mb-2">
+                   <Users className="w-3.5 h-3.5 text-amber-600" />
+                   <span className="text-[9px] font-black text-amber-700 uppercase tracking-tighter">Sig'imi: 1000-2000 nafar talaba</span>
+                </div>
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxCourses ?? 50} ta kurs
                 </li>

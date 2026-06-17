@@ -309,6 +309,120 @@ export default function AdminBilling() {
     return stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
+  // Tariff economics / Cost model defaults
+  const systemCosts = {
+    perStudent: 600,  // Monthly infrastructure/db per active student
+    perStaff: 2500,   // Management interface cost
+    perResource: 500, // Storage/CDN for files/tests
+    aiFixed: 50000,   // API overhead per org
+    botFixed: 30000,  // Polling/Server cost per bot
+  };
+
+  const calculatePlanCost = (tariff: TariffConfig) => {
+    const studentCount = tariff.students || 0;
+    const staffCount = tariff.staff || 0;
+    const resources = (tariff.maxCourses || 0) + (tariff.maxTests || 0) + (tariff.maxExams || 0);
+    
+    let cost = (studentCount * systemCosts.perStudent) + 
+               (staffCount * systemCosts.perStaff) + 
+               (resources * systemCosts.perResource);
+    
+    if (tariff.hasAI) cost += systemCosts.aiFixed;
+    if (tariff.hasBot) cost += systemCosts.botFixed;
+    
+    return cost;
+  };
+
+  const renderEconomics = () => {
+    const plans = [
+      { id: 'start', name: 'Start', config: tariffsConfig.start },
+      { id: 'standard', name: 'Standard', config: tariffsConfig.standard },
+      { id: 'professional', name: 'Professional', config: tariffsConfig.professional },
+    ];
+
+    return (
+      <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-100">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tariflar Iqtisodiyoti & Xarajatlar</h2>
+            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Tizim harajatlari va sof foyda tahlili</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {plans.map((plan) => {
+            const cost = calculatePlanCost(plan.config);
+            const price = plan.config.price || 0;
+            const profit = price - cost;
+            const margin = ((profit / price) * 100).toFixed(1);
+            
+            // 1 staff = 50-100 students efficiency
+            const capacityMin = (plan.config.staff || 0) * 50;
+            const capacityMax = (plan.config.staff || 0) * 100;
+            const currentRatio = (plan.config.students || 0);
+            const efficiency = Math.round((currentRatio / capacityMax) * 100);
+
+            return (
+              <div key={plan.id} className="bg-white rounded-[40px] border border-gray-100 p-8 hover:shadow-2xl hover:shadow-indigo-50 transition-all group overflow-hidden relative">
+                {/* Background Decor */}
+                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-gray-50 rounded-full opacity-50 group-hover:scale-150 transition-transform" />
+                
+                <div className="relative z-10 space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">{plan.name}</h3>
+                    <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                      +{margin}% Foyda
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-end border-b border-gray-50 pb-3">
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Sotuv Narxi</p>
+                        <p className="text-2xl font-black text-slate-900 font-mono">{price.toLocaleString()} <span className="text-xs">uzs</span></p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-red-400 uppercase tracking-widest leading-none mb-1">Xarajat (EST)</p>
+                        <p className="text-lg font-black text-red-500 font-mono">-{cost.toLocaleString()} <span className="text-[10px]">uzs</span></p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Xodim Sig'imi (1:100)</span>
+                         <span className="text-[10px] font-black text-indigo-600">{efficiency}% Band</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-1000 ${efficiency > 80 ? 'bg-orange-500' : 'bg-emerald-500'}`} 
+                          style={{ width: `${Math.min(100, efficiency)}%` }} 
+                        />
+                      </div>
+                      <p className="text-[9px] font-bold text-gray-400 text-center">
+                         Ushbu reja {capacityMin}-{capacityMax} nafar talabaga xizmat ko'rsata oladi.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Kutilayotgan Sof Foyda (Har bir reja uchun)</p>
+                    <div className="bg-emerald-50 p-4 rounded-2xl flex items-center justify-between border border-emerald-100/50">
+                       <DollarSign className="w-5 h-5 text-emerald-600" />
+                       <span className="text-xl font-black text-emerald-700 font-mono">{(profit).toLocaleString()} UZS</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [viewingHistoryUser, setViewingHistoryUser] =
     useState<UserProfile | null>(null);
@@ -691,6 +805,8 @@ export default function AdminBilling() {
            </div>
         </div>
       </div>
+
+      {renderEconomics()}
 
       {/* Tariflar Section */}
       <div className="bg-white p-10 md:p-16 rounded-[50px] border border-gray-100 shadow-sm space-y-16">
