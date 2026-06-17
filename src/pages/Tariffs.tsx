@@ -695,166 +695,163 @@ export default function Tariffs() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
 
           {/* 👑 CORPORATE CALCULATOR */}
-          <div className="bg-slate-900 text-white rounded-[40px] p-8 md:p-10 shadow-2xl relative overflow-hidden group border-4 border-slate-800">
-             <div className="absolute top-0 right-0 p-8 opacity-5 rotate-12 group-hover:scale-105 transition-transform">
-                <Calculator className="w-48 h-48" />
-             </div>
+          <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-sm relative overflow-hidden group border border-slate-200">
              
-             <div className="relative z-10 space-y-8">
-                <div className="flex items-center gap-4">
-                   <span className="text-4xl">👑</span>
+             <div className="relative z-10 space-y-6">
+                <div className="flex items-center gap-3.5">
+                   <span className="text-2xl">👑</span>
                    <div>
-                      <h3 className="text-2xl font-black">CORPORATE</h3>
-                      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Istagan miqdordagi limitlarni kiriting</p>
+                      <h3 className="text-xl font-bold text-slate-900">CORPORATE</h3>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Istagan miqdordagi limitlarni kiriting</p>
                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                        Talabalar sonini kiriting ({configs.corporate.perStudent ?? 1000} soʻm/ta)
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                        Talabalar soni ({configs.corporate.perStudent ?? 1000} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={corpCalc.students}
                           onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-slate-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                        Xodimlar sonini kiriting ({configs.corporate.perStaff ?? 10000} soʻm/ta)
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                        Xodimlar soni ({configs.corporate.perStaff ?? 10000} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={corpCalc.staff}
                           onChange={(e) => setCorpCalc({...corpCalc, staff: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-slate-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                        Kurslar sonini kiriting ({configs.corporate.perCourse ?? 40000} soʻm/ta)
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                        Kurslar soni ({configs.corporate.perCourse ?? 40000} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={corpCalc.courses}
                           onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-slate-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                        Testlar sonini kiriting ({configs.corporate.perTest ?? 2000} soʻm/ta)
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                        Testlar soni ({configs.corporate.perTest ?? 2000} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={corpCalc.tests}
                           onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-slate-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                        Imtihonlar sonini kiriting ({configs.corporate.perExam ?? 15000} soʻm/ta)
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                        Imtihonlar soni ({configs.corporate.perExam ?? 15000} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={corpCalc.exams}
                           onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-slate-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                        Mavzular sonini kiriting ({configs.corporate.perSubject ?? 5000} soʻm/ta)
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                        Mavzular soni ({configs.corporate.perSubject ?? 5000} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={corpCalc.subjects}
                           onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-slate-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
-                   <div className="space-y-2 md:col-span-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-                        Quizizzlar sonini kiriting ({configs.corporate.perQuizizz ?? 5000} soʻm/ta)
+                   <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
+                        Quizizzlar soni ({configs.corporate.perQuizizz ?? 5000} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-slate-800 rounded-2xl border-2 border-slate-700/60 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={corpCalc.quizizz}
                           onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-3 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-slate-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
                    {/* AI module */}
-                   <div className="flex items-center justify-between p-4 bg-slate-800/40 rounded-2xl border border-slate-700/50 hover:bg-slate-800 transition-all">
-                      <span className="text-xs font-bold text-slate-200">AI Test Generator (+{(configs.corporate.aiPrice ?? 300000).toLocaleString()} sum/oy)</span>
+                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
+                      <span className="text-xs font-bold text-slate-700">AI Test Generator (+{(configs.corporate.aiPrice ?? 300000).toLocaleString()} sum/oy)</span>
                       <input 
                         type="checkbox" 
                         checked={corpCalc.ai}
                         onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
-                        className="w-6 h-6 rounded-lg accent-blue-500 shrink-0 cursor-pointer" 
+                        className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
                       />
                    </div>
 
                    {/* Bot module */}
-                   <div className="flex items-center justify-between p-4 bg-slate-800/40 rounded-2xl border border-slate-700/50 hover:bg-slate-800 transition-all">
-                      <span className="text-xs font-bold text-slate-200">Shaxsiy Telegram Bot (+{(configs.corporate.botPrice ?? 200000).toLocaleString()} sum/oy)</span>
+                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
+                      <span className="text-xs font-bold text-slate-700">Shaxsiy Telegram Bot (+{(configs.corporate.botPrice ?? 200000).toLocaleString()} sum/oy)</span>
                       <input 
                         type="checkbox" 
                         checked={corpCalc.bot}
                         onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
-                        className="w-6 h-6 rounded-lg accent-blue-500 shrink-0 cursor-pointer" 
+                        className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
                       />
                    </div>
                 </div>
 
-                <div className="bg-slate-850 p-6 rounded-3xl border border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-4">
                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Jami oylik to'lov:</p>
-                      <div className="text-3xl sm:text-4xl font-black text-green-400 font-mono mt-1">
-                        {calcCorpPrice().toLocaleString()} <span className="text-sm font-black text-slate-300">sum/oy</span>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Jami oylik to'lov:</p>
+                      <div className="text-2xl sm:text-3xl font-mono font-black text-slate-800 mt-0.5">
+                        {calcCorpPrice().toLocaleString()} <span className="text-xs font-bold text-slate-400">sum/oy</span>
                       </div>
                    </div>
                    <button 
                      onClick={() => setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()})}
-                     className="w-full md:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all uppercase text-xs tracking-widest shadow-lg"
+                     className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-indigo-100"
                    >
                      Shartnoma Tuzish
                    </button>
@@ -863,169 +860,166 @@ export default function Tariffs() {
           </div>
 
           {/* ➕ EXTRA LIMITS CALCULATOR */}
-          <div className="bg-emerald-950 text-white rounded-[40px] p-8 md:p-10 shadow-2xl relative overflow-hidden group border-4 border-emerald-900">
-             <div className="absolute top-0 right-0 p-8 opacity-5 -rotate-12 group-hover:scale-105 transition-transform">
-                <PlusCircle className="w-48 h-48" />
-             </div>
+          <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-sm relative overflow-hidden group border border-slate-200">
              
-             <div className="relative z-10 space-y-8">
-                <div className="flex items-center gap-4">
-                   <span className="text-4xl">➕</span>
+             <div className="relative z-10 space-y-6">
+                <div className="flex items-center gap-3.5">
+                   <span className="text-2xl">➕</span>
                    <div>
-                      <h3 className="text-2xl font-black">EXTRA LIMITS</h3>
-                      <p className="text-emerald-400 text-xs font-bold uppercase tracking-widest">Joriy oyingizga qoʻshimcha limit sotib oling</p>
+                      <h3 className="text-xl font-bold text-slate-900">EXTRA LIMITS</h3>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Joriy oyingizga qoʻshimcha limit sotib oling</p>
                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
                         Qoʻshimcha talabalar ({configs.extra.perStudent ?? 1500} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-emerald-900 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={extraCalc.students}
                           onChange={(e) => setExtraCalc({...extraCalc, students: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-emerald-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
                         Qoʻshimcha xodimi ({configs.extra.perStaff ?? 15000} soʻm/ta)
                       </label>
-                      <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                      <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
                         <input 
                           type="number" 
                           min="0"
                           value={extraCalc.staff}
                           onChange={(e) => setExtraCalc({...extraCalc, staff: Math.max(0, Number(e.target.value))})}
-                          className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                          className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                         />
-                        <span className="text-xs font-black text-emerald-400">ta</span>
+                        <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                       </div>
                    </div>
 
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
                          Qoʻshimcha kurslar ({(configs.extra.perCourse ?? 50000).toLocaleString()} soʻm/ta)
                        </label>
-                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
                          <input 
                            type="number" 
                            min="0"
                            value={extraCalc.courses}
                            onChange={(e) => setExtraCalc({...extraCalc, courses: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                          />
-                         <span className="text-xs font-black text-emerald-400">ta</span>
+                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
                          Qoʻshimcha testlar ({(configs.extra.perTest ?? 3000).toLocaleString()} soʻm/ta)
                        </label>
-                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
                          <input 
                            type="number" 
                            min="0"
                            value={extraCalc.tests}
                            onChange={(e) => setExtraCalc({...extraCalc, tests: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                          />
-                         <span className="text-xs font-black text-emerald-400">ta</span>
+                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
                          Qoʻshimcha imtihonlar ({(configs.extra.perExam ?? 20000).toLocaleString()} soʻm/ta)
                        </label>
-                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
                          <input 
                            type="number" 
                            min="0"
                            value={extraCalc.exams}
                            onChange={(e) => setExtraCalc({...extraCalc, exams: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                          />
-                         <span className="text-xs font-black text-emerald-400">ta</span>
+                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
                          Qoʻshimcha mavzular ({(configs.extra.perSubject ?? 6000).toLocaleString()} soʻm/ta)
                        </label>
-                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
                          <input 
                            type="number" 
                            min="0"
                            value={extraCalc.subjects}
                            onChange={(e) => setExtraCalc({...extraCalc, subjects: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                          />
-                         <span className="text-xs font-black text-emerald-400">ta</span>
+                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                        </div>
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                       <label className="text-[10px] font-black text-emerald-300 uppercase tracking-widest pl-1">
+                    <div className="space-y-1.5 md:col-span-2">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
                          Qoʻshimcha quizizzlar ({(configs.extra.perQuizizz ?? 6000).toLocaleString()} soʻm/ta)
                        </label>
-                       <div className="flex items-center bg-emerald-950 rounded-2xl border-2 border-emerald-800 overflow-hidden pr-3 focus-within:border-white">
+                       <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
                          <input 
                            type="number" 
                            min="0"
                            value={extraCalc.quizizz}
                            onChange={(e) => setExtraCalc({...extraCalc, quizizz: Math.max(0, Number(e.target.value))})}
-                           className="w-full px-4 py-3 bg-transparent outline-none font-black text-lg text-white"
+                           className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
                          />
-                         <span className="text-xs font-black text-emerald-400">ta</span>
+                         <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
                        </div>
                     </div>
 
-                   <div className="flex items-center justify-between p-4 bg-emerald-900/40 rounded-2xl border border-emerald-800/50 hover:bg-emerald-900 transition-all">
-                      <span className="text-xs font-bold text-emerald-200">AI / Darsliklar qoʻshimcha (+{(configs.extra.aiPrice ?? 350000).toLocaleString()} sum/oy)</span>
+                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
+                      <span className="text-xs font-bold text-slate-700">AI / Darsliklar qoʻshimcha (+{(configs.extra.aiPrice ?? 350000).toLocaleString()} sum/oy)</span>
                       <input 
                         type="checkbox" 
                         checked={extraCalc.ai}
                         onChange={(e) => setExtraCalc({...extraCalc, ai: e.target.checked})}
-                        className="w-6 h-6 rounded-lg accent-green-500 shrink-0 cursor-pointer" 
+                        className="w-5 h-5 rounded-md accent-emerald-600 shrink-0 cursor-pointer" 
                       />
                    </div>
 
-                   <div className="flex items-center justify-between p-4 bg-emerald-900/40 rounded-2xl border border-emerald-800/50 hover:bg-emerald-900 transition-all">
-                      <span className="text-xs font-bold text-emerald-200">Xabar yuborish / Bot (+{(configs.extra.botPrice ?? 250000).toLocaleString()} sum/oy)</span>
+                   <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
+                      <span className="text-xs font-bold text-slate-700">Xabar yuborish / Bot (+{(configs.extra.botPrice ?? 250000).toLocaleString()} sum/oy)</span>
                       <input 
                         type="checkbox" 
                         checked={extraCalc.bot}
                         onChange={(e) => setExtraCalc({...extraCalc, bot: e.target.checked})}
-                        className="w-6 h-6 rounded-lg accent-green-500 shrink-0 cursor-pointer" 
+                        className="w-5 h-5 rounded-md accent-emerald-600 shrink-0 cursor-pointer" 
                       />
                    </div>
                 </div>
 
-                <div className="bg-emerald-900/50 p-6 rounded-3xl border border-emerald-800 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-4">
                    <div>
-                      <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest pl-1">Bir martalik jami summa:</p>
-                      <div className="text-3xl sm:text-4xl font-black text-green-400 font-mono mt-1">
-                        {calcExtraPrice().toLocaleString()} <span className="text-sm font-black text-emerald-300">sum</span>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Bir martalik jami summa:</p>
+                      <div className="text-2xl sm:text-3xl font-mono font-black text-emerald-600 mt-0.5">
+                        {calcExtraPrice().toLocaleString()} <span className="text-xs font-bold text-slate-400">sum</span>
                       </div>
                    </div>
                    <button 
                      onClick={() => setSelectedTariff({...configs.extra, name: 'EXTRA', price: calcExtraPrice()})}
-                     className="w-full md:w-auto px-8 py-4 bg-white text-emerald-950 font-black rounded-xl transition-all uppercase text-xs tracking-widest shadow-lg"
+                     className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-emerald-100"
                    >
                      Faollashtirish
                    </button>
                 </div>
-                <p className="text-[10px] font-medium text-emerald-400 leading-normal italic text-center">
+                <p className="text-[9px] font-semibold text-slate-400 leading-normal italic text-center">
                    * Diqqat: Qoʻshimcha sotib olinadigan limitlar xarid qilingan oyda amal qiladi va keyingi hisob-kitob davrida ulangan tarif oʻzining standart qiymatlariga qaytadi.
                 </p>
              </div>

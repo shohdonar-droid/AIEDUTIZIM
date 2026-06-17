@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer, enableMultiTabIndexedDbPersistence, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfigRaw from '../../firebase-applet-config.json';
 
@@ -20,6 +20,21 @@ export const db = initializeFirestore(app, {
   ssl: true,
   experimentalLongPollingOptions: { timeoutSeconds: 30 },
 }, firebaseConfigRaw.firestoreDatabaseId);
+
+// Enable offline persistence immediately to prevent blocking and error screens on network delay
+if (typeof window !== 'undefined') {
+  enableMultiTabIndexedDbPersistence(db)
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        // Multiple tabs open, enable in single tab mode
+        return enableIndexedDbPersistence(db);
+      }
+    })
+    .catch((err) => {
+      console.warn('Firestore offline persistence is inactive or unsupported in this browser environment:', err.message || err);
+    });
+}
+
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 

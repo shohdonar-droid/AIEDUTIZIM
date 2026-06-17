@@ -6,7 +6,6 @@ import { ArrowLeft, FileText, Download, Lock, Check, Layout, ExternalLink } from
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { makeDirectImageUrl } from '../lib/helpers';
-import InteractivePresentation from '../components/InteractivePresentation';
 
 const systemAboutSection: InfoSection = {
   id: 'system-about',
@@ -74,7 +73,8 @@ export default function InfoDetail() {
       }
 
       const sections = heroData.infoSections || [];
-      const updatedSections = [systemAboutSection, ...sections];
+      const hasSystemAbout = sections.some(s => s.id === 'system-about');
+      const updatedSections = hasSystemAbout ? sections : [systemAboutSection, ...sections];
       const updatedHero = {
         ...heroData,
         infoSections: updatedSections
@@ -195,10 +195,6 @@ export default function InfoDetail() {
                   <div className="prose prose-2xl max-w-none text-gray-900 font-bold whitespace-pre-wrap leading-[1.6]">
                     {currentSection.content}
                   </div>
-
-                  {currentSection.id === 'system-about' && (
-                    <InteractivePresentation />
-                  )}
 
                   {currentSection.images && currentSection.images.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
