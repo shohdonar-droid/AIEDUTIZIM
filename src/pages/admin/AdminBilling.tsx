@@ -325,19 +325,34 @@ export default function AdminBilling() {
 
   // Tariff economics / Cost model under Paid Monthly Subscriptions (Firebase Blaze & Railway Pro)
   const systemCosts = {
-    fixedMonthlyBudget: 450000,    // Oylik jami o'zgarmas xarajat (Railway + Firebase Pro ulushi)
-    perStudent: 5,                // Har bir faol talaba uchun DB tranzaksiyalari (marginal cost)
-    perStaff: 50,                 // Har bir xodim paneli faolligi
-    perResource: 0.1,             // Har bir resursning marginal saqlash xarajati (Paid limit ichida deyarli 0)
-    interactionUnit: 0.002,       // Talabaning 1ta test/resurs bilan o'zaro ishlash tranzaksiyalari
-    aiFixed: 20000,               // O'rtacha oylik AI API ulushi (tashkilot boshiga)
-    botFixed: 10000,              // O'rtacha oylik Bot server yuklamasi
+    fixedMonthlyBudget: 450000,    // Railway Pro + Firebase Blaze base portion
+    perStudent: 5,                // Oylik tranzaksiyalar (avg)
+    perStaff: 50,                 // Xodim paneli yuklamasi
+    perResource: 0.1,             // Saqlash xarajati (marginal)
+    interactionUnit: 0.002,       // Talaba tranzaksiyalari
+    aiUnitCosts: {                // AI token xarajatlari unit boshiga
+      course: 500,
+      test: 100,
+      subject: 50,
+      quizizz: 150,
+      exam: 1000,
+    },
+    botFixed: 10000,              // Bot server yuklamasi
   };
 
   const calculatePlanCost = (tariff: TariffConfig, currentOrgCount: number = 200) => {
     const S = tariff.students || 0;
     const T = tariff.staff || 0;
     
+    // AI generation costs (usage based on limits)
+    const aiGenerationCost = tariff.hasAI ? (
+      ((tariff.maxCourses || 0) * systemCosts.aiUnitCosts.course) +
+      ((tariff.maxTests || 0) * systemCosts.aiUnitCosts.test) +
+      ((tariff.maxExams || 0) * systemCosts.aiUnitCosts.exam) +
+      ((tariff.maxSubjects || 0) * systemCosts.aiUnitCosts.subject) +
+      ((tariff.maxQuizizz || 0) * systemCosts.aiUnitCosts.quizizz)
+    ) : 0;
+
     // Har bir xodim yaratadigan limitlar yig'indisi
     const resPerStaff = 
       (tariff.maxCourses || 0) + 
@@ -348,8 +363,9 @@ export default function AdminBilling() {
       
     const totalResources = T * resPerStaff;
     
-    // 1. Tizim asosi (Maintenance ulushi)
-    const infraBase = (systemCosts.fixedMonthlyBudget / Math.max(1, currentOrgCount)) + (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
+    // 1. Tizim asosi (Maintenance - Firebase, Railway)
+    const infraPortion = (systemCosts.fixedMonthlyBudget / Math.max(1, currentOrgCount));
+    const maintenanceBase = infraPortion + (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
     
     // 2. Storage & Operations (Marginal)
     const storageCost = totalResources * systemCosts.perResource;
@@ -357,12 +373,16 @@ export default function AdminBilling() {
     // 3. Interactions (Marginal)
     const interactionLoad = (S * totalResources * systemCosts.interactionUnit);
     
-    let total = infraBase + storageCost + interactionLoad;
+    const botCost = tariff.hasBot ? systemCosts.botFixed : 0;
     
-    if (tariff.hasAI) total += systemCosts.aiFixed;
-    if (tariff.hasBot) total += systemCosts.botFixed;
+    const total = maintenanceBase + storageCost + interactionLoad + aiGenerationCost + botCost;
     
-    return total;
+    return {
+      total,
+      ai: aiGenerationCost,
+      system: maintenanceBase + storageCost + interactionLoad + botCost,
+      infra: infraPortion
+    };
   };
 
   const renderEconomics = () => {
@@ -387,7 +407,8 @@ export default function AdminBilling() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {plans.map((plan) => {
             const ORGS_PER_PLAN = 20;
-            const singleCost = calculatePlanCost(plan.config);
+            const singleBreakdown = calculatePlanCost(plan.config);
+            const singleCost = singleBreakdown.total;
             const singlePrice = plan.config.price || 0;
             
             const totalCost = singleCost * ORGS_PER_PLAN;
@@ -1437,11 +1458,15 @@ export default function AdminBilling() {
                          {(() => {
                            const tariff = tariffsConfig[simTariffKey];
                            const sPrice = (simTariffKey === 'corporate' ? calcCorpPrice() : (tariff.price || 0));
-                           const sCost = calculatePlanCost(tariff, simOrgCount);
+                           const breakdown = calculatePlanCost(tariff, simOrgCount);
                            
                            const rev = sPrice * simOrgCount;
-                           const cost = sCost * simOrgCount;
+                           const cost = breakdown.total * simOrgCount;
+                           const aiCostTotal = breakdown.ai * simOrgCount;
+                           const systemCostTotal = (breakdown.total - breakdown.ai) * simOrgCount;
                            const profit = rev - cost;
+                           
+                           const isProfit = profit > 0;
 
                            return (
                              <>
@@ -1449,17 +1474,32 @@ export default function AdminBilling() {
                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Jami oylik tushum</p>
                                    <div className="text-2xl font-black text-white font-mono tracking-tighter">{rev.toLocaleString()} <span className="text-[10px] text-white/30 uppercase">sum</span></div>
                                 </div>
+                                
                                 <div className="space-y-1">
-                                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Tizim oylik xarajati</p>
-                                   <div className="text-lg font-black text-red-400 font-mono tracking-tighter">-{cost.toLocaleString()} <span className="text-[10px] opacity-40 uppercase">sum</span></div>
+                                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">AI orqali yaratish xarajatlari</p>
+                                   <div className="text-sm font-black text-amber-400 font-mono tracking-tight">-{aiCostTotal.toLocaleString()} <span className="text-[9px] opacity-40 uppercase ml-1">sum</span></div>
+                                   <p className="text-[8px] text-white/20 italic">(kurs, test, mavzu, quizizz, imtihon)</p>
                                 </div>
-                                <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-[28px] group-hover:border-emerald-500/40 transition-all">
-                                   <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Sof foyda (oylik)</p>
-                                   <div className="text-2xl font-black text-emerald-400 font-mono tracking-tighter">
-                                      {profit > 0 ? "+" : ""}{profit.toLocaleString()}
+
+                                <div className="space-y-1">
+                                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Tizim oylik to'lovlari</p>
+                                   <div className="text-sm font-black text-indigo-400 font-mono tracking-tight">-{systemCostTotal.toLocaleString()} <span className="text-[9px] opacity-40 uppercase ml-1">sum</span></div>
+                                   <p className="text-[8px] text-white/20 italic">(Firebase, Railway, Storage portion)</p>
+                                </div>
+
+                                <div className={`p-5 rounded-[28px] border transition-all ${isProfit ? 'bg-emerald-500/10 border-emerald-500/20 shadow-lg shadow-emerald-500/5' : 'bg-red-500/10 border-red-500/20'}`}>
+                                   <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                      {isProfit ? 'Sof foyda (oylik)' : 'Zarar (oylik)'}
+                                   </p>
+                                   <div className={`text-2xl font-black font-mono tracking-tighter ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                      {isProfit ? "+" : "-"}{Math.abs(profit).toLocaleString()}
                                       <span className="text-[10px] ml-1 opacity-60 uppercase">sum</span>
                                    </div>
-                                   {rev > 0 && <div className="text-[10px] font-black text-emerald-400/50 mt-1">Marginality: {((profit/rev)*100).toFixed(1)}%</div>}
+                                   {rev > 0 && (
+                                     <div className={`text-[10px] font-black mt-1 opacity-50 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        Rentabellik: {((profit/rev)*100).toFixed(1)}%
+                                     </div>
+                                   )}
                                 </div>
                              </>
                            );
