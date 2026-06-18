@@ -705,7 +705,22 @@ export default function AdminBilling() {
                <div className="space-y-6">
                   <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3">
                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
+                        <h4 className="text-sm font-black text-gray-900 uppercase">O'rnatilgan obunada baza nechta resurs ko'taradi va qo'shimcha xarajat qilmaydi?</h4>
+                     </div>
+                     <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                        Tizimning <strong>Firebase (Blaze) & Railway (Pro)</strong> oylik standart obuna limitlari ichida:
+                     </p>
+                     <ul className="text-xs text-gray-500 space-y-2 pl-4 list-disc font-medium">
+                        <li><strong>Matnli resurslar (Test, Savol, Mavzular):</strong> Bazada <strong>150,000 tagacha</strong> resursni mutlaqo bepul (baza xotirasi 1 GB gacha tekin) va qo'shimcha xarajatlarsiz saqlash mumkin.</li>
+                        <li><strong>Multimedia va Rasmlar:</strong> Firebase Cloud Storage standart 5 GB gacha bepul xotira beradi. Agarda har bir testga o'rtacha hajmdagi rasmlar biriktirilsa, <strong>10,000 dan 15,000 tagacha rasm</strong> qo'shimcha oylik to'lovlarsiz saqlanadi.</li>
+                        <li><strong>Limit oshib ketsa ham xarajat juda arzon:</strong> Chegaralardan oshganda ham Firestore har qo'shimcha 1 GB ma'lumot uchun vaqtiga atigi <strong>$0.18 (taxminan 2,250 so'm)</strong>, Cloud Storage esa har 1 GB uchun oylik atigi <strong>$0.26 (taxminan 3,300 so'm)</strong> hisoblaydi. Ya'ni, limit deyarli cheksiz deb qaralishi mumkin!</li>
+                     </ul>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3">
+                     <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
                         <h4 className="text-sm font-black text-gray-900 uppercase">Nega saqlash uchun 200 so'm hisoblanadi?</h4>
                      </div>
                      <p className="text-xs text-gray-500 font-medium leading-relaxed">
@@ -715,7 +730,7 @@ export default function AdminBilling() {
 
                   <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3">
                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
                         <h4 className="text-sm font-black text-gray-900 uppercase">Nega talaba ishlashi uchun 1 so'm hisoblanadi?</h4>
                      </div>
                      <p className="text-xs text-gray-500 font-medium leading-relaxed">
