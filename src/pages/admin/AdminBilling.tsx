@@ -680,12 +680,99 @@ export default function AdminBilling() {
                  
                  <div className="mt-8 p-4 bg-emerald-800/50 rounded-2xl border border-emerald-700/50">
                     <p className="text-[9px] font-bold text-emerald-200/60 leading-relaxed uppercase">
-                       * Ushbu proyeksiyada barcha tashkilotlar o'z limitlaridan 100% foydalanishi va barcha talabalar to'liq faol bo'lishi hisobga olingan.
+                       * Ushbu proyeksiyada barcha tashkilotlar o'z limitlaridan 100% foydalanishi va barcha talabalar to'liq faol bo'lishi hisobga olingan. {/*
                     </p>
                  </div>
               </div>
            </div>
-        </div>
+
+         */}</p></div></div></div></div> {/* Infratuzilma va Xarajatlar Tushuntirish Bo'limi (FAQ & Capacity) */}
+         <div className="bg-slate-50 rounded-[40px] p-8 md:p-12 border border-slate-100 space-y-10 mt-10">
+            <div className="space-y-3">
+               <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg">
+                     <ShieldAlert className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight">Infratuzilma Xarajatlari & Tarif Tushuntirishlari</h3>
+               </div>
+               <p className="text-gray-500 text-sm max-w-3xl font-medium leading-relaxed">
+                  Tizimning Firebase & Railway obunalari, hisob-kitob metodologiyasi va turli xil profillar bo'yicha sig'im ko'rsatkichlarining to'liq tahlili.
+               </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               {/* 1-blok: Savollarga Javoblar */}
+               <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3">
+                     <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                        <h4 className="text-sm font-black text-gray-900 uppercase">Nega saqlash uchun 200 so'm hisoblanadi?</h4>
+                     </div>
+                     <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                        Har bir yaratilgan resurs (test, kurs, imtihon, quizizz, mavzu) shunchaki ma'lumotlar bazasida oddiy matn tarzida qolmaydi. Ularning tarkibida rasmlar, diagrammalar, biriktirilgan hujjatlar va multimedia fayllari joy oladi. Ushbu ma'lumotlar <strong>Google Cloud Storage (Cloud Storage va CDN)</strong> disklarida saqlanadi hamda har oy talabalar tomonidan qayta-qayta yuklanganda egress tarmoq trafigini sarflaydi. 200 so'mlik oylik amortizatsiya bu resurslarning doimiy ochiq, tezkor va barqaror yuklanishini ta'minlaydi.
+                     </p>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3">
+                     <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                        <h4 className="text-sm font-black text-gray-900 uppercase">Nega talaba ishlashi uchun 1 so'm hisoblanadi?</h4>
+                     </div>
+                     <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                        Talaba test topshirganda yoki resursdan foydalanganda tizim real-time rejimda ishlaydi (Firestore push-notifications, socket ulanishlar va har bir to'g'ri/noto'g'ri javobni ma'lumotlar bazasiga yozish/yangilash tranzaksiyalari). Google Cloud Firestore 100k yozish uchun ~$0.18 oladi. Ammo, real yuklamada har bir talaba faolligida o'nlab real-time ulanishlar, CPU milisekundlari va xotira RAM hisoblanadi. Shuning uchun o'rtacha 1 so'm (1 UZS) hisobi xavfsiz zaxira bilan eng adolatli operatsion narxdir.
+                     </p>
+                  </div>
+               </div>
+
+               {/* 2-blok: Oylik obunalar va Profile Capacity (Sig'im) */}
+               <div className="bg-slate-900 text-white p-8 rounded-[36px] border border-slate-800 shadow-2xl space-y-6">
+                  <div>
+                     <h4 className="text-base font-black uppercase tracking-tight text-white mb-1">Infratuzilma Limitlari & Sig'imi</h4>
+                     <p className="text-slate-400 text-[10px] leading-relaxed uppercase tracking-wider">
+                        Oylik standart obuna to'langan holatda (Railway + Firebase Pro / Blaze) tizim bemalol ko'tara oladigan profillar miqdori:
+                     </p>
+                  </div>
+
+                  <div className="space-y-4 pt-2">
+                     <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl hover:bg-white/10 transition-colors">
+                        <div>
+                           <p className="text-sm font-black text-white">Tashkilotlar (Organizations)</p>
+                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Yaxlit maktablar / O'quv markazlar</p>
+                        </div>
+                        <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg text-xs font-black">200 tagacha profil</span>
+                     </div>
+
+                     <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl hover:bg-white/10 transition-colors">
+                        <div>
+                           <p className="text-sm font-black text-white">Xodimlar / O'qituvchilar (Staff)</p>
+                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tashkilotlar ichidagi ustozlar</p>
+                        </div>
+                        <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg text-xs font-black">5,000 nafargacha profil</span>
+                     </div>
+
+                     <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl hover:bg-white/10 transition-colors">
+                        <div>
+                           <p className="text-sm font-black text-white">Mustaqil O'qituvchilar (Tutors)</p>
+                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tashkilotsiz mustaqil repititorlar</p>
+                        </div>
+                        <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg text-xs font-black">3,500 nafargacha profil</span>
+                     </div>
+
+                     <div className="flex justify-between items-center bg-indigo-950/40 p-4 rounded-2xl border border-indigo-800/30">
+                        <div>
+                           <p className="text-sm font-black text-indigo-200">Talabalar (Students)</p>
+                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Faol o'quvchilar va natijalar bazasi</p>
+                        </div>
+                        <span className="px-3 py-1 bg-indigo-500/40 text-indigo-100 rounded-lg text-xs font-black">50,000 nafargacha profil</span>
+                     </div>
+                  </div>
+
+                  <p className="text-[9px] text-slate-500 leading-relaxed uppercase italic">
+                     * Eslatma: Firebase va Railway obunalari to'lansa (taxminan oylik 300,000 - 450,000 so'm o'rtacha yuklamaga asosan), yuqoridagi profillar bemalol qo'shimcha infratuzilma narxisiz ishlash imkoniga ega bo'ladi.
+                  </p>
+               </div>
+            </div>
+         </div>
       </div>
     );
   };
