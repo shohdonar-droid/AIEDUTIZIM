@@ -319,14 +319,15 @@ export default function AdminBilling() {
     return stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
-  // Tariff economics / Cost model defaults (Maximum Stress Scenario)
+  // Tariff economics / Cost model under Paid Monthly Subscriptions (Firebase Blaze & Railway Pro)
   const systemCosts = {
-    perStudent: 500,     // Oylik baza parvarishi (auth/sessions)
-    perStaff: 3000,      // Boshqaruv paneli infra xarajati
-    perResource: 200,    // Har bir resursni (test/kurs) bir marta yaratish va saqlash
-    interactionUnit: 1.0, // Talaba 1ta resursni (test/imtihon) ishlashi xarajati (db-writes/traffic)
-    aiFixed: 50000,      
-    botFixed: 30000,     
+    fixedMonthlyBudget: 450000,    // Oylik jami o'zgarmas xarajat (Railway + Firebase Pro ulushi)
+    perStudent: 5,                // Har bir faol talaba uchun DB tranzaksiyalari (marginal cost)
+    perStaff: 50,                 // Har bir xodim paneli faolligi
+    perResource: 0.1,             // Har bir resursning marginal saqlash xarajati (Paid limit ichida deyarli 0)
+    interactionUnit: 0.002,       // Talabaning 1ta test/resurs bilan o'zaro ishlash tranzaksiyalari
+    aiFixed: 20000,               // O'rtacha oylik AI API ulushi (tashkilot boshiga)
+    botFixed: 10000,              // O'rtacha oylik Bot server yuklamasi
   };
 
   const calculatePlanCost = (tariff: TariffConfig) => {
@@ -343,13 +344,14 @@ export default function AdminBilling() {
       
     const totalResources = T * resPerStaff;
     
-    // 1. Tizim asosi (Infra maintenance)
-    const infraBase = (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
+    // 1. Tizim asosi (Maintenance ulushi)
+    const orgCount = 200; // O'rtacha 200ta tashkilot orasida o'zgarmas xarajat taqsimlanishi
+    const infraBase = (systemCosts.fixedMonthlyBudget / orgCount) + (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
     
-    // 2. Limitlardan maksimal foydalanish (Storage/Cloud-Resources)
+    // 2. Storage & Operations (Marginal)
     const storageCost = totalResources * systemCosts.perResource;
     
-    // 3. Maksimal interaktivlik (Har bir talaba har bir resursni ishlaydi)
+    // 3. Interactions (Marginal)
     const interactionLoad = (S * totalResources * systemCosts.interactionUnit);
     
     let total = infraBase + storageCost + interactionLoad;
@@ -538,6 +540,10 @@ export default function AdminBilling() {
     const interactionCost = S * (R / T) * systemCosts.interactionUnit;
     
     const totalGlobalCost = infraCost + storageCost + aiAndBotCost + interactionCost + platformFixedFees;
+    
+    // Revenue Estimate: 200 Organizations (Mixed Tiers)
+    // Avg revenue per org: ~1,500,000 UZS
+    const totalGlobalRevenue = O * 1500000; 
 
     return (
       <div className="mt-16 space-y-8 pb-10">
@@ -608,20 +614,29 @@ export default function AdminBilling() {
                     <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors">
                        <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                             <Server className="w-4 h-4 text-slate-500" />
+                             <Server className="w-4 h-4 text-indigo-500" />
                           </div>
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Railway (Server Hosting)</span>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Railway Pro (Fixed Cluster)</span>
                        </div>
                        <span className="text-sm font-black text-gray-900">150,000 UZS</span>
                     </div>
                     <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors">
                        <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                             <Database className="w-4 h-4 text-slate-500" />
+                             <Database className="w-4 h-4 text-amber-500" />
                           </div>
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Firebase (Firestore/Auth)</span>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Firebase Blaze (Fixed Base)</span>
                        </div>
                        <span className="text-sm font-black text-gray-900">300,000 UZS</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors">
+                       <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                             <Activity className="w-4 h-4 text-emerald-500" />
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">Real-time Sync (50k active)</span>
+                       </div>
+                       <span className="text-sm font-black text-gray-900">{infraCost.toLocaleString()} UZS</span>
                     </div>
                     <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
                        <div className="flex items-center gap-2">
@@ -670,11 +685,11 @@ export default function AdminBilling() {
                  <div className="space-y-6 flex-grow">
                     <div>
                        <p className="text-[10px] font-black text-emerald-400/70 uppercase mb-2">Jami Oylik Tushum (200 Org)</p>
-                       <p className="text-4xl font-black text-white font-mono tracking-tighter">1,100,000,000 <span className="text-lg">UZS</span></p>
+                       <p className="text-4xl font-black text-white font-mono tracking-tighter">{totalGlobalRevenue.toLocaleString()} <span className="text-lg">UZS</span></p>
                     </div>
                     <div className="pt-6 border-t border-white/10 uppercase">
                        <p className="text-[10px] font-black text-emerald-400 mb-1">Maksimal yuklamada sof foyda</p>
-                       <p className="text-2xl font-black text-white font-mono tracking-tight">{(1100000000 - totalGlobalCost).toLocaleString()} UZS</p>
+                       <p className="text-2xl font-black text-white font-mono tracking-tight">{(totalGlobalRevenue - totalGlobalCost).toLocaleString()} UZS</p>
                     </div>
                  </div>
                  
@@ -709,12 +724,12 @@ export default function AdminBilling() {
                         <h4 className="text-sm font-black text-gray-900 uppercase">O'rnatilgan obunada baza nechta resurs ko'taradi va qo'shimcha xarajat qilmaydi?</h4>
                      </div>
                      <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                        Tizimning <strong>Firebase (Blaze) & Railway (Pro)</strong> oylik standart obuna limitlari ichida:
+                        Tizimning <strong>Firebase Blaze & Railway Pro</strong> oylik obunasi (taxminan 450,000 so'm) bir marta to'langanda, masshtabli sig'im quyidagicha bo'ladi:
                      </p>
                      <ul className="text-xs text-gray-500 space-y-2 pl-4 list-disc font-medium">
-                        <li><strong>Matnli resurslar (Test, Savol, Mavzular):</strong> Bazada <strong>150,000 tagacha</strong> resursni mutlaqo bepul (baza xotirasi 1 GB gacha tekin) va qo'shimcha xarajatlarsiz saqlash mumkin.</li>
-                        <li><strong>Multimedia va Rasmlar:</strong> Firebase Cloud Storage standart 5 GB gacha bepul xotira beradi. Agarda har bir testga o'rtacha hajmdagi rasmlar biriktirilsa, <strong>10,000 dan 15,000 tagacha rasm</strong> qo'shimcha oylik to'lovlarsiz saqlanadi.</li>
-                        <li><strong>Limit oshib ketsa ham xarajat juda arzon:</strong> Chegaralardan oshganda ham Firestore har qo'shimcha 1 GB ma'lumot uchun vaqtiga atigi <strong>$0.18 (taxminan 2,250 so'm)</strong>, Cloud Storage esa har 1 GB uchun oylik atigi <strong>$0.26 (taxminan 3,300 so'm)</strong> hisoblaydi. Ya'ni, limit deyarli cheksiz deb qaralishi mumkin!</li>
+                        <li><strong>Ma'lumotlar sig'imi:</strong> Bazada <strong>200,000 dan 500,000 gacha</strong> matnli resurslarni mutlaqo qo'shimcha xarajatlarsiz saqlash mumkin.</li>
+                        <li><strong>Multimedia:</strong> 5 GB dan 20 GB gacha media (rasmlar) oylik obuna limitiga kiradi. Bu o'rtacha <strong>30,000 - 50,000 ta</strong> test rasmlari degani.</li>
+                        <li><strong>Limit oshib ketsa ham xarajat juda arzon:</strong> Agar limitlar oshib kelsa ham, marginal xarajat (qo'shimcha 1 GB uchun) atigi $0.18 - $0.26 ni tashkil etadi.</li>
                      </ul>
                   </div>
 
