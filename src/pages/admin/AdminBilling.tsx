@@ -352,8 +352,12 @@ export default function AdminBilling() {
 
   const calculateGlobalFootprint = (tariff: TariffConfig, orgCount: number) => {
     const S = (tariff.students || 0) * orgCount;
-    const T = (tariff.staff || 0) * orgCount;
-    const R = ((tariff.maxCourses || 0) + (tariff.maxTests || 0) + (tariff.maxExams || 0)) * orgCount;
+    const staffPerOrg = tariff.staff || 1;
+    const T = staffPerOrg * orgCount;
+    
+    // Limits are per staff member, so total resources per org is staff count * limits
+    const resourcesPerOrg = staffPerOrg * ((tariff.maxCourses || 0) + (tariff.maxTests || 0) + (tariff.maxExams || 0) + (tariff.maxSubjects || 0) + (tariff.maxQuizizz || 0));
+    const R = resourcesPerOrg * orgCount;
 
     // Jami operatsiyalar footprinti (Global Across all orgs)
     const totalOps = (S * systemCosts.unitUsage.perStudent) + (T * systemCosts.unitUsage.perStaff) + (R * systemCosts.unitUsage.perResource);
@@ -363,13 +367,15 @@ export default function AdminBilling() {
     const isExceedingOps = totalOps > systemCosts.freeTier.monthlyFootprint;
     const exceedsByOps = Math.max(0, totalOps - systemCosts.freeTier.monthlyFootprint);
     
-    // AI Generation (Direct cost as it's API based, no free tier usually)
+    // AI Generation (Per staff member's full usage of limits)
     const aiCostPerOrg = tariff.hasAI ? (
-      ((tariff.maxCourses || 0) * systemCosts.aiUnitCosts.course) +
-      ((tariff.maxTests || 0) * systemCosts.aiUnitCosts.test) +
-      ((tariff.maxExams || 0) * systemCosts.aiUnitCosts.exam) +
-      ((tariff.maxSubjects || 0) * systemCosts.aiUnitCosts.subject) +
-      ((tariff.maxQuizizz || 0) * systemCosts.aiUnitCosts.quizizz)
+      staffPerOrg * (
+        ((tariff.maxCourses || 0) * systemCosts.aiUnitCosts.course) +
+        ((tariff.maxTests || 0) * systemCosts.aiUnitCosts.test) +
+        ((tariff.maxExams || 0) * systemCosts.aiUnitCosts.exam) +
+        ((tariff.maxSubjects || 0) * systemCosts.aiUnitCosts.subject) +
+        ((tariff.maxQuizizz || 0) * systemCosts.aiUnitCosts.quizizz)
+      )
     ) : 0;
     const aiCostTotal = aiCostPerOrg * orgCount;
 
