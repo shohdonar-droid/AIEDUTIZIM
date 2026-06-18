@@ -1489,8 +1489,8 @@ export default function AdminBilling() {
                                <div className="flex items-center gap-3">
                                   <Sparkles className={`w-5 h-5 ${simAiOptimized ? 'animate-pulse' : ''}`} />
                                   <div className="text-left">
-                                     <p className="text-[10px] font-black uppercase tracking-tighter">AI Optimallashtirish</p>
-                                     <p className="text-[8px] font-bold opacity-60 uppercase">Gemini Flash Model</p>
+                                     <p className="text-[10px] font-black uppercase tracking-tighter">Intellektual Optimizatsiya</p>
+                                     <p className="text-[8px] font-bold opacity-60 uppercase">Gemini 2.0 Flash & Lite</p>
                                   </div>
                                </div>
                                <div className={`w-10 h-5 rounded-full relative transition-colors ${simAiOptimized ? 'bg-emerald-500' : 'bg-white/20'}`}>
@@ -1592,18 +1592,24 @@ export default function AdminBilling() {
                       { label: "Imtihon yaratish", price: systemCosts.aiUnitCosts.exam, icon: Zap },
                       { label: "Quizizz yaratish", price: systemCosts.aiUnitCosts.quizizz, icon: HardDrive },
                       { label: "Mavzu yaratish", price: systemCosts.aiUnitCosts.subject, icon: LayoutDashboard },
-                    ].map((unit, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 hover:border-amber-200 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <unit.icon className="w-3.5 h-3.5 text-gray-400" />
-                          <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{unit.label}</span>
+                    ].map((unit, idx) => {
+                      const finalPrice = simAiOptimized ? Math.ceil(unit.price * 0.3) : unit.price;
+                      return (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 hover:border-amber-200 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <unit.icon className="w-3.5 h-3.5 text-gray-400" />
+                            <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{unit.label}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs font-black text-amber-600 font-mono tracking-tighter">{finalPrice.toLocaleString()} sum</div>
+                            {simAiOptimized && <div className="text-[7px] text-emerald-500 font-black uppercase">Lite Optimized</div>}
+                          </div>
                         </div>
-                        <div className="text-xs font-black text-amber-600 font-mono tracking-tighter">{unit.price.toLocaleString()} sum</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <p className="text-[9px] font-bold text-gray-400 leading-relaxed italic">
-                    * Ushbu narxlar AI Studio/Gemini token sarfi va infratuzilma yuklamasi asosida hisoblangan o'rtacha qiymatlardir.
+                    * Gemini 2.0 Flash va Flash-Lite muhitida o'rtacha iqtisodiy samaradorlik hisobga olingan.
                   </p>
                 </div>
 
