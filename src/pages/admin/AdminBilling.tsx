@@ -292,6 +292,7 @@ export default function AdminBilling() {
   // Simulation Office State
   const [simTariffKey, setSimTariffKey] = useState<keyof AllTariffsConfig>("standard");
   const [simOrgCount, setSimOrgCount] = useState(200);
+  const [simAiOptimized, setSimAiOptimized] = useState(false);
 
   const calcCorpPrice = () => {
     const base = tariffsConfig.corporate.basePrice ?? 500000;
@@ -369,13 +370,15 @@ export default function AdminBilling() {
     const exceedsByOps = Math.max(0, totalOps - systemCosts.freeTier.monthlyFootprint);
     
     // AI Generation (Per staff member's full usage of limits)
+    const optimizationFactor = simAiOptimized ? 0.3 : 1; // 70% reduction in optimized mode
+    
     const aiCostPerOrg = tariff.hasAI ? (
       staffPerOrg * (
-        ((tariff.maxCourses || 0) * systemCosts.aiUnitCosts.course) +
-        ((tariff.maxTests || 0) * systemCosts.aiUnitCosts.test) +
-        ((tariff.maxExams || 0) * systemCosts.aiUnitCosts.exam) +
-        ((tariff.maxSubjects || 0) * systemCosts.aiUnitCosts.subject) +
-        ((tariff.maxQuizizz || 0) * systemCosts.aiUnitCosts.quizizz)
+        ((tariff.maxCourses || 0) * (systemCosts.aiUnitCosts.course * optimizationFactor)) +
+        ((tariff.maxTests || 0) * (systemCosts.aiUnitCosts.test * optimizationFactor)) +
+        ((tariff.maxExams || 0) * (systemCosts.aiUnitCosts.exam * optimizationFactor)) +
+        ((tariff.maxSubjects || 0) * (systemCosts.aiUnitCosts.subject * optimizationFactor)) +
+        ((tariff.maxQuizizz || 0) * (systemCosts.aiUnitCosts.quizizz * optimizationFactor))
       )
     ) : 0;
     const aiCostTotal = aiCostPerOrg * orgCount;
@@ -1476,6 +1479,24 @@ export default function AdminBilling() {
                                />
                                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-white/20 uppercase tracking-widest">orgs</span>
                             </div>
+                         </div>
+
+                         <div className="pt-2">
+                            <button 
+                              onClick={() => setSimAiOptimized(!simAiOptimized)}
+                              className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group ${simAiOptimized ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/10 text-white/60 hover:border-white/20'}`}
+                            >
+                               <div className="flex items-center gap-3">
+                                  <Sparkles className={`w-5 h-5 ${simAiOptimized ? 'animate-pulse' : ''}`} />
+                                  <div className="text-left">
+                                     <p className="text-[10px] font-black uppercase tracking-tighter">AI Optimallashtirish</p>
+                                     <p className="text-[8px] font-bold opacity-60 uppercase">Gemini Flash Model</p>
+                                  </div>
+                               </div>
+                               <div className={`w-10 h-5 rounded-full relative transition-colors ${simAiOptimized ? 'bg-emerald-500' : 'bg-white/20'}`}>
+                                  <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${simAiOptimized ? 'right-1' : 'left-1'}`}></div>
+                                </div>
+                            </button>
                          </div>
                       </div>
 
