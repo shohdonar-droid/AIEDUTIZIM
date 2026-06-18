@@ -46,7 +46,8 @@ import {
   Server,
   Database,
   HardDrive,
-  Bot
+  Bot,
+  Sparkles
 } from "lucide-react";
 import { motion } from "motion/react";
 import * as XLSX from "xlsx";
@@ -1556,6 +1557,35 @@ export default function AdminBilling() {
                    </div>
                 </div>
                 
+                <div className="p-8 bg-white border border-gray-100 rounded-[40px] space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">AI Operatsiyasi Narxi (1 dona)</h4>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {[
+                      { label: "Kurs yaratish", price: systemCosts.aiUnitCosts.course, icon: BookOpen },
+                      { label: "Test yaratish", price: systemCosts.aiUnitCosts.test, icon: FileText },
+                      { label: "Imtihon yaratish", price: systemCosts.aiUnitCosts.exam, icon: Zap },
+                      { label: "Quizizz yaratish", price: systemCosts.aiUnitCosts.quizizz, icon: HardDrive },
+                      { label: "Mavzu yaratish", price: systemCosts.aiUnitCosts.subject, icon: LayoutDashboard },
+                    ].map((unit, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 hover:border-amber-200 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <unit.icon className="w-3.5 h-3.5 text-gray-400" />
+                          <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{unit.label}</span>
+                        </div>
+                        <div className="text-xs font-black text-amber-600 font-mono tracking-tighter">{unit.price.toLocaleString()} sum</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[9px] font-bold text-gray-400 leading-relaxed italic">
+                    * Ushbu narxlar AI Studio/Gemini token sarfi va infratuzilma yuklamasi asosida hisoblangan o'rtacha qiymatlardir.
+                  </p>
+                </div>
+
                 <div className="p-8 bg-gray-50 border border-gray-100 rounded-[40px] space-y-4">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-black text-gray-900 uppercase">Analysis</h4>
