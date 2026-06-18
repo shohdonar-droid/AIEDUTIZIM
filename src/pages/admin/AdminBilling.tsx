@@ -1274,6 +1274,11 @@ export default function AdminBilling() {
                   <div>
                     <h3 className="text-lg font-black text-gray-900 mb-1">START</h3>
                     <div className="text-xl font-black text-orange-600 mb-4">{(tariffsConfig.start.price || 0).toLocaleString()} <small className="text-[10px] text-gray-400 uppercase font-bold">sum/oy</small></div>
+                    <div className="mb-4 flex flex-col gap-1">
+                      <div className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md w-fit uppercase">
+                        Bepul sig'im: {Math.floor(systemCosts.freeTier.monthlyFootprint / (( (tariffsConfig.start.students || 0) * systemCosts.unitUsage.perStudent) + ((tariffsConfig.start.staff || 0) * systemCosts.unitUsage.perStaff) + (((tariffsConfig.start.maxTests || 0) + (tariffsConfig.start.maxCourses || 0)) * systemCosts.unitUsage.perResource) || 1))} org
+                      </div>
+                    </div>
                     <ul className="space-y-1.5 text-[10px] font-bold text-gray-500 mb-6">
                       <li className="flex items-center gap-2"><Check className="w-3 h-3 text-orange-500" /> {tariffsConfig.start.students} talaba</li>
                       <li className="flex items-center gap-2"><Check className="w-3 h-3 text-orange-500" /> {tariffsConfig.start.staff} xodim</li>
@@ -1298,6 +1303,11 @@ export default function AdminBilling() {
                   <div>
                     <h3 className="text-lg font-black text-gray-900 mb-1">STANDARD</h3>
                     <div className="text-xl font-black text-indigo-600 mb-4">{(tariffsConfig.standard.price || 0).toLocaleString()} <small className="text-[10px] text-gray-400 uppercase font-bold">sum/oy</small></div>
+                    <div className="mb-4 flex flex-col gap-1">
+                      <div className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md w-fit uppercase">
+                        Bepul sig'im: {Math.floor(systemCosts.freeTier.monthlyFootprint / (( (tariffsConfig.standard.students || 0) * systemCosts.unitUsage.perStudent) + ((tariffsConfig.standard.staff || 0) * systemCosts.unitUsage.perStaff) + (((tariffsConfig.standard.maxTests || 0) + (tariffsConfig.standard.maxCourses || 0)) * systemCosts.unitUsage.perResource) || 1))} org
+                      </div>
+                    </div>
                     <ul className="space-y-1.5 text-[10px] font-bold text-gray-500 mb-6">
                       <li className="flex items-center gap-2"><Check className="w-3 h-3 text-indigo-500" /> {tariffsConfig.standard.students} talaba</li>
                       <li className="flex items-center gap-2"><Check className="w-3 h-3 text-indigo-500" /> {tariffsConfig.standard.staff} xodim</li>
@@ -1321,6 +1331,11 @@ export default function AdminBilling() {
                   <div>
                     <h3 className="text-lg font-black text-gray-900 mb-1">PROFESSIONAL</h3>
                     <div className="text-xl font-black text-amber-600 mb-4">{(tariffsConfig.professional.price || 0).toLocaleString()} <small className="text-[10px] text-gray-400 uppercase font-bold">sum/oy</small></div>
+                    <div className="mb-4 flex flex-col gap-1">
+                      <div className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md w-fit uppercase">
+                        Bepul sig'im: {Math.floor(systemCosts.freeTier.monthlyFootprint / (( (tariffsConfig.professional.students || 0) * systemCosts.unitUsage.perStudent) + ((tariffsConfig.professional.staff || 0) * systemCosts.unitUsage.perStaff) + (((tariffsConfig.professional.maxTests || 0) + (tariffsConfig.professional.maxCourses || 0)) * systemCosts.unitUsage.perResource) || 1))} org
+                      </div>
+                    </div>
                     <ul className="space-y-1.5 text-[10px] font-bold text-gray-500 mb-6">
                       <li className="flex items-center gap-2"><Check className="w-3 h-3 text-amber-500" /> {tariffsConfig.professional.students} talaba</li>
                       <li className="flex items-center gap-2"><Check className="w-3 h-3 text-amber-500" /> AI Generator</li>
@@ -1344,6 +1359,11 @@ export default function AdminBilling() {
                   <div>
                     <h3 className="text-lg font-black text-gray-900 mb-1">CORPORATE</h3>
                     <div className="text-xl font-black text-indigo-900 mb-4">Maxsus <small className="text-[10px] text-gray-400 uppercase font-bold">hisob</small></div>
+                    <div className="mb-4 flex flex-col gap-1">
+                      <div className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md w-fit uppercase">
+                        Bepul sig'im: {Math.floor(systemCosts.freeTier.monthlyFootprint / (( (tariffsConfig.corporate.students || 0) * systemCosts.unitUsage.perStudent) + ((tariffsConfig.corporate.staff || 0) * systemCosts.unitUsage.perStaff) + (((tariffsConfig.corporate.maxTests || 0) + (tariffsConfig.corporate.maxCourses || 0)) * systemCosts.unitUsage.perResource) || 1))} org
+                      </div>
+                    </div>
                     <ul className="space-y-1.5 text-[10px] font-bold text-gray-500 mb-6">
                       <li className="flex items-center gap-2"><Check className="w-3 h-3 text-indigo-600" /> Cheksiz imkoniyat</li>
                       <li className="flex items-center gap-2"><Check className="w-3 h-3 text-indigo-600" /> Shaxsiy menejer</li>
