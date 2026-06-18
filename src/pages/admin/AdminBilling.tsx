@@ -323,65 +323,84 @@ export default function AdminBilling() {
     return stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
-  // Tariff economics / Cost model under Paid Monthly Subscriptions (Firebase Blaze & Railway Pro)
+  // Tariff economics / Cost model under Hybrid Tier (Free Tier -> Paid Monthly)
   const systemCosts = {
-    fixedMonthlyBudget: 450000,    // Railway Pro + Firebase Blaze base portion
-    perStudent: 5,                // Oylik tranzaksiyalar (avg)
-    perStaff: 50,                 // Xodim paneli yuklamasi
-    perResource: 0.1,             // Saqlash xarajati (marginal)
-    interactionUnit: 0.002,       // Talaba tranzaksiyalari
-    aiUnitCosts: {                // AI token xarajatlari unit boshiga
+    freeTier: {
+      monthlyFootprint: 1500000,   // Firebase jami bepul o'qish/yozish operatsiyalari (oylik)
+      storageGB: 5,                // Firebase jami bepul saqlash (GB)
+      railwayHours: 500,           // Railway bepul oylik soatlar
+    },
+    paidRates: {
+      fixedRailway: 450000,        // Railway Pro/Blaze oylik o'rtacha ushlanishi (bazaviy)
+      perResourceOp: 0.15,         // Limitdan oshgan har bir resurs operatsiyasi xarajat birligi
+      perStorageGB: 5000,          // Limitdan oshgan har 1GB saqlash uchun
+    },
+    unitUsage: {
+      perStudent: 10,              // Talaba oylik o'rtacha aktivligi (operatsiyalarda)
+      perStaff: 100,               // Xodim oylik o'rtacha aktivligi
+      perResource: 5,              // Resurs yaratish/o'qish operatsiyalari
+    },
+    aiUnitCosts: {                 // AI token xarajatlari unit boshiga
       course: 500,
       test: 100,
       subject: 50,
       quizizz: 150,
       exam: 1000,
     },
-    botFixed: 10000,              // Bot server yuklamasi
+    botFixed: 10000,               // Bot server yuklamasi (per org)
   };
 
-  const calculatePlanCost = (tariff: TariffConfig, currentOrgCount: number = 200) => {
-    const S = tariff.students || 0;
-    const T = tariff.staff || 0;
+  const calculateGlobalFootprint = (tariff: TariffConfig, orgCount: number) => {
+    const S = (tariff.students || 0) * orgCount;
+    const T = (tariff.staff || 0) * orgCount;
+    const R = ((tariff.maxCourses || 0) + (tariff.maxTests || 0) + (tariff.maxExams || 0)) * orgCount;
+
+    // Jami operatsiyalar footprinti (Global Across all orgs)
+    const totalOps = (S * systemCosts.unitUsage.perStudent) + (T * systemCosts.unitUsage.perStaff) + (R * systemCosts.unitUsage.perResource);
+    const totalStorage = R * 0.005; // Taxminiy 5MB per resource in GB
+
+    // Free Tier Status
+    const isExceedingOps = totalOps > systemCosts.freeTier.monthlyFootprint;
+    const exceedsByOps = Math.max(0, totalOps - systemCosts.freeTier.monthlyFootprint);
     
-    // AI generation costs (usage based on limits)
-    const aiGenerationCost = tariff.hasAI ? (
+    // AI Generation (Direct cost as it's API based, no free tier usually)
+    const aiCostPerOrg = tariff.hasAI ? (
       ((tariff.maxCourses || 0) * systemCosts.aiUnitCosts.course) +
       ((tariff.maxTests || 0) * systemCosts.aiUnitCosts.test) +
       ((tariff.maxExams || 0) * systemCosts.aiUnitCosts.exam) +
       ((tariff.maxSubjects || 0) * systemCosts.aiUnitCosts.subject) +
       ((tariff.maxQuizizz || 0) * systemCosts.aiUnitCosts.quizizz)
     ) : 0;
+    const aiCostTotal = aiCostPerOrg * orgCount;
 
-    // Har bir xodim yaratadigan limitlar yig'indisi
-    const resPerStaff = 
-      (tariff.maxCourses || 0) + 
-      (tariff.maxTests || 0) + 
-      (tariff.maxExams || 0) + 
-      (tariff.maxSubjects || 0) + 
-      (tariff.maxQuizizz || 0);
-      
-    const totalResources = T * resPerStaff;
-    
-    // 1. Tizim asosi (Maintenance - Firebase, Railway)
-    const infraPortion = (systemCosts.fixedMonthlyBudget / Math.max(1, currentOrgCount));
-    const maintenanceBase = infraPortion + (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
-    
-    // 2. Storage & Operations (Marginal)
-    const storageCost = totalResources * systemCosts.perResource;
-    
-    // 3. Interactions (Marginal)
-    const interactionLoad = (S * totalResources * systemCosts.interactionUnit);
-    
-    const botCost = tariff.hasBot ? systemCosts.botFixed : 0;
-    
-    const total = maintenanceBase + storageCost + interactionLoad + aiGenerationCost + botCost;
-    
+    // Paid Calculations
+    let maintenanceCost = 0;
+    if (isExceedingOps) {
+      maintenanceCost = systemCosts.paidRates.fixedRailway + (exceedsByOps * systemCosts.paidRates.perResourceOp);
+    }
+
+    const botCost = tariff.hasBot ? systemCosts.botFixed * orgCount : 0;
+    const totalCost = maintenanceCost + aiCostTotal + botCost;
+
     return {
-      total,
-      ai: aiGenerationCost,
-      system: maintenanceBase + storageCost + interactionLoad + botCost,
-      infra: infraPortion
+      total: totalCost,
+      ai: aiCostTotal,
+      system: maintenanceCost + botCost,
+      isFree: !isExceedingOps,
+      exceedsByOps,
+      totalOps,
+      freeLimit: systemCosts.freeTier.monthlyFootprint
+    };
+  };
+
+  const calculatePlanCost = (tariff: TariffConfig, currentOrgCount: number = 200) => {
+    // Legacy support for single objects (used in some places)
+    const footprint = calculateGlobalFootprint(tariff, 1);
+    return {
+      total: footprint.total,
+      ai: footprint.ai,
+      system: footprint.system,
+      infra: footprint.system * 0.5 // rough estimation
     };
   };
 
@@ -1457,19 +1476,32 @@ export default function AdminBilling() {
                       <div className="pt-8 border-t border-white/10 space-y-6">
                          {(() => {
                            const tariff = tariffsConfig[simTariffKey];
+                           const footprint = calculateGlobalFootprint(tariff, simOrgCount);
+                           
                            const sPrice = (simTariffKey === 'corporate' ? calcCorpPrice() : (tariff.price || 0));
-                           const breakdown = calculatePlanCost(tariff, simOrgCount);
-                           
                            const rev = sPrice * simOrgCount;
-                           const cost = breakdown.total * simOrgCount;
-                           const aiCostTotal = breakdown.ai * simOrgCount;
-                           const systemCostTotal = (breakdown.total - breakdown.ai) * simOrgCount;
+                           const cost = footprint.total;
                            const profit = rev - cost;
-                           
                            const isProfit = profit > 0;
 
                            return (
                              <>
+                                <div className="space-y-1">
+                                   <div className="flex justify-between items-end">
+                                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Global Yuklama</p>
+                                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${footprint.isFree ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                         {footprint.isFree ? 'BEPUL LIMIT ICHIDA' : 'LIMITDAN OSHDI'}
+                                      </span>
+                                   </div>
+                                   <div className="text-xl font-black text-white font-mono">{footprint.totalOps.toLocaleString()} <span className="text-[8px] opacity-30 uppercase">ops/oy</span></div>
+                                   <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mt-2">
+                                      <div 
+                                        className={`h-full transition-all duration-1000 ${footprint.isFree ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                                        style={{ width: `${Math.min(100, (footprint.totalOps / footprint.freeLimit) * 100)}%` }}
+                                      ></div>
+                                   </div>
+                                </div>
+
                                 <div className="space-y-1">
                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Jami oylik tushum</p>
                                    <div className="text-2xl font-black text-white font-mono tracking-tighter">{rev.toLocaleString()} <span className="text-[10px] text-white/30 uppercase">sum</span></div>
@@ -1477,14 +1509,24 @@ export default function AdminBilling() {
                                 
                                 <div className="space-y-1">
                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">AI orqali yaratish xarajatlari</p>
-                                   <div className="text-sm font-black text-amber-400 font-mono tracking-tight">-{aiCostTotal.toLocaleString()} <span className="text-[9px] opacity-40 uppercase ml-1">sum</span></div>
+                                   <div className="text-sm font-black text-amber-400 font-mono tracking-tight">
+                                      {footprint.ai === 0 ? '0' : `-${footprint.ai.toLocaleString()}`} 
+                                      <span className="text-[9px] opacity-40 uppercase ml-1">sum</span>
+                                   </div>
                                    <p className="text-[8px] text-white/20 italic">(kurs, test, mavzu, quizizz, imtihon)</p>
                                 </div>
 
                                 <div className="space-y-1">
-                                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Tizim oylik to'lovlari</p>
-                                   <div className="text-sm font-black text-indigo-400 font-mono tracking-tight">-{systemCostTotal.toLocaleString()} <span className="text-[9px] opacity-40 uppercase ml-1">sum</span></div>
-                                   <p className="text-[8px] text-white/20 italic">(Firebase, Railway, Storage portion)</p>
+                                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Tizim oylik to'lovlari (Paid)</p>
+                                   <div className="text-sm font-black text-indigo-400 font-mono tracking-tight">
+                                      {(footprint.total - footprint.ai) === 0 ? '0' : `-${(footprint.total - footprint.ai).toLocaleString()}`} 
+                                      <span className="text-[9px] opacity-40 uppercase ml-1">sum</span>
+                                   </div>
+                                   {footprint.isFree ? (
+                                     <p className="text-[8px] text-emerald-400/50 italic">Hozirgi yuklama Bepul limit ichida.</p>
+                                   ) : (
+                                     <p className="text-[8px] text-amber-400/50 italic">Limitdan oshgan {footprint.exceedsByOps.toLocaleString()} operatsiya xarajati.</p>
+                                   )}
                                 </div>
 
                                 <div className={`p-5 rounded-[28px] border transition-all ${isProfit ? 'bg-emerald-500/10 border-emerald-500/20 shadow-lg shadow-emerald-500/5' : 'bg-red-500/10 border-red-500/20'}`}>
