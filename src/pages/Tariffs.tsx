@@ -310,7 +310,7 @@ export default function Tariffs() {
     }
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'connection_requests'), {
+      const docRef = await addDoc(collection(db, 'connection_requests'), {
         userId: user.uid,
         userName: user.displayName || 'Noma\'lum',
         tariffName: selectedTariff?.name || "Noma'lum",
@@ -320,6 +320,26 @@ export default function Tariffs() {
         status: 'pending',
         timestamp: serverTimestamp()
       });
+
+      // Notify Telegram Admins
+      try {
+        fetch('/api/notify-connection-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: docRef.id,
+            data: {
+              userName: user.displayName || 'Noma\'lum',
+              tariffName: selectedTariff?.name || "Noma'lum",
+              tariffPrice: selectedTariff?.price || 0,
+              paymentType,
+              receiptUrl,
+              phone: user.phone || ""
+            }
+          })
+        });
+      } catch (e) {}
+
       alert('Soʻrov yuborildi! Tez orada admin koʻrib chiqadi.');
       setSelectedTariff(null);
       setReceiptUrl('');
@@ -340,7 +360,7 @@ export default function Tariffs() {
     }
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'connection_requests'), {
+      const docRef = await addDoc(collection(db, 'connection_requests'), {
         isNewOrgRequest: true,
         userName: newOrgData.name,
         phone: newOrgData.phone,
@@ -354,6 +374,30 @@ export default function Tariffs() {
         status: 'pending',
         timestamp: serverTimestamp()
       });
+
+      // Notify Telegram Admins
+      try {
+        fetch('/api/notify-connection-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: docRef.id,
+            data: {
+              userName: newOrgData.name,
+              phone: newOrgData.phone,
+              login: newOrgData.login,
+              password: newOrgData.password,
+              tariffName: showNewOrgModal.name,
+              tariffPrice: showNewOrgModal.price || showNewOrgModal.basePrice || 0,
+              paymentType,
+              receiptUrl,
+              isNewOrgRequest: true,
+              limits: showNewOrgModal.name === 'CORPORATE' ? corpCalc : null
+            }
+          })
+        });
+      } catch (e) {}
+
       alert("Ro'yxatdan o'tish so'rovi yuborildi! Admin tasdiqlagandan so'ng login/parol orqali kirishingiz mumkin.");
       setShowNewOrgModal(null);
       setNewOrgData({ name: '', phone: '', login: '', password: '' });

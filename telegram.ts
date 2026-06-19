@@ -297,6 +297,57 @@ export async function notifyAdminsDirectly(text: string, options: any = {}) {
   }
 }
 
+export async function notifyNewConnectionRequest(requestId: string, req: any) {
+  const ids = getAdminIds();
+  console.log("[Telegram] Notifying admins about new connection request:", requestId);
+  
+  let text = `📥 <b>YANGI ULANISH SO'ROVI</b>\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `👤 <b>Foydalanuvchi:</b> <code>${req.userName}</code>\n`;
+  text += `📞 <b>Tel:</b> <code>${req.phone || "Kiritilmagan"}</code>\n`;
+  text += `💎 <b>Tarif:</b> <code>${req.tariffName}</code>\n`;
+  text += `💰 <b>Narxi:</b> <code>${(req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
+  text += `💳 <b>To'lov turi:</b> <code>${req.paymentType}</code>\n`;
+  
+  if (req.isNewOrgRequest) {
+    text += `🆕 <b>Yangi tashkilot:</b> HA\n`;
+    text += `🔑 <b>Login:</b> <code>${req.login}</code>\n`;
+  }
+  
+  if (req.limits) {
+    text += `⚙️ <b>Limitlar:</b> ${req.limits.students} talaba, ${req.limits.staff} xodim...\n`;
+  }
+  
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `📅 <code>${new Date().toLocaleString('uz-UZ')}</code>`;
+
+  const inline_keyboard = [
+    [
+      { text: "✅ Tasdiqlash", callback_data: `admin_approve_req_${requestId}` },
+      { text: "❌ Rad etish", callback_data: `admin_reject_req_${requestId}` }
+    ]
+  ];
+
+  for (const adminId of ids) {
+    try {
+      if (req.receiptUrl) {
+        await bot.telegram.sendPhoto(adminId, req.receiptUrl, {
+          caption: text,
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard }
+        });
+      } else {
+        await bot.telegram.sendMessage(adminId, text, {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard }
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to notify admin ${adminId} about request ${requestId}:`, err);
+    }
+  }
+}
+
 export function isTodayBirthday(birthDateStr?: string | null): boolean {
   if (!birthDateStr) return false;
   try {
@@ -1526,6 +1577,194 @@ bot.action("admin_edit_system_about", async (ctx) => {
 bot.action("admin_reorder_button", async (ctx) => {
   pendingLogins.set(ctx.from.id, { step: "admin_reorder_button_select" });
   await ctx.reply("🔢 Qaysi tugmaning tartibini o'zgartirmoqchisiz? Tugma nomini kiriting:");
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action(/admin_approve_req_(.+)/, async (ctx) => {
+  const requestId = ctx.match[1];
+  const adminId = ctx.from.id;
+
+  try {
+    const reqDoc = await getDoc(doc(db, "connection_requests", requestId));
+    if (!reqDoc.exists()) {
+      await ctx.reply("❌ So'rov topilmadi.");
+      return ctx.answerCbQuery();
+    }
+
+    const req = reqDoc.data();
+    if (req.status !== "pending") {
+      await ctx.reply(`⚠️ Ushbu so'rov allaqachon ${req.status === 'approved' ? 'tasdiqlangan' : 'rad etilgan'}.`);
+      return ctx.answerCbQuery();
+    }
+
+    await ctx.reply("⏳ So'rov tasdiqlanmoqda, iltimos kuting...");
+
+    let targetUserId = req.userId;
+
+    if (req.isNewOrgRequest) {
+      const q = query(collection(db, "users"), where("login", "==", req.login.trim()));
+      const qSnap = await getDocs(q);
+      if (!qSnap.empty) {
+        await ctx.reply("❌ Ushbu login band! Ro'yxatdan o'tish so'rovi tasdiqlanmadi.");
+        return ctx.answerCbQuery();
+      }
+
+      const email = `${req.login.trim().toLowerCase()}@teacher.uz`;
+      const response = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            password: req.password,
+            returnSecureToken: false,
+          }),
+        },
+      );
+      if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error("Yangi foydalanuvchi yaratishda xatolik: " + (errJson.error?.message || response.statusText));
+      }
+      const authData = await response.json();
+      targetUserId = authData.localId;
+
+      const customLimits: any = {};
+      if (req.limits) {
+        customLimits.studentLimit = Number(req.limits.students) || 0;
+        customLimits.staffLimit = Number(req.limits.staff) || 0;
+        customLimits.courseLimit = Number(req.limits.courses) || 0;
+        customLimits.testLimit = Number(req.limits.tests) || 0;
+        customLimits.examLimit = Number(req.limits.exams) || 0;
+        customLimits.subjectLimit = Number(req.limits.subjects) || 0;
+        customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
+        customLimits.hasAi = !!req.limits.ai;
+        customLimits.hasBot = !!req.limits.bot;
+      }
+
+      await setDoc(doc(db, "users", targetUserId), {
+        uid: targetUserId,
+        displayName: req.userName,
+        phone: req.phone || "",
+        login: req.login.trim(),
+        password: req.password,
+        role: "teacher",
+        email: email,
+        tariffName: req.tariffName,
+        createdAt: serverTimestamp(),
+        ...customLimits
+      });
+    }
+
+    await updateDoc(doc(db, "connection_requests", requestId), { 
+      status: 'approved',
+      processedBy: adminId,
+      processedAt: serverTimestamp()
+    });
+
+    if (req.isLimitsRequest) {
+      const userRef = doc(db, "users", targetUserId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const targetLimits = req.requestedLimits || req.requestedItems || {};
+        const updates: any = {};
+        Object.entries(targetLimits).forEach(([key, val]) => {
+          const currentVal = userData[key] ?? 0;
+          updates[key] = currentVal + Number(val);
+        });
+        await updateDoc(userRef, updates);
+      }
+    } else {
+      const customLimits: any = {};
+      if (req.limits) {
+        customLimits.studentLimit = Number(req.limits.students) || 0;
+        customLimits.staffLimit = Number(req.limits.staff) || 0;
+        customLimits.courseLimit = Number(req.limits.courses) || 0;
+        customLimits.testLimit = Number(req.limits.tests) || 0;
+        customLimits.examLimit = Number(req.limits.exams) || 0;
+        customLimits.subjectLimit = Number(req.limits.subjects) || 0;
+        customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
+        customLimits.hasAi = !!req.limits.ai;
+        customLimits.hasBot = !!req.limits.bot;
+      }
+
+      await addDoc(collection(db, "active_subscriptions"), {
+        userId: targetUserId,
+        userName: req.userName,
+        tariffName: req.tariffName,
+        startDate: serverTimestamp(),
+        paymentType: req.paymentType,
+        tariffPrice: req.tariffPrice,
+        limits: req.limits || null
+      });
+
+      await updateDoc(doc(db, "users", targetUserId), {
+        tariffName: req.tariffName,
+        lastTariffUpdate: serverTimestamp(),
+        ...customLimits
+      });
+    }
+
+    // Payment history
+    let payerType = "tashkilot";
+    let payerName = req.userName;
+    try {
+      const uSnap = await getDoc(doc(db, "users", targetUserId));
+      if (uSnap.exists()) {
+        const uData = uSnap.data();
+        if (uData.displayName) payerName = uData.displayName;
+        if (uData.role === "staff") payerType = "xodim";
+        else if (uData.role === "mustaqil_o_qituvchi") payerType = "mustaqil_o_qituvchi";
+      }
+    } catch (e) {}
+
+    await addDoc(collection(db, "payment_history"), {
+      userId: targetUserId,
+      payerName: payerName,
+      payerType: payerType,
+      amount: req.tariffPrice || req.totalPrice || 0,
+      tariffName: req.tariffName || "Noma'lum",
+      paymentType: req.paymentType || "Chek",
+      timestamp: serverTimestamp()
+    });
+
+    await ctx.reply(`✅ So'rov muvaffaqiyatli tasdiqlandi! (${req.userName})`);
+    
+    // Notify the user if we have their telegramId
+    if (req.userId && !req.isNewOrgRequest) {
+      try {
+        const uSnap = await getDoc(doc(db, "users", req.userId));
+        if (uSnap.exists() && uSnap.data().telegramId) {
+          await bot.telegram.sendMessage(uSnap.data().telegramId, `✅ Tabriklaymiz! Sizning <b>${req.tariffName}</b> tarifiga ulanish so'rovingiz tasdiqlandi.`, { parse_mode: "HTML" });
+        }
+      } catch (e) {}
+    }
+
+    // Delete administrative message to keep chat clean
+    try {
+      if (ctx.callbackQuery?.message) {
+         await bot.telegram.deleteMessage(ctx.callbackQuery.message.chat.id, ctx.callbackQuery.message.message_id);
+      }
+    } catch(e) {}
+
+  } catch (err) {
+    console.error("Bot Approve Error:", err);
+    await ctx.reply("❌ Tasdiqlashda xatolik yuz berdi: " + (err instanceof Error ? err.message : String(err)));
+  }
+  
+  try { ctx.answerCbQuery(); } catch(e){}
+});
+
+bot.action(/admin_reject_req_(.+)/, async (ctx) => {
+  const requestId = ctx.match[1];
+  pendingLogins.set(ctx.from.id, { 
+    step: "admin_reject_request_reason", 
+    targetUserId: requestId,
+    originalMessageId: ctx.callbackQuery?.message?.message_id,
+    originalChatId: ctx.callbackQuery?.message?.chat?.id
+  });
+  await ctx.reply("❌ Rad etish sababini yuboring:");
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
@@ -4389,6 +4628,53 @@ Foydalanuvchi xabari: ${prompt}`;
       }, { merge: true });
       pendingLogins.delete(userId);
       return ctx.reply("✅ 'Tizim haqida' matni muvaffaqiyatli yangilandi.");
+    } else if (pending.step === "admin_reject_request_reason") {
+      const requestId = pending.targetUserId;
+      const reason = userText;
+      
+      try {
+        const reqDoc = await getDoc(doc(db, "connection_requests", requestId || ""));
+        if (!reqDoc.exists()) {
+          pendingLogins.delete(userId);
+          return ctx.reply("❌ So'rov topilmadi.");
+        }
+
+        const req = reqDoc.data();
+        await updateDoc(doc(db, "connection_requests", requestId || ""), { 
+          status: 'rejected',
+          rejectReason: reason,
+          processedBy: userId,
+          processedAt: serverTimestamp()
+        });
+
+        await addDoc(collection(db, "messages"), {
+          senderId: 'admin',
+          receiverId: req.userId,
+          text: `Sizning ${req.tariffName} tarifiga ulanish so'rovingiz rad etildi.\nSababi: ${reason}`,
+          timestamp: serverTimestamp(),
+          isRead: false
+        });
+
+        if (req.userId) {
+          try {
+            const uSnap = await getDoc(doc(db, "users", req.userId));
+            if (uSnap.exists() && uSnap.data().telegramId) {
+              await bot.telegram.sendMessage(uSnap.data().telegramId, `❌ Sizning <b>${req.tariffName}</b> tarifiga ulanish so'rovingiz rad etildi.\n\n⚠️ Sababi: ${reason}`, { parse_mode: "HTML" });
+            }
+          } catch(e) {}
+        }
+
+        if (pending.originalChatId && pending.originalMessageId) {
+          await bot.telegram.deleteMessage(pending.originalChatId, pending.originalMessageId).catch(() => {});
+        }
+
+        pendingLogins.delete(userId);
+        return ctx.reply(`❌ So'rov rad etildi va foydalanuvchiga xabar yuborildi. (${req.userName})`);
+
+      } catch (err) {
+        console.error("Bot Reject Error:", err);
+        return ctx.reply("❌ Xatolik yuz berdi: " + (err instanceof Error ? err.message : String(err)));
+      }
     } else if (pending.step === "admin_payment_amount") {
       const amount = parseInt(userText);
       if (isNaN(amount) || amount <= 0) {

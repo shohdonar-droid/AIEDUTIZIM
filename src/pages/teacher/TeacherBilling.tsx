@@ -159,7 +159,7 @@ export default function TeacherBilling() {
     if (!selectedTariff || !receiptUrl) return alert("Iltimos, barcha ma'lumotlarni kiriting.");
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, "connection_requests"), {
+      const docRef = await addDoc(collection(db, "connection_requests"), {
         userId: user?.uid,
         userName: user?.displayName,
         tariffName: selectedTariff.name,
@@ -171,6 +171,27 @@ export default function TeacherBilling() {
         currentTariff: currentSubscription?.tariffName || "Boshlang'ich",
         timestamp: serverTimestamp()
       });
+
+      // Notify Telegram Admins
+      try {
+        fetch('/api/notify-connection-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: docRef.id,
+            data: {
+              userId: user?.uid,
+              userName: user?.displayName,
+              tariffName: selectedTariff.name,
+              tariffPrice: selectedTariff.price || selectedTariff.basePrice || 0,
+              paymentType,
+              receiptUrl,
+              isUpgradeRequest: true
+            }
+          })
+        });
+      } catch (e) {}
+
       alert("So'rov yuborildi! Admin tasdiqlagandan so'ng tarifingiz yangilanadi.");
       setShowUpgradeModal(false);
       setSelectedTariff(null);

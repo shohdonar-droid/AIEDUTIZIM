@@ -217,7 +217,19 @@ export default function IndependentLimits() {
         paymentType: "Chek (Karta orqali)"
       };
 
-      await addDoc(collection(db, 'connection_requests'), reqPayload);
+      const docRef = await addDoc(collection(db, 'connection_requests'), reqPayload);
+
+      // Notify Telegram Admins
+      try {
+        fetch('/api/notify-connection-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: docRef.id,
+            data: reqPayload
+          })
+        });
+      } catch (e) {}
 
       // Success cleanup
       setQuantities({

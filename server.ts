@@ -365,6 +365,20 @@ app.get("/api/health", (req, res) => {
     }
   });
 
+  app.post("/api/notify-connection-request", express.json(), async (req, res) => {
+    try {
+      const { requestId, data } = req.body;
+      const { notifyNewConnectionRequest } = await import("./telegram.js");
+      if (notifyNewConnectionRequest) {
+        await notifyNewConnectionRequest(requestId, data);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Notify connection request error:", err);
+      res.status(500).json({ error: "Failed to notify admins" });
+    }
+  });
+
   app.post("/api/gemini", async (req, res) => {
     try {
       const { action, topic, count, context, docType, options } = req.body;
