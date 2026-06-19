@@ -365,7 +365,7 @@ app.get("/api/health", (req, res) => {
     }
   });
 
-  app.post("/api/notify-connection-request", express.json(), async (req, res) => {
+  app.post("/api/notify-connection-request", express.json({ limit: '50mb' }), async (req, res) => {
     try {
       const { requestId, data } = req.body;
       const { notifyNewConnectionRequest } = await import("./telegram.js");

@@ -301,12 +301,36 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
   const ids = getAdminIds();
   console.log("[Telegram] Notifying admins about new connection request:", requestId);
   
-  let text = `📥 <b>YANGI ULANISH SO'ROVI</b>\n`;
+  let typeLabel = "YANGI ULANISH SO'ROVI";
+  if (req.isUpgradeRequest) typeLabel = "TARIFNI O'ZGARTIRISH SO'ROVI";
+  if (req.isLimitsRequest) typeLabel = "LIMIT SOTIB OLISH SO'ROVI";
+
+  let text = `📥 <b>${typeLabel}</b>\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
   text += `👤 <b>Foydalanuvchi:</b> <code>${req.userName}</code>\n`;
   text += `📞 <b>Tel:</b> <code>${req.phone || "Kiritilmagan"}</code>\n`;
-  text += `💎 <b>Tarif:</b> <code>${req.tariffName}</code>\n`;
-  text += `💰 <b>Narxi:</b> <code>${(req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
+  
+  if (req.isLimitsRequest) {
+    text += `💰 <b>Jami summa:</b> <code>${(req.totalPrice || req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
+    text += `⚙️ <b>So'ralgan limitlar:</b>\n`;
+    const ITEM_LABELS: Record<string, string> = {
+      limit_departments: "Yo'nalishlar",
+      limit_groups: "Guruhlar",
+      limit_students: "Talabalar",
+      limit_subjects: "Mavzular",
+      limit_tests: "Testlar",
+      limit_quizizz: "Quizizz",
+      limit_exams: "Imtihonlar",
+      limit_certificates: "Sertifikatlar"
+    };
+    Object.entries(req.requestedLimits || req.requestedItems || {}).forEach(([key, qty]) => {
+      text += `  - ${ITEM_LABELS[key] || key}: +${qty} ta\n`;
+    });
+  } else {
+    text += `💎 <b>Tarif:</b> <code>${req.tariffName}</code>\n`;
+    text += `💰 <b>Narxi:</b> <code>${(req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
+  }
+  
   text += `💳 <b>To'lov turi:</b> <code>${req.paymentType}</code>\n`;
   
   if (req.isNewOrgRequest) {
@@ -314,7 +338,11 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
     text += `🔑 <b>Login:</b> <code>${req.login}</code>\n`;
   }
   
-  if (req.limits) {
+  if (req.isUpgradeRequest) {
+    text += `🔄 <b>Hozirgi tarif:</b> <code>${req.currentTariff || "Boshlang'ich"}</code>\n`;
+  }
+  
+  if (req.limits && !req.isLimitsRequest) {
     text += `⚙️ <b>Limitlar:</b> ${req.limits.students} talaba, ${req.limits.staff} xodim...\n`;
   }
   
@@ -331,11 +359,21 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
   for (const adminId of ids) {
     try {
       if (req.receiptUrl) {
-        await bot.telegram.sendPhoto(adminId, req.receiptUrl, {
-          caption: text,
-          parse_mode: "HTML",
-          reply_markup: { inline_keyboard }
-        });
+        if (req.receiptUrl.startsWith('data:')) {
+          const base64Data = req.receiptUrl.split(',')[1];
+          const buffer = Buffer.from(base64Data, 'base64');
+          await bot.telegram.sendPhoto(adminId, { source: buffer }, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: { inline_keyboard }
+          });
+        } else {
+          await bot.telegram.sendPhoto(adminId, req.receiptUrl, {
+            caption: text,
+            parse_mode: "HTML",
+            reply_markup: { inline_keyboard }
+          });
+        }
       } else {
         await bot.telegram.sendMessage(adminId, text, {
           parse_mode: "HTML",
