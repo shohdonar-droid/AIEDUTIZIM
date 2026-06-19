@@ -350,6 +350,8 @@ export default function AdminBilling() {
       exam: 1000,
     },
     botFixed: 10000,               // Bot server yuklamasi (per org)
+    aiFixed: 15000,                // AI bazaviy oylik xarajat (per org)
+    interactionUnit: 50,           // Har bir talaba interaktivligi uchun xarajat birligi
   };
 
   const calculateGlobalFootprint = (tariff: TariffConfig, orgCount: number) => {
@@ -532,26 +534,26 @@ export default function AdminBilling() {
                       </div>
                       <div className="flex justify-between items-center pb-3 border-b border-white/10">
                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Saqlash & Trafik (Oylik)</span>
-                         <span className="text-sm font-black font-mono text-indigo-100">{systemCosts.perResource} UZS</span>
+                         <span className="text-sm font-black font-mono text-indigo-100">{systemCosts.unitUsage.perResource} UZS</span>
                       </div>
                       
                       <div className="pt-4 space-y-2">
                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Maksimal yuklamada (Xarajat):</p>
                          <p className="text-[9px] text-slate-300 mb-3 leading-tight font-bold italic lowercase">
-                            (yaratish/AI: 40 uzs + oylik saqlash: {systemCosts.perResource} uzs + {systemCosts.interactionUnit} uzs x har bir talaba)
+                            (yaratish/AI: 40 uzs + oylik saqlash: {systemCosts.unitUsage.perResource} uzs + {systemCosts.interactionUnit} uzs x har bir talaba)
                          </p>
                          <div className="grid grid-cols-1 gap-2">
                             <div className="flex justify-between items-center px-4 py-2.5 bg-white/5 rounded-xl border border-white/5">
                                <span className="text-[9px] font-bold uppercase">START ({tariffsConfig.start.students} talaba)</span>
-                               <span className="text-xs font-black text-indigo-300">{(40 + systemCosts.perResource + ((tariffsConfig.start.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
+                               <span className="text-xs font-black text-indigo-300">{(40 + systemCosts.unitUsage.perResource + ((tariffsConfig.start.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
                             </div>
                             <div className="flex justify-between items-center px-4 py-2.5 bg-white/5 rounded-xl border border-white/5">
                                <span className="text-[9px] font-bold uppercase">STANDARD ({tariffsConfig.standard.students} talaba)</span>
-                               <span className="text-xs font-black text-indigo-300">{(40 + systemCosts.perResource + ((tariffsConfig.standard.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
+                               <span className="text-xs font-black text-indigo-300">{(40 + systemCosts.unitUsage.perResource + ((tariffsConfig.standard.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
                             </div>
                             <div className="flex justify-between items-center px-4 py-2.5 bg-white/5 rounded-xl border border-white/5">
                                <span className="text-[9px] font-bold uppercase">PROFESSIONAL ({tariffsConfig.professional.students} talaba)</span>
-                               <span className="text-xs font-black text-indigo-300">{(40 + systemCosts.perResource + ((tariffsConfig.professional.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
+                               <span className="text-xs font-black text-indigo-300">{(40 + systemCosts.unitUsage.perResource + ((tariffsConfig.professional.students || 0) * systemCosts.interactionUnit)).toLocaleString()} UZS</span>
                             </div>
                          </div>
                       </div>
@@ -587,8 +589,8 @@ export default function AdminBilling() {
     const platformFixedFees = 450000; // Oylik Railway + Firebase Pro + Domain xarajatlari
     
     // Xarajatlar
-    const infraCost = (S * systemCosts.perStudent) + (T * systemCosts.perStaff);
-    const storageCost = R * systemCosts.perResource;
+    const infraCost = (S * systemCosts.unitUsage.perStudent) + (T * systemCosts.unitUsage.perStaff);
+    const storageCost = R * systemCosts.unitUsage.perResource;
     const aiAndBotCost = O * (systemCosts.aiFixed + systemCosts.botFixed);
     const interactionCost = S * (R / T) * systemCosts.interactionUnit;
     

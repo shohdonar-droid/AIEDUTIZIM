@@ -368,7 +368,7 @@ export default function TeacherStudents() {
           <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <h2 className="text-2xl font-black text-gray-900">
-                {activeTab === 'student' ? 'Yangi Talaba Qo\'shish' : 'Yangi Xodim Qo\'shish'}
+                {activeTab === 'student' ? 'Talaba Yaratish' : 'Xodim Yaratish'}
               </h2>
               <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-200 rounded-xl transition-colors">
                 <X className="w-6 h-6 text-gray-500" />
@@ -438,7 +438,7 @@ export default function TeacherStudents() {
                     className="flex-1 flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50"
                   >
                     {creating ? <Loader2 className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}
-                    SAQLASH
+                    YARATISH
                   </button>
                 </div>
               </form>

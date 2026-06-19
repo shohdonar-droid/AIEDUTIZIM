@@ -176,7 +176,7 @@ async function generateKursIshiMultiStep(topic: string, options: any) {
 
     const callAi = async (prompt: string, maxTokens = 16384) => {
         const res = await generateContentWithRotation({
-            model: "gemini-3.5-flash",
+            model: "gemini-2.0-flash",
             contents: prompt,
             config: {
                 maxOutputTokens: maxTokens,
@@ -321,7 +321,7 @@ app.get("/api/health", (req, res) => {
       }
       
       const response = await generateContentWithRotation({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.0-flash",
         contents: "Salom, bu test xabari. Iltimos 'OK' deb javob bering."
       });
       
@@ -389,7 +389,7 @@ app.get("/api/health", (req, res) => {
         }
       }
 
-      const MODEL_NAME = "gemini-3.5-flash";
+      const MODEL_NAME = "gemini-2.0-flash";
 
       if (action === "generateDynamicTest") {
         const countOptions = 4;
@@ -785,7 +785,7 @@ app.get("/api/health", (req, res) => {
           finalJson = await generateKursIshiMultiStep(topic, options);
         } else {
           const response = await generateContentWithRotation({
-            model: "gemini-3.5-flash",
+            model: "gemini-2.0-flash",
             contents: prompt,
             config: {
               maxOutputTokens: 16384,
@@ -866,7 +866,7 @@ app.get("/api/health", (req, res) => {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-3.5-flash",
+        model: model || "gemini-2.0-flash",
         contents: prompt
       });
 

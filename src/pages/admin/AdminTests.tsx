@@ -109,6 +109,8 @@ nato'g'ri_variant`;
     maxAttempts: 1,
     randomQuestionCount: null as number | null
   });
+  const [examPreviewQuestions, setExamPreviewQuestions] = useState<Question[]>([]);
+  const [generatingPreview, setGeneratingPreview] = useState(false);
 
   const parseExamManualText = () => {
     if (!examManualText.trim()) return;
@@ -319,6 +321,26 @@ nato'g'ri_variant`;
       alert('Test muvaffaqiyatli yangilandi!');
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
+  };
+
+  const generateExamPreview = async () => {
+    if (examData.rules.some(r => !r.subject)) {
+      return alert("Barcha qoidalar uchun fan/mavzu nomini kiriting.");
+    }
+    setGeneratingPreview(true);
+    setExamPreviewQuestions([]);
+    try {
+      const allQuestions: Question[] = [];
+      for (const rule of examData.rules) {
+        const questions = await generateDynamicTest(rule.subject, rule.count, rule.context);
+        allQuestions.push(...questions);
+      }
+      setExamPreviewQuestions(allQuestions);
+    } catch (err: any) {
+      alert(err.message || "Preview yaratishda xatolik yuz berdi.");
+    } finally {
+      setGeneratingPreview(false);
+    }
   };
 
   const saveExam = async () => {
@@ -1011,313 +1033,400 @@ nato'g'ri_variant`;
         <div className="space-y-10">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-10 items-start">
             <div className="bg-white rounded-3xl p-10 border border-gray-100 shadow-sm space-y-8">
-            <div className="flex items-center gap-4 mb-4">
-             <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
-               <Clock className="h-6 w-6" />
-             </div>
-             <div>
-               <h3 className="text-2xl font-black text-gray-900">Imtihon rejalashtirish</h3>
-               <p className="text-gray-500 text-sm mt-1">Imtihon uchun ma'lumotlar va dinamik test yaratish qoidalari (3 tagacha).</p>
-             </div>
-          </div>
-          <div className="space-y-8">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Imtihon nomi</label>
-                <input
-                  type="text"
-                  className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 font-bold focus:ring-2 focus:ring-blue-600"
-                  value={examData.title}
-                  onChange={(e) => setExamData({ ...examData, title: e.target.value })}
-                  placeholder="Masalan: Yakuniy Imtihon"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                    <Calendar className="h-3 w-3" /> Boshlanish
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 font-medium focus:ring-2 focus:ring-blue-600"
-                    value={examData.startTime}
-                    onChange={(e) => setExamData({ ...examData, startTime: e.target.value })}
-                  />
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Clock className="h-6 w-6" />
                 </div>
-                <div className="space-y-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> Yakunlanish
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 font-medium focus:ring-2 focus:ring-blue-600"
-                    value={examData.endTime}
-                    onChange={(e) => setExamData({ ...examData, endTime: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                    <Plus className="h-3 w-3" /> Imkoniyat
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 text-gray-900 font-bold focus:ring-2 focus:ring-blue-600"
-                    value={examData.maxAttempts}
-                    onChange={(e) => setExamData({ ...examData, maxAttempts: parseInt(e.target.value) || 1 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" /> Tasodifiy savollar
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 text-gray-900 font-bold focus:ring-2 focus:ring-blue-600"
-                    value={examData.randomQuestionCount || ''}
-                    onChange={(e) => setExamData({ ...examData, randomQuestionCount: e.target.value ? parseInt(e.target.value) : null })}
-                    placeholder="Barchasi"
-                  />
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900">Imtihon rejalashtirish</h3>
+                  <p className="text-gray-500 text-sm mt-1">Imtihon uchun ma'lumotlar va dinamik test yaratish qoidalari (3 tagacha).</p>
                 </div>
               </div>
-            </div>
-
-             <div className="flex flex-col gap-4">
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-4">
-                     <MultiSelectDropdown
-                       label="Tashkilotlar (Ixtiyoriy)"
-                       options={teachersList.map(t => ({ id: t.id, name: t.displayName }))}
-                       selectedIds={testOrganizationIds}
-                       onChange={(id, checked) => {
-                          if (!checked) {
-                             setTestOrganizationIds(prev => prev.filter(orgId => orgId !== id));
-                          } else {
-                             setTestOrganizationIds(prev => [...prev, id]);
-                          }
-                       }}
-                       placeholder="Barcha tashkilotlar"
-                       theme="blue"
+              <div className="space-y-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Imtihon nomi</label>
+                    <input
+                      type="text"
+                      className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 font-bold focus:ring-2 focus:ring-blue-600"
+                      value={examData.title}
+                      onChange={(e) => setExamData({ ...examData, title: e.target.value })}
+                      placeholder="Masalan: Yakuniy Imtihon"
                     />
                   </div>
-                  <div className="flex-1 space-y-4">
-                     <MultiSelectDropdown
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                        <Calendar className="h-3 w-3" /> Boshlanish
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 font-medium focus:ring-2 focus:ring-blue-600"
+                        value={examData.startTime}
+                        onChange={(e) => setExamData({ ...examData, startTime: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> Yakunlanish
+                      </label>
+                      <input
+                        type="datetime-local"
+                        className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 font-medium focus:ring-2 focus:ring-blue-600"
+                        value={examData.endTime}
+                        onChange={(e) => setExamData({ ...examData, endTime: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                        <Plus className="h-3 w-3" /> Imkoniyat
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 text-gray-900 font-bold focus:ring-2 focus:ring-blue-600"
+                        value={examData.maxAttempts}
+                        onChange={(e) => setExamData({ ...examData, maxAttempts: parseInt(e.target.value) || 1 })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" /> Tasodifiy savollar
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 text-gray-900 font-bold focus:ring-2 focus:ring-blue-600"
+                        value={examData.randomQuestionCount || ''}
+                        onChange={(e) => setExamData({ ...examData, randomQuestionCount: e.target.value ? parseInt(e.target.value) : null })}
+                        placeholder="Barchasi"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  <div className="flex gap-4">
+                    <div className="flex-1 space-y-4">
+                      <MultiSelectDropdown
+                        label="Tashkilotlar (Ixtiyoriy)"
+                        options={teachersList.map(t => ({ id: t.id, name: t.displayName }))}
+                        selectedIds={testOrganizationIds}
+                        onChange={(id, checked) => {
+                          if (!checked) {
+                            setTestOrganizationIds(prev => prev.filter(orgId => orgId !== id));
+                          } else {
+                            setTestOrganizationIds(prev => [...prev, id]);
+                          }
+                        }}
+                        placeholder="Barcha tashkilotlar"
+                        theme="blue"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-4">
+                      <MultiSelectDropdown
                         label="Yo'nalishlar (Ixtiyoriy, tanlanmasa barcha uchun)"
                         options={testOrganizationIds.length > 0 ? departments.filter(d => testOrganizationIds.includes(d.creatorId || '')) : departments}
                         selectedIds={testDepartmentIds}
                         onChange={(id, checked) => {
-                           if (!checked) {
-                              setTestDepartmentIds(prev => prev.filter(dId => dId !== id));
-                              setTestGroupIds(prev => prev.filter(gid => {
-                                 const g = groups.find(x => x.id === gid);
-                                 return g && g.departmentId !== id;
-                              }));
-                           } else {
-                              setTestDepartmentIds(prev => [...prev, id]);
-                           }
+                          if (!checked) {
+                            setTestDepartmentIds(prev => prev.filter(dId => dId !== id));
+                            setTestGroupIds(prev => prev.filter(gid => {
+                              const g = groups.find(x => x.id === gid);
+                              return g && g.departmentId !== id;
+                            }));
+                          } else {
+                            setTestDepartmentIds(prev => [...prev, id]);
+                          }
                         }}
                         placeholder="Barcha uchun umumiy"
                         theme="blue"
-                     />
+                      />
+                    </div>
                   </div>
-                </div>
-                {testDepartmentIds.length > 0 && (
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-4">
-                     <MultiSelectDropdown
-                        label="Guruhlar (Ixtiyoriy, tanlanmasa barcha yo'nalish talabalariga)"
-                        options={groups.filter(g => testDepartmentIds.includes(g.departmentId))}
-                        selectedIds={testGroupIds}
-                        onChange={(id, checked) => {
-                           if (!checked) {
+                  {testDepartmentIds.length > 0 && (
+                    <div className="flex gap-4">
+                      <div className="flex-1 space-y-4">
+                        <MultiSelectDropdown
+                          label="Guruhlar (Ixtiyoriy, tanlanmasa barcha yo'nalish talabalariga)"
+                          options={groups.filter(g => testDepartmentIds.includes(g.departmentId))}
+                          selectedIds={testGroupIds}
+                          onChange={(id, checked) => {
+                            if (!checked) {
                               setTestGroupIds(prev => prev.filter(gId => gId !== id));
-                           } else {
+                            } else {
                               setTestGroupIds(prev => [...prev, id]);
-                           }
-                        }}
-                        placeholder="Yo'nalishdagi barcha guruhlar"
-                        theme="blue"
-                     />
-                  </div>
+                            }
+                          }}
+                          placeholder="Yo'nalishdagi barcha guruhlar"
+                          theme="blue"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                )}
-             </div>
 
-            <div className="space-y-6 pt-6 border-t border-gray-100">
-               <div className="flex bg-gray-50 p-1 rounded-xl">
-                 <button 
-                   onClick={() => setExamAiMode('ai')} 
-                   className={`flex-1 py-2 font-bold text-sm tracking-wide rounded-lg transition-colors ${examAiMode === 'ai' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
-                 >
-                   DINAMIK TEST (AI QOIDASI)
-                 </button>
-                 <button 
-                   onClick={() => setExamAiMode('manual')} 
-                   className={`flex-1 py-2 font-bold text-sm tracking-wide rounded-lg transition-colors ${examAiMode === 'manual' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
-                 >
-                   STATIK TEST (QO'LDA KIRITISH)
-                 </button>
-               </div>
+                <div className="space-y-6 pt-6 border-t border-gray-100">
+                  <div className="flex bg-gray-50 p-1 rounded-xl">
+                    <button
+                      onClick={() => setExamAiMode('ai')}
+                      className={`flex-1 py-2 font-bold text-sm tracking-wide rounded-lg transition-colors ${examAiMode === 'ai' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      DINAMIK TEST (AI QOIDASI)
+                    </button>
+                    <button
+                      onClick={() => setExamAiMode('manual')}
+                      className={`flex-1 py-2 font-bold text-sm tracking-wide rounded-lg transition-colors ${examAiMode === 'manual' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      STATIK TEST (QO'LDA KIRITISH)
+                    </button>
+                  </div>
 
-               {examAiMode === 'ai' ? (
-                 <>
-                   <h4 className="text-lg font-bold text-gray-900">Test generatsiya (AI)</h4>
-                   <p className="text-sm text-gray-500 mb-4">Talabalar imtihonga kirganda ushbu qoidalar yordamida har biri uchun noyob test savollari generatsiya qilinadi.</p>
-                   
-                   {examData.rules.map((rule, idx) => (
-                     <div key={idx} className="bg-gray-50 rounded-2xl p-6 space-y-4 border border-gray-100 relative">
-                        <div className="absolute top-4 right-4 bg-blue-100 text-blue-800 text-xs font-black px-3 py-1 rounded-full">
-                           QOG'OZ {idx + 1}
+                  {examAiMode === 'ai' ? (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-lg font-bold text-gray-900">Test generatsiya (AI)</h4>
+                          <p className="text-sm text-gray-500">Talabalar uchun noyob test qoidalari.</p>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                           <div className="md:col-span-3 space-y-2">
-                              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Fan yoki Mavzu nomi</label>
+                        <button
+                          onClick={generateExamPreview}
+                          type="button"
+                          disabled={generatingPreview}
+                          className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50 text-sm whitespace-nowrap"
+                        >
+                          {generatingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                          AI ORQALI YARATISH (PREVIEW)
+                        </button>
+                      </div>
+
+                      {examData.rules.map((rule, idx) => (
+                        <div key={idx} className="bg-gray-50 rounded-2xl p-6 space-y-4 border border-gray-100 relative shadow-sm">
+                          <div className="absolute top-4 right-4 flex gap-2">
+                            {examData.rules.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newRules = examData.rules.filter((_, i) => i !== idx);
+                                  setExamData({ ...examData, rules: newRules });
+                                }}
+                                className="bg-red-50 text-red-600 p-2 rounded-lg hover:bg-red-100 transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            <div className="bg-indigo-100 text-indigo-800 text-[10px] font-black px-3 py-1 rounded-full flex items-center">
+                              QOIDALAR {idx + 1}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                            <div className="md:col-span-3 space-y-2">
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Fan yoki Mavzu nomi</label>
                               <input
                                 type="text"
                                 placeholder="Masalan: Frontend asoslari"
                                 className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent font-medium"
                                 value={rule.subject}
                                 onChange={(e) => {
-                                   const newRules = [...examData.rules];
-                                   newRules[idx].subject = e.target.value;
-                                   setExamData({ ...examData, rules: newRules });
+                                  const newRules = [...examData.rules];
+                                  newRules[idx].subject = e.target.value;
+                                  setExamData({ ...examData, rules: newRules });
                                 }}
                               />
-                           </div>
-                           <div className="space-y-2">
-                              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Savollar soni</label>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Soni</label>
                               <input
                                 type="number"
                                 min="1" max="50"
                                 className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-gray-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent font-medium text-center"
                                 value={rule.count}
                                 onChange={(e) => {
-                                   const newRules = [...examData.rules];
-                                   newRules[idx].count = Number(e.target.value);
-                                   setExamData({ ...examData, rules: newRules });
+                                  const newRules = [...examData.rules];
+                                  newRules[idx].count = Number(e.target.value);
+                                  setExamData({ ...examData, rules: newRules });
                                 }}
                               />
-                           </div>
-                           <div className="md:col-span-4 space-y-2">
-                              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                            </div>
+                            <div className="md:col-span-4 space-y-2">
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
                                 <FileUp className="h-3 w-3" /> Matn (Manba)
                               </label>
                               <textarea
-                                rows={3}
-                                placeholder="Qo'shimcha matn manbasini kiriting (ixtiyoriy)... Ushbu matndan AI foydalanib test tuzadi."
-                                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent font-medium text-sm"
+                                rows={2}
+                                placeholder="Qo'shimcha matn manbasini kiriting (ixtiyoriy)..."
+                                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-blue-600 focus:border-transparent font-medium text-xs h-20"
                                 value={rule.context}
                                 onChange={(e) => {
-                                   const newRules = [...examData.rules];
-                                   newRules[idx].context = e.target.value;
-                                   setExamData({ ...examData, rules: newRules });
+                                  const newRules = [...examData.rules];
+                                  newRules[idx].context = e.target.value;
+                                  setExamData({ ...examData, rules: newRules });
                                 }}
                               />
-                           </div>
+                            </div>
+                          </div>
                         </div>
-                     </div>
-                   ))}
-                 </>
-               ) : (
-                 <div className="space-y-4">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Matn shakldagi savollar</label>
-                    <p className="text-sm text-gray-500 mb-2">Barcha talabalar uchun yagona statik savollar to'plamini kiriting.</p>
-                    <textarea
-                      rows={8}
-                      placeholder="++++ savol matni&#10;====&#10;nato'g'ri_variant&#10;====&#10;#to'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;===="
-                      className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-blue-600 font-mono text-sm leading-relaxed"
-                      value={examManualText}
-                      onChange={(e) => setExamManualText(e.target.value)}
-                    />
-                    <button
-                      onClick={parseExamManualText}
-                      className="flex items-center gap-2 py-3 px-6 rounded-xl bg-gray-900 text-white font-bold hover:bg-gray-800 transition-all text-sm"
-                    >
-                      SAVOLLARNI PARSE QILISH
-                    </button>
-                 </div>
-               )}
-            </div>
+                      ))}
 
-            {examAiMode === 'manual' && examData.questions.length > 0 && (
-              <div className="space-y-6 pt-6 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-bold text-gray-900">Parse qilingan savollar ({examData.questions.length})</h4>
-                  <button onClick={() => setExamData({ ...examData, questions: [] })} className="text-sm text-red-500 font-bold hover:underline">Tozalash</button>
+                      <button
+                        type="button"
+                        onClick={() => setExamData({ ...examData, rules: [...examData.rules, { subject: '', context: '', count: 10 }] })}
+                        className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 font-bold hover:border-indigo-400 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="h-5 w-5" /> YANGI QOIDA QO'SHISH
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Matn shakldagi savollar</label>
+                      <p className="text-sm text-gray-500 mb-2">Barcha talabalar uchun yagona statik savollar to'plamini kiriting.</p>
+                      <textarea
+                        rows={8}
+                        placeholder="++++ savol matni&#10;====&#10;nato'g'ri_variant&#10;====&#10;#to'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;===="
+                        className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-blue-600 font-mono text-sm leading-relaxed"
+                        value={examManualText}
+                        onChange={(e) => setExamManualText(e.target.value)}
+                      />
+                      <button
+                        onClick={parseExamManualText}
+                        className="flex items-center gap-2 py-3 px-6 rounded-xl bg-gray-900 text-white font-bold hover:bg-gray-800 transition-all text-sm"
+                      >
+                        SAVOLLARNI PARSE QILISH
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                  {examData.questions.map((q, i) => (
-                    <div key={i} className="p-6 rounded-2xl bg-gray-50 border border-gray-200 space-y-4">
-                      <div className="flex gap-2">
-                        <span className="text-blue-600 font-bold mt-2">{i + 1}.</span> 
-                        <textarea
-                          value={q.text}
-                          onChange={(e) => {
-                            const newQ = [...examData.questions];
-                            newQ[i].text = e.target.value;
-                            setExamData({ ...examData, questions: newQ });
-                          }}
-                          className="w-full bg-white px-4 py-2 text-gray-900 font-bold rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-600 outline-none resize-y min-h-[60px]"
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 pl-6">
-                        {q.options.map((opt, oIdx) => (
-                          <div key={oIdx} className="flex gap-2 items-center">
-                            <input 
-                              type="radio" 
-                              name={`exam-gen-correct-${i}`} 
-                              checked={oIdx === q.correctIdx}
-                              onChange={() => {
-                                const newQ = [...examData.questions];
-                                newQ[i].correctIdx = oIdx;
-                                setExamData({ ...examData, questions: newQ });
-                              }}
-                              className="w-4 h-4 text-blue-600 focus:ring-blue-600"
-                            />
-                            <input
-                              type="text"
-                              value={opt}
+
+                {examAiMode === 'manual' && examData.questions.length > 0 && (
+                  <div className="space-y-6 pt-6 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-bold text-gray-900">Parse qilingan savollar ({examData.questions.length})</h4>
+                      <button onClick={() => setExamData({ ...examData, questions: [] })} className="text-sm text-red-500 font-bold hover:underline">Tozalash</button>
+                    </div>
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                      {examData.questions.map((q, i) => (
+                        <div key={i} className="p-6 rounded-2xl bg-gray-50 border border-gray-200 space-y-4">
+                          <div className="flex gap-2">
+                            <span className="text-blue-600 font-bold mt-2">{i + 1}.</span>
+                            <textarea
+                              value={q.text}
                               onChange={(e) => {
                                 const newQ = [...examData.questions];
-                                newQ[i].options[oIdx] = e.target.value;
+                                newQ[i].text = e.target.value;
                                 setExamData({ ...examData, questions: newQ });
                               }}
-                              className={`flex-1 px-4 py-2 rounded-xl border text-sm font-medium outline-none transition-colors ${
-                                oIdx === q.correctIdx ? 'bg-green-50 border-green-200 text-green-700 font-bold' : 'bg-white border-gray-200 text-gray-600 focus:border-blue-400'
-                              }`}
+                              className="w-full bg-white px-4 py-2 text-gray-900 font-bold rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-600 outline-none resize-y min-h-[60px]"
                             />
                           </div>
-                        ))}
-                      </div>
+                          <div className="grid grid-cols-1 gap-2 pl-6">
+                            {q.options.map((opt, oIdx) => (
+                              <div key={oIdx} className="flex gap-2 items-center">
+                                <input
+                                  type="radio"
+                                  name={`exam-gen-correct-${i}`}
+                                  checked={oIdx === q.correctIdx}
+                                  onChange={() => {
+                                    const newQ = [...examData.questions];
+                                    newQ[i].correctIdx = oIdx;
+                                    setExamData({ ...examData, questions: newQ });
+                                  }}
+                                  className="w-4 h-4 text-blue-600 focus:ring-blue-600"
+                                />
+                                <input
+                                  type="text"
+                                  value={opt}
+                                  onChange={(e) => {
+                                    const newQ = [...examData.questions];
+                                    newQ[i].options[oIdx] = e.target.value;
+                                    setExamData({ ...examData, questions: newQ });
+                                  }}
+                                  className={`flex-1 px-4 py-2 rounded-xl border text-sm font-medium outline-none transition-colors ${oIdx === q.correctIdx ? 'bg-green-50 border-green-200 text-green-700 font-bold' : 'bg-white border-gray-200 text-gray-600 focus:border-blue-400'
+                                    }`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => {
+                          const newQ = { id: Math.random().toString(), text: 'Yangi savol...', options: ['', '', '', ''], correctIdx: 0 };
+                          setExamData({ ...examData, questions: [...examData.questions, newQ] });
+                        }}
+                        className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 font-bold hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="h-5 w-5" /> YANGI SAVOL QO'SHISH
+                      </button>
                     </div>
-                  ))}
-                  <button 
-                    onClick={() => {
-                      const newQ = { id: Math.random().toString(), text: 'Yangi savol...', options: ['', '', '', ''], correctIdx: 0 };
-                      setExamData({ ...examData, questions: [...examData.questions, newQ] });
-                    }}
-                    className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 font-bold hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Plus className="h-5 w-5" /> YANGI SAVOL QO'SHISH
-                  </button>
-                </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={saveExam}
+                  disabled={loading || (examAiMode === 'manual' && examData.questions.length === 0)}
+                  className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-xl font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                  IMTIHONNI REJALASHTIRISH VA SAQLASH
+                </button>
               </div>
-            )}
+            </div>
 
-            <button 
-              onClick={saveExam}
-              disabled={loading || (examAiMode === 'manual' && examData.questions.length === 0)}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-xl font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-              IMTIHONNI REJALASHTIRISH VA SAQLASH
-            </button>
-           </div>
+            {/* Generator Results */}
+            <div className="bg-white rounded-3xl p-10 border border-gray-100 shadow-sm h-fit sticky top-10 flex flex-col min-h-[400px]">
+              <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-50">
+                <h4 className="text-xl font-black text-gray-900 uppercase tracking-tight flex items-center gap-2">
+                  <Brain className="w-6 h-6 text-indigo-600" />
+                  Generator natijalari
+                </h4>
+                {examPreviewQuestions.length > 0 && (
+                  <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl">
+                    {examPreviewQuestions.length} ta savol
+                  </span>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-1 space-y-6 max-h-[800px] custom-scrollbar">
+                {!generatingPreview && examPreviewQuestions.length === 0 && (
+                  <div className="h-full flex flex-col items-center justify-center py-20 text-center space-y-4 opacity-40">
+                    <Sparkles className="w-12 h-12 text-gray-300" />
+                    <p className="font-bold text-gray-400 italic text-sm">
+                      Hali hech narsa yaratilmadi.<br />
+                      "AI ORQALI YARATISH" tugmasini bosing.
+                    </p>
+                  </div>
+                )}
+
+                {generatingPreview && (
+                  <div className="h-full flex flex-col items-center justify-center py-20 text-center space-y-4">
+                    <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+                    <p className="font-bold text-indigo-600 animate-pulse text-sm">
+                      AI tomonidan testlar yaratilmoqda...<br />
+                      Iltimos, kuting...
+                    </p>
+                  </div>
+                )}
+
+                {examPreviewQuestions.map((q, i) => (
+                  <div key={i} className="p-6 rounded-2xl bg-gray-50 border border-gray-100 shadow-sm space-y-4">
+                    <div className="flex gap-3">
+                      <span className="text-indigo-600 font-extrabold text-sm mt-0.5">{i + 1}.</span>
+                      <p className="text-sm font-bold text-gray-800 leading-relaxed">{q.text}</p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 pl-6">
+                      {q.options.map((opt, oIdx) => (
+                        <div key={oIdx} className={`p-3 rounded-xl text-xs font-medium border ${oIdx === q.correctIdx ? 'bg-green-50 border-green-200 text-green-700 font-bold' : 'bg-white border-gray-100 text-gray-500'}`}>
+                          {opt}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-3xl p-10 border border-gray-100 shadow-sm space-y-8">
+          <div className="bg-white rounded-3xl p-10 border border-gray-100 shadow-sm space-y-8">
            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">

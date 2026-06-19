@@ -40,6 +40,7 @@ export default function AdminUsers() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [teachers, setTeachers] = useState<UserProfile[]>([]);
+  const [independentTeachers, setIndependentTeachers] = useState<UserProfile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [staffUsers, setStaffUsers] = useState<UserProfile[]>([]);
@@ -272,9 +273,10 @@ export default function AdminUsers() {
 
         // Data by role - Fetching with a safety limit to prevent quota drain
         // We load them sequentially or parallel but with LIMIT(300)
-        const [studentsSnap, teachersSnap, staffSnap, subadminsSnap, tgSnap, botConfigsSnap] = await Promise.all([
+        const [studentsSnap, teachersSnap, independentTeachersSnap, staffSnap, subadminsSnap, tgSnap, botConfigsSnap] = await Promise.all([
           getDocs(query(collection(db, "users"), where("role", "==", "student"), limit(300))),
           getDocs(query(collection(db, "users"), where("role", "==", "teacher"), limit(300))),
+          getDocs(query(collection(db, "users"), where("role", "==", "mustaqil_o_qituvchi"), limit(300))),
           getDocs(query(collection(db, "users"), where("role", "==", "staff"), limit(300))),
           getDocs(query(collection(db, "users"), where("role", "in", ["subadmin", "admin"]), limit(100))),
           getDocs(query(collection(db, "telegram_users"), limit(300))),
@@ -286,6 +288,9 @@ export default function AdminUsers() {
           .filter(u => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"))
           .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
         const teachersList = teachersSnap.docs
+          .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
+          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+        const independentList = independentTeachersSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
           .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
         const staffList = staffSnap.docs
@@ -305,6 +310,7 @@ export default function AdminUsers() {
 
         setUsers(students);
         setTeachers(teachersList);
+        setIndependentTeachers(independentList);
         setStaffUsers(staffList);
         setSubadmins(subadminsList);
         setTelegramUsers(tgUsers);
@@ -315,6 +321,7 @@ export default function AdminUsers() {
         localStorage.setItem("admin_users_groups_cache", JSON.stringify(grps));
         localStorage.setItem("admin_users_students_cache", JSON.stringify(students));
         localStorage.setItem("admin_users_teachers_cache", JSON.stringify(teachersList));
+        localStorage.setItem("admin_users_independent_cache", JSON.stringify(independentList));
         localStorage.setItem("admin_users_staff_cache", JSON.stringify(staffList));
         localStorage.setItem("admin_users_subadmins_cache", JSON.stringify(subadminsList));
         localStorage.setItem("admin_users_last_load_time", Date.now().toString());
@@ -356,7 +363,7 @@ export default function AdminUsers() {
     const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
     if (isSuperAdmin) {
       // Load from cache first for instant UI
-      const cacheKeys = ["depts", "groups", "students", "teachers", "staff", "subadmins"];
+      const cacheKeys = ["depts", "groups", "students", "teachers", "independent", "staff", "subadmins"];
       cacheKeys.forEach((k) => {
         const cached = localStorage.getItem(`admin_users_${k}_cache`);
         if (cached) {
@@ -365,6 +372,7 @@ export default function AdminUsers() {
           else if (k === "groups") setGroups(data);
           else if (k === "students") setUsers(data);
           else if (k === "teachers") setTeachers(data);
+          else if (k === "independent") setIndependentTeachers(data);
           else if (k === "staff") setStaffUsers(data);
           else if (k === "subadmins") setSubadmins(data);
         }
@@ -824,6 +832,9 @@ export default function AdminUsers() {
     return matchesSearch && matchesOrg && matchesDept && matchesGrp;
   });
   const filteredTeachers = teachers.filter((u) =>
+    u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+  const filteredIndependentTeachers = independentTeachers.filter((u) =>
     u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
   const filteredStaff = staffUsers.filter((u) => {
@@ -1407,6 +1418,93 @@ export default function AdminUsers() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {!editingTeacher && (
+            <div className="mt-8 space-y-6">
+              <h3 className="text-xl font-black text-gray-900 px-2 uppercase tracking-tight flex items-center gap-2">
+                <Users className="w-6 h-6 text-indigo-600" />
+                Hamkor Mustaqil o'qituvchilar
+              </h3>
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/50 border-b border-gray-50">
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
+                        №
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
+                        F.I.SH (O'qituvchi)
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
+                        Tel raqam
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
+                        Login
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
+                        Parol
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-black text-gray-400 uppercase">
+                        Amallar
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filteredIndependentTeachers.map((t, i) => (
+                      <tr
+                        key={`${t.uid || "ind_teacher"}_${i}`}
+                        className="hover:bg-gray-50/30 group transition"
+                      >
+                        <td className="px-6 py-4 font-bold text-gray-400">
+                          {i + 1}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => impersonateTeacher(t.uid)}
+                            className="font-black text-indigo-600 hover:underline inline-flex items-center gap-1"
+                            title="O'qituvchi profiliga kirish"
+                          >
+                            <LayoutDashboard className="w-4 h-4" />{" "}
+                            {t.displayName}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-500">
+                          {t.phone || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-500">
+                          {t.login || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-mono text-gray-400">
+                          {t.password || "-"}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => setEditingTeacher(t)}
+                              className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteSingleUser(t.uid)}
+                              className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredIndependentTeachers.length === 0 && (
+                  <div className="p-10 text-center text-gray-400 italic opacity-50">
+                    Mustaqil o'qituvchilar topilmadi.
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
