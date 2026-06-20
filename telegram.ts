@@ -1619,7 +1619,7 @@ bot.action("admin_reorder_button", async (ctx) => {
 });
 
 bot.action(/admin_approve_req_(.+)/, async (ctx) => {
-  const requestId = ctx.match[1];
+  const requestId = ctx.match[1].trim();
   const adminId = ctx.from.id;
 
   try {
@@ -1636,10 +1636,16 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
     }
 
     await ctx.reply("⏳ So'rov tasdiqlanmoqda, iltimos kuting...");
+    console.log(`[Telegram] Admin ${adminId} is approving request ${requestId}`);
 
     let targetUserId = req.userId;
 
+    if (!targetUserId && !req.isNewOrgRequest) {
+      throw new Error("So'rovda foydalanuvchi ID si topilmadi.");
+    }
+
     if (req.isNewOrgRequest) {
+      console.log(`[Telegram] Creating new organization user with login: ${req.login}`);
       const q = query(collection(db, "users"), where("login", "==", req.login.trim()));
       const qSnap = await getDocs(q);
       if (!qSnap.empty) {
@@ -1666,6 +1672,7 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
       }
       const authData = await response.json();
       targetUserId = authData.localId;
+      console.log(`[Telegram] New user created with UID: ${targetUserId}`);
 
       const customLimits: any = {};
       if (req.limits) {
@@ -1701,6 +1708,7 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
     });
 
     if (req.isLimitsRequest) {
+      console.log(`[Telegram] Processing limits request for user ${targetUserId}`);
       const userRef = doc(db, "users", targetUserId);
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
@@ -1708,14 +1716,31 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
         const targetLimits = req.requestedLimits || req.requestedItems || {};
         const updates: any = {};
         Object.entries(targetLimits).forEach(([key, val]) => {
-          const currentVal = userData[key] ?? 0;
+          const currentVal = Number(userData[key]) || 0;
           updates[key] = currentVal + Number(val);
         });
         await updateDoc(userRef, updates);
+        console.log(`[Telegram] Limits updated for user ${targetUserId}:`, updates);
+      } else {
+        console.warn(`[Telegram] User ${targetUserId} not found for limits update`);
       }
     } else {
+      console.log(`[Telegram] Processing standard tariff/upgrade for user ${targetUserId}`);
       const customLimits: any = {};
-      if (req.limits) {
+      
+      // If it's a fixed tariff name and no custom limits provided, we should try to set standard defaults
+      if (req.tariffName && !req.limits) {
+        const name = String(req.tariffName).toUpperCase();
+        if (name === "START") {
+          customLimits.studentLimit = 50; customLimits.staffLimit = 2; customLimits.courseLimit = 3; customLimits.testLimit = 15; customLimits.examLimit = 2; customLimits.subjectLimit = 5; customLimits.quizizzLimit = 4;
+        } else if (name === "STANDARD") {
+          customLimits.studentLimit = 200; customLimits.staffLimit = 5; customLimits.courseLimit = 10; customLimits.testLimit = 50; customLimits.examLimit = 10; customLimits.subjectLimit = 20; customLimits.quizizzLimit = 15;
+          customLimits.hasBot = true;
+        } else if (name === "PROFESSIONAL") {
+          customLimits.studentLimit = 1000; customLimits.staffLimit = 20; customLimits.courseLimit = 50; customLimits.testLimit = 300; customLimits.examLimit = 50; customLimits.subjectLimit = 100; customLimits.quizizzLimit = 100;
+          customLimits.hasAI = true; customLimits.hasBot = true;
+        }
+      } else if (req.limits) {
         customLimits.studentLimit = Number(req.limits.students) || 0;
         customLimits.staffLimit = Number(req.limits.staff) || 0;
         customLimits.courseLimit = Number(req.limits.courses) || 0;
@@ -1733,8 +1758,8 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
         tariffName: req.tariffName,
         startDate: serverTimestamp(),
         paymentType: req.paymentType,
-        tariffPrice: req.tariffPrice,
-        limits: req.limits || null
+        tariffPrice: Number(req.tariffPrice || 0),
+        limits: req.limits || (Object.keys(customLimits).length > 0 ? customLimits : null)
       });
 
       await updateDoc(doc(db, "users", targetUserId), {
@@ -1742,6 +1767,7 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
         lastTariffUpdate: serverTimestamp(),
         ...customLimits
       });
+      console.log(`[Telegram] Tariff updated for user ${targetUserId}: ${req.tariffName}`);
     }
 
     // Payment history
@@ -1761,7 +1787,7 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
       userId: targetUserId,
       payerName: payerName,
       payerType: payerType,
-      amount: req.tariffPrice || req.totalPrice || 0,
+      amount: Number(req.tariffPrice || req.totalPrice || 0),
       tariffName: req.tariffName || "Noma'lum",
       paymentType: req.paymentType || "Chek",
       timestamp: serverTimestamp()
