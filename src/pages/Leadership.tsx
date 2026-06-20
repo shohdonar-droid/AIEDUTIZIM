@@ -94,7 +94,7 @@ export default function Leadership() {
                       <span className="text-sm font-black text-gray-800">Lavozimi:</span>
                    </div>
                    <div className="mx-2" />
-                   <span className="text-sm font-bold text-gray-600">
+                   <span className="text-sm font-bold text-red-600">
                      {admin.role === 'admin' ? 'Tizim administratori' : 'Kichik admin'}
                    </span>
                 </div>
