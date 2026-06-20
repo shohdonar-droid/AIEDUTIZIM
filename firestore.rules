@@ -60,12 +60,12 @@ service cloud.firestore {
     
     // Connection requests
     match /connection_requests/{id} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
 
     // Payment history
     match /payment_history/{id} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
 
     match /active_subscriptions/{id} {
