@@ -76,5 +76,10 @@ service cloud.firestore {
     match /activityLogs/{document=**} {
       allow read, write: if true;
     }
+
+    // Global admin rule
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
   }
 }
