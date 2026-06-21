@@ -671,7 +671,8 @@ const AI_COSTS: Record<string, number> = {
   "🌐 Tarjimon": 2,
   "📋 Test yaratish": 3,
   "📄 CV yaratish": 5,
-  "💬 Savol-javob": 1
+  "💬 Savol-javob": 1,
+  "📄 AI Antiplagiat": 5
 };
 
 const requestHistory = new Map<number, number[]>();
@@ -1014,6 +1015,7 @@ async function getAiAssistantKeyboard(userId?: number) {
     [{ text: "🎓 Tezis yaratish" }, { text: "📑 Maqola yaratish" }],
     [{ text: "📝 Dars ishlanma yaratish" }, { text: "📋 Test yaratish" }],
     [{ text: "🌐 Tarjimon" }, { text: "📄 CV yaratish" }],
+    [{ text: "📄 AI Antiplagiat" }],
     [{ text: "⬅️ Asosiy menyu" }]
   ];
 
@@ -2933,6 +2935,54 @@ async function runTranslationGeneration(ctx: any, data: any) {
   }
 }
 
+async function handleAntiplagiatAnalysis(ctx: any, input: string) {
+    const userId = ctx.from.id;
+    
+    const loadingMsg = await ctx.reply("⏳ Tahlil qilinmoqda, iltimos kuting...");
+    
+    try {
+      const analysisPrompt = `Ushbu matnni antiplagiat nuqtai nazaridan tahlil qiling: "${input}".                
+      
+      Quyidagi ko'rinishda hisobot qaytaring:
+      ━━━━━━━━━━━━━━━
+      📄 AI ANTIPLAGIAT HISOBOTI
+      ━━━━━━━━━━━━━━━
+      
+      📊 Umumiy o'xshashlik: [XX]%
+      
+      🤖 AI yozganlik ehtimoli: [XX]%
+      
+      📝 Takrorlangan jumlalar: [XX] ta
+      
+      🎓 Akademik uslub:
+      [Yaxshi/O'rta/Past]
+      
+      ⚠️ Plagiat xavfi:
+      [Past/O'rta/Yuqori]
+      
+      💡 Tavsiyalar:
+      - [Tavsiya 1]
+      - [Tavsiya 2]
+      - [Tavsiya 3]
+      
+      ━━━━━━━━━━━━━━━
+      
+      Eslatma: Natijalar Gemini AI tahliliga asoslangan bo'lib, rasmiy antiplagiat natijasi hisoblanmaydi.`;
+  
+      const report = await generateContentWithRotation({
+        model: "gemini-3.5-flash",
+        contents: analysisPrompt
+      });
+      
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+      await ctx.reply(report.text, { parse_mode: "HTML" });
+      
+    } catch (err: any) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+      await ctx.reply(`❌ Xatolik yuz berdi: ${err.message || 'Keyinroq urinib ko\'ring.'}`);
+    }
+  }
+
 async function handleWizardStep(ctx: any, wizard: any, input: string) {
   const userId = ctx.from.id;
   const service = wizard.service;
@@ -3246,6 +3296,12 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       await runDocumentGeneration(ctx, "cv", data);
     }
   }
+  else if (service === "📄 AI Antiplagiat") {
+    if (step === 1) {
+      userWizardStates.delete(userId);
+      await handleAntiplagiatAnalysis(ctx, input);
+    }
+  }
 }
 
 bot.on("message", async (ctx) => {
@@ -3368,6 +3424,7 @@ bot.on("message", async (ctx) => {
     else if (normText === "📋 Test yaratish") { promptText = "📋 <b>Fan nomini kiriting:</b>"; }
     else if (normText === "🌐 Tarjimon") { promptText = "🌐 <b>Tarjima yo'nalishini kiriting (masalan: O'zbekcha-Inglizcha):</b>"; }
     else if (normText === "📄 CV yaratish") { promptText = "📄 <b>Foydalanuvchi F.I.Sh. kiriting:</b>"; }
+    else if (normText === "📄 AI Antiplagiat") { promptText = "📄 <b>Matn yuboring yoki fayl (PDF, DOCX, TXT) yuklang:</b>"; }
 
     userWizardStates.set(userId, { service: normText, step: 1, data: {} });
     
