@@ -27,6 +27,7 @@ export default function IndependentLimits() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [receiptBase64, setReceiptBase64] = useState<string>("");
   const [receiptFileName, setReceiptFileName] = useState<string>("");
+  const [cardSettings, setCardSettings] = useState({ number: "9860 0000 0000 0000", owner: "ADMIN NAME", type: "Humo" });
 
   // Default prices per unit standard (UZS) (fallback if db configurations are not ready)
   const FALLBACK_PRICES: Record<string, number> = {
@@ -55,9 +56,20 @@ export default function IndependentLimits() {
     if (!user) return;
     try {
       // 1. Fetch dynamic tariff plan configurations
-      const tarDoc = await getDoc(doc(db, "settings", "tariffs"));
+      const [tarDoc, cardSnap] = await Promise.all([
+        getDoc(doc(db, "settings", "tariffs")),
+        getDoc(doc(db, "settings", "payment_card"))
+      ]);
       if (tarDoc.exists()) {
         setTariffsConfig(tarDoc.data());
+      }
+      if (cardSnap.exists()) {
+        const data = cardSnap.data();
+        setCardSettings({ 
+          number: data.number || "9860 0000 0000 0000", 
+          owner: data.owner || "ADMIN NAME", 
+          type: data.type || "Humo" 
+        });
       }
 
       // 2. Load connection requests history for this user
@@ -430,11 +442,11 @@ export default function IndependentLimits() {
               <div>
                 <p className="text-[10px] text-indigo-200 font-bold tracking-wider">Karta raqami (To'lov uchun):</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className="text-base font-mono font-bold tracking-widest text-white">9860 2109 4567 8901</p>
+                  <p className="text-base font-mono font-bold tracking-widest text-white">{cardSettings.number}</p>
                   <button 
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText("9860210945678901");
+                      navigator.clipboard.writeText(cardSettings.number.replace(/\s/g, ''));
                       alert("Karta raqami nusxalandi!");
                     }}
                     className="px-2 py-1 bg-white/20 hover:bg-white/30 text-[9px] font-bold rounded-lg transition-colors border border-white/10"
@@ -448,9 +460,9 @@ export default function IndependentLimits() {
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-[8px] font-mono tracking-widest text-indigo-200">KARTA EGASI</p>
-                  <p className="text-xs font-mono font-bold mt-0.5 uppercase tracking-wide">AIEDUTIZIM BILlING SERVICE</p>
+                  <p className="text-xs font-mono font-bold mt-0.5 uppercase tracking-wide">{cardSettings.owner}</p>
                 </div>
-                <div className="w-8 h-6 bg-yellow-400/90 rounded-md"></div>
+                <div className="w-8 h-6 bg-yellow-400/90 rounded-md flex items-center justify-center text-[8px] font-black text-slate-900">{cardSettings.type}</div>
               </div>
             </div>
 
