@@ -136,6 +136,64 @@ export default function Login() {
              docExists = true;
           }
         }
+
+        // Try self-healing if document doesn't exist but they logged in successfully with Firebase Auth
+        if (!docExists) {
+          try {
+            const qEmail = query(collection(db, 'users'), where('email', '==', actualEmail.toLowerCase().trim()));
+            const qEmailSnap = await getDocs(qEmail);
+            if (!qEmailSnap.empty) {
+              userDocData = qEmailSnap.docs[0].data();
+              docExists = true;
+              const foundId = qEmailSnap.docs[0].id;
+              if (foundId !== res.user.uid) {
+                console.warn("User document ID mismatch! Healing document...", foundId, "vs", res.user.uid);
+                await setDoc(doc(db, 'users', res.user.uid), {
+                  ...userDocData,
+                  uid: res.user.uid
+                });
+              }
+            } else {
+              const qLog = query(collection(db, 'users'), where('login', '==', trimmedLogin.toLowerCase().trim()));
+              const qLogSnap = await getDocs(qLog);
+              if (!qLogSnap.empty) {
+                userDocData = qLogSnap.docs[0].data();
+                docExists = true;
+                const foundId = qLogSnap.docs[0].id;
+                if (foundId !== res.user.uid) {
+                  console.warn("User document ID mismatch by login! Healing document...", foundId, "vs", res.user.uid);
+                  await setDoc(doc(db, 'users', res.user.uid), {
+                    ...userDocData,
+                    uid: res.user.uid
+                  });
+                }
+              }
+            }
+          } catch (healErr) {
+            console.error("Self-healing failed:", healErr);
+          }
+        }
+
+        // Ultimate auto-creation fallback: If auth succeeded but no Firestore document was found by any method,
+        // we create a default profile so they can still log in and are not locked out.
+        if (!docExists) {
+          try {
+            const fallbackProfile = {
+              uid: res.user.uid,
+              displayName: trimmedLogin,
+              email: actualEmail,
+              login: trimmedLogin.toLowerCase(),
+              role: activeRole,
+              createdAt: serverTimestamp()
+            };
+            await setDoc(doc(db, 'users', res.user.uid), fallbackProfile);
+            userDocData = fallbackProfile;
+            docExists = true;
+            console.log(`Auto-created missing ${activeRole} profile on login!`);
+          } catch (autoErr) {
+            console.error("Auto-creating profile failed:", autoErr);
+          }
+        }
         
         // Agar hardcoded admin bo'lsa va doc yo'q bo'lsa -> SEAMLESS yaratamiz
         if (!docExists && trimmedLogin.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
