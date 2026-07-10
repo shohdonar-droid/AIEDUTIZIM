@@ -335,16 +335,21 @@ export default function AdminUsers() {
         // Teacher/Staff of organization fetch (filtered to single organization)
         const orgUid = user?.role === 'teacher' ? user?.uid : (user?.teacherId || '');
         const [deptsSnap, groupsSnap, studentsSnap, staffSnap, facultiesSnap] = await Promise.all([
-          getDocs(query(collection(db, "departments"), where("creatorId", "==", orgUid))),
-          getDocs(query(collection(db, "groups"), where("creatorId", "==", orgUid))),
+          getDocs(collection(db, "departments")),
+          getDocs(collection(db, "groups")),
           getDocs(query(collection(db, "users"), where("role", "==", "student"), where("teacherId", "==", orgUid))),
           getDocs(query(collection(db, "users"), where("role", "==", "staff"), where("teacherId", "==", orgUid))),
           getDocs(query(collection(db, "faculties"), where("teacherId", "==", orgUid)))
         ]);
 
-        const depts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
-        const grps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
         const facs = facultiesSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Faculty);
+        const facsIds = facs.map(f => f.id);
+        const allDepts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
+        const depts = allDepts.filter(d => facsIds.includes(d.facultyId));
+        const deptsIds = depts.map(d => d.id);
+        const allGrps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
+        const grps = allGrps.filter(g => deptsIds.includes(g.departmentId));
+
         const students = studentsSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
           .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
@@ -863,9 +868,16 @@ export default function AdminUsers() {
     u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const availableGroups = groups.filter(
-    (g) => !filterDept || g.departmentId === filterDept,
-  );
+  const availableGroups = groups.filter((g) => {
+    const matchesDept = !filterDept || g.departmentId === filterDept;
+    const matchesOrg = !filterOrg || (() => {
+      const dept = departments.find((d) => d.id === g.departmentId);
+      if (!dept) return false;
+      const fac = faculties.find((f) => f.id === dept.facultyId);
+      return fac?.teacherId === filterOrg;
+    })();
+    return matchesDept && matchesOrg;
+  });
 
   const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
 
@@ -981,32 +993,34 @@ export default function AdminUsers() {
                   }
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700 uppercase ml-1">
-                  Tashkilotni tanlang
-                </label>
-                <select
-                  required
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
-                  value={newStudent.teacherId}
-                  onChange={(e) =>
-                    setNewStudent({
-                      ...newStudent,
-                      teacherId: e.target.value,
-                      facultyId: "",
-                      departmentId: "",
-                      groupId: "",
-                    })
-                  }
-                >
-                  <option value="">Tanlang</option>
-                  {teachers.map((t, idx) => (
-                    <option key={`${t.uid || "teacher"}_${idx}`} value={t.uid}>
-                      {t.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {isSuperAdmin && (
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 uppercase ml-1">
+                    Tashkilotni tanlang
+                  </label>
+                  <select
+                    required
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
+                    value={newStudent.teacherId}
+                    onChange={(e) =>
+                      setNewStudent({
+                        ...newStudent,
+                        teacherId: e.target.value,
+                        facultyId: "",
+                        departmentId: "",
+                        groupId: "",
+                      })
+                    }
+                  >
+                    <option value="">Tanlang</option>
+                    {teachers.map((t, idx) => (
+                      <option key={`${t.uid || "teacher"}_${idx}`} value={t.uid}>
+                        {t.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 uppercase ml-1">
@@ -1726,7 +1740,11 @@ export default function AdminUsers() {
               >
                 <option value="">Barcha yo'nalishlar</option>
                 {departments
-                  .filter((d) => !filterOrg || d.creatorId === filterOrg)
+                  .filter((d) => {
+                    if (!filterOrg) return true;
+                    const faculty = faculties.find((f) => f.id === d.facultyId);
+                    return faculty?.teacherId === filterOrg;
+                  })
                   .map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
