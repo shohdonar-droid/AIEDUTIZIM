@@ -27,6 +27,7 @@ export default function AdminAutoTests() {
   const [creationMethod, setCreationMethod] = useState<'ai' | 'manual'>('ai');
   const [topic, setTopic] = useState('');
   const [testCount, setTestCount] = useState(10);
+  const [randomCount, setRandomCount] = useState<number>(10);
   const [context, setContext] = useState('');
 
   const defaultManualTemplate = `++++
@@ -196,6 +197,13 @@ O'pka`;
       const deptName = departments.find(d => d.id === selectedDeptId)?.name || '';
       const grpName = groups.find(g => g.id === selectedGroupId)?.name || '';
 
+      let finalRandomCount = Number(randomCount);
+      if (!finalRandomCount || finalRandomCount <= 0) {
+        finalRandomCount = generatedQuestions.length;
+      } else if (finalRandomCount > generatedQuestions.length) {
+        finalRandomCount = generatedQuestions.length;
+      }
+
       const testData = {
         title,
         facultyId: selectedFacultyId,
@@ -205,6 +213,7 @@ O'pka`;
         groupId: selectedGroupId,
         groupName: grpName,
         questions: generatedQuestions,
+        randomCount: finalRandomCount,
         creatorId: user?.uid || '',
         creatorName: user?.displayName || 'Admin',
         createdAt: serverTimestamp()
@@ -221,6 +230,7 @@ O'pka`;
       setGeneratedQuestions([]);
       setTopic('');
       setContext('');
+      setRandomCount(10);
       setIsCreating(false);
       fetchAutoTests();
     } catch (err: any) {
@@ -284,8 +294,8 @@ O'pka`;
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="col-span-1 md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Test Sarlavhasi</label>
               <input
                 type="text"
@@ -296,6 +306,21 @@ O'pka`;
               />
             </div>
 
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tasodifiy Savollar Soni (Har safar)</label>
+              <input
+                type="number"
+                value={randomCount}
+                min={1}
+                onChange={e => setRandomCount(Number(e.target.value))}
+                placeholder="Har safar nechtasi chiqishi kerak"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition"
+              />
+              <span className="text-[10px] text-gray-400 mt-1 block px-1">Talabaga umumiy jamg'armadan tasodifiy ravishda shuncha savol chiqariladi.</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tashkilot / Fakultet</label>
               <select
@@ -313,7 +338,7 @@ O'pka`;
             </div>
 
             <div>
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Yo'nalish</label>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Yo'nalish (Tashkilot tanlangandan so'ng)</label>
               <select
                 value={selectedDeptId}
                 disabled={!selectedFacultyId}
@@ -328,8 +353,8 @@ O'pka`;
               </select>
             </div>
 
-            <div className="md:col-span-1">
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Guruh</label>
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Guruh (Yo'nalish tanlangandan so'ng)</label>
               <select
                 value={selectedGroupId}
                 disabled={!selectedDeptId}
@@ -527,6 +552,11 @@ O'pka`;
                     <span className="text-xs bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full font-bold">
                       {test.questions?.length || 0} ta Savol
                     </span>
+                    {test.randomCount && test.randomCount < (test.questions?.length || 0) && (
+                      <span className="text-xs bg-amber-50 text-amber-600 px-2.5 py-0.5 rounded-full font-bold">
+                        Tasodifiy: {test.randomCount} ta savol (Har safar)
+                      </span>
+                    )}
                     <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold">
                       {test.facultyName}
                     </span>

@@ -16,6 +16,7 @@ interface AutoTest {
   title: string;
   questions: Question[];
   groupName: string;
+  randomCount?: number;
 }
 
 export default function AutoTestExecute() {
@@ -24,6 +25,7 @@ export default function AutoTestExecute() {
   const { user } = useAuth();
 
   const [test, setTest] = useState<AutoTest | null>(null);
+  const [originalQuestions, setOriginalQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentQIdx, setCurrentQIdx] = useState(0);
   
@@ -42,7 +44,26 @@ export default function AutoTestExecute() {
       try {
         const snap = await getDoc(doc(db, 'auto_tests', testId));
         if (snap.exists()) {
-          setTest({ id: snap.id, ...snap.data() } as AutoTest);
+          const data = snap.data();
+          const allQuestions = (data.questions || []) as Question[];
+          setOriginalQuestions(allQuestions);
+
+          let displayQuestions = [...allQuestions];
+          const randomCount = data.randomCount || allQuestions.length;
+
+          if (randomCount && randomCount < allQuestions.length) {
+            // Shuffle and slice
+            const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
+            displayQuestions = shuffled.slice(0, randomCount);
+          }
+
+          setTest({
+            id: snap.id,
+            title: data.title || '',
+            groupName: data.groupName || '',
+            randomCount: data.randomCount,
+            questions: displayQuestions
+          });
         } else {
           alert("Test topilmadi.");
           navigate('/student/auto-tests');
@@ -137,6 +158,16 @@ export default function AutoTestExecute() {
     setAnsweredQuestions({});
     setCurrentQIdx(0);
     setIsFinished(false);
+
+    if (test && originalQuestions.length > 0) {
+      const randomCount = test.randomCount || originalQuestions.length;
+      let displayQuestions = [...originalQuestions];
+      if (randomCount && randomCount < originalQuestions.length) {
+        const shuffled = [...originalQuestions].sort(() => 0.5 - Math.random());
+        displayQuestions = shuffled.slice(0, randomCount);
+      }
+      setTest(prev => prev ? { ...prev, questions: displayQuestions } : null);
+    }
   };
 
   // Render Result Screen
