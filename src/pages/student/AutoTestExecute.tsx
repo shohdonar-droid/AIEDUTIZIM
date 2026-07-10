@@ -70,6 +70,21 @@ export default function AutoTestExecute() {
             displayQuestions = shuffled.slice(0, randomCount);
           }
 
+          // Shuffle options for each question to avoid correct answer being in a fixed place
+          if (displayQuestions && displayQuestions.length > 0) {
+            displayQuestions = displayQuestions.map((q: Question) => {
+              if (!q.options || q.options.length === 0) return q;
+              const originalCorrectOption = q.options[q.correctIdx];
+              const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
+              const newCorrectIdx = shuffledOptions.indexOf(originalCorrectOption);
+              return {
+                ...q,
+                options: shuffledOptions,
+                correctIdx: newCorrectIdx !== -1 ? newCorrectIdx : q.correctIdx
+              };
+            });
+          }
+
           if (displayQuestions.length === 0) {
             setErrorDetails(`Ushbu testda hech qanday savol topilmadi. (Hujjatda jami savollar soni: ${allQuestions.length}, tasodifiy son: ${data.randomCount})`);
           }
@@ -190,6 +205,22 @@ export default function AutoTestExecute() {
         const shuffled = [...originalQuestions].sort(() => 0.5 - Math.random());
         displayQuestions = shuffled.slice(0, randomCount);
       }
+
+      // Shuffle options for each question to avoid correct answer being in a fixed place
+      if (displayQuestions && displayQuestions.length > 0) {
+        displayQuestions = displayQuestions.map((q: Question) => {
+          if (!q.options || q.options.length === 0) return q;
+          const originalCorrectOption = q.options[q.correctIdx];
+          const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
+          const newCorrectIdx = shuffledOptions.indexOf(originalCorrectOption);
+          return {
+            ...q,
+            options: shuffledOptions,
+            correctIdx: newCorrectIdx !== -1 ? newCorrectIdx : q.correctIdx
+          };
+        });
+      }
+
       setTest(prev => prev ? { ...prev, questions: displayQuestions } : null);
     }
   };
