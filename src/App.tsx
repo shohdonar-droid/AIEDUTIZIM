@@ -16,6 +16,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import StudentDashboard from './pages/student/StudentDashboard';
 import TestExecute from './pages/student/TestExecute';
+import AutoTestExecute from './pages/student/AutoTestExecute';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CourseView from './pages/CourseView';
 import InfoDetail from './pages/InfoDetail';
@@ -101,6 +102,12 @@ export default function App() {
               <Route path="/tests/:testId" element={
                 <ProtectedRoute>
                   <TestExecute />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/auto-tests/:testId" element={
+                <ProtectedRoute>
+                  <AutoTestExecute />
                 </ProtectedRoute>
               } />
 

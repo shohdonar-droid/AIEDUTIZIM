@@ -32,6 +32,7 @@ import AdminStorage from './AdminStorage';
 import AdminAcademic from './AdminAcademic';
 import AdminSystemLogs from './AdminSystemLogs';
 import AdminBackup from './AdminBackup';
+import AdminAutoTests from './AdminAutoTests';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 
 export default function AdminDashboard() {
@@ -93,6 +94,7 @@ export default function AdminDashboard() {
         <Route path="/tests" element={<AdminTests />} />
         <Route path="/quizizz" element={<AdminQuizizz />} />
         <Route path="/certificates" element={<AdminCertificates />} />
+        <Route path="/auto-tests" element={<AdminAutoTests />} />
         
         {/* Monitoring */}
         <Route path="/attendance" element={<div className="p-10 font-bold">Davomat (Tez kunda)</div>} />

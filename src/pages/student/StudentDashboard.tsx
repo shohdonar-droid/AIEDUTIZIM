@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { User, GraduationCap, Award, MessageSquare, LogOut, ChevronRight, Home, LayoutDashboard, Loader2, FileText, BrainCircuit } from 'lucide-react';
+import { User, GraduationCap, Award, MessageSquare, LogOut, ChevronRight, Home, LayoutDashboard, Loader2, FileText, BrainCircuit, Sparkles } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { auth, db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import { collection, query, where, updateDoc, doc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -9,6 +9,7 @@ import StudentProfile from './StudentProfile';
 import StudentGrades from './StudentGrades';
 import StudentCourses from './StudentCourses';
 import StudentTests from './StudentTests';
+import StudentAutoTests from './StudentAutoTests';
 import StudentCertificates from './StudentCertificates';
 import SubjectsManager from '../../components/SubjectsManager';
 import SubjectRead from '../SubjectRead';
@@ -40,6 +41,7 @@ export default function StudentDashboard() {
     { name: 'Baholar', path: '/student/grades', icon: GraduationCap },
     { name: 'Kurslar', path: '/student/courses', icon: LayoutDashboard },
     { name: 'Testlar', path: '/student/tests', icon: FileText },
+    { name: 'Avto Testlar', path: '/student/auto-tests', icon: Sparkles },
     { name: 'Mavzular', path: '/student/subjects', icon: BookOpen },
     { name: 'Sertifikatlar', path: '/student/certificates', icon: Award },
     { name: 'Chat', path: '/student/chat', icon: MessageSquare, badge: unreadCount },
@@ -181,6 +183,7 @@ export default function StudentDashboard() {
             <Route path="/grades" element={<StudentGrades />} />
             <Route path="/courses" element={<StudentCourses />} />
             <Route path="/tests" element={<StudentTests />} />
+            <Route path="/auto-tests" element={<StudentAutoTests />} />
             <Route path="/subjects" element={<SubjectsManager />} />
             <Route path="/subjects/read/:id" element={<SubjectRead />} />
             <Route path="/certificates" element={<StudentCertificates />} />

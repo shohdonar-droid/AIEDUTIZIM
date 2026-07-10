@@ -72,6 +72,9 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /auto_tests/{id} { allow read, write: if true; }
+    match /auto_test_results/{id} { allow read, write: if true; }
+
     // Activity logs
     match /activityLogs/{document=**} {
       allow read, write: if true;

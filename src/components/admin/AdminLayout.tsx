@@ -64,7 +64,8 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
         { name: 'Mavzular', path: '/admin/subjects' },
         { name: 'Imtihonlar', path: '/admin/tests' },
         { name: 'Quizizz', path: '/admin/quizizz' },
-        { name: 'Sertifikatlar', path: '/admin/certificates' }
+        { name: 'Sertifikatlar', path: '/admin/certificates' },
+        { name: 'Avto Test', path: '/admin/auto-tests' }
     ]},
     { id: 'monitoring', name: 'Monitoring', icon: TrendingUp, subItems: [
         { name: 'Davomat', path: '/admin/attendance' },
