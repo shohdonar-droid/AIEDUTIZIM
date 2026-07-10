@@ -22,24 +22,40 @@ export default function StudentAutoTests() {
     const unsubscribe = safeOnSnapshot(q, (snap) => {
       const allTests = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // Filter tests for this student based on academic structure
+      // Filter tests for this student based on academic structure (supporting both single values and multiple arrays)
       const filtered = allTests.filter((test: any) => {
-        // If the test specifically targets a group, student must match it
-        if (test.groupId) {
-          return test.groupId === user.groupId;
+        // 1. Group check
+        const hasGroupArray = Array.isArray(test.groupIds) && test.groupIds.length > 0;
+        const matchesGroupArray = hasGroupArray && test.groupIds.includes(user.groupId);
+        const matchesGroupSingle = test.groupId && test.groupId === user.groupId;
+
+        if (hasGroupArray || test.groupId) {
+          return matchesGroupArray || matchesGroupSingle;
         }
-        // If no group is targeted but department is specified
-        if (test.departmentId) {
-          return test.departmentId === user.departmentId;
+
+        // 2. Department check
+        const hasDeptArray = Array.isArray(test.departmentIds) && test.departmentIds.length > 0;
+        const matchesDeptArray = hasDeptArray && test.departmentIds.includes(user.departmentId);
+        const matchesDeptSingle = test.departmentId && test.departmentId === user.departmentId;
+
+        if (hasDeptArray || test.departmentId) {
+          return matchesDeptArray || matchesDeptSingle;
         }
-        // If no group/dept but faculty is specified
-        if (test.facultyId) {
-          return test.facultyId === user.facultyId;
+
+        // 3. Faculty check
+        const hasFacultyArray = Array.isArray(test.facultyIds) && test.facultyIds.length > 0;
+        const matchesFacultyArray = hasFacultyArray && test.facultyIds.includes(user.facultyId);
+        const matchesFacultySingle = test.facultyId && test.facultyId === user.facultyId;
+
+        if (hasFacultyArray || test.facultyId) {
+          return matchesFacultyArray || matchesFacultySingle;
         }
-        // If only teacher/organization is specified
+
+        // 4. Teacher/Organization general check
         if (test.teacherId) {
           return test.teacherId === user.teacherId;
         }
+
         return false;
       });
 

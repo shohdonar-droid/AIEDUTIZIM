@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy, where, setDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import { Faculty, Department, Group, Question } from '../../types';
 import { generateDynamicTest } from '../../services/geminiService';
-import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Calendar, Database, X, Plus, PlayCircle, GraduationCap, ArrowRight, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Calendar, Database, X, Plus, PlayCircle, GraduationCap, ArrowRight, CheckCircle, AlertTriangle, Edit2, Download, Copy } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function AdminAutoTests() {
@@ -19,11 +19,14 @@ export default function AdminAutoTests() {
 
   // Form State
   const [isCreating, setIsCreating] = useState(false);
+  const [editingTestId, setEditingTestId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [selectedOrgId, setSelectedOrgId] = useState('');
-  const [selectedFacultyId, setSelectedFacultyId] = useState('');
-  const [selectedDeptId, setSelectedDeptId] = useState('');
-  const [selectedGroupId, setSelectedGroupId] = useState('');
+  
+  // Multiple Selection Arrays
+  const [selectedFacultyIds, setSelectedFacultyIds] = useState<string[]>([]);
+  const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   // Generation Settings
   const [creationMethod, setCreationMethod] = useState<'ai' | 'manual'>('ai');
@@ -95,10 +98,20 @@ O'pka`;
     }
   };
 
-  // Filter based on cascading hierarchy
+  // Filter based on cascading hierarchy (multi-select arrays)
   const filteredFaculties = faculties.filter(f => !selectedOrgId || f.teacherId === selectedOrgId);
-  const filteredDepts = departments.filter(d => !selectedFacultyId || d.facultyId === selectedFacultyId);
-  const filteredGroups = groups.filter(g => !selectedDeptId || g.departmentId === selectedDeptId);
+  const filteredDepts = departments.filter(d => 
+    selectedFacultyIds.length === 0 
+      ? (!selectedOrgId || faculties.filter(f => f.teacherId === selectedOrgId).map(f => f.id).includes(d.facultyId || ''))
+      : selectedFacultyIds.includes(d.facultyId || '')
+  );
+  const filteredGroups = groups.filter(g => 
+    selectedDeptIds.length === 0 
+      ? (selectedFacultyIds.length === 0 
+          ? (!selectedOrgId || faculties.filter(f => f.teacherId === selectedOrgId).map(f => f.id).includes(g.facultyId || ''))
+          : departments.filter(d => selectedFacultyIds.includes(d.facultyId || '')).map(d => d.id).includes(g.departmentId))
+      : selectedDeptIds.includes(g.departmentId)
+  );
 
   // Parse manual input template
   const parseManualText = () => {
@@ -178,8 +191,8 @@ O'pka`;
     setGeneratedQuestions(prev => prev.filter(q => q.id !== id));
   };
 
-  // Save full auto test to Firestore
-  const handleSaveTest = async () => {
+  // Save full auto test to Firestore (supports save/update and cloning as copy)
+  const handleSaveTest = async (saveAsCopy: boolean = false) => {
     if (!title.trim()) {
       alert("Iltimos, test sarlavhasini kiriting.");
       return;
@@ -188,16 +201,16 @@ O'pka`;
       alert("Tashkilotni tanlang.");
       return;
     }
-    if (!selectedFacultyId) {
-      alert("Fakultetni tanlang.");
+    if (selectedFacultyIds.length === 0) {
+      alert("Iltimos, kamida bitta fakultetni tanlang.");
       return;
     }
-    if (!selectedDeptId) {
-      alert("Yo'nalishni tanlang.");
+    if (selectedDeptIds.length === 0) {
+      alert("Iltimos, kamida bitta yo'nalishni tanlang.");
       return;
     }
-    if (!selectedGroupId) {
-      alert("Guruhni tanlang.");
+    if (selectedGroupIds.length === 0) {
+      alert("Iltimos, kamida bitta guruhni tanlang.");
       return;
     }
     if (generatedQuestions.length === 0) {
@@ -208,9 +221,9 @@ O'pka`;
     setLoading(true);
     try {
       const orgName = organizations.find(o => o.uid === selectedOrgId)?.displayName || '';
-      const facName = faculties.find(f => f.id === selectedFacultyId)?.name || '';
-      const deptName = departments.find(d => d.id === selectedDeptId)?.name || '';
-      const grpName = groups.find(g => g.id === selectedGroupId)?.name || '';
+      const facNames = faculties.filter(f => selectedFacultyIds.includes(f.id)).map(f => f.name);
+      const deptNames = departments.filter(d => selectedDeptIds.includes(d.id)).map(d => d.name);
+      const grpNames = groups.filter(g => selectedGroupIds.includes(g.id)).map(g => g.name);
 
       let finalRandomCount = Number(randomCount);
       if (!finalRandomCount || finalRandomCount <= 0) {
@@ -223,12 +236,21 @@ O'pka`;
         title,
         teacherId: selectedOrgId,
         teacherName: orgName,
-        facultyId: selectedFacultyId,
-        facultyName: facName,
-        departmentId: selectedDeptId,
-        departmentName: deptName,
-        groupId: selectedGroupId,
-        groupName: grpName,
+        facultyIds: selectedFacultyIds,
+        facultyNames: facNames,
+        departmentIds: selectedDeptIds,
+        departmentNames: deptNames,
+        groupIds: selectedGroupIds,
+        groupNames: grpNames,
+        
+        // Single field fallbacks for backward compatibility
+        facultyId: selectedFacultyIds[0] || '',
+        facultyName: facNames[0] || '',
+        departmentId: selectedDeptIds[0] || '',
+        departmentName: deptNames[0] || '',
+        groupId: selectedGroupIds[0] || '',
+        groupName: grpNames[0] || '',
+
         questions: generatedQuestions,
         randomCount: finalRandomCount,
         creatorId: user?.uid || '',
@@ -236,17 +258,23 @@ O'pka`;
         createdAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'auto_tests'), testData);
-      alert("Avto test muvaffaqiyatli saqlandi!");
+      if (editingTestId && !saveAsCopy) {
+        await setDoc(doc(db, 'auto_tests', editingTestId), testData, { merge: true });
+        alert("Avto test muvaffaqiyatli tahrirlandi va yangilandi!");
+      } else {
+        await addDoc(collection(db, 'auto_tests'), testData);
+        alert(saveAsCopy ? "Avto test nusxa sifatida saqlandi!" : "Avto test muvaffaqiyatli saqlandi!");
+      }
       
       // Reset form
       setTitle('');
+      setEditingTestId(null);
       if (user?.role !== 'teacher') {
         setSelectedOrgId('');
       }
-      setSelectedFacultyId('');
-      setSelectedDeptId('');
-      setSelectedGroupId('');
+      setSelectedFacultyIds([]);
+      setSelectedDeptIds([]);
+      setSelectedGroupIds([]);
       setGeneratedQuestions([]);
       setTopic('');
       setContext('');
@@ -258,6 +286,132 @@ O'pka`;
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditTest = (test: any) => {
+    setEditingTestId(test.id);
+    setTitle(test.title || '');
+    setSelectedOrgId(test.teacherId || '');
+    
+    // Load arrays or fallback to single values
+    const facs = test.facultyIds || (test.facultyId ? [test.facultyId] : []);
+    const depts = test.departmentIds || (test.departmentId ? [test.departmentId] : []);
+    const grps = test.groupIds || (test.groupId ? [test.groupId] : []);
+    
+    setSelectedFacultyIds(facs);
+    setSelectedDeptIds(depts);
+    setSelectedGroupIds(grps);
+    
+    setGeneratedQuestions(test.questions || []);
+    setRandomCount(test.randomCount || 10);
+    setIsCreating(true);
+  };
+
+  const exportToWord = (test: any) => {
+    const formattedTitle = test.title || "avto_test";
+    const dateStr = test.createdAt ? new Date(test.createdAt.seconds * 1000).toLocaleDateString() : new Date().toLocaleDateString();
+    
+    let html = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <title>${test.title}</title>
+        <style>
+          body { font-family: "Calibri", "Arial", sans-serif; line-height: 1.5; font-size: 11pt; color: #1e293b; }
+          h1 { font-family: "Georgia", serif; font-size: 20pt; font-weight: bold; color: #1e3a8a; margin-bottom: 5px; text-align: center; }
+          .meta-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
+          .meta-table td { padding: 6px 12px; border: 1px solid #cbd5e1; font-size: 9.5pt; font-weight: bold; background-color: #f8fafc; }
+          .question-block { margin-bottom: 25px; page-break-inside: avoid; }
+          .question-text { font-size: 11.5pt; font-weight: bold; color: #0f172a; margin-bottom: 8px; }
+          .options-grid { margin-left: 20px; }
+          .option-item { font-size: 10.5pt; margin-bottom: 4px; }
+          .correct-mark { color: #10b981; font-weight: bold; }
+          .answer-key-section { margin-top: 40px; border-top: 2px solid #1e3a8a; padding-top: 20px; page-break-before: always; }
+          .key-title { font-size: 14pt; font-weight: bold; color: #1e3a8a; margin-bottom: 15px; }
+          .key-table { width: 100%; max-width: 400px; border-collapse: collapse; }
+          .key-table th, .key-table td { border: 1px solid #cbd5e1; padding: 6px; text-align: center; }
+          .key-table th { background-color: #f1f5f9; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1>${formattedTitle.toUpperCase()}</h1>
+          <p style="font-size: 10pt; color: #64748b; margin-top: 0;">Sana: ${dateStr}</p>
+        </div>
+
+        <table class="meta-table">
+          <tr>
+            <td>Tashkilot / O'qituvchi:</td>
+            <td>${test.teacherName || 'Admin'}</td>
+            <td>Yaratuvchi:</td>
+            <td>${test.creatorName || 'Tizim'}</td>
+          </tr>
+          <tr>
+            <td>Fakultet(lar):</td>
+            <td>${test.facultyNames?.join(', ') || test.facultyName || 'Barchasi'}</td>
+            <td>Yo'nalish(lar):</td>
+            <td>${test.departmentNames?.join(', ') || test.departmentName || 'Barchasi'}</td>
+          </tr>
+          <tr>
+            <td>Guruh(lar):</td>
+            <td>${test.groupNames?.join(', ') || test.groupName || 'Barchasi'}</td>
+            <td>Savollar soni:</td>
+            <td>${test.questions?.length || 0} ta</td>
+          </tr>
+        </table>
+
+        <hr style="border: 1px solid #e2e8f0; margin-bottom: 30px;" />
+
+        <div style="margin-top: 20px;">
+          ${(test.questions || []).map((q: any, idx: number) => `
+            <div class="question-block">
+              <div class="question-text">${idx + 1}. ${q.text}</div>
+              <div class="options-grid">
+                ${(q.options || []).map((opt: string, optIdx: number) => {
+                  const prefix = String.fromCharCode(65 + optIdx); // A, B, C, D
+                  const isCorrect = optIdx === q.correctIdx;
+                  return `
+                    <div class="option-item">
+                      <strong>${prefix})</strong> ${opt} ${isCorrect ? '<span class="correct-mark"> (To\'g\'ri javob)</span>' : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="answer-key-section">
+          <div class="key-title">JAVOBLAR KALITI</div>
+          <table class="key-table">
+            <thead>
+              <tr>
+                <th>Savol №</th>
+                <th>To'g'ri javob</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(test.questions || []).map((q: any, idx: number) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td>${String.fromCharCode(65 + q.correctIdx)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${formattedTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_shablon.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Delete saved auto test
@@ -300,13 +454,21 @@ O'pka`;
       </div>
 
       {isCreating ? (
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-8 space-y-8">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 md:p-8 space-y-8 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="flex justify-between items-center border-b border-gray-50 pb-5">
-            <h3 className="text-xl font-bold text-gray-900">Yangi Avto Test Builder</h3>
+            <h3 className="text-xl font-bold text-gray-900">{editingTestId ? "Avto Testni Tahrirlash" : "Yangi Avto Test Builder"}</h3>
             <button
               onClick={() => {
                 setIsCreating(false);
+                setEditingTestId(null);
+                setTitle('');
+                setSelectedOrgId(user?.role === 'teacher' ? (user?.uid || '') : '');
+                setSelectedFacultyIds([]);
+                setSelectedDeptIds([]);
+                setSelectedGroupIds([]);
                 setGeneratedQuestions([]);
+                setTopic('');
+                setContext('');
               }}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition"
             >
@@ -340,7 +502,8 @@ O'pka`;
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Org Selector & Multi-selection Targeting lists */}
+          <div className="space-y-6">
             <div>
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tashkilot</label>
               <select
@@ -348,61 +511,107 @@ O'pka`;
                 disabled={user?.role === 'teacher'}
                 onChange={e => {
                   setSelectedOrgId(e.target.value);
-                  setSelectedFacultyId('');
-                  setSelectedDeptId('');
-                  setSelectedGroupId('');
+                  setSelectedFacultyIds([]);
+                  setSelectedDeptIds([]);
+                  setSelectedGroupIds([]);
                 }}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition disabled:bg-gray-50 disabled:opacity-60"
+                className="max-w-md w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition disabled:bg-gray-50 disabled:opacity-60"
               >
                 <option value="">Tanlang...</option>
                 {organizations.map(o => <option key={o.uid} value={o.uid}>{o.displayName}</option>)}
               </select>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Fakultet</label>
-              <select
-                value={selectedFacultyId}
-                disabled={!selectedOrgId}
-                onChange={e => {
-                  setSelectedFacultyId(e.target.value);
-                  setSelectedDeptId('');
-                  setSelectedGroupId('');
-                }}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition disabled:bg-gray-50 disabled:opacity-60"
-              >
-                <option value="">Tanlang...</option>
-                {filteredFaculties.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+              {/* Faculty Checkbox Grid */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">Fakultetlar (Bir nechta tanlash mumkin)</label>
+                <div className="border border-gray-200 rounded-2xl p-4 bg-slate-50/50 max-h-56 overflow-y-auto space-y-2">
+                  {filteredFaculties.map(f => {
+                    const isSelected = selectedFacultyIds.includes(f.id);
+                    return (
+                      <label key={f.id} className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50/80 transition-all">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            if (isSelected) {
+                              setSelectedFacultyIds(selectedFacultyIds.filter(id => id !== f.id));
+                            } else {
+                              setSelectedFacultyIds([...selectedFacultyIds, f.id]);
+                            }
+                          }}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300"
+                        />
+                        <span className="text-xs font-bold text-gray-700">{f.name}</span>
+                      </label>
+                    );
+                  })}
+                  {filteredFaculties.length === 0 && (
+                    <span className="text-xs text-gray-400 block p-2 text-center">Fakultetlar topilmadi.</span>
+                  )}
+                </div>
+              </div>
 
-            <div>
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Yo'nalish</label>
-              <select
-                value={selectedDeptId}
-                disabled={!selectedFacultyId}
-                onChange={e => {
-                  setSelectedDeptId(e.target.value);
-                  setSelectedGroupId('');
-                }}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition disabled:bg-gray-50 disabled:opacity-60"
-              >
-                <option value="">Tanlang...</option>
-                {filteredDepts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
+              {/* Department Checkbox Grid */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">Yo'nalishlar (Bir nechta tanlash mumkin)</label>
+                <div className="border border-gray-200 rounded-2xl p-4 bg-slate-50/50 max-h-56 overflow-y-auto space-y-2">
+                  {filteredDepts.map(d => {
+                    const isSelected = selectedDeptIds.includes(d.id);
+                    return (
+                      <label key={d.id} className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50/80 transition-all">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            if (isSelected) {
+                              setSelectedDeptIds(selectedDeptIds.filter(id => id !== d.id));
+                            } else {
+                              setSelectedDeptIds([...selectedDeptIds, d.id]);
+                            }
+                          }}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300"
+                        />
+                        <span className="text-xs font-bold text-gray-700">{d.name}</span>
+                      </label>
+                    );
+                  })}
+                  {filteredDepts.length === 0 && (
+                    <span className="text-xs text-gray-400 block p-2 text-center">Tegishli yo'nalishlar topilmadi.</span>
+                  )}
+                </div>
+              </div>
 
-            <div>
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Guruh</label>
-              <select
-                value={selectedGroupId}
-                disabled={!selectedDeptId}
-                onChange={e => setSelectedGroupId(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition disabled:bg-gray-50 disabled:opacity-60"
-              >
-                <option value="">Tanlang...</option>
-                {filteredGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
+              {/* Group Checkbox Grid */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">Guruhlar (Bir nechta tanlash mumkin)</label>
+                <div className="border border-gray-200 rounded-2xl p-4 bg-slate-50/50 max-h-56 overflow-y-auto space-y-2">
+                  {filteredGroups.map(g => {
+                    const isSelected = selectedGroupIds.includes(g.id);
+                    return (
+                      <label key={g.id} className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl border border-gray-100 shadow-sm cursor-pointer hover:bg-gray-50/80 transition-all">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            if (isSelected) {
+                              setSelectedGroupIds(selectedGroupIds.filter(id => id !== g.id));
+                            } else {
+                              setSelectedGroupIds([...selectedGroupIds, g.id]);
+                            }
+                          }}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300"
+                        />
+                        <span className="text-xs font-bold text-gray-700">{g.name}</span>
+                      </label>
+                    );
+                  })}
+                  {filteredGroups.length === 0 && (
+                    <span className="text-xs text-gray-400 block p-2 text-center">Tegishli guruhlar topilmadi.</span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -563,15 +772,26 @@ O'pka`;
                 ))}
               </div>
 
-              <div className="flex justify-end pt-4">
+              <div className="flex flex-col sm:flex-row justify-end items-center gap-4 pt-4 border-t border-gray-50">
+                {editingTestId && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveTest(true)} // saveAsCopy = true
+                    disabled={loading}
+                    className="flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition shadow-md hover:shadow-blue-100 disabled:opacity-50 w-full sm:w-auto"
+                  >
+                    <Copy className="w-4.5 h-4.5" />
+                    Nusxa sifatida saqlash
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={handleSaveTest}
+                  onClick={() => handleSaveTest(false)} // saveAsCopy = false
                   disabled={loading}
-                  className="flex items-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold transition shadow-md hover:shadow-lg hover:shadow-emerald-100 disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold transition shadow-md hover:shadow-lg hover:shadow-emerald-100 disabled:opacity-50 w-full sm:w-auto"
                 >
                   <Save className="w-5 h-5" />
-                  Avto Testni Saqlash
+                  {editingTestId ? "O'zgarishlarni Saqlash" : "Avto Testni Saqlash"}
                 </button>
               </div>
             </div>
@@ -586,37 +806,59 @@ O'pka`;
           <div className="divide-y divide-gray-50">
             {savedTests.map((test) => (
               <div key={test.id} className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-gray-50/40 transition">
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="space-y-1.5 flex-1 pr-4">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
                     <span className="text-xs bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full font-bold">
                       {test.questions?.length || 0} ta Savol
                     </span>
                     {test.randomCount && test.randomCount < (test.questions?.length || 0) && (
                       <span className="text-xs bg-amber-50 text-amber-600 px-2.5 py-0.5 rounded-full font-bold">
-                        Tasodifiy: {test.randomCount} ta savol (Har safar)
+                        Tasodifiy: {test.randomCount} ta savol
                       </span>
                     )}
                     {test.teacherName && (
                       <span className="text-xs bg-purple-50 text-purple-600 px-2.5 py-0.5 rounded-full font-bold">
-                        {test.teacherName}
+                        Tashkilot: {test.teacherName}
                       </span>
                     )}
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold">
-                      {test.facultyName}
-                    </span>
-                    <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold">
-                      {test.departmentName}
-                    </span>
-                    <span className="text-xs bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full font-bold">
-                      Guruh: {test.groupName}
-                    </span>
                   </div>
 
                   <h4 className="text-lg font-bold text-gray-900">{test.title}</h4>
-                  <p className="text-xs text-gray-400 font-medium">Yaratuvchi: {test.creatorName || 'Admin'}</p>
+                  
+                  <div className="mt-2 space-y-1 text-xs text-gray-500 font-medium">
+                    <p>
+                      <strong className="text-gray-700">Fakultet(lar):</strong>{' '}
+                      {test.facultyNames?.join(', ') || test.facultyName || 'Barchasi'}
+                    </p>
+                    <p>
+                      <strong className="text-gray-700">Yo'nalish(lar):</strong>{' '}
+                      {test.departmentNames?.join(', ') || test.departmentName || 'Barchasi'}
+                    </p>
+                    <p>
+                      <strong className="text-gray-700">Guruh(lar):</strong>{' '}
+                      <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">
+                        {test.groupNames?.join(', ') || test.groupName || 'Barchasi'}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1">Yaratuvchi: {test.creatorName || 'Admin'}</p>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => exportToWord(test)}
+                    className="p-3 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-xl transition"
+                    title="Word formatida yuklab olish"
+                  >
+                    <Download className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleEditTest(test)}
+                    className="p-3 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-xl transition"
+                    title="Tahrirlash"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
                   <button
                     onClick={() => handleDeleteTest(test.id)}
                     className="p-3 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition"
