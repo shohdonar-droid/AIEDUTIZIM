@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { useAuth } from '../../hooks/useAuth';
 import { Award, PlayCircle, Loader2, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -11,28 +12,45 @@ export default function StudentAutoTests() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !user.groupId) {
+    if (!user) {
       setLoading(false);
       return;
     }
 
-    async function loadAutoTests() {
-      try {
-        const q = query(
-          collection(db, 'auto_tests'),
-          where('groupId', '==', user.groupId)
-        );
-        const snap = await getDocs(q);
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTests(list);
-      } catch (err) {
-        console.error("Error loading auto tests:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
+    const q = query(collection(db, 'auto_tests'));
 
-    loadAutoTests();
+    const unsubscribe = safeOnSnapshot(q, (snap) => {
+      const allTests = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Filter tests for this student based on academic structure
+      const filtered = allTests.filter((test: any) => {
+        // If the test specifically targets a group, student must match it
+        if (test.groupId) {
+          return test.groupId === user.groupId;
+        }
+        // If no group is targeted but department is specified
+        if (test.departmentId) {
+          return test.departmentId === user.departmentId;
+        }
+        // If no group/dept but faculty is specified
+        if (test.facultyId) {
+          return test.facultyId === user.facultyId;
+        }
+        // If only teacher/organization is specified
+        if (test.teacherId) {
+          return test.teacherId === user.teacherId;
+        }
+        return false;
+      });
+
+      setTests(filtered);
+      setLoading(false);
+    }, (err) => {
+      console.error("Error loading auto tests:", err);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [user]);
 
   if (loading) {
