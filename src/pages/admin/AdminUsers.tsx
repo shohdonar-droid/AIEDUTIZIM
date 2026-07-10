@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import safeOnSnapshot from "../../lib/safeSnapshot";
 import { handleFirestoreError, OperationType } from "../../lib/firebase";
-import { UserProfile, Department, Group } from "../../types";
+import { UserProfile, Department, Group, Faculty } from "../../types";
 import {
   Search,
   Download,
@@ -43,6 +43,7 @@ export default function AdminUsers() {
   const [independentTeachers, setIndependentTeachers] = useState<UserProfile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [staffUsers, setStaffUsers] = useState<UserProfile[]>([]);
   const [subadmins, setSubadmins] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +83,7 @@ export default function AdminUsers() {
     displayName: "",
     phone: "",
     teacherId: "",
+    facultyId: "",
     departmentId: "",
     groupId: "",
   });
@@ -262,14 +264,17 @@ export default function AdminUsers() {
     try {
       if (isSuperAdmin) {
         // Core metadata (always needed for context)
-        const [deptsSnap, groupsSnap] = await Promise.all([
+        const [deptsSnap, groupsSnap, facultiesSnap] = await Promise.all([
           getDocs(collection(db, "departments")),
           getDocs(collection(db, "groups")),
+          getDocs(collection(db, "faculties")),
         ]);
         const depts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
         const grps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
+        const facs = facultiesSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Faculty);
         setDepartments(depts);
         setGroups(grps);
+        setFaculties(facs);
 
         // Data by role - Fetching with a safety limit to prevent quota drain
         // We load them sequentially or parallel but with LIMIT(300)
@@ -319,6 +324,7 @@ export default function AdminUsers() {
         // Save to cache
         localStorage.setItem("admin_users_depts_cache", JSON.stringify(depts));
         localStorage.setItem("admin_users_groups_cache", JSON.stringify(grps));
+        localStorage.setItem("admin_users_faculties_cache", JSON.stringify(facs));
         localStorage.setItem("admin_users_students_cache", JSON.stringify(students));
         localStorage.setItem("admin_users_teachers_cache", JSON.stringify(teachersList));
         localStorage.setItem("admin_users_independent_cache", JSON.stringify(independentList));
@@ -328,15 +334,17 @@ export default function AdminUsers() {
       } else {
         // Teacher/Staff of organization fetch (filtered to single organization)
         const orgUid = user?.role === 'teacher' ? user?.uid : (user?.teacherId || '');
-        const [deptsSnap, groupsSnap, studentsSnap, staffSnap] = await Promise.all([
+        const [deptsSnap, groupsSnap, studentsSnap, staffSnap, facultiesSnap] = await Promise.all([
           getDocs(query(collection(db, "departments"), where("creatorId", "==", orgUid))),
           getDocs(query(collection(db, "groups"), where("creatorId", "==", orgUid))),
           getDocs(query(collection(db, "users"), where("role", "==", "student"), where("teacherId", "==", orgUid))),
-          getDocs(query(collection(db, "users"), where("role", "==", "staff"), where("teacherId", "==", orgUid)))
+          getDocs(query(collection(db, "users"), where("role", "==", "staff"), where("teacherId", "==", orgUid))),
+          getDocs(query(collection(db, "faculties"), where("teacherId", "==", orgUid)))
         ]);
 
         const depts = deptsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Department);
         const grps = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Group);
+        const facs = facultiesSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Faculty);
         const students = studentsSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
           .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
@@ -346,6 +354,7 @@ export default function AdminUsers() {
 
         setDepartments(depts);
         setGroups(grps);
+        setFaculties(facs);
         setUsers(students);
         setStaffUsers(staffList);
       }
@@ -363,13 +372,14 @@ export default function AdminUsers() {
     const isSuperAdmin = user?.role === 'admin' || user?.role === 'subadmin' || (user?.email && ['shohdonar@gmail.com', 'elyorbek@admin.uz', 'elyorbek@gmail.com'].includes(user.email));
     if (isSuperAdmin) {
       // Load from cache first for instant UI
-      const cacheKeys = ["depts", "groups", "students", "teachers", "independent", "staff", "subadmins"];
+      const cacheKeys = ["depts", "groups", "faculties", "students", "teachers", "independent", "staff", "subadmins"];
       cacheKeys.forEach((k) => {
         const cached = localStorage.getItem(`admin_users_${k}_cache`);
         if (cached) {
           const data = JSON.parse(cached);
           if (k === "depts") setDepartments(data);
           else if (k === "groups") setGroups(data);
+          else if (k === "faculties") setFaculties(data);
           else if (k === "students") setUsers(data);
           else if (k === "teachers") setTeachers(data);
           else if (k === "independent") setIndependentTeachers(data);
@@ -606,6 +616,7 @@ export default function AdminUsers() {
     if (
       !newStudent.displayName ||
       !targetTeacherId ||
+      !newStudent.facultyId ||
       !newStudent.departmentId ||
       !newStudent.groupId
     ) {
@@ -643,6 +654,8 @@ export default function AdminUsers() {
         role: "student",
         teacherId: targetTeacherId,
         teacherName: orgName,
+        facultyId: newStudent.facultyId,
+        facultyName: faculties.find((f) => f.id === newStudent.facultyId)?.name || "",
         departmentId: newStudent.departmentId,
         departmentName: departments.find(
           (dep) => dep.id === newStudent.departmentId,
@@ -805,12 +818,16 @@ export default function AdminUsers() {
     if (!editingStudent || !editingStudent.uid) return;
     setStudentSaving(true);
     try {
+      const facultyObj = faculties.find((f) => f.id === editingStudent.facultyId);
+      const facultyName = facultyObj?.name || "";
       const deptName =
         departments.find((d) => d.id === editingStudent.departmentId)?.name ||
         "";
       const grpName =
         groups.find((g) => g.id === editingStudent.groupId)?.name || "";
       await setDoc(doc(db, "users", editingStudent.uid), {
+        facultyId: editingStudent.facultyId || "",
+        facultyName: facultyName,
         departmentId: editingStudent.departmentId || "",
         departmentName: deptName,
         groupId: editingStudent.groupId || "",
@@ -976,6 +993,7 @@ export default function AdminUsers() {
                     setNewStudent({
                       ...newStudent,
                       teacherId: e.target.value,
+                      facultyId: "",
                       departmentId: "",
                       groupId: "",
                     })
@@ -992,11 +1010,39 @@ export default function AdminUsers() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 uppercase ml-1">
-                    Yo'nalish
+                    Fakultet
                   </label>
                   <select
                     required
                     disabled={!newStudent.teacherId}
+                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium disabled:opacity-50"
+                    value={newStudent.facultyId}
+                    onChange={(e) =>
+                      setNewStudent({
+                        ...newStudent,
+                        facultyId: e.target.value,
+                        departmentId: "",
+                        groupId: "",
+                      })
+                    }
+                  >
+                    <option value="">Tanlang</option>
+                    {faculties
+                      .filter((f) => f.teacherId === newStudent.teacherId)
+                      .map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 uppercase ml-1">
+                    Yo'nalish
+                  </label>
+                  <select
+                    required
+                    disabled={!newStudent.facultyId}
                     className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium disabled:opacity-50"
                     value={newStudent.departmentId}
                     onChange={(e) =>
@@ -1009,7 +1055,7 @@ export default function AdminUsers() {
                   >
                     <option value="">Tanlang</option>
                     {departments
-                      .filter((d) => d.creatorId === newStudent.teacherId)
+                      .filter((d) => d.facultyId === newStudent.facultyId)
                       .map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name}
@@ -1017,29 +1063,29 @@ export default function AdminUsers() {
                       ))}
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 uppercase ml-1">
-                    Guruh
-                  </label>
-                  <select
-                    required
-                    disabled={!newStudent.departmentId}
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium disabled:opacity-50"
-                    value={newStudent.groupId}
-                    onChange={(e) =>
-                      setNewStudent({ ...newStudent, groupId: e.target.value })
-                    }
-                  >
-                    <option value="">Tanlang</option>
-                    {groups
-                      .filter((g) => g.departmentId === newStudent.departmentId)
-                      .map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 uppercase ml-1">
+                  Guruh
+                </label>
+                <select
+                  required
+                  disabled={!newStudent.departmentId}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium disabled:opacity-50"
+                  value={newStudent.groupId}
+                  onChange={(e) =>
+                    setNewStudent({ ...newStudent, groupId: e.target.value })
+                  }
+                >
+                  <option value="">Tanlang</option>
+                  {groups
+                    .filter((g) => g.departmentId === newStudent.departmentId)
+                    .map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                </select>
               </div>
               <div className="pt-4 flex gap-4">
                 <button
@@ -1709,7 +1755,18 @@ export default function AdminUsers() {
                 <Download className="w-5 h-5" /> YUKLAB OLISH
               </button>
               <button
-                onClick={() => setShowStudentModal(true)}
+                onClick={() => {
+                  const orgUid = user?.role === 'teacher' ? user?.uid : (user?.teacherId || '');
+                  setNewStudent({
+                    displayName: "",
+                    phone: "",
+                    teacherId: isSuperAdmin ? "" : orgUid,
+                    facultyId: "",
+                    departmentId: "",
+                    groupId: "",
+                  });
+                  setShowStudentModal(true);
+                }}
                 className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100"
               >
                 <Plus className="w-5 h-5" /> TALABA YARATISH
@@ -1851,10 +1908,37 @@ export default function AdminUsers() {
                 </div>
                 <div>
                   <label className="text-sm font-bold text-gray-700 block mb-1">
-                    Yo'nalish
+                    Fakultet
                   </label>
                   <select
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium"
+                    value={editingStudent.facultyId || ""}
+                    onChange={(e) =>
+                      setEditingStudent({
+                        ...editingStudent,
+                        facultyId: e.target.value,
+                        departmentId: "",
+                        groupId: "",
+                      })
+                    }
+                  >
+                    <option value="">Tanlang...</option>
+                    {faculties
+                      .filter((f) => f.teacherId === editingStudent.teacherId)
+                      .map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-1">
+                    Yo'nalish
+                  </label>
+                  <select
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium disabled:opacity-50"
+                    disabled={!editingStudent.facultyId}
                     value={editingStudent.departmentId || ""}
                     onChange={(e) =>
                       setEditingStudent({
@@ -1866,7 +1950,7 @@ export default function AdminUsers() {
                   >
                     <option value="">Tanlang...</option>
                     {departments
-                      .filter((d) => d.creatorId === editingStudent.teacherId)
+                      .filter((d) => d.facultyId === editingStudent.facultyId)
                       .map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name}
@@ -1891,11 +1975,7 @@ export default function AdminUsers() {
                   >
                     <option value="">Tanlang...</option>
                     {groups
-                      .filter(
-                        (g) =>
-                          g.creatorId === editingStudent.teacherId &&
-                          g.departmentId === editingStudent.departmentId,
-                      )
+                      .filter((g) => g.departmentId === editingStudent.departmentId)
                       .map((g) => (
                         <option key={g.id} value={g.id}>
                           {g.name}

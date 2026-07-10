@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, where } from 'firebase/firestore';
 import { Plus, Trash2, Building2, Layers, Users, Calendar, Search } from 'lucide-react';
 import { Faculty, Department, Group, AcademicYear } from '../../types';
 
@@ -12,6 +12,7 @@ export default function AdminAcademic() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [years, setYears] = useState<AcademicYear[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,6 +21,7 @@ export default function AdminAcademic() {
   const [newName, setNewName] = useState('');
   const [selectedFacultyId, setSelectedFacultyId] = useState('');
   const [selectedDeptId, setSelectedDeptId] = useState('');
+  const [selectedOrgId, setSelectedOrgId] = useState('');
 
   useEffect(() => {
     const unsubFac = onSnapshot(query(collection(db, 'faculties'), orderBy('createdAt', 'desc')), (snap) => {
@@ -33,10 +35,13 @@ export default function AdminAcademic() {
     });
     const unsubYears = onSnapshot(query(collection(db, 'academic_years'), orderBy('name', 'desc')), (snap) => {
       setYears(snap.docs.map(d => ({ id: d.id, ...d.data() } as AcademicYear)));
+    });
+    const unsubOrgs = onSnapshot(query(collection(db, 'users'), where('role', '==', 'teacher')), (snap) => {
+      setOrganizations(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
       setLoading(false);
     });
 
-    return () => { unsubFac(); unsubDept(); unsubGroups(); unsubYears(); };
+    return () => { unsubFac(); unsubDept(); unsubGroups(); unsubYears(); unsubOrgs(); };
   }, []);
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -45,7 +50,12 @@ export default function AdminAcademic() {
 
     try {
       if (activeTab === 'faculties') {
-        await addDoc(collection(db, 'faculties'), { name: newName, createdAt: serverTimestamp() });
+        if (!selectedOrgId) return alert('Tashkilotni tanlang');
+        await addDoc(collection(db, 'faculties'), { 
+          name: newName, 
+          teacherId: selectedOrgId, 
+          createdAt: serverTimestamp() 
+        });
       } else if (activeTab === 'departments') {
         if (!selectedFacultyId) return alert('Fakultetni tanlang');
         await addDoc(collection(db, 'departments'), { name: newName, facultyId: selectedFacultyId, createdAt: serverTimestamp() });
@@ -104,6 +114,20 @@ export default function AdminAcademic() {
         {/* Quick Add Form Section */}
         <div className="p-6 border-b border-gray-50 bg-gray-50/20">
           <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-4">
+            {activeTab === 'faculties' && (
+              <div className="w-full md:w-64">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tashkilotni tanlang</label>
+                <select 
+                  value={selectedOrgId} 
+                  onChange={e => setSelectedOrgId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
+                >
+                   <option value="">Tanlang...</option>
+                   {organizations.map(org => <option key={org.uid} value={org.uid}>{org.displayName || org.login || 'No name'}</option>)}
+                </select>
+              </div>
+            )}
+
             {activeTab === 'departments' && (
               <div className="w-full md:w-64">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Fakultetni tanlang</label>
@@ -164,6 +188,7 @@ export default function AdminAcademic() {
                 
                 {activeTab === 'faculties' && (
                   <>
+                    <th className="px-6 py-4 text-[11px] font-black tracking-widest text-slate-400 uppercase">Tashkilot</th>
                     <th className="px-6 py-4 text-[11px] font-black tracking-widest text-slate-400 uppercase">Fakultet nomi</th>
                     <th className="px-6 py-4 text-[11px] font-black tracking-widest text-slate-400 uppercase text-right">Yaratilgan sana</th>
                   </>
@@ -197,16 +222,20 @@ export default function AdminAcademic() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {activeTab === 'faculties' && faculties.map((f, idx) => (
-                <tr key={f.id} className="hover:bg-gray-50/30">
-                  <td className="px-6 py-4 text-xs font-bold text-slate-400">{idx + 1}</td>
-                  <td className="px-6 py-4 font-bold text-gray-900">{f.name}</td>
-                  <td className="px-6 py-4 text-right text-xs font-mono text-slate-400">{f.createdAt?.toDate().toLocaleDateString('uz-UZ')}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleDelete(f.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                  </td>
-                </tr>
-              ))}
+              {activeTab === 'faculties' && faculties.map((f, idx) => {
+                const org = organizations.find(o => o.uid === f.teacherId);
+                return (
+                  <tr key={f.id} className="hover:bg-gray-50/30">
+                    <td className="px-6 py-4 text-xs font-bold text-slate-400">{idx + 1}</td>
+                    <td className="px-6 py-4 font-medium text-gray-500 text-xs uppercase">{org?.displayName || org?.login || '-'}</td>
+                    <td className="px-6 py-4 font-bold text-gray-900">{f.name}</td>
+                    <td className="px-6 py-4 text-right text-xs font-mono text-slate-400">{f.createdAt?.toDate().toLocaleDateString('uz-UZ')}</td>
+                    <td className="px-6 py-4 text-right">
+                      <button onClick={() => handleDelete(f.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                );
+              })}
 
               {activeTab === 'departments' && departments.map((d, idx) => (
                 <tr key={d.id} className="hover:bg-gray-50/30">

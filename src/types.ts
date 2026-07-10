@@ -3,6 +3,7 @@ export type UserRole = 'admin' | 'subadmin' | 'student' | 'teacher' | 'staff' | 
 export interface Faculty {
   id: string;
   name: string;
+  teacherId?: string;
   createdAt: any;
 }
 
@@ -52,6 +53,8 @@ export interface UserProfile {
   lastIncomeDate?: any;
   departmentId?: string;
   groupId?: string;
+  facultyId?: string;
+  facultyName?: string;
   departmentName?: string;
   groupName?: string;
   teacherId?: string;

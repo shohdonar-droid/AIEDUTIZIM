@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import { Faculty, Department, Group, Question } from '../../types';
 import { generateDynamicTest } from '../../services/geminiService';
@@ -12,6 +12,7 @@ export default function AdminAutoTests() {
   const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const [savedTests, setSavedTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
@@ -19,6 +20,7 @@ export default function AdminAutoTests() {
   // Form State
   const [isCreating, setIsCreating] = useState(false);
   const [title, setTitle] = useState('');
+  const [selectedOrgId, setSelectedOrgId] = useState('');
   const [selectedFacultyId, setSelectedFacultyId] = useState('');
   const [selectedDeptId, setSelectedDeptId] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('');
@@ -65,10 +67,17 @@ O'pka`;
       const facs = await getDocs(collection(db, 'faculties'));
       const depts = await getDocs(collection(db, 'departments'));
       const grps = await getDocs(collection(db, 'groups'));
+      const orgsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'teacher')));
 
       setFaculties(facs.docs.map(d => ({ id: d.id, ...d.data() } as Faculty)));
       setDepartments(depts.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
       setGroups(grps.docs.map(d => ({ id: d.id, ...d.data() } as Group)));
+      setOrganizations(orgsSnap.docs.map(d => ({ uid: d.id, ...d.data() })));
+
+      // Pre-select if current user is a teacher (organization)
+      if (user?.role === 'teacher') {
+        setSelectedOrgId(user?.uid || '');
+      }
     } catch (err) {
       console.error("Error fetching academic data:", err);
     } finally {
@@ -86,9 +95,10 @@ O'pka`;
     }
   };
 
-  // Filter depts and groups based on hierarchy
-  const filteredDepts = departments.filter(d => d.facultyId === selectedFacultyId);
-  const filteredGroups = groups.filter(g => g.departmentId === selectedDeptId);
+  // Filter based on cascading hierarchy
+  const filteredFaculties = faculties.filter(f => !selectedOrgId || f.teacherId === selectedOrgId);
+  const filteredDepts = departments.filter(d => !selectedFacultyId || d.facultyId === selectedFacultyId);
+  const filteredGroups = groups.filter(g => !selectedDeptId || g.departmentId === selectedDeptId);
 
   // Parse manual input template
   const parseManualText = () => {
@@ -174,8 +184,12 @@ O'pka`;
       alert("Iltimos, test sarlavhasini kiriting.");
       return;
     }
+    if (!selectedOrgId) {
+      alert("Tashkilotni tanlang.");
+      return;
+    }
     if (!selectedFacultyId) {
-      alert("Tashkilot/Fakultetni tanlang.");
+      alert("Fakultetni tanlang.");
       return;
     }
     if (!selectedDeptId) {
@@ -193,6 +207,7 @@ O'pka`;
 
     setLoading(true);
     try {
+      const orgName = organizations.find(o => o.uid === selectedOrgId)?.displayName || '';
       const facName = faculties.find(f => f.id === selectedFacultyId)?.name || '';
       const deptName = departments.find(d => d.id === selectedDeptId)?.name || '';
       const grpName = groups.find(g => g.id === selectedGroupId)?.name || '';
@@ -206,6 +221,8 @@ O'pka`;
 
       const testData = {
         title,
+        teacherId: selectedOrgId,
+        teacherName: orgName,
         facultyId: selectedFacultyId,
         facultyName: facName,
         departmentId: selectedDeptId,
@@ -224,6 +241,9 @@ O'pka`;
       
       // Reset form
       setTitle('');
+      if (user?.role !== 'teacher') {
+        setSelectedOrgId('');
+      }
       setSelectedFacultyId('');
       setSelectedDeptId('');
       setSelectedGroupId('');
@@ -320,25 +340,44 @@ O'pka`;
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tashkilot / Fakultet</label>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tashkilot</label>
+              <select
+                value={selectedOrgId}
+                disabled={user?.role === 'teacher'}
+                onChange={e => {
+                  setSelectedOrgId(e.target.value);
+                  setSelectedFacultyId('');
+                  setSelectedDeptId('');
+                  setSelectedGroupId('');
+                }}
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition disabled:bg-gray-50 disabled:opacity-60"
+              >
+                <option value="">Tanlang...</option>
+                {organizations.map(o => <option key={o.uid} value={o.uid}>{o.displayName}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Fakultet</label>
               <select
                 value={selectedFacultyId}
+                disabled={!selectedOrgId}
                 onChange={e => {
                   setSelectedFacultyId(e.target.value);
                   setSelectedDeptId('');
                   setSelectedGroupId('');
                 }}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium transition disabled:bg-gray-50 disabled:opacity-60"
               >
                 <option value="">Tanlang...</option>
-                {faculties.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                {filteredFaculties.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Yo'nalish (Tashkilot tanlangandan so'ng)</label>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Yo'nalish</label>
               <select
                 value={selectedDeptId}
                 disabled={!selectedFacultyId}
@@ -354,7 +393,7 @@ O'pka`;
             </div>
 
             <div>
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Guruh (Yo'nalish tanlangandan so'ng)</label>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Guruh</label>
               <select
                 value={selectedGroupId}
                 disabled={!selectedDeptId}
@@ -555,6 +594,11 @@ O'pka`;
                     {test.randomCount && test.randomCount < (test.questions?.length || 0) && (
                       <span className="text-xs bg-amber-50 text-amber-600 px-2.5 py-0.5 rounded-full font-bold">
                         Tasodifiy: {test.randomCount} ta savol (Har safar)
+                      </span>
+                    )}
+                    {test.teacherName && (
+                      <span className="text-xs bg-purple-50 text-purple-600 px-2.5 py-0.5 rounded-full font-bold">
+                        {test.teacherName}
                       </span>
                     )}
                     <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-bold">
