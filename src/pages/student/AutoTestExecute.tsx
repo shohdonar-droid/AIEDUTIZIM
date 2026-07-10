@@ -27,6 +27,7 @@ export default function AutoTestExecute() {
   const [test, setTest] = useState<AutoTest | null>(null);
   const [originalQuestions, setOriginalQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [currentQIdx, setCurrentQIdx] = useState(0);
   
   // Track state for each question
@@ -40,7 +41,11 @@ export default function AutoTestExecute() {
 
   useEffect(() => {
     async function fetchTest() {
-      if (!testId) return;
+      if (!testId) {
+        setErrorDetails("Test ID ko'rsatilmadi.");
+        setLoading(false);
+        return;
+      }
       try {
         const snap = await getDoc(doc(db, 'auto_tests', testId));
         if (snap.exists()) {
@@ -49,27 +54,39 @@ export default function AutoTestExecute() {
           setOriginalQuestions(allQuestions);
 
           let displayQuestions = [...allQuestions];
-          const randomCount = data.randomCount || allQuestions.length;
+          
+          // Safe randomCount parsing
+          let randomCount = allQuestions.length;
+          if (data.randomCount !== undefined && data.randomCount !== null && data.randomCount !== '') {
+            const parsed = Number(data.randomCount);
+            if (!isNaN(parsed) && parsed > 0) {
+              randomCount = parsed;
+            }
+          }
 
-          if (randomCount && randomCount < allQuestions.length) {
+          if (randomCount < allQuestions.length) {
             // Shuffle and slice
             const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
             displayQuestions = shuffled.slice(0, randomCount);
           }
 
+          if (displayQuestions.length === 0) {
+            setErrorDetails(`Ushbu testda hech qanday savol topilmadi. (Hujjatda jami savollar soni: ${allQuestions.length}, tasodifiy son: ${data.randomCount})`);
+          }
+
           setTest({
             id: snap.id,
             title: data.title || '',
-            groupName: data.groupName || '',
+            groupName: data.groupName || data.groupNames?.join(', ') || '',
             randomCount: data.randomCount,
             questions: displayQuestions
           });
         } else {
-          alert("Test topilmadi.");
-          navigate('/student/auto-tests');
+          setErrorDetails(`Test topilmadi. Ma'lumotlar bazasida bunday test mavjud emas (ID: ${testId}).`);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching auto test:", err);
+        setErrorDetails(`Test ma'lumotlarini yuklashda xatolik yuz berdi: ${err?.message || err}`);
       } finally {
         setLoading(false);
       }
@@ -87,12 +104,19 @@ export default function AutoTestExecute() {
 
   if (!test || !test.questions || test.questions.length === 0) {
     return (
-      <div className="p-8 text-center max-w-md mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm mt-10">
+      <div className="p-8 text-center max-w-lg mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm mt-10 space-y-4">
         <h3 className="text-xl font-bold text-gray-900">Xatolik</h3>
-        <p className="text-gray-500 mt-2">Test ma'lumotlari yuklanmadi yoki test savollari yo'q.</p>
-        <Link to="/student/auto-tests" className="inline-block mt-6 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold">
-          Ortga qaytish
-        </Link>
+        <p className="text-gray-500">Test ma'lumotlari yuklanmadi yoki test savollari yo'q.</p>
+        {errorDetails && (
+          <div className="p-4 bg-red-50 text-red-700 text-xs font-mono rounded-2xl border border-red-100 text-left whitespace-pre-wrap">
+            <strong>Batafsil xatolik:</strong> {errorDetails}
+          </div>
+        )}
+        <div className="pt-2">
+          <Link to="/student/auto-tests" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition">
+            Ortga qaytish
+          </Link>
+        </div>
       </div>
     );
   }
