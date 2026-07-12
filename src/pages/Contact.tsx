@@ -173,7 +173,7 @@ export default function Contact() {
                        href={formatSocialLink(content.footer.telegram, 'telegram')} 
                        target="_blank" 
                        rel="noopener noreferrer" 
-                       className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-indigo-900 flex items-center justify-center transition-all duration-300 group shadow-lg"
+                       className="w-12 h-12 rounded-2xl bg-[#0088cc] text-white hover:bg-white hover:text-[#0088cc] flex items-center justify-center transition-all duration-300 group shadow-lg"
                        title="Telegram"
                        id="contact-social-telegram"
                      >
@@ -185,7 +185,7 @@ export default function Contact() {
                        href={formatSocialLink(content.footer.instagram, 'instagram')} 
                        target="_blank" 
                        rel="noopener noreferrer" 
-                       className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-[#E1306C] flex items-center justify-center transition-all duration-300 group shadow-lg"
+                       className="w-12 h-12 rounded-2xl bg-[#E1306C] text-white hover:bg-white hover:text-[#E1306C] flex items-center justify-center transition-all duration-300 group shadow-lg"
                        title="Instagram"
                        id="contact-social-instagram"
                      >
@@ -197,7 +197,7 @@ export default function Contact() {
                        href={formatSocialLink(content.footer.youtube, 'youtube')} 
                        target="_blank" 
                        rel="noopener noreferrer" 
-                       className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-[#FF0000] flex items-center justify-center transition-all duration-300 group shadow-lg"
+                       className="w-12 h-12 rounded-2xl bg-[#FF0000] text-white hover:bg-white hover:text-[#FF0000] flex items-center justify-center transition-all duration-300 group shadow-lg"
                        title="YouTube"
                        id="contact-social-youtube"
                      >

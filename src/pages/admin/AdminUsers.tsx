@@ -7,6 +7,7 @@ import {
   doc,
   updateDoc,
   setDoc,
+  addDoc,
   query,
   where,
   deleteDoc,
@@ -98,6 +99,19 @@ export default function AdminUsers() {
   const [editingStudent, setEditingStudent] =
     useState<Partial<UserProfile> | null>(null);
   const [studentSaving, setStudentSaving] = useState(false);
+
+  // Independent Teacher Creation/Edit
+  const [editingMustaqilTeacher, setEditingMustaqilTeacher] = useState<Partial<UserProfile> | null>(null);
+  const [mustaqilTeacherSaving, setMustaqilTeacherSaving] = useState(false);
+
+  // Student Password Reset Modal State
+  const [resetPasswordState, setResetPasswordState] = useState<{
+    uid: string;
+    displayName: string;
+    mode: "choose" | "manual";
+    manualPassword?: string;
+  } | null>(null);
+  const [resetSaving, setResetSaving] = useState(false);
 
   // Staff Creation
   const [showStaffModal, setShowStaffModal] = useState(false);
@@ -409,16 +423,132 @@ export default function AdminUsers() {
   }, [user]);
 
   const resetPassword = async (uid: string) => {
-    if (!confirm("Talaba parolini '123456' ga reset qilishni xohlaysizmi?"))
+    const targetUser = users.find(usr => usr.uid === uid);
+    if (targetUser) {
+      setResetPasswordState({
+        uid: targetUser.uid,
+        displayName: targetUser.displayName,
+        mode: "choose",
+        manualPassword: ""
+      });
+    }
+  };
+
+  const saveMustaqilTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMustaqilTeacher?.displayName || !editingMustaqilTeacher?.login || !editingMustaqilTeacher?.password) {
+      alert("Barcha maydonlarni to'ldiring.");
       return;
+    }
+    setMustaqilTeacherSaving(true);
     try {
-      await setDoc(doc(db, "users", uid), {
-        password: "123456",
-      }, { merge: true });
-      alert("Parol muvaffaqiyatli '123456' ga o'zgartirildi!");
-    } catch (error) {
-      console.error(error);
-      alert("Xatolik yuz berdi");
+      if (editingMustaqilTeacher.uid) {
+        // Updating existing mustaqil_o_qituvchi
+        await setDoc(doc(db, "users", editingMustaqilTeacher.uid), {
+          displayName: editingMustaqilTeacher.displayName,
+          phone: editingMustaqilTeacher.phone || "",
+          login: editingMustaqilTeacher.login.trim(),
+          password: editingMustaqilTeacher.password,
+        }, { merge: true });
+        alert("Mustaqil o'qituvchi ma'lumotlari muvaffaqiyatli saqlandi!");
+      } else {
+        // Creating new mustaqil_o_qituvchi
+        const cleanLogin = editingMustaqilTeacher.login.trim();
+        const q = query(
+          collection(db, "users"),
+          where("login", "==", cleanLogin),
+        );
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          alert("Login band!");
+          setMustaqilTeacherSaving(false);
+          return;
+        }
+
+        // Get UY Home organization Id as teacherId
+        let uyOrgId = "";
+        const qUy = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
+        const uySnap = await getDocs(qUy);
+        if (!uySnap.empty) {
+          uyOrgId = uySnap.docs[0].id;
+        } else {
+          const uyRef = await addDoc(collection(db, 'users'), {
+            displayName: 'UY',
+            role: 'teacher',
+            status: 'active',
+            createdAt: serverTimestamp(),
+            limit_departments: 9999,
+            limit_groups: 9999,
+            limit_students: 9999,
+            limit_subjects: 9999,
+            limit_tests: 9999,
+            limit_quizizz: 9999,
+            limit_exams: 9999,
+            limit_certificates: 9999
+          });
+          uyOrgId = uyRef.id;
+        }
+
+        const email = `${cleanLogin.toLowerCase()}@teacher.uz`;
+        
+        // Create Firebase Auth user
+        const response = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email,
+              password: editingMustaqilTeacher.password,
+              returnSecureToken: false,
+            }),
+          },
+        );
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error?.message || "Yaratishda xatolik");
+        }
+        const data = await response.json();
+        const uid = data.localId;
+
+        const defaultLimits = {
+          limit_departments: 1,
+          limit_groups: 1,
+          limit_students: 5,
+          limit_subjects: 2,
+          limit_tests: 2,
+          limit_quizizz: 1,
+          limit_exams: 1,
+          limit_courses: 0,
+          limit_certificates: 5,
+          limit_tests_per_subject: 10,
+          limit_questions_per_test: 10,
+          limit_questions_per_quizizz: 5,
+          limit_questions_per_exam: 10,
+        };
+
+        await setDoc(doc(db, "users", uid), {
+          uid: uid,
+          displayName: editingMustaqilTeacher.displayName,
+          phone: editingMustaqilTeacher.phone || "",
+          login: cleanLogin,
+          password: editingMustaqilTeacher.password,
+          role: "mustaqil_o_qituvchi",
+          teacherId: uyOrgId,
+          email: email,
+          status: 'active',
+          total_spent: 0,
+          createdAt: serverTimestamp(),
+          ...defaultLimits
+        });
+        alert("Mustaqil o'qituvchi muvaffaqiyatli yaratildi!");
+      }
+      setEditingMustaqilTeacher(null);
+      loadData();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setMustaqilTeacherSaving(false);
     }
   };
 
@@ -1483,10 +1613,25 @@ export default function AdminUsers() {
 
           {!editingTeacher && (
             <div className="mt-8 space-y-6">
-              <h3 className="text-xl font-black text-gray-900 px-2 uppercase tracking-tight flex items-center gap-2">
-                <Users className="w-6 h-6 text-indigo-600" />
-                Hamkor Mustaqil o'qituvchilar
-              </h3>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
+                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight flex items-center gap-2">
+                  <Users className="w-6 h-6 text-indigo-600" />
+                  Hamkor Mustaqil o'qituvchilar
+                </h3>
+                <button
+                  onClick={() =>
+                    setEditingMustaqilTeacher({
+                      displayName: "",
+                      login: "",
+                      password: "",
+                      phone: "",
+                    })
+                  }
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all text-xs uppercase tracking-wider"
+                >
+                  <Plus className="w-4 h-4" /> Mustaqil o'qituvchi qo'shish
+                </button>
+              </div>
               <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
                 <table className="w-full border-collapse">
                   <thead>
@@ -1542,8 +1687,9 @@ export default function AdminUsers() {
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={() => setEditingTeacher(t)}
+                              onClick={() => setEditingMustaqilTeacher(t)}
                               className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
+                              title="Tahrirlash"
                             >
                               <Edit className="w-4 h-4" />
                             </button>
@@ -2024,6 +2170,251 @@ export default function AdminUsers() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {editingMustaqilTeacher && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h2 className="text-xl font-black text-gray-900">
+                {editingMustaqilTeacher.uid ? "Mustaqil o'qituvchini tahrirlash" : "Yangi mustaqil o'qituvchi"}
+              </h2>
+              <button
+                onClick={() => setEditingMustaqilTeacher(null)}
+                className="p-2 hover:bg-gray-200 rounded-xl transition-colors text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={saveMustaqilTeacher} className="p-6 space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-1">
+                    FISh (O'qituvchi)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="F.I.SH kiriting"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium"
+                    value={editingMustaqilTeacher.displayName || ""}
+                    onChange={(e) =>
+                      setEditingMustaqilTeacher({
+                        ...editingMustaqilTeacher,
+                        displayName: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-1">
+                    Telefon raqam
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="+998"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium"
+                    value={editingMustaqilTeacher.phone || ""}
+                    onChange={(e) =>
+                      setEditingMustaqilTeacher({
+                        ...editingMustaqilTeacher,
+                        phone: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-1">
+                    Login
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    disabled={!!editingMustaqilTeacher.uid && !!editingMustaqilTeacher.login}
+                    placeholder="Login kiriting"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium disabled:opacity-50"
+                    value={editingMustaqilTeacher.login || ""}
+                    onChange={(e) =>
+                      setEditingMustaqilTeacher({
+                        ...editingMustaqilTeacher,
+                        login: e.target.value,
+                      })
+                    }
+                  />
+                  {editingMustaqilTeacher.uid && editingMustaqilTeacher.login && (
+                    <p className="text-xs text-orange-500 mt-1">
+                      Loginni o'zgartirib bo'lmaydi
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 block mb-1">
+                    Parol
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Kamida 6 xonali parol"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium"
+                    value={editingMustaqilTeacher.password || ""}
+                    onChange={(e) =>
+                      setEditingMustaqilTeacher({
+                        ...editingMustaqilTeacher,
+                        password: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingMustaqilTeacher(null)}
+                  className="px-6 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  disabled={mustaqilTeacherSaving}
+                  className="px-6 py-2.5 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2 disabled:opacity-50"
+                >
+                  {mustaqilTeacherSaving ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Save className="w-5 h-5" />
+                  )}
+                  SAQLASH
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {resetPasswordState && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h2 className="text-xl font-black text-gray-900">
+                Parolni o'zgartirish
+              </h2>
+              <button
+                onClick={() => setResetPasswordState(null)}
+                className="p-2 hover:bg-gray-200 rounded-xl transition-colors text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <p className="text-sm font-medium text-gray-600">
+                Talaba: <span className="font-bold text-gray-950 uppercase">{resetPasswordState.displayName}</span>
+              </p>
+
+              {resetPasswordState.mode === "choose" ? (
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={async () => {
+                      setResetSaving(true);
+                      try {
+                        await setDoc(doc(db, "users", resetPasswordState.uid), {
+                          password: "123456",
+                        }, { merge: true });
+                        alert("Parol muvaffaqiyatli '123456' ga o'zgartirildi!");
+                        setResetPasswordState(null);
+                        loadData();
+                      } catch (error) {
+                        console.error(error);
+                        alert("Xatolik yuz berdi");
+                      } finally {
+                        setResetSaving(false);
+                      }
+                    }}
+                    disabled={resetSaving}
+                    className="w-full py-3 px-4 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-xl font-bold transition-colors disabled:opacity-50"
+                  >
+                    Parol 123456 ga o'zgartirilsin
+                  </button>
+                  <button
+                    onClick={() => {
+                      setResetPasswordState({
+                        ...resetPasswordState,
+                        mode: "manual"
+                      });
+                    }}
+                    className="w-full py-3 px-4 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-xl font-bold transition-colors"
+                  >
+                    Qo'lda kiritish
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 block mb-1">
+                      YANGI PAROL
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium"
+                      placeholder="Yangi parolni kiriting"
+                      value={resetPasswordState.manualPassword || ""}
+                      onChange={(e) =>
+                        setResetPasswordState({
+                          ...resetPasswordState,
+                          manualPassword: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <button
+                      onClick={() => {
+                        setResetPasswordState({
+                          ...resetPasswordState,
+                          mode: "choose"
+                        });
+                      }}
+                      className="px-5 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+                    >
+                      Orqaga
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!resetPasswordState.manualPassword?.trim()) {
+                          alert("Iltimos parolni kiriting!");
+                          return;
+                        }
+                        setResetSaving(true);
+                        try {
+                          await setDoc(doc(db, "users", resetPasswordState.uid), {
+                            password: resetPasswordState.manualPassword.trim(),
+                          }, { merge: true });
+                          alert(`Parol muvaffaqiyatli '${resetPasswordState.manualPassword.trim()}' ga o'zgartirildi!`);
+                          setResetPasswordState(null);
+                          loadData();
+                        } catch (error) {
+                          console.error(error);
+                          alert("Xatolik yuz berdi");
+                        } finally {
+                          setResetSaving(false);
+                        }
+                      }}
+                      disabled={resetSaving}
+                      className="px-5 py-2.5 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {resetSaving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      Saqlash
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

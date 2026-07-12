@@ -444,19 +444,19 @@ export default function Home() {
                    href={formatSocialLink(content.footer.telegram, 'telegram')} 
                    target="_blank" 
                    rel="noopener noreferrer" 
-                   className="w-8 h-8 rounded-lg bg-white border border-slate-200/60 hover:bg-[#0088cc] hover:border-[#0088cc] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
+                   className="w-9 h-9 rounded-xl bg-[#0088cc]/10 border border-[#0088cc]/20 text-[#0088cc] hover:bg-[#0088cc] hover:border-[#0088cc] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
                    title="Telegram"
                    id="footer-social-telegram"
                  >
-                   <Send className="h-3.5 w-3.5 transform group-hover:scale-105 transition-transform" />
+                   <Send className="h-4 w-4 transform group-hover:scale-105 transition-transform" />
                  </a>
                ) : (
                  <span 
-                   className="w-8 h-8 rounded-lg bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
+                   className="w-9 h-9 rounded-xl bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
                    title="Telegram (kiritilmagan)"
                    id="footer-social-telegram-disabled"
                  >
-                   <Send className="h-3.5 w-3.5" />
+                   <Send className="h-4 w-4" />
                  </span>
                )}
                
@@ -465,19 +465,19 @@ export default function Home() {
                    href={formatSocialLink(content.footer.instagram, 'instagram')} 
                    target="_blank" 
                    rel="noopener noreferrer" 
-                   className="w-8 h-8 rounded-lg bg-white border border-slate-200/60 hover:bg-[#E1306C] hover:border-[#E1306C] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
+                   className="w-9 h-9 rounded-xl bg-[#E1306C]/10 border border-[#E1306C]/20 text-[#E1306C] hover:bg-[#E1306C] hover:border-[#E1306C] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
                    title="Instagram"
                    id="footer-social-instagram"
                  >
-                   <Instagram className="h-3.5 w-3.5 transform group-hover:scale-105 transition-transform" />
+                   <Instagram className="h-4 w-4 transform group-hover:scale-105 transition-transform" />
                  </a>
                ) : (
                  <span 
-                   className="w-8 h-8 rounded-lg bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
+                   className="w-9 h-9 rounded-xl bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
                    title="Instagram (kiritilmagan)"
                    id="footer-social-instagram-disabled"
                  >
-                   <Instagram className="h-3.5 w-3.5" />
+                   <Instagram className="h-4 w-4" />
                  </span>
                )}
 
@@ -486,19 +486,19 @@ export default function Home() {
                    href={formatSocialLink(content.footer.youtube, 'youtube')} 
                    target="_blank" 
                    rel="noopener noreferrer" 
-                   className="w-8 h-8 rounded-lg bg-white border border-slate-200/60 hover:bg-[#FF0000] hover:border-[#FF0000] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
+                   className="w-9 h-9 rounded-xl bg-[#FF0000]/10 border border-[#FF0000]/20 text-[#FF0000] hover:bg-[#FF0000] hover:border-[#FF0000] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
                    title="YouTube"
                    id="footer-social-youtube"
                  >
-                   <Youtube className="h-3.5 w-3.5 transform group-hover:scale-105 transition-transform" />
+                   <Youtube className="h-4 w-4 transform group-hover:scale-105 transition-transform" />
                  </a>
                ) : (
                  <span 
-                   className="w-8 h-8 rounded-lg bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
+                   className="w-9 h-9 rounded-xl bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
                    title="YouTube (kiritilmagan)"
                    id="footer-social-youtube-disabled"
                  >
-                   <Youtube className="h-3.5 w-3.5" />
+                   <Youtube className="h-4 w-4" />
                  </span>
                )}
             </div>

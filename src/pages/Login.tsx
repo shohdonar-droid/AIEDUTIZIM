@@ -52,7 +52,7 @@ export default function Login() {
   useEffect(() => {
     if (user) {
       if (user.role === 'admin' || user.role === 'subadmin') navigate('/admin');
-      else if (user.role === 'teacher' || user.role === 'staff') navigate('/teacher');
+      else if (user.role === 'teacher' || user.role === 'staff' || user.role === 'mustaqil_o_qituvchi') navigate('/teacher');
       else navigate('/student');
     }
   }, [user, navigate]);
@@ -215,7 +215,7 @@ export default function Login() {
         if (docExists) {
           const role = userDocData.role;
           
-          const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin');
+          const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin') || (role === 'mustaqil_o_qituvchi' && activeRole === 'staff');
           if (!isRoleMatch) {
              const rName = activeRole === 'admin' ? 'Admin/Kichik Admin' : activeRole === 'teacher' ? 'Tashkilot' : (activeRole === 'staff' ? 'Xodim' : 'Talaba');
              const actualRoleName = role === 'admin' ? 'Admin' : role === 'subadmin' ? 'Kichik Admin' : role === 'teacher' ? 'Tashkilot' : (role === 'staff' ? 'Xodim' : 'Talaba');
@@ -281,7 +281,7 @@ export default function Login() {
           } catch (e) {}
 
           await refreshUser();
-          const dest = (role === 'admin' || role === 'subadmin') ? '/admin' : (role === 'teacher' || role === 'staff' ? '/teacher' : '/student');
+          const dest = (role === 'admin' || role === 'subadmin') ? '/admin' : (role === 'teacher' || role === 'staff' || role === 'mustaqil_o_qituvchi' ? '/teacher' : '/student');
           navigate(dest);
         } else {
           setError('Profil hujjatlari topilmadi. Qaytadan ro\'yxatdan o\'ting.');
@@ -338,7 +338,7 @@ export default function Login() {
 
           if (foundUserDoc) {
             const role = foundUserDoc.role;
-            const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin');
+            const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin') || (role === 'mustaqil_o_qituvchi' && activeRole === 'staff');
             if (!isRoleMatch) {
               const rName = activeRole === 'admin' ? 'Admin/Kichik Admin' : activeRole === 'teacher' ? 'Tashkilot' : (activeRole === 'staff' ? 'Xodim' : 'Talaba');
               const actualRoleName = role === 'admin' ? 'Admin' : role === 'subadmin' ? 'Kichik Admin' : role === 'teacher' ? 'Tashkilot' : (role === 'staff' ? 'Xodim' : 'Talaba');
@@ -353,7 +353,7 @@ export default function Login() {
             
             await refreshUser();
             console.log("Logged in via offline fallback (Firestore password check passed)");
-            const dest = (role === 'admin' || role === 'subadmin') ? '/admin' : (role === 'teacher' || role === 'staff' ? '/teacher' : '/student');
+            const dest = (role === 'admin' || role === 'subadmin') ? '/admin' : (role === 'teacher' || role === 'staff' || role === 'mustaqil_o_qituvchi' ? '/teacher' : '/student');
             navigate(dest);
             return;
           } else {
