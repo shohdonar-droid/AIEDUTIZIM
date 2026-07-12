@@ -8,6 +8,26 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { makeDirectImageUrl } from '../lib/helpers';
 
+export function formatSocialLink(val: string | undefined, type: 'telegram' | 'instagram' | 'youtube'): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  const handle = trimmed.startsWith('@') ? trimmed.substring(1) : trimmed;
+  if (type === 'telegram') {
+    return `https://t.me/${handle}`;
+  } else if (type === 'instagram') {
+    return `https://instagram.com/${handle}`;
+  } else if (type === 'youtube') {
+    if (trimmed.startsWith('@')) {
+      return `https://youtube.com/${trimmed}`;
+    }
+    return `https://youtube.com/@${handle}`;
+  }
+  return trimmed;
+}
+
 export default function Home() {
   const { user } = useAuth();
   const [content, setContent] = useState<SiteContent | null>(null);
@@ -33,21 +53,14 @@ export default function Home() {
         }
       };
 
-      // Load from cache first
+// Load from cache first
       const cachedContent = localStorage.getItem('cache_site_content');
       const cachedCourses = localStorage.getItem('cache_courses');
       const cachedStats = localStorage.getItem('cache_stats');
-      const cachedTime = localStorage.getItem('cache_home_fetch_time');
-      const CACHE_TTL = 30 * 60 * 1000; // 30 minutes for homepage
 
       if (cachedContent) setContent(JSON.parse(cachedContent));
       if (cachedCourses) setCourses(JSON.parse(cachedCourses));
       if (cachedStats) setStats(JSON.parse(cachedStats));
-
-      if (cachedTime && (Date.now() - Number(cachedTime) < CACHE_TTL) && cachedContent && cachedCourses && cachedStats) {
-        console.log("Using fresh home cache");
-        return;
-      }
 
       try {
         const contentDoc = await getDoc(doc(db, 'siteContent', 'main'));
@@ -361,61 +374,61 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-50/50 border-t border-gray-100 pt-16 pb-10 mt-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 border-b border-gray-200/50 pb-12 mb-8">
+      <footer className="bg-[#fafafa] border-t border-slate-100/80 pt-12 pb-10 mt-16 text-slate-500">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 pb-8 mb-8 border-b border-slate-200/30">
             
             {/* 1. Logo & Description */}
-            <div className="col-span-1">
-              <Link to="/" className="flex items-center gap-2 mb-4">
-                {content.footer.logoUrl ? (
-                  <img src={makeDirectImageUrl(content.footer.logoUrl || null)} referrerPolicy="no-referrer" alt="Logo" className="h-10 object-contain" />
+            <div className="col-span-1 flex flex-col justify-start">
+              <Link to="/" className="flex items-center gap-2 mb-3">
+                {content?.footer?.logoUrl ? (
+                  <img src={makeDirectImageUrl(content.footer.logoUrl || null)} referrerPolicy="no-referrer" alt="Logo" className="h-8 object-contain" />
                 ) : (
                   <>
-                    <div className="rounded-xl bg-[#007aff] p-2 shadow-sm">
-                      <BrainCircuit className="h-6 w-6 text-white" />
+                    <div className="rounded-lg bg-[#007aff] p-1.5 shadow-sm">
+                      <BrainCircuit className="h-5 w-5 text-white" />
                     </div>
-                    <span className="text-2xl font-bold text-gray-900 tracking-tight">
+                    <span className="text-lg font-bold text-slate-800 tracking-tight">
                       AIEDU<span className="text-[#007aff]">TIZIM</span>
                     </span>
                   </>
                 )}
               </Link>
-              <p className="text-gray-500 text-sm font-medium leading-relaxed">
-                {content.footer.description || content.footer.top || "Raqamli ta'limda sun'iy intellekt\nZamonaviy texnologiyalar va sun'iy intellekt yordamida ta'lim sifatini oshirishga qaratilgan platforma. Raqamli muhitda bilim olishning eng samarali usullarini taqdim etamiz."}
+              <p className="text-slate-500 text-xs font-normal leading-relaxed max-w-xs whitespace-pre-line">
+                {content?.footer?.description || content?.footer?.top || "Raqamli ta'limda sun'iy intellekt.\nZamonaviy texnologiyalar va sun'iy intellekt yordamida ta'lim sifatini oshirishga qaratilgan platforma."}
               </p>
             </div>
 
             {/* 2. Tezkor havolalar */}
-            <div className="col-span-1">
-              <h4 className="text-base font-bold text-gray-900 mb-6 tracking-wider">Tezkor havolalar</h4>
-              <ul className="space-y-4">
-                <li><Link to="/" className="text-gray-500 text-sm font-medium hover:text-[#007aff] transition-colors">Bosh sahifa</Link></li>
-                <li><Link to="/courses" className="text-gray-500 text-sm font-medium hover:text-[#007aff] transition-colors">Kurslar</Link></li>
-                <li><Link to="/tests" className="text-gray-500 text-sm font-medium hover:text-[#007aff] transition-colors">Testlar</Link></li>
-                <li><Link to="/contact" className="text-gray-500 text-sm font-medium hover:text-[#007aff] transition-colors">Aloqa</Link></li>
+            <div className="col-span-1 md:pl-10">
+              <h4 className="text-xs font-bold text-slate-800 mb-4 uppercase tracking-widest">Tezkor havolalar</h4>
+              <ul className="space-y-2 text-xs font-medium">
+                <li><Link to="/" className="text-slate-500 hover:text-[#007aff] transition-colors">Bosh sahifa</Link></li>
+                <li><Link to="/courses" className="text-slate-500 hover:text-[#007aff] transition-colors">Kurslar</Link></li>
+                <li><Link to="/tests" className="text-slate-500 hover:text-[#007aff] transition-colors">Testlar</Link></li>
+                <li><Link to="/contact" className="text-slate-500 hover:text-[#007aff] transition-colors">Aloqa</Link></li>
               </ul>
             </div>
 
             {/* 3. Aloqa ma'lumotlari */}
             <div className="col-span-1">
-              <h4 className="text-base font-bold text-gray-900 mb-6 tracking-wider">Aloqa ma'lumotlari</h4>
-              <ul className="space-y-4">
-                <li className="text-gray-500 text-sm font-medium leading-relaxed">
-                  {content.footer.address || "Toshkent shahri, Chilonzor tumani, Bunyodkor ko'chasi 1-uy"}
+              <h4 className="text-xs font-bold text-slate-800 mb-4 uppercase tracking-widest">Aloqa ma'lumotlari</h4>
+              <ul className="space-y-2 text-xs">
+                <li className="text-slate-500 leading-relaxed font-normal">
+                  {content?.footer?.address || "Toshkent shahri, Chilonzor tumani, Bunyodkor ko'chasi 1-uy"}
                 </li>
-                <li className="text-gray-500 text-sm font-medium">
-                  <a href={`tel:${content.footer.phone || '+998914305676'}`} className="hover:text-[#007aff] transition-colors">
-                    {content.footer.phone || "+998 91 430 56 76"}
+                <li className="text-slate-500 font-medium">
+                  <a href={`tel:${content?.footer?.phone || '+998914305676'}`} className="hover:text-[#007aff] transition-colors">
+                    {content?.footer?.phone || "+998 91 430 56 76"}
                   </a>
                 </li>
-                <li className="text-gray-500 text-sm font-medium">
-                  <a href={`mailto:${content.footer.email || 'info@raqamlitalim.uz'}`} className="hover:text-[#007aff] transition-colors">
-                    {content.footer.email || "info@raqamlitalim.uz"}
+                <li className="text-slate-500 font-medium">
+                  <a href={`mailto:${content?.footer?.email || 'info@raqamlitalim.uz'}`} className="hover:text-[#007aff] transition-colors">
+                    {content?.footer?.email || "info@raqamlitalim.uz"}
                   </a>
                 </li>
-                <li className="text-gray-500 text-sm font-medium">
-                  {content.footer.workingHours || "Dushanba-Juma: 9:00 - 18:00"}
+                <li className="text-slate-400 font-normal">
+                  {content?.footer?.workingHours || "Dushanba-Juma: 9:00 - 18:00"}
                 </li>
               </ul>
             </div>
@@ -423,69 +436,69 @@ export default function Home() {
           </div>
           
           {/* Bottom & Social Icons */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-6 text-sm text-gray-400 font-medium pt-8 border-t border-gray-200/50">
-            <span>{content.footer.bottom || "© 2024 Raqamli Ta'lim. Barcha huquqlar himoyalangan."}</span>
-            <div className="flex gap-3">
-               {content.footer.telegram ? (
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-400 font-normal">
+            <span>{content?.footer?.bottom || "© 2024 Raqamli Ta'lim. Barcha huquqlar himoyalangan."}</span>
+            <div className="flex items-center gap-2.5">
+               {content?.footer?.telegram ? (
                  <a 
-                   href={content.footer.telegram} 
+                   href={formatSocialLink(content.footer.telegram, 'telegram')} 
                    target="_blank" 
                    rel="noopener noreferrer" 
-                   className="w-10 h-10 rounded-xl bg-white hover:bg-[#0088cc]/10 hover:text-[#0088cc] flex items-center justify-center transition-all duration-300 group shadow-sm border border-gray-100"
+                   className="w-8 h-8 rounded-lg bg-white border border-slate-200/60 hover:bg-[#0088cc] hover:border-[#0088cc] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
                    title="Telegram"
                    id="footer-social-telegram"
                  >
-                   <Send className="h-4.5 w-4.5 transform group-hover:scale-110 transition-transform" />
+                   <Send className="h-3.5 w-3.5 transform group-hover:scale-105 transition-transform" />
                  </a>
                ) : (
                  <span 
-                   className="w-10 h-10 rounded-xl bg-white text-gray-300 flex items-center justify-center border border-gray-100 cursor-not-allowed"
-                   title="Telegram (no link)"
+                   className="w-8 h-8 rounded-lg bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
+                   title="Telegram (kiritilmagan)"
                    id="footer-social-telegram-disabled"
                  >
-                   <Send className="h-4.5 w-4.5" />
+                   <Send className="h-3.5 w-3.5" />
                  </span>
                )}
                
-               {content.footer.instagram ? (
+               {content?.footer?.instagram ? (
                  <a 
-                   href={content.footer.instagram} 
+                   href={formatSocialLink(content.footer.instagram, 'instagram')} 
                    target="_blank" 
                    rel="noopener noreferrer" 
-                   className="w-10 h-10 rounded-xl bg-white hover:bg-[#E1306C]/10 hover:text-[#E1306C] flex items-center justify-center transition-all duration-300 group shadow-sm border border-gray-100"
+                   className="w-8 h-8 rounded-lg bg-white border border-slate-200/60 hover:bg-[#E1306C] hover:border-[#E1306C] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
                    title="Instagram"
                    id="footer-social-instagram"
                  >
-                   <Instagram className="h-4.5 w-4.5 transform group-hover:scale-110 transition-transform" />
+                   <Instagram className="h-3.5 w-3.5 transform group-hover:scale-105 transition-transform" />
                  </a>
                ) : (
                  <span 
-                   className="w-10 h-10 rounded-xl bg-white text-gray-300 flex items-center justify-center border border-gray-100 cursor-not-allowed"
-                   title="Instagram (no link)"
+                   className="w-8 h-8 rounded-lg bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
+                   title="Instagram (kiritilmagan)"
                    id="footer-social-instagram-disabled"
                  >
-                   <Instagram className="h-4.5 w-4.5" />
+                   <Instagram className="h-3.5 w-3.5" />
                  </span>
                )}
 
-               {content.footer.youtube ? (
+               {content?.footer?.youtube ? (
                  <a 
-                   href={content.footer.youtube} 
+                   href={formatSocialLink(content.footer.youtube, 'youtube')} 
                    target="_blank" 
                    rel="noopener noreferrer" 
-                   className="w-10 h-10 rounded-xl bg-white hover:bg-[#FF0000]/10 hover:text-[#FF0000] flex items-center justify-center transition-all duration-300 group shadow-sm border border-gray-100"
+                   className="w-8 h-8 rounded-lg bg-white border border-slate-200/60 hover:bg-[#FF0000] hover:border-[#FF0000] hover:text-white flex items-center justify-center transition-all duration-300 group shadow-sm"
                    title="YouTube"
                    id="footer-social-youtube"
                  >
-                   <Youtube className="h-4.5 w-4.5 transform group-hover:scale-110 transition-transform" />
+                   <Youtube className="h-3.5 w-3.5 transform group-hover:scale-105 transition-transform" />
                  </a>
                ) : (
                  <span 
-                   className="w-10 h-10 rounded-xl bg-white text-gray-300 flex items-center justify-center border border-gray-100 cursor-not-allowed"
-                   title="YouTube (no link)"
+                   className="w-8 h-8 rounded-lg bg-slate-100/50 text-slate-300 flex items-center justify-center border border-slate-200/30 cursor-not-allowed"
+                   title="YouTube (kiritilmagan)"
                    id="footer-social-youtube-disabled"
                  >
-                   <Youtube className="h-4.5 w-4.5" />
+                   <Youtube className="h-3.5 w-3.5" />
                  </span>
                )}
             </div>

@@ -5,6 +5,26 @@ import { doc, getDoc, collection, addDoc, Timestamp, setDoc, query, where, limit
 import { SiteContent } from '../types';
 import { useAuth } from '../hooks/useAuth';
 
+function formatSocialLink(val: string | undefined, type: 'telegram' | 'instagram' | 'youtube'): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  const handle = trimmed.startsWith('@') ? trimmed.substring(1) : trimmed;
+  if (type === 'telegram') {
+    return `https://t.me/${handle}`;
+  } else if (type === 'instagram') {
+    return `https://instagram.com/${handle}`;
+  } else if (type === 'youtube') {
+    if (trimmed.startsWith('@')) {
+      return `https://youtube.com/${trimmed}`;
+    }
+    return `https://youtube.com/@${handle}`;
+  }
+  return trimmed;
+}
+
 export default function Contact() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -150,7 +170,7 @@ export default function Contact() {
                 <div className="flex gap-4">
                    {content?.footer?.telegram && (
                      <a 
-                       href={content.footer.telegram} 
+                       href={formatSocialLink(content.footer.telegram, 'telegram')} 
                        target="_blank" 
                        rel="noopener noreferrer" 
                        className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-indigo-900 flex items-center justify-center transition-all duration-300 group shadow-lg"
@@ -162,7 +182,7 @@ export default function Contact() {
                    )}
                    {content?.footer?.instagram && (
                      <a 
-                       href={content.footer.instagram} 
+                       href={formatSocialLink(content.footer.instagram, 'instagram')} 
                        target="_blank" 
                        rel="noopener noreferrer" 
                        className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-[#E1306C] flex items-center justify-center transition-all duration-300 group shadow-lg"
@@ -174,7 +194,7 @@ export default function Contact() {
                    )}
                    {content?.footer?.youtube && (
                      <a 
-                       href={content.footer.youtube} 
+                       href={formatSocialLink(content.footer.youtube, 'youtube')} 
                        target="_blank" 
                        rel="noopener noreferrer" 
                        className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-[#FF0000] flex items-center justify-center transition-all duration-300 group shadow-lg"
