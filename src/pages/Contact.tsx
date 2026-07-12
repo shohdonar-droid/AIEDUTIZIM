@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Send, Loader2, BrainCircuit } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Loader2, BrainCircuit, Instagram, Youtube } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, getDoc, collection, addDoc, Timestamp, setDoc, query, where, limit, getDocs } from 'firebase/firestore';
 import { SiteContent } from '../types';
@@ -143,6 +143,50 @@ export default function Contact() {
                   </div>
                </div>
             </div>
+
+            {(content?.footer?.telegram || content?.footer?.instagram || content?.footer?.youtube) && (
+              <div className="mt-12 pt-10 border-t border-indigo-800">
+                <p className="text-xs font-black text-indigo-300 uppercase tracking-widest mb-4">Biz ijtimoiy tarmoqlarda</p>
+                <div className="flex gap-4">
+                   {content?.footer?.telegram && (
+                     <a 
+                       href={content.footer.telegram} 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-indigo-900 flex items-center justify-center transition-all duration-300 group shadow-lg"
+                       title="Telegram"
+                       id="contact-social-telegram"
+                     >
+                       <Send className="h-5 w-5 transform group-hover:scale-110 transition-transform" />
+                     </a>
+                   )}
+                   {content?.footer?.instagram && (
+                     <a 
+                       href={content.footer.instagram} 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-[#E1306C] flex items-center justify-center transition-all duration-300 group shadow-lg"
+                       title="Instagram"
+                       id="contact-social-instagram"
+                     >
+                       <Instagram className="h-5 w-5 transform group-hover:scale-110 transition-transform" />
+                     </a>
+                   )}
+                   {content?.footer?.youtube && (
+                     <a 
+                       href={content.footer.youtube} 
+                       target="_blank" 
+                       rel="noopener noreferrer" 
+                       className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white hover:text-[#FF0000] flex items-center justify-center transition-all duration-300 group shadow-lg"
+                       title="YouTube"
+                       id="contact-social-youtube"
+                     >
+                       <Youtube className="h-5 w-5 transform group-hover:scale-110 transition-transform" />
+                     </a>
+                   )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Contact Form */}

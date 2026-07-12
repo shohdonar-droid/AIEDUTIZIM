@@ -3,7 +3,7 @@ import { db } from '../lib/firebase';
 import { doc, getDoc, collection, getDocs, getCountFromServer, query, where } from 'firebase/firestore';
 import { Course, SiteContent } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, ChevronRight, GraduationCap, LayoutGrid, BarChart3, Users, Settings, Award, ArrowRight, BrainCircuit, Database, Download, FileText, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, GraduationCap, LayoutGrid, BarChart3, Users, Settings, Award, ArrowRight, BrainCircuit, Database, Download, FileText, CheckCircle2, Send, Instagram, Youtube } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { makeDirectImageUrl } from '../lib/helpers';
@@ -361,7 +361,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="glass-nav pt-16 pb-8 mt-10">
+      <footer className="bg-gray-50/50 border-t border-gray-100 pt-16 pb-10 mt-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 border-b border-gray-200/50 pb-12 mb-8">
             
@@ -423,34 +423,70 @@ export default function Home() {
           </div>
           
           {/* Bottom & Social Icons */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-gray-400 font-medium">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-6 text-sm text-gray-400 font-medium pt-8 border-t border-gray-200/50">
             <span>{content.footer.bottom || "© 2024 Raqamli Ta'lim. Barcha huquqlar himoyalangan."}</span>
-            <div className="flex gap-6">
-               {content.footer.telegram && (
-                 <a href={content.footer.telegram} target="_blank" rel="noopener noreferrer" className="hover:text-[#0088cc] transition-colors">
-                   Telegram
+            <div className="flex gap-3">
+               {content.footer.telegram ? (
+                 <a 
+                   href={content.footer.telegram} 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   className="w-10 h-10 rounded-xl bg-white hover:bg-[#0088cc]/10 hover:text-[#0088cc] flex items-center justify-center transition-all duration-300 group shadow-sm border border-gray-100"
+                   title="Telegram"
+                   id="footer-social-telegram"
+                 >
+                   <Send className="h-4.5 w-4.5 transform group-hover:scale-110 transition-transform" />
                  </a>
-               )}
-               {!content.footer.telegram && (
-                 <span className="hover:text-[#0088cc] cursor-pointer transition-colors">Telegram</span>
+               ) : (
+                 <span 
+                   className="w-10 h-10 rounded-xl bg-white text-gray-300 flex items-center justify-center border border-gray-100 cursor-not-allowed"
+                   title="Telegram (no link)"
+                   id="footer-social-telegram-disabled"
+                 >
+                   <Send className="h-4.5 w-4.5" />
+                 </span>
                )}
                
-               {content.footer.instagram && (
-                 <a href={content.footer.instagram} target="_blank" rel="noopener noreferrer" className="hover:text-[#E1306C] transition-colors">
-                   Instagram
+               {content.footer.instagram ? (
+                 <a 
+                   href={content.footer.instagram} 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   className="w-10 h-10 rounded-xl bg-white hover:bg-[#E1306C]/10 hover:text-[#E1306C] flex items-center justify-center transition-all duration-300 group shadow-sm border border-gray-100"
+                   title="Instagram"
+                   id="footer-social-instagram"
+                 >
+                   <Instagram className="h-4.5 w-4.5 transform group-hover:scale-110 transition-transform" />
                  </a>
-               )}
-               {!content.footer.instagram && (
-                 <span className="hover:text-[#E1306C] cursor-pointer transition-colors">Instagram</span>
+               ) : (
+                 <span 
+                   className="w-10 h-10 rounded-xl bg-white text-gray-300 flex items-center justify-center border border-gray-100 cursor-not-allowed"
+                   title="Instagram (no link)"
+                   id="footer-social-instagram-disabled"
+                 >
+                   <Instagram className="h-4.5 w-4.5" />
+                 </span>
                )}
 
-               {content.footer.youtube && (
-                 <a href={content.footer.youtube} target="_blank" rel="noopener noreferrer" className="hover:text-[#FF0000] transition-colors">
-                   YouTube
+               {content.footer.youtube ? (
+                 <a 
+                   href={content.footer.youtube} 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   className="w-10 h-10 rounded-xl bg-white hover:bg-[#FF0000]/10 hover:text-[#FF0000] flex items-center justify-center transition-all duration-300 group shadow-sm border border-gray-100"
+                   title="YouTube"
+                   id="footer-social-youtube"
+                 >
+                   <Youtube className="h-4.5 w-4.5 transform group-hover:scale-110 transition-transform" />
                  </a>
-               )}
-               {!content.footer.youtube && (
-                 <span className="hover:text-[#FF0000] cursor-pointer transition-colors">YouTube</span>
+               ) : (
+                 <span 
+                   className="w-10 h-10 rounded-xl bg-white text-gray-300 flex items-center justify-center border border-gray-100 cursor-not-allowed"
+                   title="YouTube (no link)"
+                   id="footer-social-youtube-disabled"
+                 >
+                   <Youtube className="h-4.5 w-4.5" />
+                 </span>
                )}
             </div>
           </div>
