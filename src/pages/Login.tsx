@@ -213,6 +213,12 @@ export default function Login() {
         }
 
         if (docExists) {
+          if (userDocData.password && userDocData.password !== loginPass) {
+             setError('Kiritilgan parol xato yoki o\'zgartirilgan.');
+             setLoading(false);
+             await auth.signOut();
+             return;
+          }
           const role = userDocData.role;
           
           const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin') || (role === 'mustaqil_o_qituvchi' && activeRole === 'staff');
