@@ -79,35 +79,45 @@ export default function Login() {
       const trimmedLogin = loginField.trim();
       const loginPass = password;
 
-      // Deterministic Email Derivation
+      let userDocDataPre: any = null;
+      let docExistsPre = false;
+
+      // Deterministic Email Derivation & Pre-auth Firestore Fetch
       if (trimmedLogin.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
         actualEmail = ADMIN_EMAIL;
-      } else if (trimmedLogin.includes('@')) {
-        actualEmail = trimmedLogin.toLowerCase();
       } else {
-        // Attempt Look up login field in Firestore users collection
         try {
-          const qLog = query(collection(db, 'users'), where('login', '==', trimmedLogin));
-          const qLogSnap = await getDocs(qLog);
-          if (!qLogSnap.empty) {
-            actualEmail = qLogSnap.docs[0].data().email;
+          let qSnap;
+          if (trimmedLogin.includes('@')) {
+            const qEmail = query(collection(db, 'users'), where('email', '==', trimmedLogin.toLowerCase().trim()));
+            qSnap = await getDocs(qEmail);
           } else {
-            const qLogLower = query(collection(db, 'users'), where('login', '==', trimmedLogin.toLowerCase()));
-            const qLogLowerSnap = await getDocs(qLogLower);
-            if (!qLogLowerSnap.empty) {
-              actualEmail = qLogLowerSnap.docs[0].data().email;
-            } else {
-              // Deterministic fallback if not found
-              if (activeRole === 'admin') actualEmail = `${trimmedLogin.toLowerCase()}@subadmin.uz`;
-              else if (activeRole === 'teacher' || activeRole === 'staff') actualEmail = `${trimmedLogin.toLowerCase()}@teacher.uz`;
-              else actualEmail = `${trimmedLogin.toLowerCase()}@student.uz`;
+            const qLog = query(collection(db, 'users'), where('login', '==', trimmedLogin));
+            qSnap = await getDocs(qLog);
+            if (qSnap.empty) {
+              const qLogLower = query(collection(db, 'users'), where('login', '==', trimmedLogin.toLowerCase()));
+              qSnap = await getDocs(qLogLower);
             }
           }
+
+          if (qSnap && !qSnap.empty) {
+            userDocDataPre = qSnap.docs[0].data();
+            docExistsPre = true;
+            actualEmail = userDocDataPre.email || '';
+          }
         } catch (quotaErr: any) {
-           console.warn("Login lookup failed (likely quota). Using deterministic fallback.", quotaErr);
-           if (activeRole === 'admin') actualEmail = `${trimmedLogin.toLowerCase()}@subadmin.uz`;
-           else if (activeRole === 'teacher' || activeRole === 'staff') actualEmail = `${trimmedLogin.toLowerCase()}@teacher.uz`;
-           else actualEmail = `${trimmedLogin.toLowerCase()}@student.uz`;
+          console.warn("Login pre-auth lookup failed:", quotaErr);
+        }
+      }
+
+      // If actualEmail not found in Firestore, use deterministic fallback
+      if (!actualEmail) {
+        if (trimmedLogin.includes('@')) {
+          actualEmail = trimmedLogin.toLowerCase();
+        } else {
+          if (activeRole === 'admin') actualEmail = `${trimmedLogin.toLowerCase()}@subadmin.uz`;
+          else if (activeRole === 'teacher' || activeRole === 'staff') actualEmail = `${trimmedLogin.toLowerCase()}@teacher.uz`;
+          else actualEmail = `${trimmedLogin.toLowerCase()}@student.uz`;
         }
       }
 
@@ -116,6 +126,21 @@ export default function Login() {
          setError('Tizimga kirish uchun elektron pochta manzili topilmadi.');
          setLoading(false);
          return;
+      }
+
+      // Pre-auth password check: If Firestore has a stored password, validate first
+      if (trimmedLogin.toLowerCase() === ADMIN_LOGIN.toLowerCase()) {
+        if (loginPass !== ADMIN_PASS) {
+          setError('Login yoki parol xato kiritildi.');
+          setLoading(false);
+          return;
+        }
+      } else if (docExistsPre && userDocDataPre && userDocDataPre.password) {
+        if (userDocDataPre.password !== loginPass) {
+          setError('Kiritilgan parol xato yoki o\'zgartirilgan.');
+          setLoading(false);
+          return;
+        }
       }
 
       try {
