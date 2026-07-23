@@ -2841,18 +2841,15 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
     children.push(headerTable);
     children.push(new Paragraph({ spacing: { before: 180, after: 120 } }));
 
-    // Personal Details (Formatted as aligned borderless table matching standard Uzbek Obektivka layout)
-    const createPairRow = (label1: string, val1: string, label2: string, val2: string) => {
+    // Personal Details (Formatted according to exact Uzbek Obektivka template with separated title and copy value rows)
+    const createLabelRow2Col = (label1: string, label2: string) => {
       return new TableRow({
         children: [
           new TableCell({
             children: [
               new Paragraph({
-                children: [
-                  new TextRun({ text: label1 + "\n", bold: true, font: "Times New Roman", size: 22 }),
-                  new TextRun({ text: val1 || "yo'q", font: "Times New Roman", size: 22 })
-                ],
-                spacing: { before: 60, after: 120 }
+                children: [new TextRun({ text: label1, bold: true, font: "Times New Roman", size: 22 })],
+                spacing: { before: 40, after: 40 }
               })
             ],
             width: { size: 50, type: WidthType.PERCENTAGE }
@@ -2860,11 +2857,33 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
           new TableCell({
             children: [
               new Paragraph({
-                children: [
-                  new TextRun({ text: label2 + "\n", bold: true, font: "Times New Roman", size: 22 }),
-                  new TextRun({ text: val2 || "yo'q", font: "Times New Roman", size: 22 })
-                ],
-                spacing: { before: 60, after: 120 }
+                children: [new TextRun({ text: label2, bold: true, font: "Times New Roman", size: 22 })],
+                spacing: { before: 40, after: 40 }
+              })
+            ],
+            width: { size: 50, type: WidthType.PERCENTAGE }
+          })
+        ]
+      });
+    };
+
+    const createValueRow2Col = (val1: string, val2: string) => {
+      return new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: val1 || "yo'q", font: "Times New Roman", size: 22 })],
+                spacing: { before: 40, after: 40 }
+              })
+            ],
+            width: { size: 50, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: val2 || "yo'q", font: "Times New Roman", size: 22 })],
+                spacing: { before: 40, after: 40 }
               })
             ],
             width: { size: 50, type: WidthType.PERCENTAGE }
@@ -2880,7 +2899,7 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
             children: [
               new Paragraph({
                 children: [new TextRun({ text: label, bold: true, font: "Times New Roman", size: 22 })],
-                spacing: { before: 60, after: 120 }
+                spacing: { before: 40, after: 40 }
               })
             ],
             width: { size: 50, type: WidthType.PERCENTAGE }
@@ -2889,8 +2908,7 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
             children: [
               new Paragraph({
                 children: [new TextRun({ text: val || "yo'q", font: "Times New Roman", size: 22 })],
-                alignment: AlignmentType.RIGHT,
-                spacing: { before: 60, after: 120 }
+                spacing: { before: 40, after: 40 }
               })
             ],
             width: { size: 50, type: WidthType.PERCENTAGE }
@@ -2899,18 +2917,50 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
       });
     };
 
-    const createSingleRow = (label: string, val: string) => {
+    const createLabelRow1Col = (label: string) => {
       return new TableRow({
         children: [
           new TableCell({
             columnSpan: 2,
             children: [
               new Paragraph({
-                children: [
-                  new TextRun({ text: label + "\n", bold: true, font: "Times New Roman", size: 22 }),
-                  new TextRun({ text: val || "yo'q", font: "Times New Roman", size: 22 })
-                ],
-                spacing: { before: 60, after: 120 }
+                children: [new TextRun({ text: label, bold: true, font: "Times New Roman", size: 22 })],
+                spacing: { before: 40, after: 40 }
+              })
+            ],
+            width: { size: 100, type: WidthType.PERCENTAGE }
+          })
+        ]
+      });
+    };
+
+    const createValueRow1Col = (val: string) => {
+      return new TableRow({
+        children: [
+          new TableCell({
+            columnSpan: 2,
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: val || "yo'q", font: "Times New Roman", size: 22 })],
+                spacing: { before: 40, after: 40 }
+              })
+            ],
+            width: { size: 100, type: WidthType.PERCENTAGE }
+          })
+        ]
+      });
+    };
+
+    const createCenterHeaderRow1Col = (title: string) => {
+      return new TableRow({
+        children: [
+          new TableCell({
+            columnSpan: 2,
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: title, bold: true, font: "Times New Roman", size: 24 })],
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 80, after: 80 }
               })
             ],
             width: { size: 100, type: WidthType.PERCENTAGE }
@@ -2920,43 +2970,47 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
     };
 
     const infoRows = [
-      createPairRow("Tug'ilgan yili:", data.birthDate, "Tug'ilgan joyi:", data.birthPlace),
-      createPairRow("Millati:", data.nationality, "Partiyaviyligi:", data.party),
-      createPairRow("Ma'lumoti:", data.education, "Tamomlagan:", data.graduated),
+      createLabelRow2Col("Tug'ilgan yili:", "Tug'ilgan joyi:"),
+      createValueRow2Col(data.birthDate, data.birthPlace),
+
+      createLabelRow2Col("Millati:", "Partiyaviyligi:"),
+      createValueRow2Col(data.nationality, data.party),
+
+      createLabelRow2Col("Ma'lumoti:", "Tamomlagan:"),
+      createValueRow2Col(data.education, data.graduated),
+
       createSameLineRow("Ma'lumoti bo'yicha mutaxassisligi:", data.specialty),
-      createPairRow("Ilmiy darajasi:", data.academicDegree, "Ilmiy unvoni:", data.academicTitle),
-      createSingleRow("Qaysi chet tillarini biladi:", data.languages),
-      createSingleRow("Davlat mukofotlari bilan taqdirlanganmi (qanaqa):", data.awards),
-      createSingleRow("Xalq deputatlari, respublika, viloyat, shahar va tuman Kengashi deputatimi yoki boshqa saylanadigan organlarning a’zosimi (to’liq ko’rsatilishi lozim):", data.deputy)
+
+      createLabelRow2Col("Ilmiy darajasi:", "Ilmiy unvoni:"),
+      createValueRow2Col(data.academicDegree, data.academicTitle),
+
+      createLabelRow1Col("Qaysi chet tillarini biladi:"),
+      createValueRow1Col(data.languages),
+
+      createLabelRow1Col("Davlat mukofotlari bilan taqdirlanganmi:"),
+      createValueRow1Col(data.awards),
+
+      createLabelRow1Col("Xalq deputatlari, respublika, viloyat, shahar va tuman Kengashi deputatimi yoki boshqa saylanadigan organlarning a’zosimi (to’liq ko’rsatilishi lozim):"),
+      createValueRow1Col(data.deputy),
+
+      createCenterHeaderRow1Col("MEHNAT FAOLIYATI"),
+      createValueRow1Col(data.workHistory || "2021 y. - h.v. - Vaqtincha ishsiz")
     ];
 
     const infoTable = new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       borders: {
-        top: { style: BorderStyle.NONE },
-        bottom: { style: BorderStyle.NONE },
-        left: { style: BorderStyle.NONE },
-        right: { style: BorderStyle.NONE },
-        insideHorizontal: { style: BorderStyle.NONE },
-        insideVertical: { style: BorderStyle.NONE }
+        top: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        left: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        right: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
+        insideVertical: { style: BorderStyle.SINGLE, size: 4, color: "000000" }
       },
       rows: infoRows
     });
 
     children.push(infoTable);
-
-    // MEHNAT FAOLIYATI section
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "MEHNAT FAOLIYATI", bold: true, font: "Times New Roman", size: 26 })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 360, after: 180 }
-    }));
-
-    const workHistoryText = data.workHistory || "2021 y. - h.v. - Vaqtincha ishsiz";
-    children.push(new Paragraph({
-      children: [new TextRun({ text: workHistoryText, font: "Times New Roman", size: 22 })],
-      spacing: { before: 60, after: 240 }
-    }));
 
     // Empty space before page 2 / Relatives section
     children.push(new Paragraph({ spacing: { before: 480, after: 240 } }));
