@@ -672,7 +672,8 @@ const AI_COSTS: Record<string, number> = {
   "📋 Test yaratish": 3,
   "📄 CV yaratish": 5,
   "💬 Savol-javob": 1,
-  "📄 AI Antiplagiat": 5
+  "📄 AI Antiplagiat": 5,
+  "📄 Obektivka yaratish": 5000
 };
 
 const requestHistory = new Map<number, number[]>();
@@ -1015,7 +1016,7 @@ async function getAiAssistantKeyboard(userId?: number) {
     [{ text: "🎓 Tezis yaratish" }, { text: "📑 Maqola yaratish" }],
     [{ text: "📝 Dars ishlanma yaratish" }, { text: "📋 Test yaratish" }],
     [{ text: "🌐 Tarjimon" }, { text: "📄 CV yaratish" }],
-    [{ text: "📄 AI Antiplagiat" }],
+    [{ text: "📄 AI Antiplagiat" }, { text: "📄 Obektivka yaratish" }],
     [{ text: "⬅️ Asosiy menyu" }]
   ];
 
@@ -2775,6 +2776,202 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
   }
 }
 
+async function runObektivkaDocxGeneration(ctx: any, data: any) {
+  const userId = ctx.from.id;
+  const chatId = ctx.chat?.id;
+  const loadingMsg = await ctx.reply(`⏳ <b>Obektivka hujjati tayyorlanmoqda...</b>\n\nIltimos kuting, hozir faylingiz shakllantiriladi.`, { parse_mode: "HTML" });
+
+  try {
+    const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = await import("docx");
+
+    const children: any[] = [];
+
+    // Title
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "MA'LUMOTNOMA", bold: true, font: "Times New Roman", size: 32 })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 120, after: 120 }
+    }));
+
+    // User's Full Name
+    children.push(new Paragraph({
+      children: [new TextRun({ text: (data.name || "").toUpperCase(), bold: true, font: "Times New Roman", size: 28 })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 360 }
+    }));
+
+    // Personal Details (Formatted as beautifully aligned Paragraphs or a bordered/borderless table)
+    const personalKeys = [
+      { key: "Tug'ilgan yili:", val: data.birthDate },
+      { key: "Tug'ilgan joyi:", val: data.birthPlace },
+      { key: "Millati:", val: data.nationality },
+      { key: "Partiyaviyligi:", val: data.party },
+      { key: "Ma'lumoti:", val: data.education },
+      { key: "Tamomlagan:", val: data.graduated },
+      { key: "Ma'lumoti bo'yicha mutaxassisligi:", val: data.specialty },
+      { key: "Ilmiy darajasi:", val: data.academicDegree },
+      { key: "Ilmiy unvoni:", val: data.academicTitle },
+      { key: "Qaysi chet tillarini biladi:", val: data.languages },
+      { key: "Davlat mukofotlari bilan taqdirlanganmi:", val: data.awards }
+    ];
+
+    const infoRows = personalKeys.map(item => {
+      return new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: item.key, bold: true, font: "Times New Roman", size: 24 })],
+                spacing: { before: 80, after: 80 }
+              })
+            ],
+            width: { size: 45, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: item.val || "yo'q", font: "Times New Roman", size: 24 })],
+                spacing: { before: 80, after: 80 }
+              })
+            ],
+            width: { size: 55, type: WidthType.PERCENTAGE }
+          })
+        ]
+      });
+    });
+
+    const infoTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: {
+        top: { style: BorderStyle.NONE },
+        bottom: { style: BorderStyle.NONE },
+        left: { style: BorderStyle.NONE },
+        right: { style: BorderStyle.NONE },
+        insideHorizontal: { style: BorderStyle.NONE },
+        insideVertical: { style: BorderStyle.NONE }
+      },
+      rows: infoRows
+    });
+
+    children.push(infoTable);
+
+    // Empty space
+    children.push(new Paragraph({ spacing: { before: 360, after: 120 } }));
+
+    // Relatives section title
+    children.push(new Paragraph({
+      children: [new TextRun({ text: `${data.name || ""}ning yaqin qarindoshlari haqida ma'lumot`.toUpperCase(), bold: true, font: "Times New Roman", size: 26 })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 240, after: 240 }
+    }));
+
+    // Relatives Table Header
+    const relativeTableRows = [
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Qarindoshligi", bold: true, font: "Times New Roman", size: 22 })], alignment: AlignmentType.CENTER })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "F.I.Sh.", bold: true, font: "Times New Roman", size: 22 })], alignment: AlignmentType.CENTER })],
+            width: { size: 25, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Tug'ilgan yili va joyi", bold: true, font: "Times New Roman", size: 22 })], alignment: AlignmentType.CENTER })],
+            width: { size: 20, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Ish joyi va lavozimi", bold: true, font: "Times New Roman", size: 22 })], alignment: AlignmentType.CENTER })],
+            width: { size: 22, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: "Yashash joyi", bold: true, font: "Times New Roman", size: 22 })], alignment: AlignmentType.CENTER })],
+            width: { size: 18, type: WidthType.PERCENTAGE }
+          })
+        ]
+      })
+    ];
+
+    // Add Otasi, Onasi, and other relatives
+    const allRelatives = [...(data.relatives || [])];
+    
+    allRelatives.forEach(rel => {
+      relativeTableRows.push(new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: rel.relation || "", font: "Times New Roman", size: 22 })] })],
+            width: { size: 15, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: rel.name || "", font: "Times New Roman", size: 22 })] })],
+            width: { size: 25, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: rel.birth || "", font: "Times New Roman", size: 22 })] })],
+            width: { size: 20, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: rel.work || "", font: "Times New Roman", size: 22 })] })],
+            width: { size: 22, type: WidthType.PERCENTAGE }
+          }),
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: rel.address || "", font: "Times New Roman", size: 22 })] })],
+            width: { size: 18, type: WidthType.PERCENTAGE }
+          })
+        ]
+      }));
+    });
+
+    const relativeTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: relativeTableRows
+    });
+
+    children.push(relativeTable);
+
+    // Document structure
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 1440,
+              bottom: 1440,
+              left: 1701, // ~3cm
+              right: 850   // ~1.5cm
+            }
+          }
+        },
+        children: children
+      }]
+    });
+
+    const docxBuffer = await Packer.toBuffer(doc);
+
+    await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+
+    const cleanFileName = `Obektivka_${(data.name || "hujjat").substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.docx`;
+    await ctx.replyWithDocument(
+      { source: docxBuffer as any, filename: cleanFileName },
+      { caption: `✅ <b>Sizning obektivkangiz tayyor bo'ldi!</b>\n\nMicrosoft Word formatidagi fayl muvaffaqiyatli shakllantirildi.` }
+    );
+
+    return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: await getAiAssistantKeyboard(userId),
+        resize_keyboard: true
+      }
+    });
+
+  } catch (err: any) {
+    console.error("Obektivka generation error:", err);
+    await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+    return ctx.reply(`❌ Obektivka hujjatini yaratishda xato yuz berdi: ${err.message || 'Noma\x27lum xatolik'}`);
+  }
+}
+
 async function runTestGeneration(ctx: any, data: any) {
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
@@ -3302,6 +3499,260 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       await handleAntiplagiatAnalysis(ctx, input);
     }
   }
+  else if (service === "📄 Obektivka yaratish") {
+    if (step === 1) {
+      data.name = input;
+      userWizardStates.set(userId, { service, step: 2, data });
+      return ctx.reply("Tug'ilgan yili: (01.01.2001)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 2) {
+      data.birthDate = input;
+      userWizardStates.set(userId, { service, step: 3, data });
+      return ctx.reply("Tug'ilgan joyi: (Toshkent viloyati Chirchiq shahar)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 3) {
+      data.birthPlace = input;
+      userWizardStates.set(userId, { service, step: 4, data });
+      return ctx.reply("Millati: (o'zbek)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "o'zbek" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 4) {
+      data.nationality = input;
+      userWizardStates.set(userId, { service, step: 5, data });
+      return ctx.reply("Partiyaviyligi: (yo'q)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "yo'q" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 5) {
+      data.party = input;
+      userWizardStates.set(userId, { service, step: 6, data });
+      return ctx.reply("Ma'lumoti: (o'rta ta'lim)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "oliy" }, { text: "o'rta maxsus" }], [{ text: "o'rta ta'lim" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 6) {
+      data.education = input;
+      userWizardStates.set(userId, { service, step: 7, data });
+      return ctx.reply("Tamomlagan: (Chirchiq shahar 1-maktab)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 7) {
+      data.graduated = input;
+      userWizardStates.set(userId, { service, step: 8, data });
+      return ctx.reply("Ma'lumoti bo'yicha mutaxassisligi:(yo'q)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "yo'q" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 8) {
+      data.specialty = input;
+      userWizardStates.set(userId, { service, step: 9, data });
+      return ctx.reply("Ilmiy daraja: (yo'q)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "yo'q" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 9) {
+      data.academicDegree = input;
+      userWizardStates.set(userId, { service, step: 10, data });
+      return ctx.reply("Ilmiy unvoni:(yo'q)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "yo'q" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 10) {
+      data.academicTitle = input;
+      userWizardStates.set(userId, { service, step: 11, data });
+      return ctx.reply("Qaysi chet tillarini biladi: (rus,ingliz)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "rus,ingliz" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 11) {
+      data.languages = input;
+      userWizardStates.set(userId, { service, step: 12, data });
+      return ctx.reply("Davlat mukofotlari bilan taqdirlanganmi (yo'q)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "yo'q" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 12) {
+      data.awards = input;
+      data.relatives = [];
+      userWizardStates.set(userId, { service, step: 13, data });
+      return ctx.reply("<b>2-bo'lim: FISH ning yaqin qarindoshlari haqida ma'lumot</b>\n\nOtasi:(Fish ni kiriting )", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 13) {
+      data.temp_relative = { relation: "Otasi", name: input };
+      userWizardStates.set(userId, { service, step: 14, data });
+      return ctx.reply("Tug'ilgan yili va joyi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 14) {
+      data.temp_relative.birth = input;
+      userWizardStates.set(userId, { service, step: 15, data });
+      return ctx.reply("Ish joyi va lavozimi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 15) {
+      data.temp_relative.work = input;
+      userWizardStates.set(userId, { service, step: 16, data });
+      return ctx.reply("yashash joyi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 16) {
+      data.temp_relative.address = input;
+      data.relatives.push(data.temp_relative);
+      data.temp_relative = null;
+
+      userWizardStates.set(userId, { service, step: 17, data });
+      return ctx.reply("Onasi: (Fish ni kiriting)", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 17) {
+      data.temp_relative = { relation: "Onasi", name: input };
+      userWizardStates.set(userId, { service, step: 18, data });
+      return ctx.reply("Tug'ilgan yili va joyi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 18) {
+      data.temp_relative.birth = input;
+      userWizardStates.set(userId, { service, step: 19, data });
+      return ctx.reply("Ish joyi va lavozimi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 19) {
+      data.temp_relative.work = input;
+      userWizardStates.set(userId, { service, step: 20, data });
+      return ctx.reply("yashash joyi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 20) {
+      data.temp_relative.address = input;
+      data.relatives.push(data.temp_relative);
+      data.temp_relative = null;
+
+      userWizardStates.set(userId, { service, step: 21, data });
+      return ctx.reply("aka,uka,opa,singlingiz bormi?", {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [[{ text: "ha" }, { text: "yo'q" }], [{ text: "⬅️ Asosiy menyu" }]],
+          resize_keyboard: true
+        }
+      });
+    }
+    else if (step === 21) {
+      const lowerInput = input.trim().toLowerCase();
+      if (lowerInput === "ha") {
+        userWizardStates.set(userId, { service, step: 22, data });
+        return ctx.reply("Tanlang:", {
+          parse_mode: "HTML",
+          reply_markup: {
+            keyboard: [[{ text: "Akasi" }, { text: "Ukasi" }], [{ text: "Opasi" }, { text: "Singlisi" }], [{ text: "⬅️ Asosiy menyu" }]],
+            resize_keyboard: true
+          }
+        });
+      } else if (lowerInput === "yo'q") {
+        userWizardStates.delete(userId);
+        await runObektivkaDocxGeneration(ctx, data);
+      } else {
+        return ctx.reply("aka,uka,opa,singlingiz bormi?", {
+          parse_mode: "HTML",
+          reply_markup: {
+            keyboard: [[{ text: "ha" }, { text: "yo'q" }], [{ text: "⬅️ Asosiy menyu" }]],
+            resize_keyboard: true
+          }
+        });
+      }
+    }
+    else if (step === 22) {
+      const validTypes = ["Akasi", "Ukasi", "Opasi", "Singlisi"];
+      if (validTypes.includes(input)) {
+        data.temp_relative_type = input;
+        userWizardStates.set(userId, { service, step: 23, data });
+        return ctx.reply(`${input} (fish ni kiriting)`, {
+          parse_mode: "HTML",
+          reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+        });
+      } else {
+        return ctx.reply("Tanlang:", {
+          parse_mode: "HTML",
+          reply_markup: {
+            keyboard: [[{ text: "Akasi" }, { text: "Ukasi" }], [{ text: "Opasi" }, { text: "Singlisi" }], [{ text: "⬅️ Asosiy menyu" }]],
+            resize_keyboard: true
+          }
+        });
+      }
+    }
+    else if (step === 23) {
+      data.temp_relative = { relation: data.temp_relative_type, name: input };
+      userWizardStates.set(userId, { service, step: 24, data });
+      return ctx.reply("Tug'ilgan yili va joyi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 24) {
+      data.temp_relative.birth = input;
+      userWizardStates.set(userId, { service, step: 25, data });
+      return ctx.reply("Ish joyi va lavozimi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 25) {
+      data.temp_relative.work = input;
+      userWizardStates.set(userId, { service, step: 26, data });
+      return ctx.reply("yashash joyi", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    }
+    else if (step === 26) {
+      data.temp_relative.address = input;
+      data.relatives.push(data.temp_relative);
+      data.temp_relative = null;
+      delete data.temp_relative_type;
+
+      userWizardStates.set(userId, { service, step: 21, data });
+      return ctx.reply("aka,uka,opa,singlingiz bormi?", {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [[{ text: "ha" }, { text: "yo'q" }], [{ text: "⬅️ Asosiy menyu" }]],
+          resize_keyboard: true
+        }
+      });
+    }
+  }
 }
 
 bot.on("message", async (ctx) => {
@@ -3425,6 +3876,7 @@ bot.on("message", async (ctx) => {
     else if (normText === "🌐 Tarjimon") { promptText = "🌐 <b>Tarjima yo'nalishini kiriting (masalan: O'zbekcha-Inglizcha):</b>"; }
     else if (normText === "📄 CV yaratish") { promptText = "📄 <b>Foydalanuvchi F.I.Sh. kiriting:</b>"; }
     else if (normText === "📄 AI Antiplagiat") { promptText = "📄 <b>Matn yuboring yoki fayl (PDF, DOCX, TXT) yuklang:</b>"; }
+    else if (normText === "📄 Obektivka yaratish") { promptText = "FISH ni kiriting: (Ortiqov Elyorbek Jasurbek o'g'li )"; }
 
     userWizardStates.set(userId, { service: normText, step: 1, data: {} });
     
