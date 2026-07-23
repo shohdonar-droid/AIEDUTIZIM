@@ -2782,7 +2782,7 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
   const loadingMsg = await ctx.reply(`⏳ <b>Obektivka hujjati tayyorlanmoqda...</b>\n\nIltimos kuting, hozir faylingiz shakllantiriladi.`, { parse_mode: "HTML" });
 
   try {
-    const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = await import("docx");
+    const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, PageBreak } = await import("docx");
 
     const children: any[] = [];
 
@@ -2994,28 +2994,30 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
       createValueRow1Col(data.deputy),
 
       createCenterHeaderRow1Col("MEHNAT FAOLIYATI"),
-      createValueRow1Col(data.workHistory || "2021 y. - h.v. - Vaqtincha ishsiz")
+      createValueRow1Col(data.workHistory || "")
     ];
 
     const infoTable = new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       borders: {
-        top: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-        bottom: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-        left: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-        right: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-        insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: "000000" },
-        insideVertical: { style: BorderStyle.SINGLE, size: 4, color: "000000" }
+        top: { style: BorderStyle.NONE },
+        bottom: { style: BorderStyle.NONE },
+        left: { style: BorderStyle.NONE },
+        right: { style: BorderStyle.NONE },
+        insideHorizontal: { style: BorderStyle.NONE },
+        insideVertical: { style: BorderStyle.NONE }
       },
       rows: infoRows
     });
 
     children.push(infoTable);
 
-    // Empty space before page 2 / Relatives section
-    children.push(new Paragraph({ spacing: { before: 480, after: 240 } }));
+    // Page Break to place Relatives section on Page 2
+    children.push(new Paragraph({
+      children: [new PageBreak()]
+    }));
 
-    // Relatives section title matching sample image
+    // Relatives section title matching sample image (Page 2)
     children.push(new Paragraph({
       children: [new TextRun({ text: `${data.name || ""}ning yaqin qarindoshlari haqida`, bold: true, font: "Times New Roman", size: 24 })],
       alignment: AlignmentType.CENTER,
