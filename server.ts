@@ -465,25 +465,49 @@ app.get("/api/health", (req, res) => {
 
       } else if (action === "generatePresentation") {
         const slideCount = count || 15;
+        const opt = options || {};
+        const lang = opt.language || "O'zbek";
+        const designType = opt.designType || "Zamonaviy";
+        const hasImages = opt.addImages !== undefined ? opt.addImages : true;
+        const hasCharts = opt.createDiagrams !== undefined ? opt.createDiagrams : true;
+        const hasNotes = opt.speakerNotes !== undefined ? opt.speakerNotes : true;
+
         const prompt = `${ACADEMIC_PERSONA}
-          Siz professional taqdimot ustasisiz. "${topic}" mavzusi bo'yicha ${slideCount} ta slayddan iborat o'ta professional va akademik taqdimot strukturasi (outline) tayyorlang.
-          
-          QOIDALAR:
-          1. STRUCTURE: Faqat slayd sarlavhasi (Title) va uning mazmunini (Content) qaytaring.
-          2. TOZA MATN: Slayd mazmunida "Microsoft PowerPoint Custom Layout Template", "Infografika kartalari" kabi texnik andozalarni mutlaqo ishlatmang.
-          3. BELGILAR: Bullet pointlar uchun ★, ✦, 🔴 kabi maxsus belgilarni ishlatmang. Standart Markdown ro'yxatidan foydalaning.
-          4. HAQIQIY MA'LUMOT: Placeholderlar o'rniga haqiqiy va mantiqiy statistik ma'lumotlar, foizlar va aniq jadvallarni matn ko'rinishida yozing.
-          5. SPEECH NOTES: Har bir slayd uchun 30-50 soniyalik professional nutq matnini (speechNote) ham yarating.
-          6. Slaydlar soni qat'iyan ${slideCount} ta bo'lsin.
-          
+          Siz AIEDUTIZIM Telegram botining AI Slayd Yaratish xizmatisiz.
+          Sizning yagona vazifangiz foydalanuvchi bergan "${topic}" mavzusi asosida professional, himoya uchun tayyor, zamonaviy va vizual jihatdan jozibador PowerPoint taqdimotini yaratishdir.
+
+          TAQDIMOT PARAMETRLARI:
+          - Slaydlar soni: ${slideCount} ta (qat'iyan ${slideCount} ta slayd bo'lsin)
+          - Til: ${lang} (Taqdimot matnlari va barcha slayd mazmuni to'liq ushbu tilda bo'lishi shart!)
+          - Dizayn uslubi: ${designType} (Dizayn turlari: Academic, Professional, Minimal, Modern, Dark, Light)
+          - Rasm qo'shish: ${hasImages ? "HA" : "YO'Q"}
+          - Diagrammalar yaratish: ${hasCharts ? "HA" : "YO'Q"}
+          - Ma'ruzachi nutqi (Speaker Notes / Himoya matni) kerakligi: ${hasNotes ? "HA (mukammal 100-200 so'zdan iborat nutq)" : "YO'Q (juda qisqa 10-20 so'zdan iborat nutq bo'lsin)"}
+
+          ASOSIY QOIDALAR:
+          1. Har doim professional, ilmiy, akademik va biznes taqdimot standartlariga mos taqdimot yarating.
+          2. Slaydlarda mantiqiy ketma-ketlik bo'lsin va har bir slayd bitta asosiy g'oyani ifodalasin.
+          3. Slaydlarda uzun matn yozmang. White Space ishlating.
+          4. Har bir slaydda bitta sarlavha va 3–5 ta asosiy bullet point (qisqa punkt) bo'lsin.
+          5. Bir slayddagi matn hajmi 25–40 ta so'zdan oshmasin.
+          6. Slaydlar dizayni va turlari bir xil ko'rinishda bo'lmasin, ularni rang-barang layoutlar bilan boyiting:
+             - 1-slayd (layout: "cover"): Muqova (katta sarlavha, muallif, tashkilot, sana)
+             - 2-slayd (layout: "agenda"): Reja (4-7 ta asosiy bo'lim ikonkalar bilan)
+             - Boshqa slaydlar uchun: "content", "image-left", "image-right", "cards", "chart" kabi layoutlarni navbatma-navbat ishlating.
+          7. TOZA MATN: Slayd mazmunida "Microsoft PowerPoint Custom Layout Template", "Infografika kartalari" kabi texnik andozalarni mutlaqo ishlatmang.
+          8. BELGILAR: Bullet pointlar uchun ★, ✦, 🔴 kabi maxsus belgilarni ishlatmang. Standart Markdown ro'yxatidan foydalaning.
+          9. HAQIQIY MA'LUMOT: Placeholderlar o'rniga haqiqiy va mantiqiy statistik ma'lumotlar, foizlar va aniq jadvallarni matn ko'rinishida yozing.
+          10. SPEAKER NOTES (Himoya matni): Har bir slayd uchun foydalanuvchi ushbu slaydni himoya qilishda aytishi kerak bo'lgan, tanlangan tildagi professional nutq matnini (speechNote) yarating. Agar foydalanuvchi tanlamagan bo'lsa ham (YO'Q bo'lsa), schema talabi uchun juda qisqa 1 jumlalik nutq yozing.
+          11. YAKUNIY SLAYD (layout: "summary"): Har doim Xulosa, Asosiy natijalar, Tavsiyalar va "E'tiboringiz uchun rahmat! Savollar bormi?" yakunlovchi qismini o'z ichiga olsin.
+
           LAYOUT TURLARI:
-          - "cover" - Titul
-          - "agenda" - Mundarija
-          - "content" - Qisqa matn
-          - "image-left" / "image-right"
-          - "cards" - Infografika
-          - "chart" - Diagrammalar (Pie, Bar, Line)
-          - "summary" - Rahmati bilan xulosa
+          - "cover" - Titul/Muqova
+          - "agenda" - Mundarija/Reja
+          - "content" - Qisqa matnli slayd
+          - "image-left" / "image-right" - Rasm chapda yoki o'ngda joylashgan slayd
+          - "cards" - Infografik kartalar ko'rinishidagi punktlar
+          - "chart" - Tahliliy diagrammalar (Pie, Bar, Line)
+          - "summary" - Xulosa va yakun
 
           Javob faqat JSON formatida bo'lsin.`;
 

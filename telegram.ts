@@ -2214,14 +2214,20 @@ async function runPresentationGeneration(ctx: any, data: any) {
   const loadingMsg = await ctx.reply(`⏳ <b>Taqdimot tayyorlanmoqda...</b>\n\nIltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
 
   try {
-    const topicStr = `Mavzu: ${data.topic}. Slaydlar soni: ${data.slideCount}. Dizayn turi: ${data.designType}. Qo'shimcha talablar: ${data.requirements}`;
     const res = await fetch(getApiUrl("/api/gemini"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "generatePresentation",
-        topic: topicStr,
-        count: Number(data.slideCount) || 15
+        topic: data.topic,
+        count: Number(data.slideCount) || 15,
+        options: {
+          language: data.language,
+          designType: data.designType,
+          addImages: data.addImages === "Ha, rasm qo'shilsin" || data.addImages === true,
+          createDiagrams: data.createDiagrams === "Ha, grafiklar bo'lsin" || data.createDiagrams === true,
+          speakerNotes: data.speakerNotes === "Ha, ma'ruzachi nutqi yozilsin" || data.speakerNotes === true
+        }
       })
     });
 
@@ -2242,7 +2248,17 @@ async function runPresentationGeneration(ctx: any, data: any) {
           contentSub: "2563EB", contentBody: "1E293B", primaryAccent: "2563EB", secondaryAccent: "7C3AED",
           accentLight: "EFF6FF", bannerFill: "0F172A"
         },
+        Modern: {
+          bg: "F8FAFC", coverBg: "0F172A", titleColor: "FFFFFF", contentTitleColor: "0F172A",
+          contentSub: "2563EB", contentBody: "1E293B", primaryAccent: "2563EB", secondaryAccent: "7C3AED",
+          accentLight: "EFF6FF", bannerFill: "0F172A"
+        },
         Akademik: {
+          bg: "FAF8F5", coverBg: "1E40AF", titleColor: "FFFFFF", contentTitleColor: "1E3A8A",
+          contentSub: "10B981", contentBody: "1F2937", primaryAccent: "1E40AF", secondaryAccent: "F59E0B",
+          accentLight: "EFF6FF", bannerFill: "1E40AF"
+        },
+        Academic: {
           bg: "FAF8F5", coverBg: "1E40AF", titleColor: "FFFFFF", contentTitleColor: "1E3A8A",
           contentSub: "10B981", contentBody: "1F2937", primaryAccent: "1E40AF", secondaryAccent: "F59E0B",
           accentLight: "EFF6FF", bannerFill: "1E40AF"
@@ -2252,14 +2268,34 @@ async function runPresentationGeneration(ctx: any, data: any) {
           contentSub: "2563EB", contentBody: "262626", primaryAccent: "000000", secondaryAccent: "7C3AED",
           accentLight: "F5F5F5", bannerFill: "171717"
         },
+        Minimal: {
+          bg: "FFFFFF", coverBg: "171717", titleColor: "FFFFFF", contentTitleColor: "000000",
+          contentSub: "2563EB", contentBody: "262626", primaryAccent: "000000", secondaryAccent: "7C3AED",
+          accentLight: "F5F5F5", bannerFill: "171717"
+        },
         Korporativ: {
           bg: "F1F5F9", coverBg: "0B0F19", titleColor: "FFFFFF", contentTitleColor: "0B0F19",
           contentSub: "EF4444", contentBody: "334155", primaryAccent: "2563EB", secondaryAccent: "10B981",
           accentLight: "E2E8F0", bannerFill: "0B0F19"
+        },
+        Professional: {
+          bg: "F1F5F9", coverBg: "0F172A", titleColor: "FFFFFF", contentTitleColor: "0F172A",
+          contentSub: "10B981", contentBody: "334155", primaryAccent: "2563EB", secondaryAccent: "10B981",
+          accentLight: "E2E8F0", bannerFill: "0F172A"
+        },
+        Dark: {
+          bg: "1E293B", coverBg: "0F172A", titleColor: "FFFFFF", contentTitleColor: "FFFFFF",
+          contentSub: "38BDF8", contentBody: "E2E8F0", primaryAccent: "38BDF8", secondaryAccent: "F43F5E",
+          accentLight: "334155", bannerFill: "0F172A"
+        },
+        Light: {
+          bg: "FAFAFA", coverBg: "F4F4F5", titleColor: "18181B", contentTitleColor: "18181B",
+          contentSub: "4F46E5", contentBody: "27272A", primaryAccent: "4F46E5", secondaryAccent: "06B6D4",
+          accentLight: "F4F4F5", bannerFill: "E4E4E7"
         }
       };
 
-      const selectedStyle = stylesMap[templateName] || stylesMap.Zamonaviy || stylesMap.Modern;
+      const selectedStyle = stylesMap[templateName] || stylesMap[data.designType] || stylesMap.Zamonaviy || stylesMap.Modern;
 
       const getSlideImage = (queryOrObj: any) => {
         const query = typeof queryOrObj === "string" 
@@ -3364,29 +3400,75 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     } else if (step === 2) {
       data.slideCount = input.replace(/[^0-9]/g, "") || "10";
       userWizardStates.set(userId, { service, step: 3, data });
-      return ctx.reply("📊 <b>Dizayn turini tanlang:</b>", {
+      return ctx.reply("📊 <b>Taqdimot tilini tanlang:</b>", {
         parse_mode: "HTML",
         reply_markup: {
           keyboard: [
-            [{ text: "Zamonaviy" }, { text: "Minimalistik" }],
-            [{ text: "Akademik" }, { text: "Korporativ" }],
+            [{ text: "O'zbekcha" }, { text: "Ruscha" }, { text: "Inglizcha" }],
             [{ text: "⬅️ Asosiy menyu" }]
           ],
           resize_keyboard: true
         }
       });
     } else if (step === 3) {
-      data.designType = input;
+      data.language = input;
       userWizardStates.set(userId, { service, step: 4, data });
-      return ctx.reply("📊 <b>Qo'shimcha talablarni kiriting:</b>\n<i>(yoki \"Yo'q\" deb yozing)</i>", {
+      return ctx.reply("📊 <b>Dizayn turini tanlang:</b>", {
         parse_mode: "HTML",
         reply_markup: {
-          keyboard: [[{ text: "Yo'q" }], [{ text: "⬅️ Asosiy menyu" }]],
+          keyboard: [
+            [{ text: "Academic" }, { text: "Professional" }],
+            [{ text: "Minimal" }, { text: "Modern" }],
+            [{ text: "Dark" }, { text: "Light" }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
           resize_keyboard: true
         }
       });
     } else if (step === 4) {
-      data.requirements = input;
+      data.designType = input;
+      userWizardStates.set(userId, { service, step: 5, data });
+      return ctx.reply("📊 <b>Taqdimotga rasmlar qo'shilsinmi?</b>", {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [
+            [{ text: "Ha, rasm qo'shilsin" }],
+            [{ text: "Yo'q, rasm kerak emas" }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
+          resize_keyboard: true
+        }
+      });
+    } else if (step === 5) {
+      data.addImages = input;
+      userWizardStates.set(userId, { service, step: 6, data });
+      return ctx.reply("📊 <b>Tahliliy diagrammalar va grafiklar yaratilsinmi?</b>\n<i>Statistik ma'lumotlar mavjud bo'lsa, avtomatik grafiklar hosil qilinadi.</i>", {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [
+            [{ text: "Ha, grafiklar bo'lsin" }],
+            [{ text: "Yo'q, grafiklar kerak emas" }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
+          resize_keyboard: true
+        }
+      });
+    } else if (step === 6) {
+      data.createDiagrams = input;
+      userWizardStates.set(userId, { service, step: 7, data });
+      return ctx.reply("📊 <b>Ma'ruzachi nutqi (Speaker Notes / Himoya matni) kerakmi?</b>\n<i>Har bir slayd uchun taqdimotni himoya qilishda aytiladigan maxsus ma'ruza matni yoziladi.</i>", {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [
+            [{ text: "Ha, ma'ruzachi nutqi yozilsin" }],
+            [{ text: "Yo'q, nutq kerak emas" }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
+          resize_keyboard: true
+        }
+      });
+    } else if (step === 7) {
+      data.speakerNotes = input;
       userWizardStates.delete(userId);
       await runPresentationGeneration(ctx, data);
     }
