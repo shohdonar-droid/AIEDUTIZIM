@@ -45,17 +45,45 @@ nato'g'ri_variant
 ====
 nato'g'ri_variant`;
   const [manualText, setManualText] = useState(defaultManualTemplate);
+  const [isFileUploaded, setIsFileUploaded] = useState(false);
+  const [examFileUploaded, setExamFileUploaded] = useState(false);
 
   const parseManualText = () => {
     if (!topic) return alert("Test namini (Kurs yoki Mavzuni) kiriting.");
     if (!manualText.trim()) return;
     
-    // Find all blocks starting with "++++"
-    const blocks = manualText.split('++++').map(b => b.trim()).filter(b => b);
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = manualText;
+    
+    // Custom text extraction that keeps <img>
+    function extractTextWithImages(node: Node): string {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (el.tagName === 'IMG') return el.outerHTML;
+        
+        let text = '';
+        for (const child of Array.from(el.childNodes)) {
+          text += extractTextWithImages(child);
+        }
+        
+        // Add newline if it's a block element
+        if (['P', 'DIV', 'BR', 'LI', 'TR'].includes(el.tagName)) {
+           return text + '\n';
+        }
+        return text;
+      }
+      return '';
+    }
+
+    const cleanText = extractTextWithImages(tempDiv);
+    
+    // Find all blocks starting with "++++" using regex for robustness
+    const blocks = cleanText.split(/\+{4,}/).map(b => b.trim()).filter(b => b);
     const questions: Question[] = [];
 
     for (const block of blocks) {
-      const parts = block.split('====').map(p => p.trim());
+      const parts = block.split(/={4,}/).map(p => p.trim()).filter(p => p);
       if (parts.length < 2) continue; // No options found
 
       const qText = parts[0];
@@ -114,11 +142,39 @@ nato'g'ri_variant`;
 
   const parseExamManualText = () => {
     if (!examManualText.trim()) return;
-    const blocks = examManualText.split('++++').map(b => b.trim()).filter(b => b);
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = examManualText;
+    
+    // Custom text extraction that keeps <img>
+    function extractTextWithImages(node: Node): string {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (el.tagName === 'IMG') return el.outerHTML;
+        
+        let text = '';
+        for (const child of Array.from(el.childNodes)) {
+          text += extractTextWithImages(child);
+        }
+        
+        // Add newline if it's a block element
+        if (['P', 'DIV', 'BR', 'LI', 'TR'].includes(el.tagName)) {
+           return text + '\n';
+        }
+        return text;
+      }
+      return '';
+    }
+
+    const cleanText = extractTextWithImages(tempDiv);
+    
+    // Find all blocks starting with "++++" using regex for robustness
+    const blocks = cleanText.split(/\+{4,}/).map(b => b.trim()).filter(b => b);
     const questions: Question[] = [];
 
     for (const block of blocks) {
-      const parts = block.split('====').map(p => p.trim());
+      const parts = block.split(/={4,}/).map(p => p.trim()).filter(p => p);
       if (parts.length < 2) continue;
       
       const qText = parts[0];
@@ -904,15 +960,54 @@ nato'g'ri_variant`;
                   <div className="space-y-4">
                     <label className="flex items-center gap-2 text-xs font-black text-gray-400 uppercase tracking-widest">
                       <FileUp className="h-4 w-4" />
-                      Matn shaklidagi test
+                      Matn shaklidagi test yoki Word fayl
                     </label>
-                    <textarea
-                      rows={8}
-                      placeholder="++++ savol matni&#10;====&#10;nato'g'ri_variant&#10;====&#10;#to'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;===="
-                      className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-purple-600 font-medium text-sm leading-relaxed font-mono"
-                      value={manualText}
-                      onChange={(e) => setManualText(e.target.value)}
+                    <input 
+                      type="file" 
+                      accept=".docx"
+                      onChange={async (e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          const reader = new FileReader();
+                          reader.onload = async (event) => {
+                            try {
+                              const arrayBuffer = event.target?.result as ArrayBuffer;
+                              console.log("File loaded. ArrayBuffer size:", arrayBuffer.byteLength);
+                              if (arrayBuffer.byteLength === 0) {
+                                throw new Error("File is empty");
+                              }
+                              const mammoth = await import('mammoth');
+                              const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+                              console.log("Mammoth extracted html length:", result.value.length);
+                              setManualText(result.value);
+                              setIsFileUploaded(true);
+                            } catch (err) {
+                              console.error("Mammoth error details:", err);
+                              alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang. Xato: " + err);
+                            }
+                          };
+                          reader.readAsArrayBuffer(file);
+                        }
+                      }}
+                      className="w-full px-5 py-3 rounded-xl bg-white border-2 border-gray-200 text-sm font-medium text-gray-600"
                     />
+                    
+                    {!isFileUploaded && (
+                        <textarea
+                          rows={8}
+                          placeholder="++++ savol matni&#10;====&#10;nato'g'ri_variant&#10;====&#10;#to'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;===="
+                          className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-400 text-gray-900 focus:ring-2 focus:ring-purple-600 font-medium text-sm leading-relaxed font-mono"
+                          value={manualText}
+                          onChange={(e) => setManualText(e.target.value)}
+                        />
+                    )}
+                    
+                    {isFileUploaded && (
+                        <div className="p-4 bg-green-50 text-green-700 rounded-xl font-bold flex items-center justify-between">
+                            <span>Fayl yuklandi!</span>
+                            <button onClick={() => { setIsFileUploaded(false); setManualText(defaultManualTemplate); }} className="text-xs text-red-500 underline">O'chirish</button>
+                        </div>
+                    )}
                   </div>
                   <button
                     onClick={parseManualText}
@@ -1278,22 +1373,58 @@ nato'g'ri_variant`;
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Matn shakldagi savollar</label>
-                      <p className="text-sm text-gray-500 mb-2">Barcha talabalar uchun yagona statik savollar to'plamini kiriting.</p>
-                      <textarea
-                        rows={8}
-                        placeholder="++++ savol matni&#10;====&#10;nato'g'ri_variant&#10;====&#10;#to'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;===="
-                        className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-blue-600 font-mono text-sm leading-relaxed"
-                        value={examManualText}
-                        onChange={(e) => setExamManualText(e.target.value)}
-                      />
-                      <button
-                        onClick={parseExamManualText}
-                        className="flex items-center gap-2 py-3 px-6 rounded-xl bg-gray-900 text-white font-bold hover:bg-gray-800 transition-all text-sm"
-                      >
-                        SAVOLLARNI PARSE QILISH
-                      </button>
-                    </div>
+                       <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Matn shakldagi savollar</label>
+                       <p className="text-sm text-gray-500 mb-2">Barcha talabalar uchun yagona statik savollar to'plamini kiriting.</p>
+                       
+                       <input 
+                         type="file" 
+                         accept=".docx"
+                         onChange={async (e) => {
+                           if (e.target.files && e.target.files[0]) {
+                             const file = e.target.files[0];
+                             const reader = new FileReader();
+                             reader.onload = async (event) => {
+                               try {
+                                 const arrayBuffer = event.target?.result as ArrayBuffer;
+                                 const mammoth = await import('mammoth');
+                                 const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+                                 setExamManualText(result.value);
+                                 setExamFileUploaded(true);
+                               } catch (err) {
+                                 console.error("Mammoth error:", err);
+                                 alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang.");
+                               }
+                             };
+                             reader.readAsArrayBuffer(file);
+                           }
+                         }}
+                         className="w-full px-5 py-3 rounded-xl bg-white border-2 border-gray-200 text-sm font-medium text-gray-600"
+                       />
+
+                       {!examFileUploaded && (
+                        <textarea
+                          rows={8}
+                          placeholder="++++ savol matni&#10;====&#10;nato'g'ri_variant&#10;====&#10;#to'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;====&#10;nato'g'ri_variant&#10;===="
+                          className="w-full px-5 py-4 rounded-xl bg-white border-2 border-gray-200 placeholder:text-gray-500 text-gray-900 focus:ring-2 focus:ring-blue-600 font-mono text-sm leading-relaxed"
+                          value={examManualText}
+                          onChange={(e) => setExamManualText(e.target.value)}
+                        />
+                       )}
+                       
+                       {examFileUploaded && (
+                        <div className="p-4 bg-green-50 text-green-700 rounded-xl font-bold flex items-center justify-between">
+                            <span>Fayl yuklandi!</span>
+                            <button onClick={() => { setExamFileUploaded(false); setExamManualText(defaultManualTemplate); }} className="text-xs text-red-500 underline">O'chirish</button>
+                        </div>
+                       )}
+
+                       <button
+                         onClick={parseExamManualText}
+                         className="flex items-center gap-2 py-3 px-6 rounded-xl bg-gray-900 text-white font-bold hover:bg-gray-800 transition-all text-sm"
+                       >
+                         SAVOLLARNI PARSE QILISH
+                       </button>
+                     </div>
                   )}
                 </div>
 
