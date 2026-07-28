@@ -32,6 +32,7 @@ export interface Group {
 
 export interface UserProfile {
   uid: string;
+  platformUid?: string;
   email: string;
   displayName: string;
   role: UserRole;

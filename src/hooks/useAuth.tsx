@@ -4,6 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc, setDoc, addDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import safeOnSnapshot from '../lib/safeSnapshot';
 import { UserProfile } from '../types';
+import { generateSixCharId } from '../lib/helpers';
 
 interface AuthContextType {
   user: (UserProfile & { isImpersonated?: boolean }) | null;
@@ -34,7 +35,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', targetUid));
       if (userDoc.exists()) {
         const udata = userDoc.data() as UserProfile;
-        const userWithUid = { ...udata, uid: userDoc.id };
+        let platformUid = udata.platformUid;
+        if (!platformUid || platformUid.length !== 6) {
+          platformUid = generateSixCharId();
+          try {
+            await updateDoc(doc(db, 'users', targetUid), { platformUid });
+          } catch (e) {}
+        }
+        const userWithUid = { ...udata, platformUid, uid: userDoc.id };
         if (impId && udata.role === 'teacher') {
             // impersonated teacher
             setUser({ ...userWithUid, isImpersonated: true } as any);
