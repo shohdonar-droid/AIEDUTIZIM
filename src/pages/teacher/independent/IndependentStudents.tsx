@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useAuth } from '../../../hooks/useAuth';
+import { getNextSequentialId } from '../../../lib/idUtils';
 import { GraduationCap, Plus, Trash2, Edit2, Save, X, Search, Users, Phone, Key, HelpCircle } from 'lucide-react';
 
 export default function IndependentStudents() {
@@ -93,7 +94,7 @@ export default function IndependentStudents() {
       const groupData = groups.find(g => g.id === newGroupId);
       const newStudentRef = doc(collection(db, 'users'));
 
-      const autoLogin = newLogin.trim() || `std_${Math.floor(Math.random() * 900000 + 100000)}`;
+      const autoLogin = newLogin.trim() || await getNextSequentialId('student');
       const autoPassword = newPassword.trim() || '123456';
       const emailVal = newEmail.trim() || `${autoLogin}@student.uz`;
 

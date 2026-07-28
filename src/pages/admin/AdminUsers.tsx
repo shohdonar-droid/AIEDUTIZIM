@@ -35,6 +35,7 @@ import firebaseConfig from "../../../firebase-applet-config.json";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../hooks/useAuth";
 import { logSystemAction } from "../../lib/logUtils";
+import { getNextSequentialId } from "../../lib/idUtils";
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -438,25 +439,26 @@ export default function AdminUsers() {
 
   const saveMustaqilTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingMustaqilTeacher?.displayName || !editingMustaqilTeacher?.login || !editingMustaqilTeacher?.password) {
-      alert("Barcha maydonlarni to'ldiring.");
+    if (!editingMustaqilTeacher?.displayName || !editingMustaqilTeacher?.password) {
+      alert("Ism va parolni to'ldiring.");
       return;
     }
     setMustaqilTeacherSaving(true);
     try {
       if (editingMustaqilTeacher.uid) {
         // Updating existing mustaqil_o_qituvchi
+        const cleanLogin = editingMustaqilTeacher.login?.trim() || await getNextSequentialId('mustaqil_o_qituvchi');
         await setDoc(doc(db, "users", editingMustaqilTeacher.uid), {
           displayName: editingMustaqilTeacher.displayName,
           phone: editingMustaqilTeacher.phone || "",
-          login: editingMustaqilTeacher.login.trim(),
+          login: cleanLogin,
           password: editingMustaqilTeacher.password,
           customLimitPrices: editingMustaqilTeacher.customLimitPrices || {},
         }, { merge: true });
         alert("Mustaqil o'qituvchi ma'lumotlari muvaffaqiyatli saqlandi!");
       } else {
         // Creating new mustaqil_o_qituvchi
-        const cleanLogin = editingMustaqilTeacher.login.trim();
+        const cleanLogin = editingMustaqilTeacher.login?.trim() || await getNextSequentialId('mustaqil_o_qituvchi');
         const q = query(
           collection(db, "users"),
           where("login", "==", cleanLogin),
@@ -613,19 +615,19 @@ export default function AdminUsers() {
     e.preventDefault();
     if (
       !editingTeacher?.displayName ||
-      !editingTeacher?.login ||
       !editingTeacher?.password
     ) {
-      alert("Barcha maydonlarni to'ldiring.");
+      alert("Nomi va parolni to'ldiring.");
       return;
     }
     setTeacherSaving(true);
     try {
+      const cleanLogin = editingTeacher.login?.trim() || await getNextSequentialId('teacher');
       if (editingTeacher.uid) {
         await setDoc(doc(db, "users", editingTeacher.uid), {
           displayName: editingTeacher.displayName,
           phone: editingTeacher.phone || "",
-          login: editingTeacher.login.trim(),
+          login: cleanLogin,
           password: editingTeacher.password,
           ball: Number(editingTeacher.ball) || 0,
           aiTestLimit: Number(editingTeacher.aiTestLimit) || 999999,
@@ -635,7 +637,7 @@ export default function AdminUsers() {
       } else {
         const q = query(
           collection(db, "users"),
-          where("login", "==", editingTeacher.login.trim()),
+          where("login", "==", cleanLogin),
         );
         const qSnap = await getDocs(q);
         if (!qSnap.empty) {
@@ -644,7 +646,7 @@ export default function AdminUsers() {
           return;
         }
 
-        const email = `${editingTeacher.login.trim().toLowerCase()}@teacher.uz`;
+        const email = `${cleanLogin.toLowerCase()}@teacher.uz`;
         const response = await fetch(
           `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
           {
@@ -777,7 +779,7 @@ export default function AdminUsers() {
     try {
       const org = isSuperAdmin ? teachers.find((t) => t.uid === targetTeacherId) : user;
       const orgName = org?.displayName || "";
-      const login = `std_${Math.random().toString(36).substr(2, 6)}`;
+      const login = await getNextSequentialId("student");
       const email = `${login}@student.uz`;
       const pass = "123456";
       const res = await fetch(
@@ -832,7 +834,6 @@ export default function AdminUsers() {
     if (
       !newStaff.displayName ||
       !targetTeacherId ||
-      !newStaff.login ||
       !newStaff.password
     ) {
       alert("Majburiy maydonlarni to'ldiring");
@@ -841,7 +842,8 @@ export default function AdminUsers() {
 
     setStaffCreating(true);
     try {
-      const gEmail = `${newStaff.login}@teacher.uz`;
+      const staffLogin = newStaff.login.trim() || await getNextSequentialId("staff");
+      const gEmail = `${staffLogin}@teacher.uz`;
       const signupRes = await fetch(
         `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
         {
@@ -864,7 +866,7 @@ export default function AdminUsers() {
       await setDoc(doc(db, "users", d.localId), {
         uid: d.localId,
         displayName: newStaff.displayName,
-        login: newStaff.login,
+        login: staffLogin,
         password: newStaff.password,
         phone: newStaff.phone,
         email: gEmail,

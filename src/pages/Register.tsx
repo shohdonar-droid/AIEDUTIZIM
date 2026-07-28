@@ -5,6 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { BrainCircuit, Loader2 } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
+import { getNextSequentialId } from '../lib/idUtils';
 
 export default function Register() {
   const [error, setError] = useState('');
@@ -100,10 +101,13 @@ export default function Register() {
               ...defaultLimits // ensure limits are set
             });
           } else {
+            const nextId = await getNextSequentialId('mustaqil_o_qituvchi');
             await setDoc(userDocRef, {
               uid: user.uid,
               displayName: user.displayName || "Mustaqil O'qituvchi",
               email: user.email,
+              login: nextId,
+              systemId: nextId,
               role: 'mustaqil_o_qituvchi',
               teacherId: uyOrgId,
               createdAt: serverTimestamp(),

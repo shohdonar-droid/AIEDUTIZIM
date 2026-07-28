@@ -7,6 +7,7 @@ import { Search, Trash2, Filter, Key, Plus, X, Save, Loader2, Download, Edit } f
 import { useAuth } from '../../hooks/useAuth';
 import * as XLSX from 'xlsx';
 import firebaseConfig from '../../../firebase-applet-config.json';
+import { getNextSequentialId } from '../../lib/idUtils';
 
 export default function TeacherStudents() {
   const { user } = useAuth();
@@ -66,17 +67,7 @@ export default function TeacherStudents() {
       );
       const snap = await getDocs(q);
       
-      let nextNum = 1;
-      if (!snap.empty) {
-        const lastLogin = snap.docs[0].data().login || '';
-        const m = lastLogin.match(/\d+$/);
-        if (m) {
-          nextNum = parseInt(m[0]) + 1;
-        }
-      }
-
-      const paddedNum = nextNum.toString().padStart(5, '0');
-      const generatedLogin = `${prefix}${paddedNum}`;
+      const generatedLogin = await getNextSequentialId('student');
       
       // Generate random 6-char password (letters and numbers)
       const charset = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -139,15 +130,16 @@ export default function TeacherStudents() {
   const createStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (!newStaff.displayName || !newStaff.phone || !newStaff.login || !newStaff.password) {
-      alert("Iltimos, barcha maydonlarni to'ldiring.");
+    if (!newStaff.displayName || !newStaff.phone || !newStaff.password) {
+      alert("Iltimos, ism, telefon va parolni to'ldiring.");
       return;
     }
 
     setCreating(true);
     try {
       const orgId = user.role === 'staff' ? user.teacherId : user.uid;
-      const gEmail = `${newStaff.login}@teacher.uz`;
+      const staffLogin = newStaff.login.trim() || await getNextSequentialId('staff');
+      const gEmail = `${staffLogin}@teacher.uz`;
 
       const signupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`, {
         method: 'POST',
@@ -170,7 +162,7 @@ export default function TeacherStudents() {
         uid: newUid,
         displayName: newStaff.displayName,
         phone: newStaff.phone,
-        login: newStaff.login,
+        login: staffLogin,
         password: newStaff.password,
         email: gEmail,
         role: 'staff',

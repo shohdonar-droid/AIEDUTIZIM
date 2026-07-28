@@ -1359,8 +1359,8 @@ bot.command("addbalance", async (ctx) => {
           updatedAt: serverTimestamp()
         });
 
-        await ctx.reply(`✅ Foydalanuvchi (ID: ${targetTgId}) balansiga ${amount} ball qo'shildi.`);
-        await bot.telegram.sendMessage(targetTgId, `💰 <b>Sizning balansingizga ${amount} ball qo'shildi!</b>`, { parse_mode: "HTML" }).catch(() => {});
+        await ctx.reply(`✅ Foydalanuvchi (ID: ${targetTgId}) balansiga ${amount} so'm qo'shildi.`);
+        await bot.telegram.sendMessage(targetTgId, `💰 <b>Sizning balansingizga ${amount} so'm qo'shildi!</b>`, { parse_mode: "HTML" }).catch(() => {});
       } else {
       return ctx.reply("❌ Bunday ID ga ega foydalanuvchi topilmadi.");
     }
@@ -1902,7 +1902,7 @@ bot.action(/admin_approve_pay_(\d+)/, async (ctx) => {
     if (!s.empty) uName = s.docs[0].data().name || s.docs[0].data().displayName || uName;
   } catch (e) {}
 
-  const promptMsg = await ctx.reply(`👤 <b>${uName}</b> uchun qancha ball qo'shmoqchisiz? Faqat son kiriting:`, { parse_mode: "HTML" });
+  const promptMsg = await ctx.reply(`👤 <b>${uName}</b> uchun qancha so'm qo'shmoqchisiz? Faqat son kiriting:`, { parse_mode: "HTML" });
 
   pendingLogins.set(ctx.from.id, { 
     step: "admin_payment_amount", 
@@ -4245,7 +4245,7 @@ bot.on("message", async (ctx) => {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "➕ Ball qo'shish", callback_data: `admin_approve_pay_${userId}` },
+            { text: "➕ To'ldirish", callback_data: `admin_approve_pay_${userId}` },
             { text: "❌ Rad etish", callback_data: `admin_reject_pay_${userId}` }
           ]
         ]
@@ -5612,7 +5612,7 @@ Foydalanuvchi xabari: ${prompt}`;
           
           // Notify user
           await bot.telegram.sendMessage(Number(targetId), 
-            `✅ To\x27lov tasdiqlandi\n\n💰 Sizga ${amount} ball qo\x27shildi\n\n📊 Yangi balans: ${newBalance}`, 
+            `✅ To\x27lov tasdiqlandi\n\n💰 Sizga ${amount} so\x27m qo\x27shildi\n\n📊 Yangi balans: ${newBalance}`, 
             { parse_mode: "HTML" }
           ).catch((e) => {
              console.error(`Notify user ${targetId} failed:`, e);
@@ -5663,7 +5663,7 @@ Foydalanuvchi xabari: ${prompt}`;
             await ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
           }
 
-          return ctx.reply(`✅ <b>Muvaffaqiyatli!</b>\n\n👤 ${uName} (ID: ${targetId}) balansiga ${amount} ball qo'shildi.\n📊 Yangi balans: ${newBalance}`);
+          return ctx.reply(`✅ <b>Muvaffaqiyatli!</b>\n\n👤 ${uName} (ID: ${targetId}) balansiga ${amount} so'm qo'shildi.\n📊 Yangi balans: ${newBalance}`);
         } else {
           pendingLogins.delete(userId);
           return ctx.reply(`❌ Foydalanuvchi (ID: ${targetId}) bazadan topilmadi.`);
