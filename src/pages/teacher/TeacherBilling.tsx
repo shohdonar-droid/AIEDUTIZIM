@@ -66,7 +66,7 @@ export default function TeacherBilling() {
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [configs, setConfigs] = useState<any>(defaultTariffs);
-  const [cardSettings, setCardSettings] = useState({ number: "9860 0000 0000 0000", owner: "ADMIN NAME", type: "Humo" });
+  const [cardSettings, setCardSettings] = useState({ number: "9860 2109 4567 8901", owner: "S. O. ELYORBEK", type: "Humo / Uzcard" });
 
   // Modal states
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -113,6 +113,12 @@ export default function TeacherBilling() {
           const subs = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
           subs.sort((a: any, b: any) => (b.startDate?.toMillis?.() || 0) - (a.startDate?.toMillis?.() || 0));
           setCurrentSubscription(subs[0]);
+        } else if ((user as any).assignedTariff) {
+          setCurrentSubscription({
+            tariffName: (user as any).assignedTariff,
+            tariffPrice: (user as any).tariffPrice || 0,
+            startDate: (user as any).createdAt || new Date()
+          });
         }
       } catch (err) {
         console.error("Billing load error:", err);

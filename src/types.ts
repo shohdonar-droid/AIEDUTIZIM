@@ -80,6 +80,9 @@ export interface UserProfile {
   limit_exams?: number;
   limit_questions_per_exam?: number;
   limit_certificates?: number;
+  customLimitPrices?: Record<string, any>;
+  assignedTariff?: string;
+  tariffPrice?: number;
   createdAt: any;
 }
 

@@ -60,11 +60,6 @@ export default function IndependentCertificates() {
     e.preventDefault();
     if (!selectedDeptId || !selectedGroupId || !selectedStudentId || !title.trim() || !user) return;
 
-    if (currentCount >= limit) {
-      alert(`Sizning sertifikatlar limiti tugagan (${currentCount} / ${limit}). Iltimos, limitlar bo'limida yangi limit sotib oling.`);
-      return;
-    }
-
     try {
       setLoading(true);
       const studentData = students.find(s => s.id === selectedStudentId);

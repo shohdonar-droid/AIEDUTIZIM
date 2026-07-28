@@ -78,8 +78,7 @@ export default function IndependentOverview() {
     { title: "Mavzular", key: "subjects", current: stats.subjects, max: (user as any)?.limit_subjects ?? 2, icon: BookOpen, color: "bg-amber-500" },
     { title: "Testlar", key: "tests", current: stats.tests, max: (user as any)?.limit_tests ?? 2, icon: FileText, color: "bg-red-500" },
     { title: "Quizizz", key: "quizizz", current: stats.quizizz, max: (user as any)?.limit_quizizz ?? 1, icon: Gamepad2, color: "bg-pink-500" },
-    { title: "Imtihonlar", key: "exams", current: stats.exams, max: (user as any)?.limit_exams ?? 1, icon: Clock, color: "bg-cyan-500" },
-    { title: "Sertifikatlar", key: "certificates", current: stats.certificates, max: (user as any)?.limit_certificates ?? 5, icon: Award, color: "bg-yellow-500" }
+    { title: "Imtihonlar", key: "exams", current: stats.exams, max: (user as any)?.limit_exams ?? 1, icon: Clock, color: "bg-cyan-500" }
   ];
 
   return (

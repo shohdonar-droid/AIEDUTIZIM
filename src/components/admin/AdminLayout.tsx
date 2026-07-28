@@ -203,6 +203,9 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
                 <span className="font-bold text-[9px] text-blue-600 tracking-widest uppercase mt-1">
                   {user?.role === 'superadmin' ? 'SUPER ADMINISTRATOR' : (user?.role === 'subadmin' ? 'KICHIK ADMINISTRATOR' : 'ADMINISTRATOR')}
                 </span>
+                <span className="font-bold text-[9px] text-emerald-600 uppercase mt-0.5">
+                  Balans: {Number((user as any)?.balance ?? 0).toLocaleString('uz-UZ')} UZS
+                </span>
               </div>
             )}
           </div>

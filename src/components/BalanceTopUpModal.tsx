@@ -19,8 +19,8 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
   const [copiedUid, setCopiedUid] = useState(false);
   
   const [cardSettings, setCardSettings] = useState({
-    number: "5614 6812 9015 3646",
-    owner: "IBODULLAYEVA SH",
+    number: "9860 2109 4567 8901",
+    owner: "S. O. ELYORBEK",
     type: "Humo / Uzcard"
   });
 

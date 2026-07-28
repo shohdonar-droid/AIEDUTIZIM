@@ -84,7 +84,6 @@ interface TariffConfig {
   limit_tests_price?: number;
   limit_quizizz_price?: number;
   limit_exams_price?: number;
-  limit_certificates_price?: number;
 }
 
 interface AllTariffsConfig {
@@ -113,8 +112,7 @@ const defaultTariffs: AllTariffsConfig = {
     limit_subjects_price: 15000,
     limit_tests_price: 3000,
     limit_quizizz_price: 4000,
-    limit_exams_price: 20000,
-    limit_certificates_price: 10000
+    limit_exams_price: 20000
   },
   standard: {
     price: 700000,
@@ -133,8 +131,7 @@ const defaultTariffs: AllTariffsConfig = {
     limit_subjects_price: 12000,
     limit_tests_price: 2500,
     limit_quizizz_price: 3000,
-    limit_exams_price: 15000,
-    limit_certificates_price: 8000
+    limit_exams_price: 15000
   },
   professional: {
     price: 1500000,
@@ -153,8 +150,7 @@ const defaultTariffs: AllTariffsConfig = {
     limit_subjects_price: 10000,
     limit_tests_price: 2000,
     limit_quizizz_price: 2500,
-    limit_exams_price: 12000,
-    limit_certificates_price: 6000
+    limit_exams_price: 12000
   },
   corporate: {
     basePrice: 500000,
@@ -178,8 +174,7 @@ const defaultTariffs: AllTariffsConfig = {
     limit_subjects_price: 8000,
     limit_tests_price: 1500,
     limit_quizizz_price: 2000,
-    limit_exams_price: 10000,
-    limit_certificates_price: 5000
+    limit_exams_price: 10000
   },
   extra: {
     perStudent: 1500,
@@ -197,8 +192,7 @@ const defaultTariffs: AllTariffsConfig = {
     limit_subjects_price: 15000,
     limit_tests_price: 4000,
     limit_quizizz_price: 4500,
-    limit_exams_price: 20000,
-    limit_certificates_price: 10000
+    limit_exams_price: 20000
   }
 };
 
@@ -219,9 +213,9 @@ export default function AdminBilling() {
   const [savingTariff, setSavingTariff] = useState(false);
 
   // Card Settings state
-  const [cardSettings, setCardSettings] = useState({ number: "9860 0000 0000 0000", owner: "ADMIN NAME", type: "Humo" });
+  const [cardSettings, setCardSettings] = useState({ number: "9860 2109 4567 8901", owner: "S. O. ELYORBEK", type: "Humo / Uzcard" });
   const [isEditingCard, setIsEditingCard] = useState(false);
-  const [cardForm, setCardForm] = useState({ number: "", owner: "", type: "Humo" });
+  const [cardForm, setCardForm] = useState({ number: "", owner: "", type: "Humo / Uzcard" });
 
   useEffect(() => {
     async function loadConfigs() {
@@ -237,9 +231,9 @@ export default function AdminBilling() {
         if (cSnap.exists()) {
           const data = cSnap.data();
           setCardSettings({ 
-            number: data.number || "9860 0000 0000 0000", 
-            owner: data.owner || "ADMIN NAME", 
-            type: data.type || "Humo" 
+            number: data.number || "9860 2109 4567 8901", 
+            owner: data.owner || "S. O. ELYORBEK", 
+            type: data.type || "Humo / Uzcard" 
           });
         }
       } catch (err) {
@@ -2360,7 +2354,7 @@ export default function AdminBilling() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
                           Imtihonlar (+1 ta)
@@ -2369,17 +2363,6 @@ export default function AdminBilling() {
                           type="number"
                           value={editingTariffForm.limit_exams_price ?? 0}
                           onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_exams_price: Number(e.target.value) })}
-                          className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1 block">
-                          Sertifikatlar (+1 ta)
-                        </label>
-                        <input
-                          type="number"
-                          value={editingTariffForm.limit_certificates_price ?? 0}
-                          onChange={(e) => setEditingTariffForm({ ...editingTariffForm, limit_certificates_price: Number(e.target.value) })}
                           className="w-full px-5 py-3.5 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-sm"
                         />
                       </div>

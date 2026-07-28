@@ -103,6 +103,7 @@ export default function AdminUsers() {
   // Independent Teacher Creation/Edit
   const [editingMustaqilTeacher, setEditingMustaqilTeacher] = useState<Partial<UserProfile> | null>(null);
   const [mustaqilTeacherSaving, setMustaqilTeacherSaving] = useState(false);
+  const [showLimitPricesModal, setShowLimitPricesModal] = useState(false);
 
   // Student Password Reset Modal State
   const [resetPasswordState, setResetPasswordState] = useState<{
@@ -449,6 +450,7 @@ export default function AdminUsers() {
           phone: editingMustaqilTeacher.phone || "",
           login: editingMustaqilTeacher.login.trim(),
           password: editingMustaqilTeacher.password,
+          customLimitPrices: editingMustaqilTeacher.customLimitPrices || {},
         }, { merge: true });
         alert("Mustaqil o'qituvchi ma'lumotlari muvaffaqiyatli saqlandi!");
       } else {
@@ -538,6 +540,7 @@ export default function AdminUsers() {
           email: email,
           status: 'active',
           total_spent: 0,
+          customLimitPrices: editingMustaqilTeacher.customLimitPrices || {},
           createdAt: serverTimestamp(),
           ...defaultLimits
         });
@@ -618,6 +621,8 @@ export default function AdminUsers() {
           password: editingTeacher.password,
           ball: Number(editingTeacher.ball) || 0,
           aiTestLimit: Number(editingTeacher.aiTestLimit) || 999999,
+          assignedTariff: editingTeacher.assignedTariff || "START",
+          tariffPrice: Number(editingTeacher.tariffPrice) || 0,
         }, { merge: true });
       } else {
         const q = query(
@@ -657,6 +662,8 @@ export default function AdminUsers() {
           ball: Number(editingTeacher.ball) || 0,
           role: "teacher",
           email: email,
+          assignedTariff: editingTeacher.assignedTariff || "START",
+          tariffPrice: Number(editingTeacher.tariffPrice) || 0,
           createdAt: serverTimestamp(),
         });
       }
@@ -1482,6 +1489,44 @@ export default function AdminUsers() {
                     }
                   />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">
+                    Tarif rejimi
+                  </label>
+                  <select
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold"
+                    value={editingTeacher.assignedTariff || "START"}
+                    onChange={(e) =>
+                      setEditingTeacher({
+                        ...editingTeacher,
+                        assignedTariff: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="START">START</option>
+                    <option value="STANDARD">STANDARD</option>
+                    <option value="PROFESSIONAL">PROFESSIONAL</option>
+                    <option value="CORPORATE">CORPORATE</option>
+                    <option value="EXTRA">EXTRA</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">
+                    Oylik to'lov summasi (so'mda)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Masalan: 150000"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-blue-600"
+                    value={editingTeacher.tariffPrice || ""}
+                    onChange={(e) =>
+                      setEditingTeacher({
+                        ...editingTeacher,
+                        tariffPrice: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
                 <div className="md:col-span-2 flex justify-end gap-2 mt-4 pt-4 border-t">
                   <button
                     type="submit"
@@ -2267,6 +2312,15 @@ export default function AdminUsers() {
                     }
                   />
                 </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLimitPricesModal(true)}
+                    className="w-full py-3 px-4 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+                  >
+                    ⚙️ Maxsus limit narxlari (Arzonroq narx belgilash)
+                  </button>
+                </div>
               </div>
               <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
                 <button
@@ -2290,6 +2344,68 @@ export default function AdminUsers() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showLimitPricesModal && editingMustaqilTeacher && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-purple-50/50">
+              <div>
+                <h3 className="text-lg font-black text-gray-900">Mustaqil o'qituvchi limit narxlari</h3>
+                <p className="text-xs text-gray-500">{editingMustaqilTeacher.displayName} uchun maxsus narxlarni kiriting (bo'sh qoldirilsa standart narx ishlaydi)</p>
+              </div>
+              <button
+                onClick={() => setShowLimitPricesModal(false)}
+                className="p-2 hover:bg-gray-200 rounded-xl transition-colors text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+              {[
+                { key: 'limit_departments', label: "Yo'nalishlar narxi" },
+                { key: 'limit_groups', label: "Guruhlar narxi" },
+                { key: 'limit_students', label: "Talabalar narxi" },
+                { key: 'limit_subjects', label: "Mavzular narxi" },
+                { key: 'limit_tests', label: "Testlar narxi" },
+                { key: 'limit_quizizz', label: "Quizizz / Savollar narxi" },
+                { key: 'limit_exams', label: "Imtihonlar narxi" },
+              ].map(item => (
+                <div key={item.key} className="flex items-center justify-between gap-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  <label className="text-sm font-bold text-gray-700 flex-1">{item.label}</label>
+                  <div className="flex items-center gap-2 w-40">
+                    <input
+                      type="number"
+                      placeholder="Standart"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg font-bold text-sm"
+                      value={editingMustaqilTeacher.customLimitPrices?.[item.key] ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value === "" ? "" : Number(e.target.value);
+                        setEditingMustaqilTeacher({
+                          ...editingMustaqilTeacher,
+                          customLimitPrices: {
+                            ...(editingMustaqilTeacher.customLimitPrices || {}),
+                            [item.key]: val
+                          }
+                        });
+                      }}
+                    />
+                    <span className="text-xs text-gray-400 font-medium shrink-0">so'm</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLimitPricesModal(false)}
+                className="px-6 py-2.5 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors shadow"
+              >
+                Tasdiqlash
+              </button>
+            </div>
           </div>
         </div>
       )}

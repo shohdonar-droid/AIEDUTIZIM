@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../../../hooks/useAuth';
-import { ShieldAlert, CreditCard, ShoppingCart, History, CheckCircle2, Clock, Plus, Minus, X, Upload, Check, ChevronRight } from 'lucide-react';
+import { ShieldAlert, CreditCard, ShoppingCart, History, CheckCircle2, Clock, Plus, Minus, X, Upload, Check, ChevronRight, Wallet } from 'lucide-react';
+import BalanceTopUpModal from '../../../components/BalanceTopUpModal';
 
 export default function IndependentLimits() {
   const { user, refreshUser } = useAuth();
@@ -19,15 +20,12 @@ export default function IndependentLimits() {
     limit_subjects: 0,
     limit_tests: 0,
     limit_quizizz: 0,
-    limit_exams: 0,
-    limit_certificates: 0
+    limit_exams: 0
   });
 
   // Modal details
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [receiptBase64, setReceiptBase64] = useState<string>("");
-  const [receiptFileName, setReceiptFileName] = useState<string>("");
-  const [cardSettings, setCardSettings] = useState({ number: "9860 0000 0000 0000", owner: "ADMIN NAME", type: "Humo" });
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
+  const [cardSettings, setCardSettings] = useState({ number: "9860 2109 4567 8901", owner: "S. O. ELYORBEK", type: "Humo / Uzcard" });
 
   // Default prices per unit standard (UZS) (fallback if db configurations are not ready)
   const FALLBACK_PRICES: Record<string, number> = {
@@ -37,8 +35,7 @@ export default function IndependentLimits() {
     limit_subjects: 15000,
     limit_tests: 3000,
     limit_quizizz: 4000,
-    limit_exams: 20000,
-    limit_certificates: 10000
+    limit_exams: 20000
   };
 
   const ITEM_LABELS: Record<string, string> = {
@@ -48,8 +45,7 @@ export default function IndependentLimits() {
     limit_subjects: "Mavzular (+1 ta)",
     limit_tests: "Testlar (+1 ta)",
     limit_quizizz: "Quizizz / Savollar (+1 ta)",
-    limit_exams: "Imtihonlar (+1 ta)",
-    limit_certificates: "Sertifikatlar (+1 ta)"
+    limit_exams: "Imtihonlar (+1 ta)"
   };
 
   const loadData = async () => {
@@ -66,9 +62,9 @@ export default function IndependentLimits() {
       if (cardSnap.exists()) {
         const data = cardSnap.data();
         setCardSettings({ 
-          number: data.number || "9860 0000 0000 0000", 
-          owner: data.owner || "ADMIN NAME", 
-          type: data.type || "Humo" 
+          number: data.number || "9860 2109 4567 8901", 
+          owner: data.owner || "S. O. ELYORBEK", 
+          type: data.type || "Humo / Uzcard" 
         });
       }
 
@@ -96,49 +92,11 @@ export default function IndependentLimits() {
     loadData();
   }, [user]);
 
-  // Determine pricing dynamically based on extra (EXTRA LIMITS) tariff plan
-  const compressImage = (base64Str: string): Promise<string> => {
-    return new Promise((resolve) => {
-      if (!base64Str.startsWith("data:image")) {
-        // If it exceeds safe firestore size, truncate or alert later
-        resolve(base64Str);
-        return;
-      }
-      const img = new Image();
-      img.src = base64Str;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-        const MAX_DIM = 400; // Aggressively compress width/height down to fit within Firestore 1MB limits
-        if (width > MAX_DIM || height > MAX_DIM) {
-          if (width > height) {
-            height = Math.round((height * MAX_DIM) / width);
-            width = MAX_DIM;
-          } else {
-            width = Math.round((width * MAX_DIM) / height);
-            height = MAX_DIM;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", 0.4)); // Save space
-        } else {
-          resolve(base64Str);
-        }
-      };
-      img.onerror = () => {
-        resolve(base64Str);
-      };
-    });
-  };
-
   const getUnitPrice = (key: string) => {
+    if ((user as any)?.customLimitPrices?.[key] !== undefined && (user as any).customLimitPrices[key] !== null && (user as any).customLimitPrices[key] !== '') {
+      return Number((user as any).customLimitPrices[key]);
+    }
     const activePlan = tariffsConfig?.["extra"];
-    // Check if the price field exists in the plan, e.g. "limit_departments_price"
     const priceField = `${key}_price`;
     if (activePlan && activePlan[priceField] !== undefined) {
       return Number(activePlan[priceField]);
@@ -165,85 +123,66 @@ export default function IndependentLimits() {
 
   const totalCost = calculateTotal();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setReceiptFileName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const rawBase = reader.result as string;
-        try {
-          const comp = await compressImage(rawBase);
-          setReceiptBase64(comp);
-        } catch (err) {
-          setReceiptBase64(rawBase);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-    if (e && typeof e.preventDefault === 'function') {
-      e.preventDefault();
-    }
+  const handleBuyLimits = async () => {
     if (totalCost === 0 || !user) {
       alert("Iltimos, kamida bitta limit miqdorini tanlang!");
       return;
     }
-    if (!receiptBase64) {
-      alert("Iltimos, to'lov chekini yuklang!");
-      return;
-    }
 
-    if (receiptBase64.length > 800 * 1024) {
-      alert("Yuklangan chek rasmi hajmi juda katta! Iltimos, boshqa kichikroq o'lchamdagi chek rasmini yuklang.");
+    const currentBalance = Number((user as any)?.balance ?? 0);
+    if (currentBalance < totalCost) {
+      alert(`Balansingiz yetarli emas!\n\nTanlangan limitlar narxi: ${totalCost.toLocaleString('uz-UZ')} so'm\nSizning balansingiz: ${currentBalance.toLocaleString('uz-UZ')} so'm\n\nIltimos, avval balansingizni to'ldirib keyin limit oling.`);
+      setIsBalanceModalOpen(true);
       return;
     }
 
     try {
       setSubmitting(true);
-      
+      const newBalance = currentBalance - totalCost;
       const requestedLimits = Object.fromEntries(
         Object.entries(quantities).filter(([_, qty]) => qty > 0)
       );
 
-      // Create detailed description string of requested limits
       const summaryItems = Object.entries(requestedLimits)
         .map(([key, qty]) => `${ITEM_LABELS[key]?.split('(')[0]}: +${qty} ta`)
         .join(', ');
 
-      const reqPayload = {
+      const txRecord = {
+        id: Date.now().toString(),
+        type: 'limit_purchase',
+        amount: totalCost,
+        description: `Limitlar xaridi (${summaryItems})`,
+        timestamp: new Date().toISOString()
+      };
+
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        balance: newBalance,
+        limit_departments: (user.limit_departments || 0) + (quantities.limit_departments || 0),
+        limit_groups: (user.limit_groups || 0) + (quantities.limit_groups || 0),
+        limit_students: (user.limit_students || 0) + (quantities.limit_students || 0),
+        limit_subjects: (user.limit_subjects || 0) + (quantities.limit_subjects || 0),
+        limit_tests: (user.limit_tests || 0) + (quantities.limit_tests || 0),
+        limit_quizizz: (user.limit_quizizz || 0) + (quantities.limit_quizizz || 0),
+        limit_exams: (user.limit_exams || 0) + (quantities.limit_exams || 0),
+        billingHistory: arrayUnion(txRecord)
+      });
+
+      await addDoc(collection(db, 'connection_requests'), {
         userId: user.uid,
         userName: `${user.displayName || "Mustaqil O'qituvchi"} (Mustaqil o'qituvchi)`,
         userEmail: user.email || '',
-        tariffName: `Limit qo'shish (${summaryItems})`,
+        tariffName: `Limit xaridi (Balansdan: ${summaryItems})`,
         tariffPrice: totalCost,
         totalPrice: totalCost,
         requestedLimits,
-        receiptUrl: receiptBase64,
-        status: 'pending',
+        status: 'approved',
         isLimitsRequest: true,
         timestamp: serverTimestamp(),
         createdAt: serverTimestamp(),
-        paymentType: "Chek (Karta orqali)"
-      };
+        paymentType: "Balansdan yechish"
+      });
 
-      const docRef = await addDoc(collection(db, 'connection_requests'), reqPayload);
-
-      // Notify Telegram Admins
-      try {
-        fetch('/api/notify-connection-request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requestId: docRef.id,
-            data: reqPayload
-          })
-        });
-      } catch (e) {}
-
-      // Success cleanup
       setQuantities({
         limit_departments: 0,
         limit_groups: 0,
@@ -251,19 +190,15 @@ export default function IndependentLimits() {
         limit_subjects: 0,
         limit_tests: 0,
         limit_quizizz: 0,
-        limit_exams: 0,
-        limit_certificates: 0
+        limit_exams: 0
       });
-      setReceiptBase64("");
-      setReceiptFileName("");
-      setIsModalOpen(false);
 
-      alert("Limitni olish uchun to'lov so'rovingiz adminga yuborildi! Tasdiqlangach limitga qo'shiladi.");
+      alert(`Tabriklaymiz! Tanlangan limitlar balansingizdan yechilgan mablag' (${totalCost.toLocaleString('uz-UZ')} so'm) evaziga avtomatik ravishda hisobingizga qo'shildi.`);
       await loadData();
       if (refreshUser) refreshUser();
     } catch (err) {
       console.error(err);
-      alert("So'rov yuborishda xatolik yuz berdi.");
+      alert("Limitlarni sotib olishda xatolik yuz berdi.");
     } finally {
       setSubmitting(false);
     }
@@ -279,11 +214,28 @@ export default function IndependentLimits() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Limitlar paneli</h1>
-        <p className="text-gray-500 font-medium text-sm mt-1">
-          Hozirgi limit ko'rsatkichlaringizni oshirish va yangi resurs limitlarni sotib olish oynasi.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Limitlar paneli</h1>
+          <p className="text-gray-500 font-medium text-sm mt-1">
+            Hozirgi limit ko'rsatkichlaringizni oshirish va yangi resurs limitlarni sotib olish oynasi.
+          </p>
+        </div>
+        <div className="flex items-center gap-4 bg-emerald-50/70 border border-emerald-100 p-4 rounded-2xl">
+          <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center font-black shadow-md">
+            <Wallet className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block">Sizning balansingiz</span>
+            <span className="text-xl font-black text-emerald-900">{Number((user as any)?.balance ?? 0).toLocaleString('uz-UZ')} UZS</span>
+          </div>
+          <button
+            onClick={() => setIsBalanceModalOpen(true)}
+            className="ml-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> Balansni To'ldirish
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -343,6 +295,12 @@ export default function IndependentLimits() {
                   {Object.values(quantities).reduce((a, b) => a + b, 0)} ta limit
                 </span>
               </div>
+              <div className="flex justify-between items-center text-xs text-gray-500 font-bold">
+                <span>Mavjud balans:</span>
+                <span className="text-emerald-600 font-black">
+                  {Number((user as any)?.balance ?? 0).toLocaleString('uz-UZ')} so'm
+                </span>
+              </div>
               <div className="border-t border-gray-200 my-2"></div>
               <div className="flex justify-between items-center text-sm font-black text-gray-800">
                 <span>To'lov summasi:</span>
@@ -353,10 +311,11 @@ export default function IndependentLimits() {
             </div>
 
             <button
-              onClick={() => setIsModalOpen(true)}
-              disabled={totalCost === 0}
-              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-750 transition-all text-xs uppercase tracking-widest disabled:opacity-50"
+              onClick={handleBuyLimits}
+              disabled={totalCost === 0 || submitting}
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-750 transition-all text-xs uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
               Limitni olish
             </button>
           </div>
@@ -371,7 +330,7 @@ export default function IndependentLimits() {
             ) : (
               <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                 {history.map((req) => (
-                  <div key={req.id} className="p-3.5 bg-gray-55/40 rounded-2xl border border-gray-100 flex flex-col gap-1.5">
+                  <div key={req.id} className="p-3.5 bg-gray-50/40 rounded-2xl border border-gray-100 flex flex-col gap-1.5">
                     <div className="flex justify-between items-center text-[10px] font-bold">
                       <span className="text-gray-400">
                         {req.timestamp?.toDate ? req.timestamp.toDate().toLocaleString('uz-UZ') : "Kutilmoqda"}
@@ -381,7 +340,7 @@ export default function IndependentLimits() {
                           <Check className="h-2.5 w-2.5" /> Tasdiqlangan
                         </span>
                       ) : req.status === 'rejected' ? (
-                        <span className="flex items-center gap-1 text-red-650 bg-red-50/50 px-2 py-0.5 rounded-full text-[9px] uppercase font-black">
+                        <span className="flex items-center gap-1 text-red-600 bg-red-50/50 px-2 py-0.5 rounded-full text-[9px] uppercase font-black">
                           <X className="h-2.5 w-2.5" /> Rad etilgan
                         </span>
                       ) : (
@@ -411,132 +370,7 @@ export default function IndependentLimits() {
         </div>
       </div>
 
-      {/* Payment Popup Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            {/* Close button */}
-            <button 
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 p-2 bg-gray-150/50 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-              <CreditCard className="h-6 w-6 text-indigo-600" /> Limit To'lov Oynasi
-            </h3>
-
-            {/* Stylized credit card mockup */}
-            <div className="bg-gradient-to-tr from-indigo-700 via-indigo-900 to-purple-950 p-6 rounded-2xl text-white shadow-xl relative overflow-hidden h-44 flex flex-col justify-between mb-6">
-              {/* Card Chips & Branding */}
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-[8px] font-black tracking-widest text-indigo-200 uppercase"> MUSTAQIL O'QITUVCHI BILlING </p>
-                  <p className="text-[10px] font-bold text-indigo-100 mt-0.5">Admin orqali tasdiqlash uchun</p>
-                </div>
-                <span className="text-lg font-black italic tracking-tighter text-indigo-300">HUMO</span>
-              </div>
-              
-              {/* Card number */}
-              <div>
-                <p className="text-[10px] text-indigo-200 font-bold tracking-wider">Karta raqami (To'lov uchun):</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-base font-mono font-bold tracking-widest text-white">{cardSettings.number}</p>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(cardSettings.number.replace(/\s/g, ''));
-                      alert("Karta raqami nusxalandi!");
-                    }}
-                    className="px-2 py-1 bg-white/20 hover:bg-white/30 text-[9px] font-bold rounded-lg transition-colors border border-white/10"
-                  >
-                    Nusxalash
-                  </button>
-                </div>
-              </div>
-
-              {/* Card Holder name & chip */}
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-[8px] font-mono tracking-widest text-indigo-200">KARTA EGASI</p>
-                  <p className="text-xs font-mono font-bold mt-0.5 uppercase tracking-wide">{cardSettings.owner}</p>
-                </div>
-                <div className="w-8 h-6 bg-yellow-400/90 rounded-md flex items-center justify-center text-[8px] font-black text-slate-900">{cardSettings.type}</div>
-              </div>
-            </div>
-
-            {/* Price review instruction */}
-            <div className="bg-indigo-50/50 rounded-2xl p-4 mb-6 border border-indigo-100 space-y-1">
-              <p className="text-xs font-semibold text-gray-500">To'lanadigan summa:</p>
-              <p className="text-lg font-black text-indigo-600">{totalCost.toLocaleString('uz-UZ')} so'm</p>
-              <p className="text-[10px] text-gray-400 font-bold leading-normal">
-                Yuqoridagi karta raqamiga to'lov qiling va bank ilovasidagi to'lov chekini (skrinshot yoki rasmini) quyidagi joyga yuklang.
-              </p>
-            </div>
-
-            {/* Receipt Upload Box */}
-            <div className="space-y-2 mb-6">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 block">To'lov chekini yuklash</label>
-              
-              <div className="border-2 border-dashed border-gray-200 hover:border-indigo-500 rounded-2xl p-6.5 text-center transition-all bg-gray-50/50 cursor-pointer relative">
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                />
-                <div className="space-y-2.5">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mx-auto text-gray-400 border border-gray-100">
-                    <Upload className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-700">Chek rasmini yuklang</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">JPEG, PNG formatlar (Maks 10MB)</p>
-                  </div>
-                </div>
-              </div>
-
-              {receiptFileName && (
-                <div className="flex items-center gap-2 p-3 bg-green-50 text-green-700 rounded-xl border border-green-200">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                  <span className="text-xs font-medium truncate flex-1">{receiptFileName}</span>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setReceiptBase64("");
-                      setReceiptFileName("");
-                    }} 
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-3">
-              <button 
-                type="button" 
-                onClick={() => setIsModalOpen(false)}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-150 text-gray-550 rounded-xl font-bold font-semibold text-xs uppercase tracking-wider"
-              >
-                Bekor qilish
-              </button>
-              <button 
-                type="button" 
-                onClick={handleSubmit}
-                disabled={submitting || !receiptBase64}
-                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-750 text-white rounded-xl font-black text-xs uppercase tracking-wider disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                {submitting && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
-                Yuborish
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BalanceTopUpModal isOpen={isBalanceModalOpen} onClose={() => setIsBalanceModalOpen(false)} />
     </div>
   );
 }

@@ -138,7 +138,7 @@ export default function Tariffs() {
   const { user } = useAuth();
   const [configs, setConfigs] = useState<AllTariffsConfig>(defaultTariffs);
   const [loading, setLoading] = useState(true);
-  const [cardSettings, setCardSettings] = useState({ number: "9860 0000 0000 0000", owner: "ADMIN NAME", type: "Humo" });
+  const [cardSettings, setCardSettings] = useState({ number: "9860 2109 4567 8901", owner: "S. O. ELYORBEK", type: "Humo / Uzcard" });
 
   // Connection request state
   const [selectedTariff, setSelectedTariff] = useState<TariffConfig | null>(null);
@@ -288,9 +288,9 @@ export default function Tariffs() {
         if (cSnap.exists()) {
           const data = cSnap.data();
           setCardSettings({ 
-            number: data.number || "9860 0000 0000 0000", 
-            owner: data.owner || "ADMIN NAME", 
-            type: data.type || "Humo" 
+            number: data.number || "9860 2109 4567 8901", 
+            owner: data.owner || "S. O. ELYORBEK", 
+            type: data.type || "Humo / Uzcard" 
           });
         }
       } catch (err) {
