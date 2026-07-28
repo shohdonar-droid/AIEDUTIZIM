@@ -1615,6 +1615,29 @@ bot.action("admin_edit_system_about", async (ctx) => {
   try { ctx.answerCbQuery(); } catch(e){}
 });
 
+bot.action("admin_price_settings", async (ctx) => {
+  try {
+    const snap = await getDoc(doc(db, "botConfig", "aiCosts"));
+    const costs = snap.exists() ? snap.data() : AI_COSTS;
+    
+    let text = "💰 <b>Narxlar sozlamalari:</b>\n\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n\n";
+    const buttons = [];
+    
+    for (const [service, price] of Object.entries(costs)) {
+      text += `🔹 <b>${service}</b>: ${price} ball\n`;
+      buttons.push([{ text: `✏️ ${service}`, callback_data: `edit_price_${service.replace(/\s+/g, '_')}` }]);
+    }
+    
+    await ctx.editMessageText(text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [...buttons, [{ text: "🔙 Orqaga", callback_data: "admin_bot_settings" }]] }
+    });
+  } catch (e) {
+    console.error(e);
+    await ctx.reply("Xatolik yuz berdi.");
+  }
+});
+
 bot.action("admin_reorder_button", async (ctx) => {
   pendingLogins.set(ctx.from.id, { step: "admin_reorder_button_select" });
   await ctx.reply("🔢 Qaysi tugmaning tartibini o'zgartirmoqchisiz? Tugma nomini kiriting:");
@@ -5090,9 +5113,6 @@ Foydalanuvchi xabari: ${prompt}`;
         reply_markup: {
           inline_keyboard: [
             [{ text: "💰 Narxlar sozlamalari", callback_data: "admin_price_settings" }],
-            [{ text: "📝 Asosiy menyuni tahrirlash", callback_data: "admin_edit_menu_main" }],
-            [{ text: "➕ Tugma qo'shish", callback_data: "admin_add_button" }, { text: "❌ Tugma o'chirish", callback_data: "admin_delete_button" }],
-            [{ text: "✏️ Nomini o'zgartirish", callback_data: "admin_rename_button" }, { text: "🔢 Tartibini o'zgartirish", callback_data: "admin_reorder_button" }],
             [{ text: "📄 Xabar matnini tahrirlash", callback_data: "admin_edit_msg_text" }],
             [{ text: "ℹ️ 'Tizim haqida' matnini tahrirlash", callback_data: "admin_edit_system_about" }]
           ]
