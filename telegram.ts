@@ -663,17 +663,17 @@ const customMenuTexts = new PersistentMap<string, string>(
 );
 
 const AI_COSTS: Record<string, number> = {
-  "📊 Slayd yaratish": 5,
-  "📄 Kurs ishi yaratish": 10,
-  "🎓 Tezis yaratish": 7,
-  "📑 Maqola yaratish": 5,
-  "📝 Dars ishlanma yaratish": 5,
-  "🌐 Tarjimon": 2,
-  "📋 Test yaratish": 3,
-  "📄 CV yaratish": 5,
-  "💬 Savol-javob": 1,
-  "📄 AI Antiplagiat": 5,
-  "📄 Obektivka yaratish": 5000
+  "📊 Slayd yaratish": 4000,
+  "📄 Kurs ishi yaratish": 35000,
+  "🎓 Tezis yaratish": 5000,
+  "📑 Maqola yaratish": 40000,
+  "📝 Dars ishlanma yaratish": 5000,
+  "🌐 Tarjimon": 3000,
+  "📋 Test yaratish": 3000,
+  "📄 CV yaratish": 5000,
+  "💬 Savol-javob": 1000,
+  "📄 AI Antiplagiat": 5000,
+  "📄 Obektivka yaratish": 15000
 };
 
 const requestHistory = new Map<number, number[]>();
@@ -1620,11 +1620,11 @@ bot.action("admin_price_settings", async (ctx) => {
     const snap = await getDoc(doc(db, "botConfig", "aiCosts"));
     const costs = snap.exists() ? snap.data() : AI_COSTS;
     
-    let text = "💰 <b>Narxlar sozlamalari:</b>\n\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n\n";
+    let text = "💰 <b>Narxlar sozlamalari (so'mda):</b>\n\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n\n";
     const buttons = [];
     
     for (const [service, price] of Object.entries(costs)) {
-      text += `🔹 <b>${service}</b>: ${price} ball\n`;
+      text += `🔹 <b>${service}</b>: ${price} so'm\n`;
       buttons.push([{ text: `✏️ ${service}`, callback_data: `edit_price_${service.replace(/\s+/g, '_')}` }]);
     }
     
@@ -1662,7 +1662,7 @@ bot.on("message", async (ctx, next) => {
       
       await setDoc(docRef, { ...currentCosts, [pending.service]: newPrice });
       pendingLogins.delete(userId);
-      await ctx.reply(`✅ <b>${pending.service}</b> narxi <b>${newPrice}</b> ga o'zgartirildi.`, { parse_mode: "HTML" });
+      await ctx.reply(`✅ <b>${pending.service}</b> narxi <b>${newPrice} so'm</b> ga o'zgartirildi.`, { parse_mode: "HTML" });
     } catch (e) {
       console.error(e);
       await ctx.reply("❌ Xatolik yuz berdi.");
@@ -5257,17 +5257,17 @@ Foydalanuvchi xabari: ${prompt}`;
       const displayBalance = bal - spent;
       
       return ctx.reply(`💰 <b>Sizning balansingiz:</b>\n\n` +
-                       `💎 Umumiy ballar: <b>${bal}</b>\n` +
-                       `📉 Ishlatilgan: <b>${spent}</b>\n` +
+                       `💎 Umumiy mablag': <b>${bal} so'm</b>\n` +
+                       `📉 Ishlatilgan: <b>${spent} so'm</b>\n` +
                        `━━━━━━\n` +
-                       `✅ Mavjud balans: <b>${displayBalance} ball</b>`, { parse_mode: "HTML" });
+                       `✅ Mavjud balans: <b>${displayBalance} so'm</b>`, { parse_mode: "HTML" });
     } catch (e: any) {
       console.error("[Balance] CRITICAL ERROR:", e);
       // Absolute fallback - don't show error message, show 0 balance and log
       return ctx.reply(`💰 <b>Sizning balansingiz</b>\n\n` +
                        `👤 Ism: <b>${ctx.from.first_name || "Foydalanuvchi"}</b>\n` +
                        `🆔 Telegram ID: <code>${userId}</code>\n` +
-                       `💎 Ball: <b>0</b>\n\n` +
+                       `💎 Mablag': <b>0 so'm</b>\n\n` +
                        `<i>⚠️ Ma'lumotlarni yangilashda texnik uzilish. Tez orada tuzatiladi.</i>`, { parse_mode: "HTML" });
     }
   }
@@ -5275,11 +5275,11 @@ Foydalanuvchi xabari: ${prompt}`;
   if (normText === "🎁 Bepul ball" || normText === "🎁 Bepul ball olish") {
     aiModeDeactivate();
     return ctx.reply(
-      `🎁 <b>Bepul ballar olish imkoniyatlari:</b>\n\n` +
-      `1️⃣ <b>Do'stlarni taklif qilish:</b> Har bir taklif qilingan do'stingiz uchun <b>5 ball</b> beriladi. Do'stingiz botga kirib /start bosishi kifoya.\n` +
-      `2️⃣ <b>Kunlik bonus:</b> Tizimga har kuni kirganingizda profilingizda ballar yangilanadi.\n` +
-      `3️⃣ <b>Xatoliklar bo'yicha xabar:</b> Tizimdagi xatoliklar haqida @adminga xabar bersangiz va tasdiqlansa, sizga sovg'a tariqasida ballar taqdim etiladi.\n\n` +
-      `💡 <i>Hozircha har bir do'stingiz uchun 5 ball olish uchun quyidagi "👥 Do'stlarni taklif qilish" tugmasidan foydalaning!</i>`,
+      `🎁 <b>Bepul bonus olish imkoniyatlari:</b>\n\n` +
+      `1️⃣ <b>Do'stlarni taklif qilish:</b> Har bir taklif qilingan do'stingiz uchun <b>5000 so'm</b> beriladi. Do'stingiz botga kirib /start bosishi kifoya.\n` +
+      `2️⃣ <b>Kunlik bonus:</b> Tizimga har kuni kirganingizda profilingizda bonuslar yangilanadi.\n` +
+      `3️⃣ <b>Xatoliklar bo'yicha xabar:</b> Tizimdagi xatoliklar haqida @adminga xabar bersangiz va tasdiqlansa, sizga sovg'a tariqasida bonuslar taqdim etiladi.\n\n` +
+      `💡 <i>Hozircha har bir do'stingiz uchun 5000 so'm olish uchun quyidagi "👥 Do'stlarni taklif qilish" tugmasidan foydalaning!</i>`,
       { parse_mode: "HTML" }
     );
   }
@@ -5289,11 +5289,11 @@ Foydalanuvchi xabari: ${prompt}`;
     const refLink = `${APP_URL}/?r=${userId}`; // Web link
     const botRefLink = `https://t.me/${ctx.botInfo.username}?start=ref_${userId}`; // Bot link
     return ctx.reply(
-      `👥 <b>Do'stlarni taklif qiling va ballar to'plang!</b>\n\n` +
+      `👥 <b>Do'stlarni taklif qiling va mablag' to'plang!</b>\n\n` +
       `Sizning shaxsiy referal havolangiz:\n\n` +
       `🔗 <b>Telegram bot uchun:</b> ${botRefLink}\n` +
       `🔗 <b>Veb-sayt uchun:</b> ${refLink}\n\n` +
-      `🎁 Har bir taklif qilingan do'st uchun <b>5 ball</b> balansingizga qo'shiladi!`,
+      `🎁 Har bir taklif qilingan do'st uchun <b>5000 so'm</b> balansingizga qo'shiladi!`,
       { parse_mode: "HTML" }
     );
   }
