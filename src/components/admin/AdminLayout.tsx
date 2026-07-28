@@ -84,7 +84,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
     ]},
     { id: 'notifications', name: 'Bildirishnomalar', path: '/admin/notifications', icon: Bell },
     { id: 'chat', name: 'Chat', path: '/admin/chat', icon: MessageSquare, badge: unreadCount },
-    { id: 'settings', name: 'Tizim sozlamalari', icon: Settings, subItems: [
+    { id: 'settings', name: 'Tizim imkoniyatlari', icon: Settings, subItems: [
         { name: 'Xavfsizlik', path: '/admin/settings/security' },
         { name: 'Dizayn', path: '/admin/settings/design' },
         { name: 'Integratsiyalar', path: '/admin/settings/integrations' },

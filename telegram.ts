@@ -933,7 +933,7 @@ async function getKeyboard(
             [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
             [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
             isPrimary 
-              ? [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }]
+              ? [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Bot sozlamalari" }]
               : [{ text: "📥 Javob berilmaganlar" }],
             [{ text: "ℹ️ Tizim haqida" }]
           ];
@@ -941,7 +941,7 @@ async function getKeyboard(
         }
 
         if (authed) {
-          const excludeForUser = ["📢 E'lon yuborish", "📊 Statistika", "📥 Javob berilmaganlar", "⚙️ Menyu sozlamalari", "👤 Profil", "🚪 Chiqish", ...alwaysExclude];
+          const excludeForUser = ["📢 E'lon yuborish", "📊 Statistika", "📥 Javob berilmaganlar", "⚙️ Bot sozlamalari", "👤 Profil", "🚪 Chiqish", ...alwaysExclude];
           kb = kb.map(row => row.filter((btn: any) => {
             const txt = btn.text || "";
             return !excludeForUser.includes(txt) && !txt.startsWith("📊 Statistika");
@@ -955,7 +955,7 @@ async function getKeyboard(
           ];
           return [...userHeader, ...kb];
         } else {
-          const excludeForGuest = ["📢 E'lon yuborish", "📊 Statistika", "📥 Javob berilmaganlar", "⚙️ Menyu sozlamalari", "👤 Profil", "🚪 Chiqish", "🔑 Kirish", ...alwaysExclude];
+          const excludeForGuest = ["📢 E'lon yuborish", "📊 Statistika", "📥 Javob berilmaganlar", "⚙️ Bot sozlamalari", "👤 Profil", "🚪 Chiqish", "🔑 Kirish", ...alwaysExclude];
           kb = kb.map(row => row.filter((btn: any) => {
             const txt = btn.text || "";
             return !excludeForGuest.includes(txt) && !txt.startsWith("📊 Statistika");
@@ -983,7 +983,7 @@ async function getKeyboard(
       rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
       rows.push([{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }]);
       rows.push([{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }]);
-      rows.push([{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Menyu sozlamalari" }]);
+      rows.push([{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Bot sozlamalari" }]);
       rows.push([{ text: "ℹ️ Tizim haqida" }]);
       rows.push([{ text: "🌐 Rasmiy sayt" }]);
       return rows;
@@ -5077,18 +5077,19 @@ Foydalanuvchi xabari: ${prompt}`;
     }
   }
 
-  if (normText === "⚙️ Menyu sozlamalari") {
+  if (normText === "⚙️ Bot sozlamalari") {
     const adminIds = getAdminIds();
     const isHardAdmin = adminIds.includes(userId);
     if (!isHardAdmin && (!authed || (authed.role !== "admin" && authed.role !== "subadmin"))) {
       return ctx.reply("Sizda bu huquq yo'q.");
     }
     return ctx.reply(
-      "⚙️ <b>Menyu sozlamalari</b>\n\nQuyidagi amallardan birini tanlang:",
+      "⚙️ <b>Bot sozlamalari</b>\n\nQuyidagi amallardan birini tanlang:",
       {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
+            [{ text: "💰 Narxlar sozlamalari", callback_data: "admin_price_settings" }],
             [{ text: "📝 Asosiy menyuni tahrirlash", callback_data: "admin_edit_menu_main" }],
             [{ text: "➕ Tugma qo'shish", callback_data: "admin_add_button" }, { text: "❌ Tugma o'chirish", callback_data: "admin_delete_button" }],
             [{ text: "✏️ Nomini o'zgartirish", callback_data: "admin_rename_button" }, { text: "🔢 Tartibini o'zgartirish", callback_data: "admin_reorder_button" }],

@@ -102,17 +102,15 @@ export default function TeacherDashboard() {
     { id: 'billing', name: 'Tarif', path: '/teacher/billing', icon: Award, exact: true },
   ].filter(m => !m.hidden);
 
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['academic', 'users', 'resources', 'monitoring']);
+  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
 
   const toggleMenu = (id: string) => {
-    setExpandedMenus(prev => 
-      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
-    );
+    setExpandedMenu(prev => (prev === id ? null : id));
   };
 
   const renderMenuItem = (item: any, isMobile = false) => {
     const Icon = item.icon;
-    const isExpanded = expandedMenus.includes(item.id);
+    const isExpanded = expandedMenu === item.id;
     const hasSubItems = item.subItems && item.subItems.length > 0;
     const isActive = item.exact 
       ? location.pathname === item.path
