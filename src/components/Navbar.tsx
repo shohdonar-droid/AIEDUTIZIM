@@ -29,12 +29,14 @@ import { SiteContent } from '../types';
 
 import { handleFirestoreError, OperationType } from '../lib/firebase';
 import { makeDirectImageUrl } from '../lib/helpers';
+import BalanceTopUpModal from './BalanceTopUpModal';
 
 export default function Navbar() {
   const { user, isAdmin } = useAuth();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isTuzilmaOpen, setIsTuzilmaOpen] = useState(false);
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [headerConfig, setHeaderConfig] = useState<SiteContent['header']>({});
   const tuzilmaTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -230,7 +232,13 @@ export default function Navbar() {
               ))}
               
               {user ? (
-                <div className={`flex items-center gap-4 ml-4 border-l pl-6 ${isWhiteText ? 'border-white/20' : 'border-gray-200'}`}>
+                <div className={`flex items-center gap-3 ml-4 border-l pl-6 ${isWhiteText ? 'border-white/20' : 'border-gray-200'}`}>
+                  <button
+                    onClick={() => setIsBalanceModalOpen(true)}
+                    className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    💳 Balans
+                  </button>
                   <Link
                     to="/search-cert"
                     className={`px-3 py-1.5 font-bold text-sm tracking-wide rounded-xl border-2 transition-all ${
@@ -259,6 +267,12 @@ export default function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setIsBalanceModalOpen(true)}
+                    className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    💳 Balans
+                  </button>
                   <Link
                     to="/search-cert"
                     className={`px-3 py-1.5 font-bold text-sm tracking-wide rounded-xl border-2 transition-all ${
@@ -371,6 +385,18 @@ export default function Navbar() {
                 >
                   Sertifikat tekshirish (ID)
                 </Link>
+
+                <button
+                  onClick={() => {
+                    setIsBalanceModalOpen(true);
+                    setIsOpen(false);
+                  }}
+                  className={`block w-full text-left px-4 py-3 text-base font-bold flex items-center gap-2 text-emerald-600 ${
+                    isWhiteText ? 'hover:bg-white/5' : 'hover:bg-emerald-50'
+                  }`}
+                >
+                  💳 Balansni to'ldirish
+                </button>
                 
                 {user ? (
                   <>
@@ -413,6 +439,7 @@ export default function Navbar() {
           )}
         </AnimatePresence>
       </nav>
+      <BalanceTopUpModal isOpen={isBalanceModalOpen} onClose={() => setIsBalanceModalOpen(false)} />
     </>
   );
 }
