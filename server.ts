@@ -405,7 +405,47 @@ app.get("/api/health", (req, res) => {
 
       const MODEL_NAME = "gemini-2.0-flash";
 
-      if (action === "generateDynamicTest") {
+      if (action === "parseTestWithGemini") {
+        const { htmlText } = req.body;
+        const prompt = `
+        Vazifa: Yuklangan matnni (HTML teglar, base64 rasmlar bilan aralashgan) tozalang va standart shablon formatiga o'tkazing.
+        
+        QOIDALAR (O'TA MUHIM):
+        1. Barcha HTML teglarni (<p>, <br />, <em>, <img>, <span>, <div>, <style> va h.k.) BUTUNLAY O'CHIRING.
+        2. Matn ichidagi barcha 'data:image/x-wmf;base64,...' kabi teglar va ularning mazmunini O'CHIRING.
+        3. Formulalarni tiklash: Agar matnda formula tushib qolgan bo'lsa (bo'sh joy yoki rasm bo'lib qolgan bo'lsa), matn mazmuni va javob variantlaridan kelib chiqib matematik formulani TO'LIQ VA XATOSIZ TIKLANG.
+        4. Matematik belgilar (∫, ∑, lim, √, ∃, ∀, ∈, ∉, ≤, ≥, ≠, ±, ∞, →) va indekslarni (x_n, x^2, n_0, f'(x)) toza matn yoki LaTeX ko'rinishida saqlang.
+        5. Format:
+           ++++
+           Savol va formulasi
+           ====
+           # To'g'ri javob
+           ====
+           Noto'g'ri javob 1
+           ====
+           Noto'g'ri javob 2
+           ====
+           Noto'g'ri javob 3
+        
+        Matn: ${htmlText}
+        `;
+        
+        try {
+          const response = await generateContentWithRotation({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: {
+              maxOutputTokens: 16384,
+              temperature: 0.1
+            }
+          });
+          return res.json({ text: response.text });
+        } catch (err: any) {
+          console.error(`[API Gemini] Test parsing failed: ${err.message}`);
+          const status = err.status || err.statusCode || 500;
+          return res.status(status).json({ error: `Parsingda xatolik: ${err.message}` });
+        }
+      } else if (action === "generateDynamicTest") {
         const countOptions = 4;
         const prompt = `Siz professional pedagog va testolog-ekspertisiz.
           Vazifa: "${topic}" mavzusi bo'yicha ${count || 10} ta professional va akademik test savollarini yaratish.

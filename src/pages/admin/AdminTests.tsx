@@ -51,40 +51,25 @@ nato'g'ri_variant`;
   const parseManualText = () => {
     if (!topic) return alert("Test namini (Kurs yoki Mavzuni) kiriting.");
     if (!manualText.trim()) return;
-    
+
+    // Use plain text directly
+    // Strip HTML tags, but warn the user if images (formulas) are present
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = manualText;
     
-    // Custom text extraction that keeps <img>
-    function extractTextWithImages(node: Node): string {
-      if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const el = node as HTMLElement;
-        if (el.tagName === 'IMG') return el.outerHTML;
-        
-        let text = '';
-        for (const child of Array.from(el.childNodes)) {
-          text += extractTextWithImages(child);
-        }
-        
-        // Add newline if it's a block element
-        if (['P', 'DIV', 'BR', 'LI', 'TR'].includes(el.tagName)) {
-           return text + '\n';
-        }
-        return text;
-      }
-      return '';
+    // Check if there are images, if so, they might be formulas
+    if (tempDiv.querySelectorAll('img').length > 0) {
+      console.warn("Images/Formulas detected. They might be lost if they are images.");
     }
-
-    const cleanText = extractTextWithImages(tempDiv);
     
-    // Find all blocks starting with "++++" using regex for robustness
-    const blocks = cleanText.split(/\+{4,}/).map(b => b.trim()).filter(b => b);
+    const plainText = tempDiv.textContent || "";
+    
+    const blocks = plainText.split(/\+{4,}/).map(b => b.trim()).filter(b => b);
     const questions: Question[] = [];
 
     for (const block of blocks) {
       const parts = block.split(/={4,}/).map(p => p.trim()).filter(p => p);
-      if (parts.length < 2) continue; // No options found
+      if (parts.length < 2) continue;
 
       const qText = parts[0];
       const optionParts = parts.slice(1).filter(p => p !== '');
@@ -94,9 +79,9 @@ nato'g'ri_variant`;
       let idx = 0;
 
       for (let optText of optionParts) {
-        const isCorrect = optText.startsWith('#');
-        if (isCorrect) {
-          optText = optText.substring(1).trim();
+        // "#" indicates correct answer
+        if (optText.startsWith('#')) {
+          optText = optText.replace(/^#\s?/, '').trim();
           correctIdx = idx;
         }
         
@@ -115,7 +100,7 @@ nato'g'ri_variant`;
     }
     
     if (questions.length === 0) {
-      alert("Matnda test savollari topilmadi. Formatni tekshiring: ++++ savol \\n ====\\n nato'g'ri \\n ====\\n #to'g'ri \\n ====\\n nato'g'ri \\n ====\\n nato'g'ri");
+      alert("Matnda test savollari topilmadi. Formatni tekshiring: ++++ savol \\n ====\\n nato'g'ri \\n ====\\n #to'g'ri \\n ====\\n nato'g'ri");
       return;
     }
 
@@ -143,51 +128,33 @@ nato'g'ri_variant`;
   const parseExamManualText = () => {
     if (!examManualText.trim()) return;
     
+    // Strip HTML tags
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = examManualText;
-    
-    // Custom text extraction that keeps <img>
-    function extractTextWithImages(node: Node): string {
-      if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const el = node as HTMLElement;
-        if (el.tagName === 'IMG') return el.outerHTML;
-        
-        let text = '';
-        for (const child of Array.from(el.childNodes)) {
-          text += extractTextWithImages(child);
-        }
-        
-        // Add newline if it's a block element
-        if (['P', 'DIV', 'BR', 'LI', 'TR'].includes(el.tagName)) {
-           return text + '\n';
-        }
-        return text;
-      }
-      return '';
-    }
+    const plainText = tempDiv.textContent || "";
 
-    const cleanText = extractTextWithImages(tempDiv);
-    
-    // Find all blocks starting with "++++" using regex for robustness
-    const blocks = cleanText.split(/\+{4,}/).map(b => b.trim()).filter(b => b);
+    // Split by "++++" to get blocks
+    const blocks = plainText.split(/\+{4,}/).map(b => b.trim()).filter(b => b);
     const questions: Question[] = [];
 
     for (const block of blocks) {
+      // Split by "===="
       const parts = block.split(/={4,}/).map(p => p.trim()).filter(p => p);
       if (parts.length < 2) continue;
       
       const qText = parts[0];
-      const optionParts = parts.slice(1).filter(p => p !== '');
+      const optionParts = parts.slice(1);
 
       const options = [];
       let correctIdx = 0;
       let idx = 0;
 
       for (let optText of optionParts) {
+        // "#" indicates correct answer
         const isCorrect = optText.startsWith('#');
         if (isCorrect) {
-          optText = optText.substring(1).trim();
+          // Remove the # and the following space
+          optText = optText.replace(/^#\s?/, '').trim();
           correctIdx = idx;
         }
 
@@ -206,7 +173,7 @@ nato'g'ri_variant`;
     }
     
     if (questions.length === 0) {
-      alert("Matnda test savollari topilmadi. Formatni tekshiring: ++++ savol \\n ====\\n nato'g'ri \\n ====\\n #to'g'ri \\n ====\\n nato'g'ri \\n ====\\n nato'g'ri");
+      alert("Matnda test savollari topilmadi. Formatni tekshiring: ++++ savol \\n ====\\n nato'g'ri \\n ====\\n #to'g'ri \\n ====\\n nato'g'ri");
       return;
     }
 
@@ -977,10 +944,50 @@ nato'g'ri_variant`;
                                 throw new Error("File is empty");
                               }
                               const mammoth = await import('mammoth');
-                              const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-                              console.log("Mammoth extracted html length:", result.value.length);
-                              setManualText(result.value);
-                              setIsFileUploaded(true);
+                              const result = await mammoth.convertToHtml({ 
+                                arrayBuffer: arrayBuffer,
+                                convertImage: mammoth.images.imgElement(async (image) => {
+                                  const buffer = await image.read("base64");
+                                  return { src: `data:${image.contentType};base64,${buffer}` };
+                                })
+                              });
+                              
+                              const tempDiv = document.createElement('div');
+                              tempDiv.innerHTML = result.value;
+                              
+                              // Remove style tags
+                              tempDiv.querySelectorAll('style').forEach(s => s.remove());
+                              
+                              // Replace br with newline
+                              tempDiv.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+                              
+                              // Send textContent to backend to remove other HTML tags
+                              const textToParse = tempDiv.textContent || "";
+                              
+                              let response;
+                              let data;
+                              let retries = 2;
+                              while (retries >= 0) {
+                                response = await fetch('/api/gemini', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ action: 'parseTestWithGemini', htmlText: textToParse })
+                                });
+                                data = await response.json();
+                                if ((response.status === 429 || response.status === 503) && retries > 0) {
+                                  await new Promise(r => setTimeout(r, 10000));
+                                  retries--;
+                                  continue;
+                                }
+                                break;
+                              }
+                              
+                              if (data.text) {
+                                setManualText(data.text);
+                                setIsFileUploaded(true);
+                              } else {
+                                throw new Error(data.error || "Parsingda xatolik");
+                              }
                             } catch (err) {
                               console.error("Mammoth error details:", err);
                               alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang. Xato: " + err);
@@ -1056,13 +1063,19 @@ nato'g'ri_variant`;
               <div className="space-y-8 flex-1 overflow-y-auto max-h-[1000px] pr-4 custom-scrollbar">
                 {generatedQuestions.map((q, i) => (
                   <div key={i} className="space-y-4 p-6 rounded-2xl bg-gray-50 border border-gray-100">
-                    <div className="flex gap-2 relative">
-                      <span className="text-purple-600 font-bold mt-2">{i + 1}.</span> 
+                    <div className="flex gap-2 relative flex-col">
+                      <span className="text-purple-600 font-bold">{i + 1}.</span> 
+                      {q.text.includes('<img') && (
+                        <div className="flex justify-center p-2 bg-white border border-gray-200 rounded-lg mb-2">
+                            <div dangerouslySetInnerHTML={{ __html: q.text.match(/<img[^>]*>/)?.[0] || '' }} />
+                        </div>
+                      )}
                       <textarea
-                        value={q.text}
+                        value={q.text.replace(/<img[^>]*>/g, '')}
                         onChange={(e) => {
                           const newQ = [...generatedQuestions];
-                          newQ[i].text = e.target.value;
+                          const imageTag = q.text.match(/<img[^>]*>/)?.[0] || '';
+                          newQ[i].text = imageTag + e.target.value;
                           setGeneratedQuestions(newQ);
                         }}
                         className="w-full bg-white px-4 py-2 text-gray-900 font-bold rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-600 outline-none resize-y min-h-[60px]"
@@ -1387,9 +1400,37 @@ nato'g'ri_variant`;
                                try {
                                  const arrayBuffer = event.target?.result as ArrayBuffer;
                                  const mammoth = await import('mammoth');
-                                 const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-                                 setExamManualText(result.value);
-                                 setExamFileUploaded(true);
+                                 const result = await mammoth.convertToHtml({ 
+                                   arrayBuffer: arrayBuffer,
+                                   convertImage: mammoth.images.imgElement(async (image) => {
+                                     const buffer = await image.read("base64");
+                                     return { src: `data:${image.contentType};base64,${buffer}` };
+                                   })
+                                 });
+                                 let response;
+                                 let data;
+                                 let retries = 2;
+                                 while (retries >= 0) {
+                                   response = await fetch('/api/gemini', {
+                                     method: 'POST',
+                                     headers: { 'Content-Type': 'application/json' },
+                                     body: JSON.stringify({ action: 'parseTestWithGemini', htmlText: result.value })
+                                   });
+                                   data = await response.json();
+                                   if ((response.status === 429 || response.status === 503) && retries > 0) {
+                                     await new Promise(r => setTimeout(r, 10000));
+                                     retries--;
+                                     continue;
+                                   }
+                                   break;
+                                 }
+                                 
+                                 if (data.text) {
+                                   setExamManualText(data.text);
+                                   setExamFileUploaded(true);
+                                 } else {
+                                   throw new Error(data.error || "Parsingda xatolik");
+                                 }
                                } catch (err) {
                                  console.error("Mammoth error:", err);
                                  alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang.");
@@ -1437,13 +1478,19 @@ nato'g'ri_variant`;
                     <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                       {examData.questions.map((q, i) => (
                         <div key={i} className="p-6 rounded-2xl bg-gray-50 border border-gray-200 space-y-4">
-                          <div className="flex gap-2">
-                            <span className="text-blue-600 font-bold mt-2">{i + 1}.</span>
+                          <div className="flex gap-2 flex-col">
+                            <span className="text-blue-600 font-bold">{i + 1}.</span>
+                            {q.text.includes('<img') && (
+                              <div className="flex justify-center p-2 bg-white border border-gray-200 rounded-lg mb-2">
+                                  <div dangerouslySetInnerHTML={{ __html: q.text.match(/<img[^>]*>/)?.[0] || '' }} />
+                              </div>
+                            )}
                             <textarea
-                              value={q.text}
+                              value={q.text.replace(/<img[^>]*>/g, '')}
                               onChange={(e) => {
                                 const newQ = [...examData.questions];
-                                newQ[i].text = e.target.value;
+                                const imageTag = q.text.match(/<img[^>]*>/)?.[0] || '';
+                                newQ[i].text = imageTag + e.target.value;
                                 setExamData({ ...examData, questions: newQ });
                               }}
                               className="w-full bg-white px-4 py-2 text-gray-900 font-bold rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-600 outline-none resize-y min-h-[60px]"
