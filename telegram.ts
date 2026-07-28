@@ -1638,6 +1638,38 @@ bot.action("admin_price_settings", async (ctx) => {
   }
 });
 
+bot.action(/edit_price_(.+)/, async (ctx) => {
+  const service = ctx.match[1].replace(/_/g, ' ');
+  pendingLogins.set(ctx.from.id, { step: "admin_set_new_price", service });
+  await ctx.reply(`✍️ <b>${service}</b> uchun yangi narxni (faqat son) kiriting:`, { parse_mode: "HTML" });
+});
+
+bot.on("message", async (ctx) => {
+  const userId = ctx.from.id;
+  const pending = pendingLogins.get(userId);
+  const text = (ctx.message as any).text;
+
+  if (pending && pending.step === "admin_set_new_price") {
+    const newPrice = parseInt(text);
+    if (isNaN(newPrice)) {
+      return ctx.reply("❌ Iltimos, narxni faqat raqamlarda kiriting.");
+    }
+
+    try {
+      const docRef = doc(db, "botConfig", "aiCosts");
+      const snap = await getDoc(docRef);
+      const currentCosts = snap.exists() ? snap.data() : { ...AI_COSTS };
+      
+      await setDoc(docRef, { ...currentCosts, [pending.service]: newPrice });
+      pendingLogins.delete(userId);
+      await ctx.reply(`✅ <b>${pending.service}</b> narxi <b>${newPrice}</b> ga o'zgartirildi.`, { parse_mode: "HTML" });
+    } catch (e) {
+      console.error(e);
+      await ctx.reply("❌ Xatolik yuz berdi.");
+    }
+  }
+});
+
 bot.action("admin_reorder_button", async (ctx) => {
   pendingLogins.set(ctx.from.id, { step: "admin_reorder_button_select" });
   await ctx.reply("🔢 Qaysi tugmaning tartibini o'zgartirmoqchisiz? Tugma nomini kiriting:");
