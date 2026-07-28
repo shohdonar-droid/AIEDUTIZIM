@@ -1644,7 +1644,7 @@ bot.action(/edit_price_(.+)/, async (ctx) => {
   await ctx.reply(`✍️ <b>${service}</b> uchun yangi narxni (faqat son) kiriting:`, { parse_mode: "HTML" });
 });
 
-bot.on("message", async (ctx) => {
+bot.on("message", async (ctx, next) => {
   const userId = ctx.from.id;
   const pending = pendingLogins.get(userId);
   const text = (ctx.message as any).text;
@@ -1667,7 +1667,10 @@ bot.on("message", async (ctx) => {
       console.error(e);
       await ctx.reply("❌ Xatolik yuz berdi.");
     }
+    return;
   }
+  
+  await next();
 });
 
 bot.action("admin_reorder_button", async (ctx) => {
