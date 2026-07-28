@@ -4,8 +4,11 @@ import { collection, addDoc, query, deleteDoc, doc, serverTimestamp, getDocs, wh
 import safeOnSnapshot from '../../lib/safeSnapshot';
 import { Department, Group } from '../../types';
 import { Plus, Trash2, Layers, Users } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { logSystemAction } from '../../lib/logUtils';
 
 export default function AdminDepartments() {
+  const { user } = useAuth();
   const [faculties, setFaculties] = useState<any[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -48,6 +51,12 @@ export default function AdminDepartments() {
         facultyId: selectedFacultyId,
         createdAt: serverTimestamp()
       });
+      await logSystemAction(
+        `Yangi yo'nalish yaratildi: ${newDeptName.trim()}`,
+        "Yo'nalishlar",
+        user?.displayName || "Admin",
+        user?.role || "Admin"
+      );
       setNewDeptName('');
       setSelectedFacultyId('');
     } catch (err) {
@@ -65,6 +74,12 @@ export default function AdminDepartments() {
         departmentId: selectedDeptId,
         createdAt: serverTimestamp()
       });
+      await logSystemAction(
+        `Yangi guruh yaratildi: ${newGroupName.trim()}`,
+        "Guruhlar",
+        user?.displayName || "Admin",
+        user?.role || "Admin"
+      );
       setNewGroupName('');
       setSelectedDeptId('');
     } catch (err) {
@@ -77,6 +92,12 @@ export default function AdminDepartments() {
     if (!confirm("Rostdan ham o'chirmoqchimisiz? Guruhlar ham alohida o'chirilishi kerak bo'lishi mumkin.")) return;
     try {
       await deleteDoc(doc(db, 'departments', id));
+      await logSystemAction(
+        `Yo'nalish o'chirildi: ${departments.find(d => d.id === id)?.name || id}`,
+        "Yo'nalishlar",
+        user?.displayName || "Admin",
+        user?.role || "Admin"
+      );
     } catch (err) { console.error(err); }
   };
 
@@ -84,6 +105,12 @@ export default function AdminDepartments() {
     if (!confirm("Rostdan ham o'chirmoqchimisiz?")) return;
     try {
       await deleteDoc(doc(db, 'groups', id));
+      await logSystemAction(
+        `Guruh o'chirildi: ${groups.find(g => g.id === id)?.name || id}`,
+        "Guruhlar",
+        user?.displayName || "Admin",
+        user?.role || "Admin"
+      );
     } catch (err) { console.error(err); }
   };
 

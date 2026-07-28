@@ -1958,7 +1958,14 @@ bot.action(/admin_reject_pay_(\d+)/, async (ctx) => {
 bot.action("add_balance", async (ctx) => {
   try {
     await ctx.answerCbQuery();
-    await ctx.reply(paymentInstructionsText, { parse_mode: "HTML" });
+    await ctx.reply(paymentInstructionsText, { 
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Click", url: "https://click.uz/" }, { text: "Payme", url: "https://payme.uz/" }, { text: "Uzum", url: "https://uzum.com/" }]
+        ]
+      }
+    });
   } catch (e) {}
 });
 
@@ -4161,7 +4168,7 @@ bot.on("message", async (ctx) => {
     const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
     
     if (!hasBalance) {
-      return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost} ball.\nSizning balansingizda mablag' yetarli emas.`, {
+      return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost} so'm.\nSizning balansingizda mablag' yetarli emas.`, {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [

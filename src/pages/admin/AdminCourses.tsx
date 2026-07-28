@@ -8,6 +8,7 @@ import { MultiSelectDropdown } from '../../components/MultiSelectDropdown';
 import { Plus, Edit, Trash2, Loader2, Book, Layout, Save, X, Database, PlayCircle } from 'lucide-react';
 import { seedCourses } from './seed_courses';
 import { useAuth } from '../../hooks/useAuth';
+import { logSystemAction } from '../../lib/logUtils';
 
 export default function AdminCourses() {
   const { user } = useAuth();
@@ -66,6 +67,12 @@ export default function AdminCourses() {
     try {
       if (editingCourse.id) {
         await updateDoc(doc(db, 'courses', editingCourse.id), editingCourse);
+        await logSystemAction(
+          `Kurs tahrirlandi: ${editingCourse.title}`,
+          "Kurslar",
+          user?.displayName || "Admin",
+          user?.role || "Admin"
+        );
       } else {
         await addDoc(collection(db, 'courses'), {
           ...editingCourse,
@@ -79,6 +86,12 @@ export default function AdminCourses() {
           })),
           createdAt: serverTimestamp()
         });
+        await logSystemAction(
+          `Yangi kurs yaratildi: ${editingCourse.title}`,
+          "Kurslar",
+          user?.displayName || "Admin",
+          user?.role || "Admin"
+        );
       }
       setEditingCourse(null);
     } catch (err: any) { 

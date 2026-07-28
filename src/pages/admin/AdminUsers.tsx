@@ -34,6 +34,7 @@ import {
 import firebaseConfig from "../../../firebase-applet-config.json";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../hooks/useAuth";
+import { logSystemAction } from "../../lib/logUtils";
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -571,7 +572,14 @@ export default function AdminUsers() {
       
     try {
       // 1. Delete user document
+      const targetUser = users.find(u => u.uid === uid);
       await deleteDoc(doc(db, "users", uid));
+      await logSystemAction(
+        `Foydalanuvchi o'chirildi: ${targetUser?.displayName || uid}`,
+        "Foydalanuvchilar",
+        user?.displayName || "Admin",
+        user?.role || "Admin"
+      );
       
       // 2. Cleanup related data (enrollments, testResults)
       // We do these in parallel but catch errors for each so one failure doesn't block the profile deletion from being recognized
