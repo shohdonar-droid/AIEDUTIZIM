@@ -5299,7 +5299,14 @@ Foydalanuvchi xabari: ${prompt}`;
   if (normText === "💳 Balansni to'ldirish") {
     aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
-    return ctx.reply(paymentInstructionsText, { parse_mode: "HTML" });
+    return ctx.reply(paymentInstructionsText, { 
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "Click", url: "https://click.uz/" }, { text: "Payme", url: "https://payme.uz/" }, { text: "Uzum", url: "https://uzum.com/" }]
+        ]
+      }
+    });
   }
 
   if (normText === "🌐 Rasmiy sayt") {
