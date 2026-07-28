@@ -1160,10 +1160,8 @@ async function getAuthedUser(userId: number) {
 }
 
 const paymentInstructionsText = `💳 <b>Balansni to'ldirish yo'riqnomasi:</b>\n\n` +
-                     `1. Saytga kiring: https://aiedutizim.vercel.uz\n` +
-                     `2. "To'ldirish" bo'limini tanlang.\n` +
-                     `3. Click yoki Payme orqali to'lovni amalga oshiring.\n\n` +
-                     `Yoki quyidagi karta raqamiga o'tkazma qiling va adminga skrinshot yuboring:\n` +
+                     `1.  Click, Payme yoki uzum orqali to'lovni amalga oshiring.\n\n` +
+                     `Yoki quyidagi karta raqamiga o'tkazma qiling va botga skrinshotini yuboring:\n` +
                      `💳 <code>5614 6812 9015 3646</code>\n` +
                      `Ibodullayeva SH`;
 
