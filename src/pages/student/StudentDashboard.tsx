@@ -79,9 +79,6 @@ export default function StudentDashboard() {
             >
               <p className="font-black text-gray-900 truncate uppercase text-[10px] tracking-tight">{user?.displayName}</p>
               <p className="text-[8px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-0.5">Talaba</p>
-              <p className="text-[9px] text-emerald-600 font-black mt-0.5">
-                Balans: {Number((user as any)?.balance ?? 0).toLocaleString('uz-UZ')} UZS
-              </p>
             </motion.div>
           )}
         </div>

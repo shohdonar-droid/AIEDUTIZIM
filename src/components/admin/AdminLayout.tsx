@@ -32,7 +32,7 @@ import { useAuth } from '../../hooks/useAuth';
 export function AdminLayout({ children, unreadCount, user }: { children: React.ReactNode, unreadCount: number, user: any }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['academic', 'users', 'resources', 'monitoring', 'site_mgmt', 'billing', 'settings']);
+  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -43,9 +43,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
   };
 
   const toggleMenu = (id: string) => {
-    setExpandedMenus(prev => 
-      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
-    );
+    setExpandedMenu(prev => (prev === id ? null : id));
   };
 
   const menuStructure = [
@@ -86,7 +84,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
     ]},
     { id: 'notifications', name: 'Bildirishnomalar', path: '/admin/notifications', icon: Bell },
     { id: 'chat', name: 'Chat', path: '/admin/chat', icon: MessageSquare, badge: unreadCount },
-    { id: 'settings', name: 'Sayt sozlamalari', icon: Settings, subItems: [
+    { id: 'settings', name: 'Tizim sozlamalari', icon: Settings, subItems: [
         { name: 'Xavfsizlik', path: '/admin/settings/security' },
         { name: 'Dizayn', path: '/admin/settings/design' },
         { name: 'Integratsiyalar', path: '/admin/settings/integrations' },
@@ -99,7 +97,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
 
   const renderMenuItem = (item: any, isMobile = false) => {
     const Icon = item.icon;
-    const isExpanded = expandedMenus.includes(item.id);
+    const isExpanded = expandedMenu === item.id;
     const hasSubItems = item.subItems && item.subItems.length > 0;
     const isChat = item.id === 'chat';
 
@@ -202,9 +200,6 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
                 </span>
                 <span className="font-bold text-[9px] text-blue-600 tracking-widest uppercase mt-1">
                   {user?.role === 'superadmin' ? 'SUPER ADMINISTRATOR' : (user?.role === 'subadmin' ? 'KICHIK ADMINISTRATOR' : 'ADMINISTRATOR')}
-                </span>
-                <span className="font-bold text-[9px] text-emerald-600 uppercase mt-0.5">
-                  Balans: {Number((user as any)?.balance ?? 0).toLocaleString('uz-UZ')} UZS
                 </span>
               </div>
             )}
