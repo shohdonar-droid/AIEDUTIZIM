@@ -415,7 +415,7 @@ app.get("/api/health", (req, res) => {
         2. Matn ichidagi barcha 'data:image/x-wmf;base64,...' kabi teglar va ularning mazmunini O'CHIRING.
         3. Formulalarni tiklash: Agar matnda formula tushib qolgan bo'lsa (bo'sh joy yoki rasm bo'lib qolgan bo'lsa), matn mazmuni va javob variantlaridan kelib chiqib matematik formulani TO'LIQ VA XATOSIZ TIKLANG.
         4. Matematik belgilar (∫, ∑, lim, √, ∃, ∀, ∈, ∉, ≤, ≥, ≠, ±, ∞, →) va indekslarni (x_n, x^2, n_0, f'(x)) toza matn yoki LaTeX ko'rinishida saqlang.
-        5. Format:
+        5. FORMATLASH: Har bir savolni quyidagi tartibda yozing va BARCHA savollarni parselang (hech qaysini tashlab ketmang):
            ++++
            Savol va formulasi
            ====

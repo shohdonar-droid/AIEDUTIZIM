@@ -286,7 +286,8 @@ export async function generateContentWithRotation(
       if (errMsg.includes("400") && !errMsg.includes("not found")) throw error;
       
       if (errMsg.includes("503") || errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("unavailable")) {
-         const delay = Math.min(2000, 500 * attempts);
+         // Wait significantly longer for rate limits/server overload (up to 15 seconds)
+         const delay = Math.min(15000, 2000 * Math.pow(2, attempts)); 
          await new Promise(r => setTimeout(r, delay));
       }
     }

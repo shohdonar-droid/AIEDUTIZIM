@@ -482,6 +482,52 @@ export default function Tariffs() {
                 </div>
               </div>
 
+              {/* Payment Gateway UID Info & Direct Payment */}
+              {user && (
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black text-amber-600 uppercase tracking-wider">Sizning Platforma ID (UID):</p>
+                      <p className="text-sm font-black font-mono text-amber-900 select-all">{user.uid}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(user.uid);
+                        alert("UID nusxalandi! " + paymentType + " ilovasiga o'tib ushbu ID orqali to'lov qilishingiz mumkin.");
+                      }}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
+                    >
+                      Nusxalash
+                    </button>
+                  </div>
+                  <p className="text-[11px] font-bold text-amber-700 leading-tight">
+                    💡 <b>{paymentType}</b> ilovasiga kirib, xizmatlar ichidan bizning platformani qidiring va ushbu <b>UID</b> raqamingizni kiriting. Shuningdek, quyidagi tugma orqali to'g'ridan-to'g'ri to'lov sahifasiga o'tishingiz mumkin:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const amount = selectedTariff.price || 0;
+                      let payUrl = "#";
+                      if (paymentType === 'Click') {
+                        payUrl = `https://my.click.uz/services/pay?id=12345&merchant_id=9999&amount=${amount}&transaction_param=${user.uid}`;
+                      } else if (paymentType === 'Payme') {
+                        payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&ac.user_id=${user.uid}&amount=${amount * 100}`;
+                      } else if (paymentType === 'Uzum Bank') {
+                        payUrl = `https://uzumbank.uz/pay?merchant_id=platform&account=${user.uid}&amount=${amount}`;
+                      } else {
+                        alert(`Karta raqamimiz (${cardSettings.number}) ga o'tkazma qiling.`);
+                        return;
+                      }
+                      window.open(payUrl, '_blank');
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-xs uppercase tracking-widest shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    🚀 {paymentType} orqali onlayn to'lash
+                  </button>
+                </div>
+              )}
+
               <div>
                 <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">
                   To'lov chekini jo'natish usuli
@@ -699,6 +745,27 @@ export default function Tariffs() {
                   <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Karta raqami ({cardSettings.type}):</p>
                   <p className="text-sm font-black font-mono text-gray-800">{cardSettings.number}</p>
                   <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase">{cardSettings.owner}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const amount = showNewOrgModal.price || showNewOrgModal.basePrice || 0;
+                      let payUrl = "#";
+                      if (paymentType === 'Click') {
+                        payUrl = `https://my.click.uz/services/pay?id=12345&merchant_id=9999&amount=${amount}`;
+                      } else if (paymentType === 'Payme') {
+                        payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&amount=${amount * 100}`;
+                      } else if (paymentType === 'Uzum Bank') {
+                        payUrl = `https://uzumbank.uz/pay?merchant_id=platform&amount=${amount}`;
+                      } else {
+                        alert(`Karta raqamimiz (${cardSettings.number}) ga o'tkazma qiling.`);
+                        return;
+                      }
+                      window.open(payUrl, '_blank');
+                    }}
+                    className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-xs uppercase tracking-widest shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    🚀 {paymentType} orqali onlayn to'lash
+                  </button>
                 </div>
               </div>
             </div>

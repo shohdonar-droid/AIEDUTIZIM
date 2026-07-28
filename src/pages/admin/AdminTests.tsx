@@ -934,6 +934,7 @@ nato'g'ri_variant`;
                       accept=".docx"
                       onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
+                          setIsFileUploaded(true);
                           const file = e.target.files[0];
                           const reader = new FileReader();
                           reader.onload = async (event) => {
@@ -946,11 +947,11 @@ nato'g'ri_variant`;
                               const mammoth = await import('mammoth');
                               const result = await mammoth.convertToHtml({ 
                                 arrayBuffer: arrayBuffer,
-                                convertImage: mammoth.images.imgElement(async (image) => {
+                                convertImage: mammoth.images.imgElement(async (image: any) => {
                                   const buffer = await image.read("base64");
                                   return { src: `data:${image.contentType};base64,${buffer}` };
                                 })
-                              });
+                              } as any);
                               
                               const tempDiv = document.createElement('div');
                               tempDiv.innerHTML = result.value;
@@ -986,9 +987,11 @@ nato'g'ri_variant`;
                                 setManualText(data.text);
                                 setIsFileUploaded(true);
                               } else {
+                                setIsFileUploaded(false);
                                 throw new Error(data.error || "Parsingda xatolik");
                               }
                             } catch (err) {
+                              setIsFileUploaded(false);
                               console.error("Mammoth error details:", err);
                               alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang. Xato: " + err);
                             }
@@ -1394,6 +1397,7 @@ nato'g'ri_variant`;
                          accept=".docx"
                          onChange={async (e) => {
                            if (e.target.files && e.target.files[0]) {
+                             setExamFileUploaded(true);
                              const file = e.target.files[0];
                              const reader = new FileReader();
                              reader.onload = async (event) => {
@@ -1429,9 +1433,11 @@ nato'g'ri_variant`;
                                    setExamManualText(data.text);
                                    setExamFileUploaded(true);
                                  } else {
+                                   setExamFileUploaded(false);
                                    throw new Error(data.error || "Parsingda xatolik");
                                  }
                                } catch (err) {
+                                 setExamFileUploaded(false);
                                  console.error("Mammoth error:", err);
                                  alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang.");
                                }
