@@ -1,6 +1,7 @@
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   initializeFirestore,
+  getFirestore,
   collection,
   query,
   where,
@@ -11,29 +12,41 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
+  Firestore,
 } from "firebase/firestore";
 import crypto from "crypto";
 import firebaseConfigRaw from "../../firebase-applet-config.json";
 
 const firebaseConfig = {
-  apiKey: firebaseConfigRaw.apiKey,
-  authDomain: firebaseConfigRaw.authDomain,
-  projectId: firebaseConfigRaw.projectId,
-  storageBucket: firebaseConfigRaw.storageBucket,
-  messagingSenderId: firebaseConfigRaw.messagingSenderId,
-  appId: firebaseConfigRaw.appId,
+  apiKey: process.env.FIREBASE_API_KEY || firebaseConfigRaw.apiKey,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || firebaseConfigRaw.authDomain,
+  projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfigRaw.projectId,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || firebaseConfigRaw.storageBucket,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || firebaseConfigRaw.messagingSenderId,
+  appId: process.env.FIREBASE_APP_ID || firebaseConfigRaw.appId,
 };
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const db = initializeFirestore(
-  app,
-  {
-    experimentalForceLongPolling: true,
-    host: "firestore.googleapis.com",
-    ssl: true,
-  },
-  firebaseConfigRaw.firestoreDatabaseId
-);
+const databaseId = process.env.FIREBASE_DATABASE_ID || firebaseConfigRaw.firestoreDatabaseId;
+
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+function initSafeDb(): Firestore {
+  try {
+    return initializeFirestore(
+      app,
+      {
+        experimentalForceLongPolling: true,
+        host: "firestore.googleapis.com",
+        ssl: true,
+      },
+      databaseId
+    );
+  } catch (e) {
+    return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+  }
+}
+
+const db = initSafeDb();
 
 export interface FoundUser {
   docId: string;

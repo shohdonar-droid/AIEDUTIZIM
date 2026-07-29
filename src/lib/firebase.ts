@@ -1,25 +1,36 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer, enableMultiTabIndexedDbPersistence, enableIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDocFromServer, enableMultiTabIndexedDbPersistence, enableIndexedDbPersistence, Firestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfigRaw from '../../firebase-applet-config.json';
 
 const firebaseConfig = {
-  apiKey: firebaseConfigRaw.apiKey,
-  authDomain: firebaseConfigRaw.authDomain,
-  projectId: firebaseConfigRaw.projectId,
-  storageBucket: firebaseConfigRaw.storageBucket,
-  messagingSenderId: firebaseConfigRaw.messagingSenderId,
-  appId: firebaseConfigRaw.appId,
+  apiKey: process.env.FIREBASE_API_KEY || firebaseConfigRaw.apiKey,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || firebaseConfigRaw.authDomain,
+  projectId: process.env.FIREBASE_PROJECT_ID || firebaseConfigRaw.projectId,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || firebaseConfigRaw.storageBucket,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || firebaseConfigRaw.messagingSenderId,
+  appId: process.env.FIREBASE_APP_ID || firebaseConfigRaw.appId,
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  host: 'firestore.googleapis.com',
-  ssl: true,
-  experimentalLongPollingOptions: { timeoutSeconds: 30 },
-}, firebaseConfigRaw.firestoreDatabaseId);
+const databaseId = process.env.FIREBASE_DATABASE_ID || firebaseConfigRaw.firestoreDatabaseId;
+
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+function initSafeFirestore(): Firestore {
+  try {
+    return initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      host: 'firestore.googleapis.com',
+      ssl: true,
+      experimentalLongPollingOptions: { timeoutSeconds: 30 },
+    }, databaseId);
+  } catch (e) {
+    return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+  }
+}
+
+export const db = initSafeFirestore();
 
 // Enable offline persistence immediately to prevent blocking and error screens on network delay
 if (typeof window !== 'undefined') {

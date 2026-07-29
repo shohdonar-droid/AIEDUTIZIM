@@ -3,6 +3,7 @@ import { initializeApp, getApps, getApp, setLogLevel } from "firebase/app";
 import firebaseConfigRaw from "./firebase-applet-config.json";
 import {
   initializeFirestore,
+  getFirestore,
   collection,
   query,
   where,
@@ -72,11 +73,12 @@ const firebaseApiKey = firebaseConfig.apiKey;
 const firebaseProjectId = firebaseConfig.projectId;
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-db = initializeFirestore(
-  app,
-  { experimentalForceLongPolling: true },
-  process.env.FIREBASE_DATABASE_ID || firebaseConfigRaw.firestoreDatabaseId,
-);
+const targetDbId = process.env.FIREBASE_DATABASE_ID || firebaseConfigRaw.firestoreDatabaseId;
+try {
+  db = initializeFirestore(app, { experimentalForceLongPolling: true }, targetDbId);
+} catch (e) {
+  db = targetDbId ? getFirestore(app, targetDbId) : getFirestore(app);
+}
 
 export let botPaused = false;
 export let adminTelegramId: number | null = null;
