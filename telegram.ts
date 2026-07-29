@@ -6660,22 +6660,48 @@ export async function launchBot() {
     pollDatabaseNotifications();
   }
 
-  function triggerBotLaunch() {
+  async function triggerBotLaunch() {
     const useWebhook = process.env.USE_WEBHOOK === "true";
-    const webhookUrl = `${process.env.APP_URL}/api/telegram-webhook`;
-    if (useWebhook && process.env.APP_URL) {
-      bot.telegram.setWebhook(webhookUrl).catch(() => bot.launch());
+    const appUrl = process.env.APP_URL || "";
+    const webhookUrl = `${appUrl}/api/telegram-webhook`;
+
+    if (useWebhook && appUrl) {
+      try {
+        await bot.telegram.setWebhook(webhookUrl);
+        console.log(`[Telegram Bot] Webhook set successfully to ${webhookUrl}`);
+      } catch (err: any) {
+        console.error(`[Telegram Bot] Webhook setup failed: ${err?.message || err}. Falling back to polling.`);
+        try {
+          await bot.telegram.deleteWebhook({ drop_pending_updates: false });
+        } catch (e) {}
+        bot.launch().catch((launchErr: any) => {
+          console.error("[Telegram Bot Polling Error]", launchErr?.message || launchErr);
+        });
+      }
     } else {
-      bot.launch().catch((err: any) => {
+      try {
+        // Clear any old/active webhook on Telegram servers to avoid 409 Conflict
+        await bot.telegram.deleteWebhook({ drop_pending_updates: false });
+        console.log("[Telegram Bot] Cleared old webhook. Launching long polling...");
+      } catch (e: any) {
+        console.warn("[Telegram Bot] deleteWebhook warning:", e?.message || e);
+      }
+
+      bot.launch().then(() => {
+        console.log("✅ [Telegram Bot] Bot launched and listening for updates!");
+      }).catch((err: any) => {
+        console.error("❌ [Telegram Bot Launch Error]", err?.message || err);
         if (err?.response?.error_code === 409) {
-          setTimeout(triggerBotLaunch, 15000);
+          console.warn("⚠️ [Telegram Bot] Conflict 409. Retrying in 10s...");
+          setTimeout(triggerBotLaunch, 10000);
         } else {
           setTimeout(triggerBotLaunch, 5000);
         }
       });
     }
+
     bot.telegram.setChatMenuButton({
-      menuButton: { type: "web_app", text: "📱 Tizimga kirish", web_app: { url: `${process.env.APP_URL}/login` } },
+      menuButton: { type: "web_app", text: "📱 Tizimga kirish", web_app: { url: `${appUrl || "https://ai-edutizim.uz"}/login` } },
     }).catch(() => {});
   }
 
