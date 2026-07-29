@@ -104,6 +104,7 @@ export default function IndependentStudents() {
         phone: newPhone.trim() || "-",
         email: emailVal,
         login: autoLogin,
+        systemId: autoLogin,
         password: autoPassword,
         role: 'student',
         groupId: newGroupId,

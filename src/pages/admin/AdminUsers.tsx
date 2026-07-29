@@ -305,6 +305,18 @@ export default function AdminUsers() {
           getDocs(query(collection(db, "users"), where("isBotUser", "==", true), limit(100)))
         ]);
 
+        const allUsers = [
+          ...studentsSnap.docs,
+          ...teachersSnap.docs,
+          ...independentTeachersSnap.docs,
+          ...staffSnap.docs,
+          ...subadminsSnap.docs
+        ];
+        console.log("ALL_USER_IDS:", allUsers.map(d => {
+          const data = d.data();
+          return { id: d.id, displayName: data.displayName, login: data.login, systemId: data.systemId };
+        }));
+
         const students = studentsSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
           .filter(u => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"))
@@ -537,6 +549,7 @@ export default function AdminUsers() {
           displayName: editingMustaqilTeacher.displayName,
           phone: editingMustaqilTeacher.phone || "",
           login: cleanLogin,
+          systemId: cleanLogin,
           password: editingMustaqilTeacher.password,
           role: "mustaqil_o_qituvchi",
           teacherId: uyOrgId,
@@ -667,7 +680,8 @@ export default function AdminUsers() {
           uid: uid,
           displayName: editingTeacher.displayName,
           phone: editingTeacher.phone || "",
-          login: editingTeacher.login.trim(),
+          login: cleanLogin,
+          systemId: cleanLogin,
           password: editingTeacher.password,
           ball: Number(editingTeacher.ball) || 0,
           role: "teacher",
@@ -801,6 +815,7 @@ export default function AdminUsers() {
         displayName: newStudent.displayName,
         phone: newStudent.phone,
         login: login,
+        systemId: login,
         password: pass,
         email: email,
         role: "student",
@@ -867,6 +882,7 @@ export default function AdminUsers() {
         uid: d.localId,
         displayName: newStaff.displayName,
         login: staffLogin,
+        systemId: staffLogin,
         password: newStaff.password,
         phone: newStaff.phone,
         email: gEmail,
@@ -1599,6 +1615,9 @@ export default function AdminUsers() {
                       №
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
+                      ID
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
                       Tashkilot nomi
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
@@ -1623,6 +1642,9 @@ export default function AdminUsers() {
                     >
                       <td className="px-6 py-4 font-bold text-gray-400">
                         {i + 1}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-500">
+                        {t.systemId || "-"}
                       </td>
                       <td className="px-6 py-4">
                         <button
@@ -1695,6 +1717,9 @@ export default function AdminUsers() {
                         №
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
+                        ID
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
                         F.I.SH (O'qituvchi)
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase">
@@ -1719,6 +1744,9 @@ export default function AdminUsers() {
                       >
                         <td className="px-6 py-4 font-bold text-gray-400">
                           {i + 1}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-500">
+                          {t.systemId || "-"}
                         </td>
                         <td className="px-6 py-4">
                           <button
@@ -1824,6 +1852,9 @@ export default function AdminUsers() {
                     №
                   </th>
                   <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
+                    ID
+                  </th>
+                  <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
                     F.I.SH (Xodim)
                   </th>
                   {isSuperAdmin && (
@@ -1850,6 +1881,9 @@ export default function AdminUsers() {
                   <tr key={`${s.uid || "staff"}_${i}`} className="hover:bg-gray-50/30 group">
                     <td className="px-6 py-4 font-bold text-gray-400">
                       {i + 1}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-500">
+                      {s.systemId || "-"}
                     </td>
                     <td className="px-6 py-4 font-black uppercase text-sm">
                       {s.displayName}
@@ -2001,6 +2035,9 @@ export default function AdminUsers() {
                     <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase whitespace-nowrap">
                       №
                     </th>
+                    <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase whitespace-nowrap">
+                      ID
+                    </th>
                     {isSuperAdmin && (
                       <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase">
                         Tashkilot
@@ -2036,6 +2073,9 @@ export default function AdminUsers() {
                       <tr key={`${u.uid || "user"}_${i}`} className="hover:bg-gray-50/30 group">
                         <td className="px-6 py-4 font-bold text-gray-400 whitespace-nowrap">
                           {i + 1}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-500">
+                          {u.systemId || "-"}
                         </td>
                         {isSuperAdmin && (
                           <td className="px-6 py-4">
@@ -2697,6 +2737,9 @@ export default function AdminUsers() {
                     <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
                       №
                     </th>
+                    <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                      ID
+                    </th>
                     <th className="px-6 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
                       Admin ismi
                     </th>
@@ -2722,6 +2765,9 @@ export default function AdminUsers() {
                     >
                       <td className="px-6 py-4 font-bold text-gray-400 whitespace-nowrap">
                         {i + 1}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-500">
+                        {t.login || "-"}
                       </td>
                       <td className="px-6 py-4 font-black text-sm uppercase text-gray-800">
                         <div className="flex flex-col">

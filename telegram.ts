@@ -543,6 +543,7 @@ const pendingLogins = new Map<
   { 
     step: string; 
     email?: string; 
+    service?: string;
     targetUserId?: string; 
     targetMenu?: string;
     buttonName?: string;
@@ -3430,7 +3431,7 @@ async function handleAntiplagiatAnalysis(ctx: any, input: string) {
       Eslatma: Natijalar Gemini AI tahliliga asoslangan bo'lib, rasmiy antiplagiat natijasi hisoblanmaydi.`;
   
       const report = await generateContentWithRotation({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.6-flash",
         contents: analysisPrompt
       });
       
@@ -4966,11 +4967,31 @@ bot.on("message", async (ctx) => {
 2. If the user requests a "kurs ishi" (coursework) or "slayd" (presentation), YOU MUST FIRST ASK FOR THE SPECIFIC TOPIC ("mavzu"). Once the topic is provided, generate the requested document strictly following the guidelines below.
 
 ### 1. GUIDELINES FOR GENERATING KURS ISHI (ACADEMIC DOCX CONTENT):
-- Tone: Strictly academic, formal, and objective.
-- Language: High-level Uzbek (pedagogical terminology).
-- Mathematical Formulas: NEVER use raw LaTeX symbols like $...$ or $$...$$ for Word documents. Instead, write equations out in clear text format or standardized Unicode structures that copy-paste naturally into MS Word's Equation editor (e.g., use words or clear bracket structures instead of raw TeX code).
-- Completeness: Do not just write a summary or stop at Chapter 1. Generate full, comprehensive content for all chapters, including Introduction, Body Chapters (with tables/data), Conclusion, and References.
-- Specifics: Always tailor the content to the context of Uzbekistan Higher Education (e.g., referencing official Presidential Decrees, Ministry strategies, and specific local university contexts like Chirchiq State Pedagogical University if applicable).
+Sen O'zbekiston oliy ta'lim tizimi standartlariga mos "kurs ishi" (course paper) yozuvchi ilmiy-akademik yordamchisan. Foydalanuvchi sendan mavzu, universitet nomi, fakultet, kafedra, yo'nalish, talaba F.I.Sh, ilmiy rahbar F.I.Sh kabi ma'lumotlarni oladi va shu asosda to'liq, original, ilmiy jihatdan puxta kurs ishi generatsiya qilishing kerak.
+
+QAT'IY QOIDALAR (hech qachon buzilmasin):
+1. ISM-FAMILIYALARNI TO'G'RI FORMATLA: Talaba va rahbar F.I.Sh doim odatiy grammatik qoidada — har bir so'zning faqat birinchi harfi katta, qolgani kichik (masalan: "Ortiqov Elyorbek", "Bekchanova Sh."). HECH QACHON "oRTIQOV eLYORBEK" kabi teskari case ishlatma. Universitet, fakultet, kafedra nomlarini ham standart Sarlavha holatida yoz (barcha harflarni bosh harf bilan YOZMA, faqat rasmiy qisqartmalar — ChDPU kabi — bundan mustasno).
+2. HAR BIR SARLAVHA FAQAT BIR MARTA CHIQSIN: "MUNDARIJA", "KIRISH", "XULOSA" kabi bo'lim sarlavhalarini takrorlama. Har bir bo'lim sarlavhasi hujjatda faqat bitta joyda, bitta marta paydo bo'lsin.
+3. METADATA/XIZMAT MA'LUMOTLARINI HUJJAT MATNIGA QO'SHMA: "Mavzu: ... Rahbar: ... Sahifalar: 30" kabi ichki xulosa-kartochkalarni yoki har qanday texnik/debug xarakteridagi qatorlarni yakuniy hujjat matniga hech qachon kiritma. Faqat foydalanuvchi ko'rishi kerak bo'lgan rasmiy kurs ishi matnini chiqar.
+4. SXEMA VA JARAYONLARNI MATN-SAN'AT (ASCII-art) KO'RINISHIDA CHIZMA: Agar bosqichlar ketma-ketligini, jarayon oqimini yoki taqqoslashni ko'rsatish kerak bo'lsa — buni doim JADVAL (Markdown table yoki so'zma-so'z ro'yxat: "1-bosqich → 2-bosqich → ...") ko'rinishida ber. Kvadrat qavs, chiziq (---), o'q belgisi (▼, →) kabi belgilardan iborat "quti-diagramma" yaratma — bu Word'ga o'tkazilganda tartibsiz matn bo'lib qoladi.
+5. ILMIY JIHATDAN PUXTALIK:
+   - Har bir bobda kamida 2-3 ta haqiqiy yoki ishonchli tarzda umumlashtirilgan ilmiy nazariya/muallifga tayanish (masalan pedagogika uchun: Vygotsky, Gilford, Torrance, mahalliy olimlar).
+   - Fikrlarni asossiz umumlashtirmasdan, sabab-natija bog'lanishi orqali yoz.
+   - Har bir bob oxirida qisqa oraliq xulosa bo'lsin.
+   - Adabiyotlar ro'yxatini turkumlarga bo'l: (I) qonun hujjatlari, (II) darslik/monografiyalar, (III) ilmiy maqolalar/dissertatsiyalar, (IV) xorijiy manbalar, (V) elektron resurslar — har biri to'g'ri bibliografik formatda (muallif, nomi, shahar, nashriyot, yil, sahifa).
+   - O'zbekiston me'yoriy-huquqiy hujjatlariga (qonun, farmon, qaror) real sana va raqamlar bilan murojaat qil; agar aniq bilmasang, umumiy holatda ("tegishli me'yoriy hujjatlarga ko'ra" kabi) yoz, o'ylab topilgan sana/raqam bermaslik lozim.
+6. STRUKTURA (standart 25-35 sahifa uchun):
+   - Titul varaq (universitet, fakultet, kafedra, "KURS ISHI", mavzu, fan, F.I.Sh talaba/rahbar, shahar-yil)
+   - Mundarija (bir marta)
+   - Kirish (dolzarblik, muammo, obyekt, predmet, maqsad, vazifalar, ilmiy yangilik, metodlar, baza)
+   - I BOB — nazariy asoslar (2 ta kichik bo'lim)
+   - II BOB — amaliy holat tahlili (2 ta kichik bo'lim)
+   - III BOB — takomillashtirish/tavsiyalar (2 ta kichik bo'lim)
+   - Xulosa
+   - Ilmiy-amaliy tavsiyalar
+   - Foydalanilgan adabiyotlar ro'yxati (turkumlangan, kamida 15-20 manba)
+7. USLUB: rasmiy-ilmiy uslub, birinchi shaxsda emas ("biz" yoki betaraf uchinchi shaxs), ortiqcha reklama iboralarisiz ("ajoyib", "zo'r" kabi so'zlarsiz), aniq va tekshirilishi mumkin bo'lgan fikrlar bilan.
+8. FORMULALAR: Word (.docx) uchun LaTeX ($...$) ishlatmang, Unicode yoki oddiy matn ko'rinishida yozing.
 
 ### 2. GUIDELINES FOR GENERATING SLIDES (POWERPOINT CONTENT):
 - Structure: Output clean, structured presentation outlines containing ONLY the slide title and slide content.
@@ -4988,7 +5009,7 @@ ${systemCtx}
 Foydalanuvchi xabari: ${prompt}`;
 
           const aiResponse = await generateContentWithRotation({
-            model: imagePart ? "gemini-3.5-flash" : "gemini-3.5-flash",
+            model: "gemini-3.6-flash",
             contents: [
               { role: "user", parts: [{ text: systemInstructionText }, ...(imagePart ? [imagePart] : [])] }
             ]
@@ -5444,7 +5465,7 @@ Foydalanuvchi xabari: ${prompt}`;
       `   ⏳ Ishlash vaqti (Uptime): <code>${hours}h ${minutes}m ${seconds}s</code>\n` +
       `   📦 Kutubxona: <code>Telegraf v4.16.3</code>\n\n` +
       `🧠 <b>AI Xizmati:</b>\n` +
-      `   🤖 Model: <code>Gemini 2.0 Flash / 1.5 Pro</code>\n` +
+      `   🤖 Model: <code>Gemini 3.6 Flash / 3.1 Pro</code>\n` +
       `   🛡 Rate-Limit: <code>Admin/O'qituvchilar cheksiz, Talabalar daqiqasiga 20 ta so'rov</code>\n\n` +
       `🗄 <b>Baza holati (Firestore):</b>\n` +
       `   🔹 ProjectID: <code>${firebaseProjectId || "aiedutizim-default"}</code>\n` +
@@ -6363,7 +6384,7 @@ Foydalanuvchi xabari: ${prompt}`;
                     : `Mavzu: ${fnArgs.title}. 5 ta JSON test yarat.`;
 
                   const genRes = await generateContentWithRotation({
-                    model: "gemini-3.5-flash",
+                    model: "gemini-3.6-flash",
                     contents: [{ role: "user", parts: [{ text: pText }] }],
                     config: {
                       systemInstruction:

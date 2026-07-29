@@ -98,6 +98,10 @@ export default function Login() {
               const qLogLower = query(collection(db, 'users'), where('login', '==', trimmedLogin.toLowerCase()));
               qSnap = await getDocs(qLogLower);
             }
+            if (qSnap.empty) {
+              const qSys = query(collection(db, 'users'), where('systemId', '==', trimmedLogin));
+              qSnap = await getDocs(qSys);
+            }
           }
 
           if (qSnap && !qSnap.empty) {

@@ -1404,13 +1404,8 @@ nato'g'ri_variant`;
                                try {
                                  const arrayBuffer = event.target?.result as ArrayBuffer;
                                  const mammoth = await import('mammoth');
-                                 const result = await mammoth.convertToHtml({ 
-                                   arrayBuffer: arrayBuffer,
-                                   convertImage: mammoth.images.imgElement(async (image) => {
-                                     const buffer = await image.read("base64");
-                                     return { src: `data:${image.contentType};base64,${buffer}` };
-                                   })
-                                 });
+                                  const docxOpts: any = { arrayBuffer, convertImage: (mammoth as any).images?.imgElement(async (image: any) => { const buffer = await image.read("base64"); return { src: `data:${image.contentType};base64,${buffer}` }; }) };
+                                  const result = await mammoth.convertToHtml(docxOpts);
                                  let response;
                                  let data;
                                  let retries = 2;

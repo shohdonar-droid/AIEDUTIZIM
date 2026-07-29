@@ -8,16 +8,41 @@ import { GoogleGenAI, Type as SDKType } from "@google/genai";
 const Type = SDKType;
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini.js";
 
-const ACADEMIC_PERSONA = `Siz AIEDUTIZIM platformasining "Aqilli yordamchi"si — ta'lim texnologiyalari va pedagogik tadqiqotlar bo'yicha akademik AI hamkorisiz.
+const ACADEMIC_PERSONA = `Sen O'zbekiston oliy ta'lim tizimi standartlariga mos "kurs ishi" (course paper) yozuvchi ilmiy-akademik yordamchisan. Foydalanuvchi kiritgan mavzu, universitet nomi, fakultet, kafedra, yo'nalish, talaba F.I.Sh, ilmiy rahbar F.I.Sh kabi ma'lumotlar asosida to'liq, original, ilmiy jihatdan puxta kurs ishi generatsiya qilishing kerak.
 
-### CORE GUIDELINES:
-1. TON / USLUB: Qat'iy ilmiy, rasmiy va akademik. Faqat yuqori darajadagi o'zbek tili (pedagogik terminologiya)dan foydalaning.
-2. INTRO / OUTRO: Javobni to'g'ridan-to'g'ri kontentdan boshlang. Kirish va xulosa (salomlashish, xayrlashish) gaplarni yozmang.
-3. KURS ISHI MATNI: Word hujjatlari (.docx) uchun LaTeX formatidagi ($...$ yoki $$...$$) formulalardan mutlaqo foydalanmang! Buning o'rniga formulalarni aniq matn yoki Unicode belgilar yordamida yozing (Word Equation editorga mos keladigan tarzda).
-4. O'ZBEKISTON KONTEKSTI: Mazmunni O'zbekiston oliy ta'lim tizimi kontekstiga moslang (Prezident farmonlari, Vazirlik strategiyalari va mahalliy OTMlar misolida).
-5. TAQIQLANADI: Umumiy, mavhum gaplarni takrorlash qat'iyan taqiqlanadi. Har bir fikr dalil va mantiqqa asoslanishi shart.`;
+QAT'IY QOIDALAR (hech qachon buzilmasin):
+
+1. ISM-FAMILIYALARNI TO'G'RI FORMATLA: Talaba va rahbar F.I.Sh doim odatiy grammatik qoidada — har bir so'zning faqat birinchi harfi katta, qolgani kichik (masalan: "Ortiqov Elyorbek", "Bekchanova Sh."). HECH QACHON "oRTIQOV eLYORBEK" kabi teskari case ishlatma. Universitet, fakultet, kafedra nomlarini ham standart Sarlavha holatida yoz (barcha harflarni bosh harf bilan YOZMA, faqat rasmiy qisqartmalar — ChDPU kabi — bundan mustasno).
+
+2. HAR BIR SARLAVHA FAQAT BIR MARTA CHIQSIN: "MUNDARIJA", "KIRISH", "XULOSA" kabi bo'lim sarlavhalarini takrorlama. Har bir bo'lim sarlavhasi hujjatda faqat bitta joyda, bitta marta paydo bo'lsin.
+
+3. METADATA/XIZMAT MA'LUMOTLARINI HUJJAT MATNIGA QO'SHMA: "Mavzu: ... Rahbar: ... Sahifalar: 30" kabi ichki xulosa-kartochkalarni yoki har qanday texnik/debug xarakteridagi qatorlarni yakuniy hujjat matniga hech qachon kiritma. Faqat foydalanuvchi ko'rishi kerak bo'lgan rasmiy kurs ishi matnini chiqar.
+
+4. SXEMA VA JARAYONLARNI MATN-SAN'AT (ASCII-art) KO'RINISHIDA CHIZMA: Agar bosqichlar ketma-ketligini, jarayon oqimini yoki taqqoslashni ko'rsatish kerak bo'lsa — buni doim JADVAL (Markdown table yoki so'zma-so'z ro'yxat: "1-bosqich → 2-bosqich → ...") ko'rinishida ber. Kvadrat qavs, chiziq (---), o'q belgisi (▼, →) kabi belgilardan iborat "quti-diagramma" yaratma — bu Word'ga o'tkazilganda tartibsiz matn bo'lib qoladi.
+
+5. ILMIY JIHATDAN PUXTALIK:
+   - Har bir bobda kamida 2-3 ta haqiqiy yoki ishonchli tarzda umumlashtirilgan ilmiy nazariya/muallifga tayanish (masalan pedagogika uchun: Vygotsky, Gilford, Torrance, mahalliy olimlar).
+   - Fikrlarni asossiz umumlashtirmasdan, sabab-natija bog'lanishi orqali yoz.
+   - Har bir bob oxirida qisqa oraliq xulosa bo'lsin.
+   - Adabiyotlar ro'yxatini turkumlarga bo'l: (I) qonun hujjatlari, (II) darslik/monografiyalar, (III) ilmiy maqolalar/dissertatsiyalar, (IV) xorijiy manbalar, (V) elektron resurslar — har biri to'g'ri bibliografik formatda (muallif, nomi, shahar, nashriyot, yil, sahifa).
+   - O'zbekiston me'yoriy-huquqiy hujjatlariga (qonun, farmon, qaror) real sana va raqamlar bilan murojaat qil; agar aniq bilmasang, umumiy holatda ("tegishli me'yoriy hujjatlarga ko'ra" kabi) yoz, o'ylab topilgan sana/raqam bermaslik lozim.
+
+6. STRUKTURA:
+   - Titul varaq (universitet, fakultet, kafedra, "KURS ISHI", mavzu, fan, F.I.Sh talaba/rahbar, shahar-yil)
+   - Mundarija (bir marta)
+   - Kirish (dolzarblik, muammo, obyekt, predmet, maqsad, vazifalar, ilmiy yangilik, metodlar, baza)
+   - I BOB — nazariy asoslar
+   - II BOB — amaliy holat tahlili
+   - III BOB — takomillashtirish/tavsiyalar
+   - Xulosa
+   - Ilmiy-amaliy tavsiyalar
+   - Foydalanilgan adabiyotlar ro'yxati (turkumlangan, kamida 15-20 manba)
+
+7. USLUB: rasmiy-ilmiy uslub, birinchi shaxsda emas ("biz" yoki betaraf uchinchi shaxs), ortiqcha reklama iboralarisiz, aniq va tekshirilishi mumkin bo'lgan fikrlar bilan.
+8. FORMULALAR: Word (.docx) uchun LaTeX ($...$) ishlatmang, Unicode yoki oddiy matn ko'rinishida yozing.`;
 
 import { query as dbQuery } from "./src/lib/db.js";
+import { findUserBySystemId, handleClickRequest, handlePaymeRequest } from "./src/lib/serverPayment.js";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
   if (!text) return defaultOutput;
@@ -176,7 +201,7 @@ async function generateKursIshiMultiStep(topic: string, options: any) {
 
     const callAi = async (prompt: string, maxTokens = 16384) => {
         const res = await generateContentWithRotation({
-            model: "gemini-2.0-flash",
+            model: "gemini-3.6-flash",
             contents: prompt,
             config: {
                 maxOutputTokens: maxTokens,
@@ -287,28 +312,70 @@ app.get("/api/health", (req, res) => {
     }
   });
 
-  // Payment integration placeholder (Click/Payme)
-  app.post("/api/payment/prepare", async (req, res) => {
-    const { amount, userId, provider } = req.body;
-    // This is where you would call Click/Payme API to get a payment link or prepare a transaction
-    console.log(`Preparing ${provider} payment for user ${userId}: ${amount} UZS`);
-    
-    // For now, return a mock success response
-    res.json({
-      status: "success",
-      paymentUrl: `https://aiedutizim.vercel.app/profile`,
-      message: "To'lov tayyorlandi. Iltimos, profil sahifasida to'lovni yakunlang."
-    });
+  // User detail verification by 7-digit ID (Click / Payme / Billing integration)
+  app.get("/api/payment/check-user/:systemId?", async (req, res) => {
+    try {
+      const systemId = req.params.systemId || (req.query.systemId as string) || (req.query.id as string);
+      if (!systemId) {
+        return res.status(400).json({ success: false, error: "systemId talab qilinadi" });
+      }
+      const user = await findUserBySystemId(systemId);
+      if (!user) {
+        return res.status(404).json({ success: false, error: "Foydalanuvchi topilmadi" });
+      }
+      res.json({
+        success: true,
+        user: {
+          systemId: user.systemId,
+          displayName: user.displayName,
+          role: user.role,
+          ball: user.ball,
+          balance: user.balance,
+        },
+      });
+    } catch (e: any) {
+      console.error("[CheckUser API] Error:", e);
+      res.status(500).json({ success: false, error: e.message });
+    }
   });
 
+  // Official Click Merchant API Endpoint
+  app.post("/api/payment/click", async (req, res) => {
+    try {
+      const response = await handleClickRequest(req.body);
+      res.json(response);
+    } catch (e: any) {
+      console.error("[Click API] Exception:", e);
+      res.json({ error: -9, error_note: e.message });
+    }
+  });
+
+  // Official Payme JSON-RPC 2.0 API Endpoint
+  app.post("/api/payment/payme", async (req, res) => {
+    try {
+      const response = await handlePaymeRequest(req.body);
+      res.json(response);
+    } catch (e: any) {
+      console.error("[Payme API] Exception:", e);
+      res.json({
+        error: { code: -32603, message: { uz: "Tizim xatosi", ru: "Системная ошибка", en: "Internal error" } },
+        id: req.body?.id || null,
+      });
+    }
+  });
+
+  // Generic Payment Callback Endpoint
   app.post("/api/payment/callback/:provider", async (req, res) => {
     const { provider } = req.params;
-    const body = req.body;
-    console.log(`Received ${provider} payment callback:`, body);
-    
-    // Verify signature, check transaction status, and update user balance in Firestore
-    // This endpoint should be accessible by Click/Payme servers
-    
+    const providerLower = provider.toLowerCase();
+    if (providerLower === "click") {
+      const response = await handleClickRequest(req.body);
+      return res.json(response);
+    }
+    if (providerLower === "payme") {
+      const response = await handlePaymeRequest(req.body);
+      return res.json(response);
+    }
     res.json({ status: "ok" });
   });
 
@@ -321,7 +388,7 @@ app.get("/api/health", (req, res) => {
       }
       
       const response = await generateContentWithRotation({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         contents: "Salom, bu test xabari. Iltimos 'OK' deb javob bering."
       });
       
@@ -403,7 +470,7 @@ app.get("/api/health", (req, res) => {
         }
       }
 
-      const MODEL_NAME = "gemini-2.0-flash";
+      const MODEL_NAME = "gemini-3.6-flash";
 
       if (action === "parseTestWithGemini") {
         const { htmlText } = req.body;
@@ -676,10 +743,8 @@ app.get("/api/health", (req, res) => {
             `;
           }
 
-          prompt = `Siz AIEDUTIZIM Telegram Bot ichidagi AI Yordamchi modulida ishlovchi professional sun'iy intellekt yordamchisiz hamda oliy ta'lim muassasalari uchun professional ilmiy rahbar va akademik ekspertsiz.
+          prompt = `Sen O'zbekiston oliy ta'lim tizimi standartlariga mos "kurs ishi" (course paper) yozuvchi ilmiy-akademik yordamchisan. Foydalanuvchi kiritgan mavzu, universitet nomi, fakultet, kafedra, yo'nalish, talaba F.I.Sh, ilmiy rahbar F.I.Sh kabi ma'lumotlar asosida to'liq, original, ilmiy jihatdan puxta kurs ishi generatsiya qilishing kerak.
 
-          Vazifa: Foydalanuvchi tomonidan kiritilgan mavzu asosida universitet talablariga mos, topshirishga tayyor, ilmiy uslubdagi kurs ishini yarating.
-          
           Mavzu: "${topic}". 
           Tashkiliy ma'lumotlar:
           - OTM nomi: ${university}
@@ -690,69 +755,37 @@ app.get("/api/health", (req, res) => {
           - Ilmiy rahbar: ${advisor}
           - Tanlangan hajm: ${targetPages} sahifa (${modeDescription})
 
-          KURS ISHI TALABLARI:
-          - Referat shaklida yozmang.
-          - Akademik uslubga qat'iy amal qiling, xolis ilmiy tildan foydalaning (noakademik va shaxsiy qarashlarni bildiruvchi yengil iboralar ishlatilmasin).
-          - Ilmiy terminlardan professional darajada foydalaning.
-          - Takroriy jumlalardan qoching.
-          - Har bir bob chuqur tahlil asosida yozilsin va kamida 1000-2000 so'zdan iborat bo'lsin.
-          - Statistik ma'lumotlar keltiring.
-          - Zarur joylarda jadval tavsiyalari kiriting.
-          - Zarur joylarda diagramma tavsiyalari kiriting.
-          - Har bir bob yakunida alohida bob xulosasi yozilsin.
-          - Amaliy tavsiyalar kiriting.
-          - Natija universitetga topshirishga to'liq tayyor bo'lsin.
+          QAT'IY QOIDALAR (hech qachon buzilmasin):
+
+          1. ISM-FAMILIYALARNI TO'G'RI FORMATLA: Talaba va rahbar F.I.Sh doim odatiy grammatik qoidada — har bir so'zning faqat birinchi harfi katta, qolgani kichik (masalan: "Ortiqov Elyorbek", "Bekchanova Sh."). HECH QACHON "oRTIQOV eLYORBEK" kabi teskari case ishlatma. Universitet, fakultet, kafedra nomlarini ham standart Sarlavha holatida yoz (barcha harflarni bosh harf bilan YOZMA, faqat rasmiy qisqartmalar — ChDPU kabi — bundan mustasno).
+
+          2. HAR BIR SARLAVHA FAQAT BIR MARTA CHIQSIN: "MUNDARIJA", "KIRISH", "XULOSA" kabi bo'lim sarlavhalarini takrorlama. Har bir bo'lim sarlavhasi hujjatda faqat bitta joyda, bitta marta paydo bo'lsin.
+
+          3. METADATA/XIZMAT MA'LUMOTLARINI HUJJAT MATNIGA QO'SHMA: "Mavzu: ... Rahbar: ... Sahifalar: 30" kabi ichki xulosa-kartochkalarni yoki har qanday texnik/debug xarakteridagi qatorlarni yakuniy hujjat matniga hech qachon kiritma. Faqat foydalanuvchi ko'rishi kerak bo'lgan rasmiy kurs ishi matnini chiqar.
+
+          4. SXEMA VA JARAYONLARNI MATN-SAN'AT (ASCII-art) KO'RINISHIDA CHIZMA: Agar bosqichlar ketma-ketligini, jarayon oqimini yoki taqqoslashni ko'rsatish kerak bo'lsa — buni doim JADVAL (Markdown table yoki so'zma-so'z ro'yxat: "1-bosqich → 2-bosqich → ...") ko'rinishida ber. Kvadrat qavs, chiziq (---), o'q belgisi (▼, →) kabi belgilardan iborat "quti-diagramma" yaratma — bu Word'ga o'tkazilganda tartibsiz matn bo'lib qoladi.
+
+          5. ILMIY JIHATDAN PUXTALIK:
+             - Har bir bobda kamida 2-3 ta haqiqiy yoki ishonchli tarzda umumlashtirilgan ilmiy nazariya/muallifga tayanish (masalan pedagogika uchun: Vygotsky, Gilford, Torrance, mahalliy olimlar).
+             - Fikrlarni asossiz umumlashtirmasdan, sabab-natija bog'lanishi orqali yoz.
+             - Har bir bob oxirida qisqa oraliq xulosa bo'lsin.
+             - Adabiyotlar ro'yxatini turkumlarga bo'l: (I) qonun hujjatlari, (II) darslik/monografiyalar, (III) ilmiy maqolalar/dissertatsiyalar, (IV) xorijiy manbalar, (V) elektron resurslar — har biri to'g'ri bibliografik formatda (muallif, nomi, shahar, nashriyot, yil, sahifa).
+             - O'zbekiston me'yoriy-huquqiy hujjatlariga (qonun, farmon, qaror) real sana va raqamlar bilan murojaat qil; agar aniq bilmasang, umumiy holatda ("tegishli me'yoriy hujjatlarga ko'ra" kabi) yoz, o'ylab topilgan sana/raqam bermaslik lozim.
+
+          6. STRUKTURA (standart 25-35 sahifa uchun):
+             - Titul varaq (universitet, fakultet, kafedra, "KURS ISHI", mavzu, fan, F.I.Sh talaba/rahbar, shahar-yil)
+             - Mundarija (bir marta)
+             - Kirish (dolzarblik, muammo, obyekt, predmet, maqsad, vazifalar, ilmiy yangilik, metodlar, baza)
+             - I BOB — nazariy asoslar (2 ta kichik bo'lim)
+             - II BOB — amaliy holat tahlili (2 ta kichik bo'lim)
+             - III BOB — takomillashtirish/tavsiyalar (2 ta kichik bo'lim)
+             - Xulosa
+             - Ilmiy-amaliy tavsiyalar
+             - Foydalanilgan adabiyotlar ro'yxati (turkumlangan, kamida ${minSources} ta manba)
+
+          7. USLUB: rasmiy-ilmiy uslub, birinchi shaxsda emas ("biz" yoki betaraf uchinchi shaxs), ortiqcha reklama iboralarisiz ("ajoyib", "zo'r" kabi so'zlarsiz), aniq va tekshirilishi mumkin bo'lgan fikrlar bilan.
+
           ${additionalGuidelines}
-
-          KURS ISHI TUZILISHI:
-          
-          1. TITUL VARAQ
-             - OTM nomi: ${university}
-             - Fakultet: ${faculty}
-             - Kafedra: ${department}
-             - Yo'nalish: ${direction}
-             - Kurs ishi mavzusi: "${topic.toUpperCase()}"
-             - Talaba F.I.Sh.: ${studentName}
-             - Rahbar F.I.Sh.: ${advisor}
-             - Shahar va yil: Toshkent - 2026
-
-          2. MUNDARIJA
-          
-          3. KIRISH:
-             Quyidagilar alohida sarlavhalar ostida juda keng bayon etilsin:
-             - Mavzuning dolzarbligi
-             - Tadqiqot maqsadi
-             - Tadqiqot vazifalari
-             - Tadqiqot obyekti
-             - Tadqiqot predmeti
-             - Tadqiqot metodlari
-             - Nazariy ahamiyati
-             - Amaliy ahamiyati
-             - Ishning tuzilishi
-
-          4. I BOB: NAZARIY VA METODOLOGIK ASOSLARI
-             - Nazariy asoslar, ilmiy qarashlar va asosiy tushunchalar.
-             - Mahalliy va xorijiy tajribalar, mavzuning ilmiy tahlili.
-             - Kamida 4-5 ta bo'lim bo'lishi shart (50 sahifa rejimda kamida 5 ta bo'lim).
-             - Bob yakunida batafsil bob xulosasi yozilsin.
-
-          5. II BOB: AMALIY TAHLIL VA EKSPERIMENTAL NATIJALAR
-             - Amaliy tahlil, mavjud holat, statistik ma'lumotlar va muammolar tahlili.
-             - Excel jadvallari va diagrammalar tavsiyasi/izohi kiritilsin.
-             - Kamida 4-5 ta bo'lim bo'lishi shart (50 sahifa rejimda kamida 5 ta bo'lim).
-             - Bob yakunida batafsil bob xulosasi yozilsin.
-
-          6. III BOB: SOHANI TAKOMILLASHTIRISH VA RIVOJLANISH ISTIQBOLLARI
-             - Takomillashtirish yo'llari, innovatsion yondashuvlar, amaliy tavsiyalar va rivojlanish istiqbollari.
-             - Muallif takliflari va modellari.
-             - Kamida 4-5 ta bo'lim bo'lishi shart (50 sahifa rejimda kamida 5 ta bo'lim).
-             - Bob yakunida batafsil bob xulosasi yozilsin.
-
-          7. UMUMIY XULOSA
-             - Tadqiqot natijalari, asosiy qisqa xulosalar va amaliy tavsiyalar mantiqiy tarzda batafsil yoritilsin.
-
-          8. FOYDALANILGAN ADABIYOTLAR RO'YXATI
-             - Kamida ${minSources} ta zamonaviy ilmiy manbalar (kitoblar, akademik jurnallar, OAK jurnallari), to'liq bibliografik me'yorlarda (Muallif, kitob nomi, nashriyot, yil, sahifalar) ko'rsatilsin.
 
           Placeholder ([...]) qoldirmang, talabalik ishi me'yorlari va pedagogik/ilmiy me'yorlarga to'liq amal qiling.`;
         } else if (docType === "tezis") {
@@ -863,7 +896,7 @@ app.get("/api/health", (req, res) => {
           finalJson = await generateKursIshiMultiStep(topic, options);
         } else {
           const response = await generateContentWithRotation({
-            model: "gemini-2.0-flash",
+            model: "gemini-3.6-flash",
             contents: prompt,
             config: {
               maxOutputTokens: 16384,
@@ -944,7 +977,7 @@ app.get("/api/health", (req, res) => {
       }
 
       const response = await generateContentWithRotation({
-        model: model || "gemini-2.0-flash",
+        model: model || "gemini-3.6-flash",
         contents: prompt
       });
 
@@ -1132,7 +1165,7 @@ Agar foydalanuvchi ma'muriyat (admin) bilan bevosita bog'lanish istagini bildirs
       const getResponse = async (contents) => {
           try {
              return await generateContentWithRotation({
-               model: "gemini-3.5-flash",
+               model: "gemini-3.6-flash",
                contents: contents,
                config: {
                  maxOutputTokens: 4096,
