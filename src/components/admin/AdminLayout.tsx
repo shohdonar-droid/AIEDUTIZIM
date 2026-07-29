@@ -77,6 +77,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
     ]},
     { id: 'billing', name: 'Billing', icon: Wallet, subItems: [
         { name: 'Tariflar', path: '/admin/billing' },
+        { name: 'Monitoring', path: '/admin/billing/monitoring' },
         { name: 'Faol obunalar', path: '/admin/active-subscriptions' },
         { name: 'To\'lovlar tarixi', path: '/admin/payment-history' },
         { name: 'Ulanish so\'rovlari', path: '/admin/connection-requests' },

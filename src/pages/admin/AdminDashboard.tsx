@@ -17,6 +17,7 @@ import AdminJurnal from './AdminJurnal';
 import AdminCertificates from './AdminCertificates';
 import AdminNotifications from './AdminNotifications';
 import AdminBilling from './AdminBilling';
+import AdminBillingMonitoring from './AdminBillingMonitoring';
 import AdminActiveSubscriptions from './AdminActiveSubscriptions';
 import AdminBotUsers from './AdminBotUsers';
 import AdminBot from './AdminBot';
@@ -108,6 +109,7 @@ export default function AdminDashboard() {
         
         {/* Billing */}
         <Route path="/billing" element={<AdminBilling />} />
+        <Route path="/billing/monitoring" element={<AdminBillingMonitoring />} />
         <Route path="/active-subscriptions" element={<AdminActiveSubscriptions />} />
         <Route path="/payment-history" element={<AdminPaymentHistory />} />
         <Route path="/connection-requests" element={<AdminServices />} />
