@@ -125,6 +125,108 @@ nato'g'ri_variant`;
   const [examPreviewQuestions, setExamPreviewQuestions] = useState<Question[]>([]);
   const [generatingPreview, setGeneratingPreview] = useState(false);
 
+  const autoFormatTextToTestTemplate = (rawText: string): string => {
+    if (!rawText.trim()) return rawText;
+    if (rawText.includes('++++') && rawText.includes('====')) return rawText;
+
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return rawText;
+
+    let result = '';
+    let currentQ = '';
+    let currentOpts: { text: string; isCorrect: boolean }[] = [];
+
+    const flushQuestion = () => {
+      if (currentQ && currentOpts.length > 0) {
+        result += `++++\n${currentQ}\n`;
+        let hasCorrect = currentOpts.some(o => o.isCorrect);
+        currentOpts.forEach((opt, idx) => {
+          const mark = opt.isCorrect || (!hasCorrect && idx === 0) ? '#' : '';
+          result += `====\n${mark}${opt.text}\n`;
+        });
+        result += `====\n\n`;
+      }
+    };
+
+    const isOptLine = (line: string) => {
+      return /^([#\*\+])?\s*([A-Da-d1-4][\)\.]|\*|\+|#)\s+/.test(line) || /^([#\*\+])\s*[^\s]/.test(line);
+    };
+
+    const parseOptLine = (line: string) => {
+      const isCorrect = line.startsWith('#') || line.startsWith('*') || line.startsWith('+');
+      let text = line.replace(/^[#\*\+]\s*/, '').replace(/^[A-Da-d1-4][\)\.]\s*/, '').trim();
+      return { text, isCorrect };
+    };
+
+    const isQLine = (line: string) => {
+      return /^(\d+[\)\.]|\d+-savol|savol\s*\d+|[Qq]\d+[\)\.])/i.test(line);
+    };
+
+    for (const line of lines) {
+      if (isOptLine(line)) {
+        currentOpts.push(parseOptLine(line));
+      } else if (isQLine(line)) {
+        flushQuestion();
+        currentQ = line.replace(/^(\d+[\)\.]|\d+-savol|savol\s*\d+|[Qq]\d+[\)\.])\s*/i, '').trim() || line;
+        currentOpts = [];
+      } else {
+        if (currentOpts.length > 0) {
+          currentOpts[currentOpts.length - 1].text += ' ' + line;
+        } else if (currentQ) {
+          currentQ += ' ' + line;
+        } else {
+          currentQ = line;
+        }
+      }
+    }
+    flushQuestion();
+
+    return result.trim() || rawText;
+  };
+
+  const processDocxFileToTestText = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      throw new Error("Fayl bo'sh!");
+    }
+
+    const mammoth = await import('mammoth');
+    
+    // 1. Extract raw text cleanly (preserves linebreaks & paragraphs)
+    const rawResult = await mammoth.extractRawText({ arrayBuffer });
+    const rawText = (rawResult.value || "").trim();
+
+    if (!rawText) {
+      throw new Error("Word faylidan matn o'qib bo'lmadi.");
+    }
+
+    // 2. If text is already in ++++ and ==== format, return directly
+    if (rawText.includes('++++') && rawText.includes('====')) {
+      return rawText;
+    }
+
+    // 3. Try Gemini AI parsing with clean raw text (no huge base64 images)
+    try {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'parseTestWithGemini', htmlText: rawText })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.text && data.text.trim()) {
+          return data.text;
+        }
+      }
+    } catch (err) {
+      console.warn("[Docx Parser] Gemini AI parsing call failed, using local format fallback:", err);
+    }
+
+    // 4. Fallback: Local regex format converter
+    const localFormatted = autoFormatTextToTestTemplate(rawText);
+    return localFormatted;
+  };
+
   const parseExamManualText = () => {
     if (!examManualText.trim()) return;
     
@@ -934,69 +1036,16 @@ nato'g'ri_variant`;
                       accept=".docx"
                       onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
-                          setIsFileUploaded(true);
                           const file = e.target.files[0];
-                          const reader = new FileReader();
-                          reader.onload = async (event) => {
-                            try {
-                              const arrayBuffer = event.target?.result as ArrayBuffer;
-                              console.log("File loaded. ArrayBuffer size:", arrayBuffer.byteLength);
-                              if (arrayBuffer.byteLength === 0) {
-                                throw new Error("File is empty");
-                              }
-                              const mammoth = await import('mammoth');
-                              const result = await mammoth.convertToHtml({ 
-                                arrayBuffer: arrayBuffer,
-                                convertImage: mammoth.images.imgElement(async (image: any) => {
-                                  const buffer = await image.read("base64");
-                                  return { src: `data:${image.contentType};base64,${buffer}` };
-                                })
-                              } as any);
-                              
-                              const tempDiv = document.createElement('div');
-                              tempDiv.innerHTML = result.value;
-                              
-                              // Remove style tags
-                              tempDiv.querySelectorAll('style').forEach(s => s.remove());
-                              
-                              // Replace br with newline
-                              tempDiv.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
-                              
-                              // Send textContent to backend to remove other HTML tags
-                              const textToParse = tempDiv.textContent || "";
-                              
-                              let response;
-                              let data;
-                              let retries = 2;
-                              while (retries >= 0) {
-                                response = await fetch('/api/gemini', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ action: 'parseTestWithGemini', htmlText: textToParse })
-                                });
-                                data = await response.json();
-                                if ((response.status === 429 || response.status === 503) && retries > 0) {
-                                  await new Promise(r => setTimeout(r, 10000));
-                                  retries--;
-                                  continue;
-                                }
-                                break;
-                              }
-                              
-                              if (data.text) {
-                                setManualText(data.text);
-                                setIsFileUploaded(true);
-                              } else {
-                                setIsFileUploaded(false);
-                                throw new Error(data.error || "Parsingda xatolik");
-                              }
-                            } catch (err) {
-                              setIsFileUploaded(false);
-                              console.error("Mammoth error details:", err);
-                              alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang. Xato: " + err);
-                            }
-                          };
-                          reader.readAsArrayBuffer(file);
+                          try {
+                            setIsFileUploaded(true);
+                            const parsedText = await processDocxFileToTestText(file);
+                            setManualText(parsedText);
+                          } catch (err: any) {
+                            setIsFileUploaded(false);
+                            console.error("Docx parse error:", err);
+                            alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang. Xato: " + (err?.message || err));
+                          }
                         }
                       }}
                       className="w-full px-5 py-3 rounded-xl bg-white border-2 border-gray-200 text-sm font-medium text-gray-600"
@@ -1392,56 +1441,25 @@ nato'g'ri_variant`;
                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Matn shakldagi savollar</label>
                        <p className="text-sm text-gray-500 mb-2">Barcha talabalar uchun yagona statik savollar to'plamini kiriting.</p>
                        
-                       <input 
-                         type="file" 
-                         accept=".docx"
-                         onChange={async (e) => {
-                           if (e.target.files && e.target.files[0]) {
-                             setExamFileUploaded(true);
-                             const file = e.target.files[0];
-                             const reader = new FileReader();
-                             reader.onload = async (event) => {
-                               try {
-                                 const arrayBuffer = event.target?.result as ArrayBuffer;
-                                 const mammoth = await import('mammoth');
-                                  const docxOpts: any = { arrayBuffer, convertImage: (mammoth as any).images?.imgElement(async (image: any) => { const buffer = await image.read("base64"); return { src: `data:${image.contentType};base64,${buffer}` }; }) };
-                                  const result = await mammoth.convertToHtml(docxOpts);
-                                 let response;
-                                 let data;
-                                 let retries = 2;
-                                 while (retries >= 0) {
-                                   response = await fetch('/api/gemini', {
-                                     method: 'POST',
-                                     headers: { 'Content-Type': 'application/json' },
-                                     body: JSON.stringify({ action: 'parseTestWithGemini', htmlText: result.value })
-                                   });
-                                   data = await response.json();
-                                   if ((response.status === 429 || response.status === 503) && retries > 0) {
-                                     await new Promise(r => setTimeout(r, 10000));
-                                     retries--;
-                                     continue;
-                                   }
-                                   break;
-                                 }
-                                 
-                                 if (data.text) {
-                                   setExamManualText(data.text);
-                                   setExamFileUploaded(true);
-                                 } else {
-                                   setExamFileUploaded(false);
-                                   throw new Error(data.error || "Parsingda xatolik");
-                                 }
-                               } catch (err) {
-                                 setExamFileUploaded(false);
-                                 console.error("Mammoth error:", err);
-                                 alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang.");
-                               }
-                             };
-                             reader.readAsArrayBuffer(file);
-                           }
-                         }}
-                         className="w-full px-5 py-3 rounded-xl bg-white border-2 border-gray-200 text-sm font-medium text-gray-600"
-                       />
+                        <input 
+                          type="file" 
+                          accept=".docx"
+                          onChange={async (e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              try {
+                                setExamFileUploaded(true);
+                                const parsedText = await processDocxFileToTestText(file);
+                                setExamManualText(parsedText);
+                              } catch (err: any) {
+                                setExamFileUploaded(false);
+                                console.error("Docx parse error:", err);
+                                alert("Faylni o'qib bo'lmadi. Iltimos, haqiqiy .docx faylni tanlang. Xato: " + (err?.message || err));
+                              }
+                            }
+                          }}
+                          className="w-full px-5 py-3 rounded-xl bg-white border-2 border-gray-200 text-sm font-medium text-gray-600"
+                        />
 
                        {!examFileUploaded && (
                         <textarea
