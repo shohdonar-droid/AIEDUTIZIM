@@ -6571,8 +6571,15 @@ bot.on("supergroup_chat_created", async (ctx) => {
 });
 
 bot.catch((err: any, ctx) => {
-  console.error(`[Telegraf Global Catch] Fault in processing update ${ctx.update?.update_id || "unknown"}:`, err);
-  ctx.reply("⚠️ Tizimda kichik uzilish kuzatildi. Iltimos, xabaringizni qaytadan yuboring.").catch(() => {});
+  const errMsg = err?.message || String(err);
+  if (errMsg.includes("409") || errMsg.includes("Conflict")) {
+    console.warn("⚠️ [Telegraf Catch] 409 Conflict ignored (another instance active).");
+    return;
+  }
+  console.error(`[Telegraf Global Catch] Fault in processing update ${ctx?.update?.update_id || "unknown"}:`, err);
+  if (ctx && typeof ctx.reply === "function") {
+    ctx.reply("⚠️ Tizimda kichik uzilish kuzatildi. Iltimos, xabaringizni qaytadan yuboring.").catch(() => {});
+  }
 });
 
 function startSelfPing() {
@@ -6680,44 +6687,81 @@ export async function launchBot() {
     pollDatabaseNotifications();
   }
 
+  let isLaunching = false;
+  let retryTimer: any = null;
+
   async function triggerBotLaunch() {
+    if (isLaunching) return;
+    isLaunching = true;
+
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
     const useWebhook = process.env.USE_WEBHOOK === "true";
     const appUrl = process.env.APP_URL || "";
     const webhookUrl = `${appUrl}/api/telegram-webhook`;
 
+    try {
+      bot.stop("RELAUNCH");
+    } catch (e) {}
+
     if (useWebhook && appUrl) {
       try {
-        await bot.telegram.setWebhook(webhookUrl);
+        await bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
         console.log(`[Telegram Bot] Webhook set successfully to ${webhookUrl}`);
       } catch (err: any) {
         console.error(`[Telegram Bot] Webhook setup failed: ${err?.message || err}. Falling back to polling.`);
         try {
-          await bot.telegram.deleteWebhook({ drop_pending_updates: false });
+          await bot.telegram.deleteWebhook({ drop_pending_updates: true });
         } catch (e) {}
-        bot.launch().catch((launchErr: any) => {
+        try {
+          await bot.launch({ dropPendingUpdates: true });
+          console.log("✅ [Telegram Bot] Bot launched (fallback polling)!");
+        } catch (launchErr: any) {
           console.error("[Telegram Bot Polling Error]", launchErr?.message || launchErr);
-        });
+        }
+      } finally {
+        isLaunching = false;
       }
     } else {
       try {
-        // Clear any old/active webhook on Telegram servers to avoid 409 Conflict
-        await bot.telegram.deleteWebhook({ drop_pending_updates: false });
-        console.log("[Telegram Bot] Cleared old webhook. Launching long polling...");
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        console.log("[Telegram Bot] Cleared old webhook & pending updates. Launching long polling...");
       } catch (e: any) {
         console.warn("[Telegram Bot] deleteWebhook warning:", e?.message || e);
       }
 
-      bot.launch().then(() => {
+      try {
+        await bot.launch({ dropPendingUpdates: true });
         console.log("✅ [Telegram Bot] Bot launched and listening for updates!");
-      }).catch((err: any) => {
-        console.error("❌ [Telegram Bot Launch Error]", err?.message || err);
-        if (err?.response?.error_code === 409) {
-          console.warn("⚠️ [Telegram Bot] Conflict 409. Retrying in 10s...");
-          setTimeout(triggerBotLaunch, 10000);
+      } catch (err: any) {
+        const errMsg = err?.message || String(err);
+        const isConflict = err?.response?.error_code === 409 || errMsg.includes("409") || errMsg.includes("Conflict");
+
+        try {
+          bot.stop("LAUNCH_ERROR");
+        } catch (e) {}
+
+        if (isConflict) {
+          console.warn("⚠️ [Telegram Bot] 409 Conflict: another instance is active. Retrying polling in 15s...");
+          isLaunching = false;
+          retryTimer = setTimeout(() => {
+            triggerBotLaunch();
+          }, 15000);
+          return;
         } else {
-          setTimeout(triggerBotLaunch, 5000);
+          console.error("❌ [Telegram Bot Launch Error]", errMsg);
+          isLaunching = false;
+          retryTimer = setTimeout(() => {
+            triggerBotLaunch();
+          }, 10000);
+          return;
         }
-      });
+      } finally {
+        isLaunching = false;
+      }
     }
 
     bot.telegram.setChatMenuButton({
@@ -6726,6 +6770,15 @@ export async function launchBot() {
   }
 
   triggerBotLaunch();
-  process.once("SIGINT", () => bot.stop("SIGINT"));
-  process.once("SIGTERM", () => bot.stop("SIGTERM"));
+
+  const handleStop = (signal: string) => {
+    console.log(`[Telegram Bot] Gracefully stopping bot due to ${signal}...`);
+    try {
+      bot.stop(signal);
+    } catch (e) {}
+  };
+
+  process.once("SIGINT", () => handleStop("SIGINT"));
+  process.once("SIGTERM", () => handleStop("SIGTERM"));
+  process.once("beforeExit", () => handleStop("beforeExit"));
 }
