@@ -18,7 +18,11 @@ import {
   Lock,
   Unlock,
   AlertCircle,
-  Plus
+  Plus,
+  Key,
+  CheckCircle,
+  XCircle,
+  RefreshCw
 } from "lucide-react";
 
 export default function AdminBot() {
@@ -32,6 +36,17 @@ export default function AdminBot() {
   const [savingAdminId, setSavingAdminId] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
+  // Token management state
+  const [botTokenInput, setBotTokenInput] = useState("");
+  const [savingToken, setSavingToken] = useState(false);
+  const [testingToken, setTestingToken] = useState(false);
+  const [tokenStatus, setTokenStatus] = useState<{
+    tested: boolean;
+    valid: boolean;
+    message: string;
+    botInfo?: { id: number; username?: string; first_name?: string };
+  }>({ tested: false, valid: false, message: "" });
+
   useEffect(() => {
     fetchUsers();
 
@@ -44,6 +59,9 @@ export default function AdminBot() {
           adminTelegramId: data.adminTelegramId || ""
         });
         setNewAdminId(data.adminTelegramId || "");
+        if (data.botToken && !botTokenInput) {
+          setBotTokenInput(data.botToken);
+        }
 
         let assistantList: any[] = [];
         if (Array.isArray(data.adminTelegramIds)) {
@@ -60,6 +78,80 @@ export default function AdminBot() {
 
     return () => unsubBot();
   }, []);
+
+  const handleTestToken = async (overrideToken?: string) => {
+    const tokenToTest = (overrideToken || botTokenInput).trim();
+    if (!tokenToTest) {
+      setTokenStatus({
+        tested: true,
+        valid: false,
+        message: "Iltimos, Telegram Bot Tokenini kiriting!"
+      });
+      return;
+    }
+
+    setTestingToken(true);
+    setTokenStatus({ tested: false, valid: false, message: "" });
+
+    try {
+      const match = tokenToTest.match(/\d+:[A-Za-z0-9_-]+/);
+      const cleanToken = match ? match[0] : tokenToTest;
+
+      const res = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`);
+      const data = await res.json();
+
+      if (data.ok && data.result) {
+        setTokenStatus({
+          tested: true,
+          valid: true,
+          message: `✅ Telegram Bot muvaffaqiyatli ulangan! Bot: @${data.result.username || data.result.first_name}`,
+          botInfo: {
+            id: data.result.id,
+            username: data.result.username,
+            first_name: data.result.first_name
+          }
+        });
+      } else {
+        setTokenStatus({
+          tested: true,
+          valid: false,
+          message: `❌ Token faol emas (401 Unauthorized): ${data.description || "Noto'g'ri token"}`
+        });
+      }
+    } catch (err: any) {
+      setTokenStatus({
+        tested: true,
+        valid: false,
+        message: `❌ API so'rovda xatolik: ${err?.message || err}`
+      });
+    } finally {
+      setTestingToken(false);
+    }
+  };
+
+  const handleSaveBotToken = async () => {
+    const cleanToken = botTokenInput.trim();
+    if (!cleanToken) {
+      alert("Iltimos, Bot Tokenini kiriting!");
+      return;
+    }
+
+    setSavingToken(true);
+    try {
+      await setDoc(doc(db, "settings", "bot_settings"), {
+        botToken: cleanToken
+      }, { merge: true });
+
+      setSuccessMsg("Telegram Bot Token muvaffaqiyatli saqlandi!");
+      setTimeout(() => setSuccessMsg(""), 4000);
+      await handleTestToken(cleanToken);
+    } catch (e) {
+      console.error("Error saving Bot Token", e);
+      alert("Tokenni saqlashda xatolik yuz berdi.");
+    } finally {
+      setSavingToken(false);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
@@ -159,16 +251,82 @@ export default function AdminBot() {
       </div>
 
       {/* Control Card Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
+        {/* Token Card */}
+        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+              <Key className="text-amber-500" size={20} /> Telegram Bot Token (API Key)
+            </h3>
+            <p className="text-gray-500 text-xs mb-6 leading-relaxed">
+              BotFather bergan Tokenni kiriting va <b>"Tokenni Saqlash & Sinash"</b> tugmasini bosing. Agar bot javob bermasa, token eskirgan yoki bekor qilingan bo'lishi mumkin.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Bot Token
+                </label>
+                <input
+                  type="password"
+                  placeholder="Masalan: 8602426313:AAEnX9kh..."
+                  value={botTokenInput}
+                  onChange={(e) => setBotTokenInput(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white text-gray-800 font-mono"
+                />
+              </div>
+
+              {tokenStatus.tested && (
+                <div className={`p-3 rounded-2xl border text-xs font-medium ${
+                  tokenStatus.valid
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    : "bg-red-50 border-red-200 text-red-800"
+                }`}>
+                  <div className="flex items-center gap-2 font-bold mb-1">
+                    {tokenStatus.valid ? (
+                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-red-600 shrink-0" />
+                    )}
+                    <span>{tokenStatus.valid ? "Ulanish Muvaffaqiyatli" : "Ulanishda Xatolik"}</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">{tokenStatus.message}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 mt-6 flex flex-wrap gap-2 items-center justify-between">
+            <button
+              onClick={() => handleTestToken()}
+              disabled={testingToken || !botTokenInput.trim()}
+              className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition-all font-bold flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${testingToken ? "animate-spin" : ""}`} />
+              <span>Tekshirish</span>
+            </button>
+
+            <button
+              onClick={handleSaveBotToken}
+              disabled={savingToken || !botTokenInput.trim()}
+              className="text-xs bg-amber-600 text-white px-5 py-2.5 rounded-xl hover:bg-amber-700 disabled:opacity-50 transition-all font-bold flex items-center gap-2 shadow-sm"
+            >
+              {savingToken ? "Saqlanmoqda..." : "Saqlash va Ulash"}
+            </button>
+          </div>
+        </div>
+
         {/* Status Card */}
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            Status va Nazorat
-          </h3>
-          <p className="text-gray-500 text-xs mb-6Leading-relaxed">
-            Telegram bot ishini bir zumda to'xtatib turishingiz mumkin. Bot to'xtatilgan vaqtda foydalanuvchilar buyruqlariga dynamic tarzda javob bermaydi va API limiti tejaladi.
-          </p>
+        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              Status va Nazorat
+            </h3>
+            <p className="text-gray-500 text-xs mb-6 leading-relaxed">
+              Telegram bot ishini bir zumda to'xtatib turishingiz mumkin. Bot to'xtatilgan vaqtda foydalanuvchilar buyruqlariga dynamic tarzda javob bermaydi va API limiti tejaladi.
+            </p>
+          </div>
 
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
             <div className="flex flex-col">

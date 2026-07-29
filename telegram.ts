@@ -143,6 +143,23 @@ export async function broadcastBotResumed() {
 }
 
 let lastKnownPaused: boolean | null = null;
+let currentBotToken: string = sanitizeBotToken(process.env.TELEGRAM_BOT_TOKEN || "8602426313:AAEnX9khyPLZYFWrvvVRJqP5PRANqbD7i-I");
+
+export function updateActiveBotToken(newToken: string) {
+  const cleanToken = sanitizeBotToken(newToken);
+  if (cleanToken && cleanToken !== currentBotToken) {
+    currentBotToken = cleanToken;
+    if (globalT.bot) {
+      (globalT.bot.telegram as any).token = cleanToken;
+      console.log("[Telegram] Applied updated Telegram Bot token to Telegraf runtime.");
+      globalT.bot.telegram.getMe().then((me) => {
+        console.log(`✅ [Telegram Bot] Successfully connected to Telegram API as @${me.username}`);
+      }).catch((err) => {
+        console.error(`❌ [Telegram Bot] Token verification failed:`, err?.message || err);
+      });
+    }
+  }
+}
 
 if (db && process.env.VERCEL !== "1") {
   onSnapshot(doc(db, "settings", "bot_settings"), (snap) => {
@@ -157,6 +174,10 @@ if (db && process.env.VERCEL !== "1") {
       if (wasPaused === true && nextPaused === false) {
         console.log("[Telegram] Bot was resumed by admin. Initiating reload/resume union broadcast notifications...");
         broadcastBotResumed().catch((e) => console.error("Broadcast resumed fail: ", e));
+      }
+
+      if (data.botToken) {
+        updateActiveBotToken(data.botToken);
       }
 
       if (data.adminTelegramId) {
@@ -189,11 +210,8 @@ if (db && process.env.VERCEL !== "1") {
   });
 }
 
-const rawBotToken =
-  process.env.TELEGRAM_BOT_TOKEN ||
-  "8602426313:AAEnX9khyPLZYFWrvvVRJqP5PRANqbD7i-I";
-
 function sanitizeBotToken(raw: string): string {
+  if (!raw) return "";
   const match = raw.match(/\d+:[A-Za-z0-9_-]+/);
   if (match) {
     return match[0];
@@ -201,7 +219,7 @@ function sanitizeBotToken(raw: string): string {
   return raw.trim();
 }
 
-const botToken = sanitizeBotToken(rawBotToken);
+const botToken = currentBotToken;
 
 interface GlobalTelegram {
   bot?: Telegraf;
