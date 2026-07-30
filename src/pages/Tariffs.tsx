@@ -24,6 +24,9 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useAuth } from "../hooks/useAuth";
+import { activateTariffWithBalance } from '../lib/tariffService';
+import BalanceTopUpModal from '../components/BalanceTopUpModal';
+
 
 interface TariffConfig {
   name?: string;
@@ -142,8 +145,7 @@ export default function Tariffs() {
 
   // Connection request state
   const [selectedTariff, setSelectedTariff] = useState<TariffConfig | null>(null);
-  const [paymentType, setPaymentType] = useState('Click');
-  const [receiptUrl, setReceiptUrl] = useState('');
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Organization Signup Modal states
@@ -302,54 +304,34 @@ export default function Tariffs() {
     loadConfig();
   }, []);
 
-  const handleSubmitRequest = async () => {
+  const handleActivateTariff = async () => {
     if (!user) return alert('Iltimos, tizimga kiring');
-    if (!receiptUrl) return alert('Iltimos, chekni yuklang yoki rasm havolasini kiriting');
-    if (receiptUrl.length > 800 * 1024) {
-      return alert("Yuklangan chek rasmi hajmi juda katta! Iltimos, boshqa kichikroq o'lchamdagi chek rasmini yuklang.");
+    
+    // Refresh user balance to be sure
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const userData = userDoc.data();
+    const currentBalance = Number(userData?.balance ?? userData?.ball ?? 0);
+    const price = selectedTariff?.price || 0;
+
+    if (currentBalance < price) {
+      alert("Hisobingizdagi mablag' yetarli emas. Avval hisobingizni to'ldiring.");
+      setIsBalanceModalOpen(true);
+      return;
     }
+
     setIsSubmitting(true);
-    try {
-      const docRef = await addDoc(collection(db, 'connection_requests'), {
-        userId: user.uid,
-        userName: user.displayName || 'Noma\'lum',
-        tariffName: selectedTariff?.name || "Noma'lum",
-        tariffPrice: selectedTariff?.price || 0,
-        paymentType,
-        receiptUrl,
-        status: 'pending',
-        timestamp: serverTimestamp()
-      });
+    const result = await activateTariffWithBalance(
+      user.uid,
+      selectedTariff?.name?.toLowerCase() || 'tariff',
+      selectedTariff || {}
+    );
 
-      // Notify Telegram Admins
-      try {
-        fetch('/api/notify-connection-request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requestId: docRef.id,
-            data: {
-              userName: user.displayName || 'Noma\'lum',
-              tariffName: selectedTariff?.name || "Noma'lum",
-              tariffPrice: selectedTariff?.price || 0,
-              paymentType,
-              receiptUrl,
-              phone: user.phone || ""
-            }
-          })
-        });
-      } catch (e) {}
-
-      alert('Soʻrov yuborildi! Tez orada admin koʻrib chiqadi.');
+    setIsSubmitting(false);
+    if (result.success) {
+      alert(result.message);
       setSelectedTariff(null);
-      setReceiptUrl('');
-      setFileName('');
-      setFileSize('');
-    } catch (err) {
-      console.error(err);
-      alert('Soʻrov yuborishda xatolik yuz berdi: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      alert(result.message);
     }
   };
 
@@ -455,7 +437,7 @@ export default function Tariffs() {
             className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl"
           >
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Tarifga ulanish so'rovi</h3>
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Tarifni faollashtirish</h3>
               <button onClick={() => setSelectedTariff(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
             </div>
 
@@ -465,201 +447,19 @@ export default function Tariffs() {
                 <div className="text-lg font-black text-slate-800">{selectedTariff.name} — {(selectedTariff.price || 0).toLocaleString()} UZS / oy</div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">To'lov turini tanlang</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Click', 'Payme', 'Uzum Bank', 'Bank'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setPaymentType(type)}
-                      className={`py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all ${
-                        paymentType === type ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-200'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Payment Gateway UID Info & Direct Payment */}
-              {user && (
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-black text-amber-600 uppercase tracking-wider">Sizning Platforma ID (UID):</p>
-                      <p className="text-sm font-black font-mono text-amber-900 select-all">{user.uid}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(user.uid);
-                        alert("UID nusxalandi! " + paymentType + " ilovasiga o'tib ushbu ID orqali to'lov qilishingiz mumkin.");
-                      }}
-                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
-                    >
-                      Nusxalash
-                    </button>
-                  </div>
-                  <p className="text-[11px] font-bold text-amber-700 leading-tight">
-                    💡 <b>{paymentType}</b> ilovasiga kirib, xizmatlar ichidan bizning platformani qidiring va ushbu <b>UID</b> raqamingizni kiriting. Shuningdek, quyidagi tugma orqali to'g'ridan-to'g'ri to'lov sahifasiga o'tishingiz mumkin:
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const amount = selectedTariff.price || 0;
-                      let payUrl = "#";
-                      if (paymentType === 'Click') {
-                        payUrl = `https://my.click.uz/services/pay?id=12345&merchant_id=9999&amount=${amount}&transaction_param=${user.uid}`;
-                      } else if (paymentType === 'Payme') {
-                        payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&ac.user_id=${user.uid}&amount=${amount * 100}`;
-                      } else if (paymentType === 'Uzum Bank') {
-                        payUrl = `https://uzumbank.uz/pay?merchant_id=platform&account=${user.uid}&amount=${amount}`;
-                      } else {
-                        alert(`Karta raqamimiz (${cardSettings.number}) ga o'tkazma qiling.`);
-                        return;
-                      }
-                      window.open(payUrl, '_blank');
-                    }}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-xs uppercase tracking-widest shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    🚀 {paymentType} orqali onlayn to'lash
-                  </button>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">
-                  To'lov chekini jo'natish usuli
-                </label>
-                <div className="flex border border-gray-100 rounded-2xl bg-gray-50 p-1 mb-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReceiptTab('upload');
-                      setReceiptUrl('');
-                      setFileName('');
-                      setFileSize('');
-                      setFileError('');
-                    }}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                      receiptTab === 'upload' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                  >
-                    <ImageIcon className="w-4 h-4" />
-                    Fayl yuklash (Chizma/Chek)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReceiptTab('url');
-                      setReceiptUrl('');
-                      setFileName('');
-                      setFileSize('');
-                      setFileError('');
-                    }}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                      receiptTab === 'url' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                  >
-                    <LinkIcon className="w-4 h-4" />
-                    Havola (URL)
-                  </button>
-                </div>
-
-                {receiptTab === 'upload' ? (
-                  <div className="space-y-4">
-                    {!receiptUrl ? (
-                      <div
-                        onDragEnter={handleDrag}
-                        onDragOver={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDrop={handleDrop}
-                        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[140px] relative ${
-                          dragActive 
-                            ? 'border-blue-600 bg-blue-50 text-blue-600' 
-                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:border-slate-300'
-                        }`}
-                      >
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={e => e.target.files?.[0] && handleFileChange(e.target.files[0])}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <Upload className="w-8 h-8 mb-2.5 animate-bounce text-slate-400 group-hover:text-blue-500" />
-                        <p className="text-xs font-bold text-slate-600 mb-1">
-                          Chek rasmi yoki faylni sudrab o'tkazing
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          Yoki ustiga bosib kompyuterdan tanlang (Rasm/PDF formatlarida)
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          {receiptUrl.startsWith('data:image') ? (
-                            <img 
-                              src={receiptUrl} 
-                              alt="Chek preview" 
-                              className="w-12 h-12 rounded-lg object-cover bg-white border border-gray-100 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                              <FileText className="w-6 h-6" />
-                            </div>
-                          )}
-                          <div className="overflow-hidden">
-                            <p className="text-xs font-bold text-slate-800 truncate" title={fileName || 'chek_yuklandi.png'}>
-                              {fileName || 'Chek yuklandi'}
-                            </p>
-                            <p className="text-[10px] text-slate-400 font-bold font-mono">
-                              {fileSize || 'Oʻlchami nomaʻlum'}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReceiptUrl('');
-                            setFileName('');
-                            setFileSize('');
-                          }}
-                          className="p-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl transition-colors"
-                          title="O'chirish"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                    {fileError && (
-                      <p className="text-[10px] font-bold text-red-500 px-1">{fileError}</p>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <input 
-                      type="text" 
-                      value={receiptUrl}
-                      onChange={e => setReceiptUrl(e.target.value)}
-                      placeholder="https://example.com/rasm.png yoki google drive havolasi..."
-                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none text-sm font-medium"
-                    />
-                  </div>
-                )}
-              </div>
-
               <button 
-                onClick={handleSubmitRequest}
+                onClick={handleActivateTariff}
                 disabled={isSubmitting}
-                className="w-full py-5 rounded-3xl bg-blue-600 text-white font-black text-sm tracking-widest uppercase hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50"
+                className="w-full py-5 rounded-3xl bg-emerald-600 text-white font-black text-sm tracking-widest uppercase hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 active:scale-95 disabled:opacity-50"
               >
-                {isSubmitting ? 'Yuborilmoqda...' : 'Meni shu tarifga o\'tkazib bering'}
+                {isSubmitting ? 'Faollashtirilmoqda...' : 'Hisobdan yechib olish va faollashtirish'}
               </button>
             </div>
           </motion.div>
         </div>
       )}
+      
+      <BalanceTopUpModal isOpen={isBalanceModalOpen} onClose={() => setIsBalanceModalOpen(false)} />
 
       {/* Modal for New Organization Request (Guest) */}
       {showNewOrgModal && (
