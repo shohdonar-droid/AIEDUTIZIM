@@ -217,9 +217,10 @@ export default function TeacherBilling() {
           </div>
           <button 
             onClick={() => setIsBalanceModalOpen(true)}
-            className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all shrink-0"
+            className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-black uppercase text-[11px] tracking-widest hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20"
           >
-            <Wallet className="w-5 h-5" />
+            <Wallet className="w-4 h-4" />
+            Balansni to'ldirish
           </button>
         </div>
       </header>

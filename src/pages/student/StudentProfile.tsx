@@ -198,7 +198,7 @@ export default function StudentProfile() {
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1.5 font-bold">
-                  💡 Payme, Click yoki Uzum Bank ilovasida ushbu ID raqamingiz orqali to'g'ridan-to'g'ri balansni to'ldirishingiz mumkin.
+                  💡 Payme, Click, Paynet yoki Uzum Bank ilovasida ushbu ID raqamingiz orqali to'g'ridan-to'g'ri balansni to'ldirishingiz mumkin.
                 </p>
               </div>
               <div>

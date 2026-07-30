@@ -543,12 +543,12 @@ export default function Tariffs() {
 
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">To'lov turini tanlang</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['Click', 'Payme', 'Uzum Bank', 'Bank'].map(type => (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {['Click', 'Payme', 'Uzum Bank', 'Paynet', 'Bank'].map(type => (
                       <button
                         key={type}
                         onClick={() => setPaymentType(type)}
-                        className={`py-2 px-3 rounded-xl border-2 font-bold text-xs transition-all ${
+                        className={`py-2 px-3 rounded-xl border-2 font-bold text-[11px] sm:text-xs transition-all ${
                           paymentType === type ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-50 text-gray-400 hover:border-gray-100'
                         }`}
                       >
@@ -573,6 +573,9 @@ export default function Tariffs() {
                         payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&amount=${amount * 100}`;
                       } else if (paymentType === 'Uzum Bank') {
                         payUrl = `https://uzumbank.uz/pay?merchant_id=platform&amount=${amount}`;
+                      } else if (paymentType === 'Paynet') {
+                        alert("Paynet to'lovi uchun tizim administratoriga murojaat qiling yoki Paynet shoxobchalaridan to'lov qiling.");
+                        return;
                       } else {
                         alert(`Karta raqamimiz (${cardSettings.number}) ga o'tkazma qiling.`);
                         return;

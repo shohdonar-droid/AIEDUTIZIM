@@ -139,7 +139,7 @@ export default function TeacherProfile() {
                 </button>
               </div>
               <p className="text-[11px] text-gray-500 mt-1.5 font-bold">
-                💡 Payme, Click yoki Uzum Bank ilovasida ushbu 6 xonali ID raqamingiz orqali balansni to'ldirishingiz mumkin.
+                💡 Payme, Click, Paynet yoki Uzum Bank ilovasida ushbu 6 xonali ID raqamingiz orqali balansni to'ldirishingiz mumkin.
               </p>
             </div>
 
