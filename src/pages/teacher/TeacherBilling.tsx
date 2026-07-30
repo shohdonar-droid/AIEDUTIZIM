@@ -184,6 +184,17 @@ export default function TeacherBilling() {
 
   const handleUpgradeSubmit = async () => {
     if (!selectedTariff) return alert("Iltimos, tarifni tanlang.");
+
+    const price = selectedTariff.price || selectedTariff.basePrice || 0;
+    const currentBalance = Number((user as any)?.balance ?? (user as any)?.ball ?? 0);
+
+    if (currentBalance < price) {
+      alert("Sizning joriy balansingiz tarif reja to'loviga yetmaydi, balansingizni to'ldiring.");
+      setShowUpgradeModal(false);
+      setIsBalanceModalOpen(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const result = await activateTariffWithBalance(
@@ -210,9 +221,12 @@ export default function TeacherBilling() {
   };
 
   // Filter tariffs for upgrade (exclude current)
-  const upgradeOptions = Object.values(configs || defaultTariffs).filter((t: any) => 
-    t.name !== currentSubscription?.tariffName && ["START", "STANDARD", "PROFESSIONAL", "CORPORATE"].includes(t.name)
-  );
+  const upgradeOptions = Object.values(configs || defaultTariffs).filter((t: any) => {
+    const tName = t.name || "";
+    const currentName = currentSubscription?.tariffName || "";
+    return tName.toLowerCase() !== currentName.toLowerCase() && 
+           ["start", "standard", "professional", "corporate"].includes(tName.toLowerCase());
+  });
 
   if (loading) return <div className="p-8 text-center font-black">Yuklanmoqda...</div>;
 
@@ -366,14 +380,43 @@ export default function TeacherBilling() {
                        )}
                     </div>
 
-                 <button
-                  disabled={isSubmitting || !selectedTariff}
-                  onClick={handleUpgradeSubmit}
-                  className="w-full py-6 bg-blue-600 text-white rounded-3xl font-black text-sm tracking-[0.2em] uppercase shadow-2xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-4"
-                 >
-                    {isSubmitting ? "Yuborilmoqda..." : "Balansdan to'lash va faollashtirish"}
-                    <ArrowRight className="w-6 h-6" />
-                 </button>
+                 {(() => {
+                   const price = selectedTariff ? (selectedTariff.price || selectedTariff.basePrice || 0) : 0;
+                   const currentBalance = Number((user as any)?.balance ?? (user as any)?.ball ?? 0);
+                   const isEnough = selectedTariff ? currentBalance >= price : true;
+
+                   if (selectedTariff && !isEnough) {
+                     return (
+                       <div className="space-y-4">
+                         <div className="p-4 bg-red-50 text-red-600 rounded-2xl border border-red-100 flex flex-col items-center justify-center text-center">
+                           <p className="font-bold text-sm">Sizning joriy balansingiz tarif reja to'loviga yetmaydi.</p>
+                           <p className="text-xs mt-1">Yetishmayotgan summa: {(price - currentBalance).toLocaleString()} UZS</p>
+                         </div>
+                         <button
+                          onClick={() => {
+                            setShowUpgradeModal(false);
+                            setIsBalanceModalOpen(true);
+                          }}
+                          className="w-full py-4 md:py-6 bg-emerald-600 text-white rounded-3xl font-black text-xs md:text-sm tracking-[0.1em] md:tracking-[0.2em] uppercase shadow-xl shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2 md:gap-4"
+                         >
+                            Balansni to'ldirish
+                            <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
+                         </button>
+                       </div>
+                     );
+                   }
+
+                   return (
+                     <button
+                      disabled={isSubmitting || !selectedTariff}
+                      onClick={handleUpgradeSubmit}
+                      className="w-full py-4 md:py-6 bg-blue-600 text-white rounded-3xl font-black text-xs md:text-sm tracking-[0.1em] md:tracking-[0.2em] uppercase shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-2 md:gap-4"
+                     >
+                        {isSubmitting ? "Yuborilmoqda..." : "Balansdan to'lash va faollashtirish"}
+                        <ArrowRight className="w-5 h-5 md:w-6 md:h-6" />
+                     </button>
+                   );
+                 })()}
               </div>
            </motion.div>
         </div>
