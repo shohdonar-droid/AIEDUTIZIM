@@ -13,9 +13,12 @@ import {
   Trash2,
   Clock,
   ShieldCheck,
-  Award
+  Award,
+  Wallet
 } from "lucide-react";
 import { motion } from "motion/react";
+import BalanceTopUpModal from "../../components/BalanceTopUpModal";
+import { activateTariffWithBalance } from "../../lib/tariffService";
 
 interface TariffConfig {
   name: string;
@@ -70,6 +73,7 @@ export default function TeacherBilling() {
 
   // Modal states
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [selectedTariff, setSelectedTariff] = useState<any>(null);
   const [paymentType, setPaymentType] = useState('Click');
   const [receiptUrl, setReceiptUrl] = useState('');
@@ -162,47 +166,24 @@ export default function TeacherBilling() {
   };
 
   const handleUpgradeSubmit = async () => {
-    if (!selectedTariff || !receiptUrl) return alert("Iltimos, barcha ma'lumotlarni kiriting.");
+    if (!selectedTariff) return alert("Iltimos, tarifni tanlang.");
     setIsSubmitting(true);
     try {
-      const docRef = await addDoc(collection(db, "connection_requests"), {
-        userId: user?.uid,
-        userName: user?.displayName,
-        tariffName: selectedTariff.name,
-        tariffPrice: selectedTariff.price || selectedTariff.basePrice || 0,
-        paymentType,
-        receiptUrl,
-        status: "pending",
-        isUpgradeRequest: true,
-        currentTariff: currentSubscription?.tariffName || "Boshlang'ich",
-        timestamp: serverTimestamp()
-      });
+      const result = await activateTariffWithBalance(
+        user.uid,
+        selectedTariff?.name?.toLowerCase() || 'tariff',
+        selectedTariff as any
+      );
 
-      // Notify Telegram Admins
-      try {
-        fetch('/api/notify-connection-request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requestId: docRef.id,
-            data: {
-              userId: user?.uid,
-              userName: user?.displayName,
-              tariffName: selectedTariff.name,
-              tariffPrice: selectedTariff.price || selectedTariff.basePrice || 0,
-              paymentType,
-              receiptUrl,
-              isUpgradeRequest: true
-            }
-          })
-        });
-      } catch (e) {}
-
-      alert("So'rov yuborildi! Admin tasdiqlagandan so'ng tarifingiz yangilanadi.");
-      setShowUpgradeModal(false);
-      setSelectedTariff(null);
-      setReceiptUrl('');
-      setFileName('');
+      if (result.success) {
+        alert(result.message);
+        setShowUpgradeModal(false);
+        setSelectedTariff(null);
+        // We can reload the page or let the listener handle it (if any).
+        window.location.reload();
+      } else {
+        alert(result.message);
+      }
     } catch (err) {
       console.error(err);
       alert("Xatolik yuz berdi");
@@ -220,9 +201,27 @@ export default function TeacherBilling() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <header>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Tarif Boshqaruvi</h1>
-        <p className="text-gray-500 mt-2 text-sm font-medium">Hozirgi tarifingiz va obuna holati bilan tanishing</p>
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Tarif Boshqaruvi</h1>
+          <p className="text-gray-500 mt-2 text-sm font-medium">Hozirgi tarifingiz va obuna holati bilan tanishing</p>
+        </div>
+        
+        {/* Balance Section */}
+        <div className="flex items-center gap-4 bg-white px-6 py-4 rounded-3xl border border-gray-100 shadow-sm">
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Joriy balans</p>
+            <p className="text-xl font-black text-emerald-600">
+              {Number((user as any)?.balance ?? (user as any)?.ball ?? 0).toLocaleString('uz-UZ')} UZS
+            </p>
+          </div>
+          <button 
+            onClick={() => setIsBalanceModalOpen(true)}
+            className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all shrink-0"
+          >
+            <Wallet className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -318,9 +317,8 @@ export default function TeacherBilling() {
               </div>
 
               <div className="space-y-8">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Yangi Tarifni Tanlang</label>
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Yangi Tarifni Tanlang</label>
                        <select 
                         className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-gray-900 outline-none focus:ring-2 focus:ring-blue-600 appearance-none"
                         onChange={(e) => {
@@ -350,64 +348,24 @@ export default function TeacherBilling() {
                        )}
                     </div>
 
-                    <div className="space-y-4">
-                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">To'lov Usuli</label>
-                       <div className="grid grid-cols-2 gap-3">
-                          {['Click', 'Payme', 'Uzum Bank', 'Oson'].map(type => (
-                            <button
-                              key={type}
-                              onClick={() => setPaymentType(type)}
-                              className={`py-4 px-4 rounded-2xl border-2 font-black text-[10px] uppercase tracking-widest transition-all ${
-                                paymentType === type ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-200'
-                              }`}
-                            >
-                              {type}
-                            </button>
-                          ))}
-                       </div>
-                    </div>
-                 </div>
-
-                 <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                       <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-white rounded-3xl border border-gray-200 flex items-center justify-center shadow-sm shrink-0">
-                             <CreditCard className="w-8 h-8 text-gray-900" />
-                          </div>
-                          <div>
-                             <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Karta raqami</h4>
-                             <p className="text-xl font-black font-mono text-gray-950 tracking-wider mt-1">9860 2109 4567 8901</p>
-                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">S. O. ELYORBEK</p>
-                          </div>
-                       </div>
-                       
-                       <div className="w-full md:w-auto">
-                          <label className={`w-full md:w-auto h-16 px-8 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 cursor-pointer transition-all ${receiptUrl ? 'bg-green-50 border-green-500 text-green-600' : 'bg-white border-gray-200 text-gray-400 hover:border-blue-500'}`}>
-                             <input 
-                              type="file" 
-                              className="hidden" 
-                              accept="image/*"
-                              onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-                             />
-                             <Upload className="w-5 h-5" />
-                             <span className="text-xs font-black uppercase tracking-widest">{fileName ? "Chek Almashtir": "Chek Yuklash"}</span>
-                          </label>
-                          {fileName && <p className="text-[9px] font-bold text-center mt-2 text-gray-400 truncate max-w-[150px] mx-auto">{fileName}</p>}
-                       </div>
-                    </div>
-                 </div>
-
                  <button
-                  disabled={isSubmitting || !selectedTariff || !receiptUrl}
+                  disabled={isSubmitting || !selectedTariff}
                   onClick={handleUpgradeSubmit}
                   className="w-full py-6 bg-blue-600 text-white rounded-3xl font-black text-sm tracking-[0.2em] uppercase shadow-2xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-4"
                  >
-                    {isSubmitting ? "Yuborilmoqda..." : "Yuborish (Adminga so'rov)"}
+                    {isSubmitting ? "Yuborilmoqda..." : "Balansdan to'lash va faollashtirish"}
                     <ArrowRight className="w-6 h-6" />
                  </button>
               </div>
            </motion.div>
         </div>
+      )}
+
+      {isBalanceModalOpen && (
+        <BalanceTopUpModal 
+          isOpen={isBalanceModalOpen}
+          onClose={() => setIsBalanceModalOpen(false)}
+        />
       )}
     </div>
   );
