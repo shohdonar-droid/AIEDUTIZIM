@@ -147,6 +147,8 @@ export default function Tariffs() {
   const [selectedTariff, setSelectedTariff] = useState<TariffConfig | null>(null);
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentType, setPaymentType] = useState('Click');
+  const [receiptUrl, setReceiptUrl] = useState('');
 
   // New Organization Signup Modal states
   const [showNewOrgModal, setShowNewOrgModal] = useState<TariffConfig | null>(null);
@@ -323,7 +325,7 @@ export default function Tariffs() {
     const result = await activateTariffWithBalance(
       user.uid,
       selectedTariff?.name?.toLowerCase() || 'tariff',
-      selectedTariff || {}
+      (selectedTariff || {}) as any
     );
 
     setIsSubmitting(false);
@@ -428,6 +430,22 @@ export default function Tariffs() {
 
   return (
     <div className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-24">
+      {/* Balance Section */}
+      <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div>
+          <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">Joriy balans</h2>
+          <p className="text-3xl font-black text-emerald-600 mt-1">
+            {Number((user as any)?.balance ?? (user as any)?.ball ?? 0).toLocaleString('uz-UZ')} UZS
+          </p>
+        </div>
+        <button 
+          onClick={() => setIsBalanceModalOpen(true)}
+          className="px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 uppercase text-xs tracking-widest"
+        >
+          Hisobni to'ldirish
+        </button>
+      </div>
+
       {/* Modal for Connection Request */}
       {selectedTariff && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
