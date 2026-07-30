@@ -1359,36 +1359,7 @@ export default function AdminUsers() {
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 uppercase ml-1">
-                    Login
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
-                    placeholder="xodim_login"
-                    value={newStaff.login}
-                    onChange={(e) =>
-                      setNewStaff({ ...newStaff, login: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700 uppercase ml-1">
-                    Parol
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 outline-none transition-all font-medium"
-                    placeholder="******"
-                    value={newStaff.password}
-                    onChange={(e) =>
-                      setNewStaff({ ...newStaff, password: e.target.value })
-                    }
-                  />
-                </div>
+                {/* Manual login and password inputs removed as per request - now automatically generated */}
               </div>
               <div className="pt-4 flex gap-4">
                 <button
@@ -1463,46 +1434,8 @@ export default function AdminUsers() {
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">
-                    Login (Kirish u-n)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl"
-                    value={editingTeacher.login || ""}
-                    onChange={(e) =>
-                      setEditingTeacher({
-                        ...editingTeacher,
-                        login: e.target.value,
-                      })
-                    }
-                    disabled={!!editingTeacher.uid}
-                  />
-                  {editingTeacher.uid && (
-                    <p className="text-xs text-orange-500">
-                      Loginni o'zgartirib bo'lmaydi
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">
-                    Parol (123456...)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl"
-                    value={editingTeacher.password || ""}
-                    onChange={(e) =>
-                      setEditingTeacher({
-                        ...editingTeacher,
-                        password: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+                {/* Login removed for auto-generation */}
+                {/* Password removed for auto-generation */}
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">
                     Test generatsiyasi limiti
@@ -2324,48 +2257,7 @@ export default function AdminUsers() {
                     }
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-bold text-gray-700 block mb-1">
-                    Login
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    disabled={!!editingMustaqilTeacher.uid && !!editingMustaqilTeacher.login}
-                    placeholder="Login kiriting"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium disabled:opacity-50"
-                    value={editingMustaqilTeacher.login || ""}
-                    onChange={(e) =>
-                      setEditingMustaqilTeacher({
-                        ...editingMustaqilTeacher,
-                        login: e.target.value,
-                      })
-                    }
-                  />
-                  {editingMustaqilTeacher.uid && editingMustaqilTeacher.login && (
-                    <p className="text-xs text-orange-500 mt-1">
-                      Loginni o'zgartirib bo'lmaydi
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-sm font-bold text-gray-700 block mb-1">
-                    Parol
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Kamida 6 xonali parol"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-medium"
-                    value={editingMustaqilTeacher.password || ""}
-                    onChange={(e) =>
-                      setEditingMustaqilTeacher({
-                        ...editingMustaqilTeacher,
-                        password: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+                {/* Login and password removed for auto-generation */}
                 <div className="pt-2">
                   <button
                     type="button"
