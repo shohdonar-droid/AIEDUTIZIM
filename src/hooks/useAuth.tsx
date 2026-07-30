@@ -5,6 +5,7 @@ import { doc, getDoc, updateDoc, setDoc, addDoc, collection, query, where, getDo
 import safeOnSnapshot from '../lib/safeSnapshot';
 import { UserProfile } from '../types';
 import { generateSixCharId } from '../lib/helpers';
+import { getNextSequentialId, UserRoleIDType } from '../lib/idUtils';
 
 interface AuthContextType {
   user: (UserProfile & { isImpersonated?: boolean }) | null;
@@ -35,14 +36,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', targetUid));
       if (userDoc.exists()) {
         const udata = userDoc.data() as UserProfile;
-        let platformUid = udata.platformUid;
-        if (!platformUid || platformUid.length !== 6) {
-          platformUid = generateSixCharId();
+        let systemId = udata.systemId;
+        if (!systemId && udata.role) {
+          systemId = await getNextSequentialId(udata.role as UserRoleIDType);
           try {
-            await updateDoc(doc(db, 'users', targetUid), { platformUid });
+            await updateDoc(doc(db, 'users', targetUid), { systemId, login: systemId });
           } catch (e) {}
         }
-        const userWithUid = { ...udata, platformUid, uid: userDoc.id };
+        const userWithUid = { ...udata, systemId, login: udata.login || systemId, uid: userDoc.id };
         if (impId && udata.role === 'teacher') {
             // impersonated teacher
             setUser({ ...userWithUid, isImpersonated: true } as any);

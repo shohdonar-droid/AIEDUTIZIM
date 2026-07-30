@@ -122,12 +122,12 @@ export default function TeacherProfile() {
               </label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl font-black text-amber-800 select-all font-mono text-sm">
-                  {user?.platformUid || user?.uid}
+                  {user?.systemId || user?.uid}
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    const uIdToCopy = user?.platformUid || user?.uid;
+                    const uIdToCopy = user?.systemId || user?.uid;
                     if (uIdToCopy) {
                       navigator.clipboard.writeText(uIdToCopy);
                       alert("UID nusxalandi! To'lov ilovasida ushbu ID orqali to'lov qilishingiz mumkin.");
@@ -139,7 +139,7 @@ export default function TeacherProfile() {
                 </button>
               </div>
               <p className="text-[11px] text-gray-500 mt-1.5 font-bold">
-                💡 Payme, Click, Paynet yoki Uzum Bank ilovasida ushbu 6 xonali ID raqamingiz orqali balansni to'ldirishingiz mumkin.
+                💡 Payme, Click, Paynet yoki Uzum Bank ilovasida ushbu 7 xonali ID raqamingiz orqali balansni to'ldirishingiz mumkin.
               </p>
             </div>
 

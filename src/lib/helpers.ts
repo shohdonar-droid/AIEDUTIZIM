@@ -15,7 +15,7 @@ export function makeDirectImageUrl(url: string | null | undefined): string | nul
 }
 
 export function generateSixCharId(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const chars = '0123456789';
   let res = '';
   for (let i = 0; i < 6; i++) {
     res += chars.charAt(Math.floor(Math.random() * chars.length));

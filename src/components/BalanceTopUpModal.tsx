@@ -60,7 +60,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
   };
 
   const handleCopyUid = () => {
-    const uidToCopy = user?.platformUid || user?.uid || '';
+    const uidToCopy = user?.systemId || user?.uid || '';
     if (uidToCopy) {
       navigator.clipboard.writeText(uidToCopy);
       setCopiedUid(true);
@@ -270,7 +270,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
                 <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
                   <div>
                     <p className="text-[10px] text-slate-400 font-bold uppercase">Sizning Platforma ID (UID):</p>
-                    <p className="text-sm font-black font-mono text-amber-300">{user.platformUid || user.uid}</p>
+                    <p className="text-sm font-black font-mono text-amber-300">{user.systemId || user.uid}</p>
                   </div>
                   <button
                     type="button"
@@ -291,7 +291,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
               <button
                 type="button"
                 onClick={() => {
-                  const uId = user.platformUid || user.uid;
+                  const uId = user.systemId || user.uid;
                   let payUrl = "#";
                   if (paymentType === 'Click') {
                     payUrl = `https://my.click.uz/services/pay?id=12345&merchant_id=9999&amount=${finalAmount}&transaction_param=${uId}`;
