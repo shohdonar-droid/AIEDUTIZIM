@@ -239,77 +239,77 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
           {/* Admin Card Details (Only if 'Karta') */}
           {paymentType === 'Karta' && (
             <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl text-white space-y-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-emerald-400" />
-                <span className="text-xs font-black uppercase tracking-wider text-slate-300">Admin Karta Ma'lumotlari</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-emerald-400" />
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-300">Admin Karta Ma'lumotlari</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/30">
+                  {cardSettings.type}
+                </span>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/30">
-                {cardSettings.type}
-              </span>
-            </div>
 
-            <div className="flex items-center justify-between bg-white/10 p-3 rounded-xl backdrop-blur-md">
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase">Karta raqami</p>
-                <p className="text-base sm:text-lg font-black font-mono tracking-wider text-emerald-300">{cardSettings.number}</p>
-                <p className="text-[11px] text-slate-300 font-bold uppercase mt-0.5">{cardSettings.owner}</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyCard}
-                className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-md shrink-0"
-              >
-                {copiedCard ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copiedCard ? "Nusxalandi" : "Nusxalash"}
-              </button>
-            </div>
-
-            {user && (
-              <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
+              <div className="flex items-center justify-between bg-white/10 p-3 rounded-xl backdrop-blur-md">
                 <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Sizning Platforma ID (UID):</p>
-                  <p className="text-sm font-black font-mono text-amber-300">{user.platformUid || user.uid}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Karta raqami</p>
+                  <p className="text-base sm:text-lg font-black font-mono tracking-wider text-emerald-300">{cardSettings.number}</p>
+                  <p className="text-[11px] text-slate-300 font-bold uppercase mt-0.5">{cardSettings.owner}</p>
                 </div>
                 <button
                   type="button"
-                  onClick={handleCopyUid}
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-sm shrink-0"
+                  onClick={handleCopyCard}
+                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-md shrink-0"
                 >
-                  {copiedUid ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedUid ? "Nusxalandi" : "UID"}
+                  {copiedCard ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedCard ? "Nusxalandi" : "Nusxalash"}
                 </button>
               </div>
-            )}
 
-            {/* Direct online payment button */}
-            {paymentType !== 'Karta' && finalAmount > 0 && user && (
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const uId = user.platformUid || user.uid;
-                    let payUrl = "#";
-                    if (paymentType === 'Click') {
-                      payUrl = `https://my.click.uz/services/pay?id=12345&merchant_id=9999&amount=${finalAmount}&transaction_param=${uId}`;
-                    } else if (paymentType === 'Payme') {
-                      payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&ac.user_id=${uId}&amount=${finalAmount * 100}`;
-                    } else if (paymentType === 'Uzum Bank') {
-                      payUrl = `https://uzumbank.uz/pay?merchant_id=platform&account=${uId}&amount=${finalAmount}`;
-                    } else if (paymentType === 'Paynet') {
-                      alert("Paynet to'lovi uchun tizim administratoriga murojaat qiling.");
-                      return;
-                    }
-                    window.open(payUrl, '_blank');
-                  }}
-                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {paymentType} orqali onlayn to'lov qilish ({finalAmount.toLocaleString()} so'm)
-                </button>
-              </div>
-            )}
-          </div>
+              {user && (
+                <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">Sizning Platforma ID (UID):</p>
+                    <p className="text-sm font-black font-mono text-amber-300">{user.platformUid || user.uid}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyUid}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-sm shrink-0"
+                  >
+                    {copiedUid ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedUid ? "Nusxalandi" : "UID"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Direct online payment button */}
+          {paymentType !== 'Karta' && finalAmount > 0 && user && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const uId = user.platformUid || user.uid;
+                  let payUrl = "#";
+                  if (paymentType === 'Click') {
+                    payUrl = `https://my.click.uz/services/pay?id=12345&merchant_id=9999&amount=${finalAmount}&transaction_param=${uId}`;
+                  } else if (paymentType === 'Payme') {
+                    payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&ac.user_id=${uId}&amount=${finalAmount * 100}`;
+                  } else if (paymentType === 'Uzum Bank') {
+                    payUrl = `https://uzumbank.uz/pay?merchant_id=platform&account=${uId}&amount=${finalAmount}`;
+                  } else if (paymentType === 'Paynet') {
+                    alert("Paynet to'lovi uchun tizim administratoriga murojaat qiling.");
+                    return;
+                  }
+                  window.open(payUrl, '_blank');
+                }}
+                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                {paymentType} orqali onlayn to'lov qilish ({finalAmount.toLocaleString()} so'm)
+              </button>
+            </div>
           )}
 
           {/* Receipt Upload (Only if 'Karta') */}
