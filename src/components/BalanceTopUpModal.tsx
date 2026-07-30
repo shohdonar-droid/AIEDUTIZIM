@@ -177,47 +177,49 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
 
         <div className="space-y-6 pt-6 overflow-y-auto pr-1 flex-1">
           {/* Amount selection */}
-          <div>
-            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              1. To'ldirish summasini tanlang
-            </label>
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              {[10000, 25000, 50000, 100000].map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => {
-                    setAmount(val);
-                    setCustomAmount('');
-                  }}
-                  className={`py-3 rounded-xl border-2 font-black text-sm transition-all ${
-                    amount === val && !customAmount
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm'
-                      : 'border-gray-100 text-slate-700 hover:border-gray-200 bg-gray-50/50'
-                  }`}
-                >
-                  {val.toLocaleString()} UZS
-                </button>
-              ))}
-            </div>
+          {paymentType !== 'Karta' && (
             <div>
-              <input
-                type="number"
-                placeholder="Yoki o'zingiz summa kiriting (UZS)"
-                value={customAmount}
-                onChange={(e) => setCustomAmount(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-emerald-500 focus:outline-none font-bold text-sm text-slate-800 bg-gray-50/30"
-              />
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                1. To'ldirish summasini tanlang
+              </label>
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                {[10000, 25000, 50000, 100000].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => {
+                      setAmount(val);
+                      setCustomAmount('');
+                    }}
+                    className={`py-3 rounded-xl border-2 font-black text-sm transition-all ${
+                      amount === val && !customAmount
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm'
+                        : 'border-gray-100 text-slate-700 hover:border-gray-200 bg-gray-50/50'
+                    }`}
+                  >
+                    {val.toLocaleString()} UZS
+                  </button>
+                ))}
+              </div>
+              <div>
+                <input
+                  type="number"
+                  placeholder="Yoki o'zingiz summa kiriting (UZS)"
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-emerald-500 focus:outline-none font-bold text-sm text-slate-800 bg-gray-50/30"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Payment Type */}
           <div>
             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
               2. To'lov tizimini tanlang
             </label>
-            <div className="grid grid-cols-4 gap-2">
-              {['Click', 'Payme', 'Uzum Bank', 'Karta'].map((type) => (
+            <div className="grid grid-cols-3 gap-2">
+              {['Click', 'Payme', 'Uzum Bank', 'Paynet', 'Karta'].map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -234,8 +236,9 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
             </div>
           </div>
 
-          {/* Admin Card / UID Info Box */}
-          <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl text-white space-y-4 shadow-lg">
+          {/* Admin Card Details (Only if 'Karta') */}
+          {paymentType === 'Karta' && (
+            <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl text-white space-y-4 shadow-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-emerald-400" />
@@ -281,7 +284,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
 
             {/* Direct online payment button */}
             {paymentType !== 'Karta' && finalAmount > 0 && user && (
-              <div>
+              <div className="mt-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -293,54 +296,60 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
                       payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&ac.user_id=${uId}&amount=${finalAmount * 100}`;
                     } else if (paymentType === 'Uzum Bank') {
                       payUrl = `https://uzumbank.uz/pay?merchant_id=platform&account=${uId}&amount=${finalAmount}`;
+                    } else if (paymentType === 'Paynet') {
+                      alert("Paynet to'lovi uchun tizim administratoriga murojaat qiling.");
+                      return;
                     }
                     window.open(payUrl, '_blank');
                   }}
-                  className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" />
-                  🚀 {paymentType} orqali onlayn to'lov qilish ({finalAmount.toLocaleString()} UZS)
+                  {paymentType} orqali onlayn to'lov qilish ({finalAmount.toLocaleString()} so'm)
                 </button>
               </div>
             )}
           </div>
+          )}
 
-          {/* Receipt Upload */}
-          <div>
-            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              3. To'lov chekini (skrinshotini) yuklang
-            </label>
-            <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-emerald-500 transition-all bg-gray-50/50">
-              {receiptUrl ? (
-                <div className="space-y-3">
-                  <div className="w-20 h-20 mx-auto rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white flex items-center justify-center">
-                    <img src={receiptUrl} alt="Receipt" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          {/* Receipt Upload (Only if 'Karta') */}
+          {paymentType === 'Karta' && (
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                3. To'lov chekini (skrinshotini) yuklang
+              </label>
+              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-emerald-500 transition-all bg-gray-50/50">
+                {receiptUrl ? (
+                  <div className="space-y-3">
+                    <div className="w-20 h-20 mx-auto rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white flex items-center justify-center">
+                      <img src={receiptUrl} alt="Receipt" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-700">{fileName || "Chek yuklandi"} ({fileSize})</div>
+                    <button
+                      type="button"
+                      onClick={() => { setReceiptUrl(''); setFileName(''); setFileSize(''); }}
+                      className="text-xs font-black text-red-500 hover:underline"
+                    >
+                      Boshqa rasm yuklash
+                    </button>
                   </div>
-                  <div className="text-xs font-bold text-slate-700">{fileName || "Chek yuklandi"} ({fileSize})</div>
-                  <button
-                    type="button"
-                    onClick={() => { setReceiptUrl(''); setFileName(''); setFileSize(''); }}
-                    className="text-xs font-black text-red-500 hover:underline"
-                  >
-                    Boshqa rasm yuklash
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Upload className="w-6 h-6" />
+                ) : (
+                  <div className="space-y-2">
+                    <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-700">Chek rasmini bu yerga tashlang yoki tanlang</p>
+                    <p className="text-[10px] text-slate-400">PNG, JPG yoki WEBP (Maks: 800KB)</p>
+                    <label className="inline-block mt-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-sm transition-all">
+                      Faylni tanlash
+                      <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                    </label>
                   </div>
-                  <p className="text-xs font-bold text-slate-700">Chek rasmini bu yerga tashlang yoki tanlang</p>
-                  <p className="text-[10px] text-slate-400">PNG, JPG yoki WEBP (Maks: 800KB)</p>
-                  <label className="inline-block mt-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-sm transition-all">
-                    Faylni tanlash
-                    <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                  </label>
-                </div>
-              )}
+                )}
+              </div>
+              {fileError && <p className="text-xs text-red-500 mt-1 font-bold">{fileError}</p>}
             </div>
-            {fileError && <p className="text-xs text-red-500 mt-1 font-bold">{fileError}</p>}
-          </div>
+          )}
         </div>
 
         <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 mt-4">

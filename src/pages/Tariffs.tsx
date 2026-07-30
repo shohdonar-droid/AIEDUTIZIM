@@ -430,7 +430,6 @@ export default function Tariffs() {
 
   return (
     <div className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-24">
-      {/* Balance Section */}
       <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
         <div>
           <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">Joriy balans</h2>
