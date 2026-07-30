@@ -36,6 +36,7 @@ import * as XLSX from "xlsx";
 import { useAuth } from "../../hooks/useAuth";
 import { logSystemAction } from "../../lib/logUtils";
 import { getNextSequentialId } from "../../lib/idUtils";
+import { generatePassword } from "../../lib/helpers";
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -460,17 +461,19 @@ export default function AdminUsers() {
       if (editingMustaqilTeacher.uid) {
         // Updating existing mustaqil_o_qituvchi
         const cleanLogin = editingMustaqilTeacher.login?.trim() || await getNextSequentialId('mustaqil_o_qituvchi');
+        const pass = editingMustaqilTeacher.password?.trim() || generatePassword();
         await setDoc(doc(db, "users", editingMustaqilTeacher.uid), {
           displayName: editingMustaqilTeacher.displayName,
           phone: editingMustaqilTeacher.phone || "",
           login: cleanLogin,
-          password: editingMustaqilTeacher.password,
+          password: pass,
           customLimitPrices: editingMustaqilTeacher.customLimitPrices || {},
         }, { merge: true });
         alert("Mustaqil o'qituvchi ma'lumotlari muvaffaqiyatli saqlandi!");
       } else {
         // Creating new mustaqil_o_qituvchi
         const cleanLogin = editingMustaqilTeacher.login?.trim() || await getNextSequentialId('mustaqil_o_qituvchi');
+        const pass = editingMustaqilTeacher.password?.trim() || generatePassword();
         const q = query(
           collection(db, "users"),
           where("login", "==", cleanLogin),
@@ -516,7 +519,7 @@ export default function AdminUsers() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email,
-              password: editingMustaqilTeacher.password,
+              password: pass,
               returnSecureToken: false,
             }),
           },
@@ -550,7 +553,7 @@ export default function AdminUsers() {
           phone: editingMustaqilTeacher.phone || "",
           login: cleanLogin,
           systemId: cleanLogin,
-          password: editingMustaqilTeacher.password,
+          password: pass,
           role: "mustaqil_o_qituvchi",
           teacherId: uyOrgId,
           email: email,
@@ -580,24 +583,23 @@ export default function AdminUsers() {
     if (
       !silent &&
       !confirm(
-        "Haqiqatan ham o'chirmoqchimisiz? Rozi bo'lsangiz, barcha ma'lumotlar o'chiriladi!",
+        "Haqiqatan ham o'chirmoqchimisiz? Foydalanuvchi profiliga kirish bloklanadi va ID qayta ishlatilmaydi!",
       )
     )
       return;
       
     try {
-      // 1. Delete user document
+      // 1. Soft delete user document
       const targetUser = users.find(u => u.uid === uid);
-      await deleteDoc(doc(db, "users", uid));
+      await updateDoc(doc(db, "users", uid), { status: "deleted" });
       await logSystemAction(
-        `Foydalanuvchi o'chirildi: ${targetUser?.displayName || uid}`,
+        `Foydalanuvchi bloklandi (o'chirildi): ${targetUser?.displayName || uid}`,
         "Foydalanuvchilar",
         user?.displayName || "Admin",
         user?.role || "Admin"
       );
       
-      // 2. Cleanup related data (enrollments, testResults)
-      // We do these in parallel but catch errors for each so one failure doesn't block the profile deletion from being recognized
+      // 2. Cleanup related data (enrollments, testResults) - This part remains to keep DB clean
       try {
         const eQ = query(collection(db, "enrollments"), where("userId", "==", uid));
         const eSnap = await getDocs(eQ);
@@ -615,12 +617,12 @@ export default function AdminUsers() {
       }
 
       if (!silent) {
-        alert("Foydalanuvchi muvaffaqiyatli o'chirildi!");
-        loadData(); // Refresh UI
+        alert("Foydalanuvchi muvaffaqiyatli bloklandi!");
+        loadData(true); // Refresh UI
       }
     } catch (error: any) {
-      console.error("Delete user error:", error);
-      if (!silent) alert("O'chirishda xatolik yuz berdi: " + (error?.message || error));
+      console.error("Block user error:", error);
+      if (!silent) alert("Bloklashda xatolik yuz berdi: " + (error?.message || error));
     }
   };
 
@@ -636,12 +638,13 @@ export default function AdminUsers() {
     setTeacherSaving(true);
     try {
       const cleanLogin = editingTeacher.login?.trim() || await getNextSequentialId('teacher');
+      const pass = editingTeacher.password?.trim() || generatePassword();
       if (editingTeacher.uid) {
         await setDoc(doc(db, "users", editingTeacher.uid), {
           displayName: editingTeacher.displayName,
           phone: editingTeacher.phone || "",
           login: cleanLogin,
-          password: editingTeacher.password,
+          password: pass,
           ball: Number(editingTeacher.ball) || 0,
           aiTestLimit: Number(editingTeacher.aiTestLimit) || 999999,
           assignedTariff: editingTeacher.assignedTariff || "START",
@@ -667,7 +670,7 @@ export default function AdminUsers() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email,
-              password: editingTeacher.password,
+              password: pass,
               returnSecureToken: false,
             }),
           },
@@ -682,7 +685,7 @@ export default function AdminUsers() {
           phone: editingTeacher.phone || "",
           login: cleanLogin,
           systemId: cleanLogin,
-          password: editingTeacher.password,
+          password: pass,
           ball: Number(editingTeacher.ball) || 0,
           role: "teacher",
           email: email,
@@ -795,7 +798,7 @@ export default function AdminUsers() {
       const orgName = org?.displayName || "";
       const login = await getNextSequentialId("student");
       const email = `${login}@student.uz`;
-      const pass = "123456";
+      const pass = generatePassword();
       const res = await fetch(
         `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
         {
@@ -859,6 +862,7 @@ export default function AdminUsers() {
     try {
       const staffLogin = newStaff.login.trim() || await getNextSequentialId("staff");
       const gEmail = `${staffLogin}@teacher.uz`;
+      const pass = newStaff.password.trim() || generatePassword();
       const signupRes = await fetch(
         `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
         {
@@ -866,7 +870,7 @@ export default function AdminUsers() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: gEmail,
-            password: newStaff.password,
+            password: pass,
             returnSecureToken: false,
           }),
         },
@@ -883,7 +887,7 @@ export default function AdminUsers() {
         displayName: newStaff.displayName,
         login: staffLogin,
         systemId: staffLogin,
-        password: newStaff.password,
+        password: pass,
         phone: newStaff.phone,
         email: gEmail,
         role: "staff",

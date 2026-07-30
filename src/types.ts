@@ -84,6 +84,7 @@ export interface UserProfile {
   customLimitPrices?: Record<string, any>;
   assignedTariff?: string;
   tariffPrice?: number;
+  status?: 'active' | 'deleted' | 'blocked';
   createdAt: any;
 }
 

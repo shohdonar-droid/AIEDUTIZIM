@@ -49,8 +49,9 @@ export default function AdminBillingMonitoring() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [platformFilter, setPlatformFilter] = useState<"all" | "site" | "bot">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [tokenRate, setTokenRate] = useState<number>(1); // 1 Token = 1 UZS default
   const [selectedUser, setSelectedUser] = useState<UserBillingRecord | null>(null);
+
+  const tokenRate = 1; // Constant rate for token calculation
 
   useEffect(() => {
     fetchMonitoringData();
@@ -202,6 +203,7 @@ export default function AdminBillingMonitoring() {
   const stats = useMemo(() => {
     const totalUsersCount = users.length;
     const totalTokensCount = users.reduce((acc, u) => acc + (u.usedTokens || 0), 0);
+    const tokenRate = 1; // Default rate
     const totalTokensCostSum = totalTokensCount * tokenRate;
     const totalPaidSum = users.reduce((acc, u) => acc + (u.totalPaid || 0), 0);
     const siteUsersCount = users.filter((u) => u.platform === "site" || u.platform === "both").length;
@@ -215,7 +217,7 @@ export default function AdminBillingMonitoring() {
       siteUsersCount,
       botUsersCount,
     };
-  }, [users, tokenRate]);
+  }, [users]);
 
   const exportExcel = () => {
     const exportData = filteredUsers.map((u, idx) => ({
@@ -427,20 +429,7 @@ export default function AdminBillingMonitoring() {
             </select>
           </div>
 
-          {/* Adjustable Token Rate */}
-          <div className="flex items-center gap-2 bg-indigo-50/70 border border-indigo-100 px-3 py-1.5 rounded-xl">
-            <Sliders className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="text-xs font-bold text-indigo-900">1 Token narxi:</span>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              value={tokenRate}
-              onChange={(e) => setTokenRate(Math.max(0, Number(e.target.value)))}
-              className="w-16 px-2 py-0.5 bg-white border border-indigo-200 rounded-lg text-xs font-black text-center text-indigo-700 focus:outline-none"
-            />
-            <span className="text-xs font-bold text-indigo-800">so'm</span>
-          </div>
+          {/* Adjustable Token Rate Removed */}
         </div>
       </div>
 
@@ -483,6 +472,7 @@ export default function AdminBillingMonitoring() {
                 </tr>
               ) : (
                 filteredUsers.map((u, idx) => {
+                  const tokenRate = 1;
                   const tokenCost = u.usedTokens * tokenRate;
                   return (
                     <tr
@@ -616,7 +606,7 @@ export default function AdminBillingMonitoring() {
                   {selectedUser.usedTokens.toLocaleString("uz-UZ")} token
                 </div>
                 <div className="text-xs text-purple-700 font-bold mt-1">
-                  ≈ {(selectedUser.usedTokens * tokenRate).toLocaleString("uz-UZ")} UZS
+                  ≈ {(selectedUser.usedTokens * 1).toLocaleString("uz-UZ")} UZS
                 </div>
               </div>
 

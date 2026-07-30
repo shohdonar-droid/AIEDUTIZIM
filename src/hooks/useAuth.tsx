@@ -36,6 +36,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', targetUid));
       if (userDoc.exists()) {
         const udata = userDoc.data() as UserProfile;
+        
+        if (udata.status === 'deleted' || udata.status === 'blocked') {
+            setUser(null);
+            localStorage.removeItem('cached_user_profile');
+            auth.signOut();
+            return;
+        }
+
         let systemId = udata.systemId;
         if (!systemId && udata.role) {
           systemId = await getNextSequentialId(udata.role as UserRoleIDType);
@@ -218,6 +226,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userUnsub = safeOnSnapshot(doc(db, 'users', targetUid), (snap) => {
           if (snap.exists()) {
             const udata = snap.data() as UserProfile;
+            
+            if (udata.status === 'deleted' || udata.status === 'blocked') {
+                setUser(null);
+                localStorage.removeItem('cached_user_profile');
+                auth.signOut();
+                return;
+            }
+
             const userWithUid = { ...udata, uid: snap.id };
             
             let finalUser = userWithUid;

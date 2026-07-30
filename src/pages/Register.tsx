@@ -6,6 +6,7 @@ import { BrainCircuit, Loader2 } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { getNextSequentialId } from '../lib/idUtils';
+import { generatePassword } from '../lib/helpers';
 
 export default function Register() {
   const [error, setError] = useState('');
@@ -102,12 +103,14 @@ export default function Register() {
             });
           } else {
             const nextId = await getNextSequentialId('mustaqil_o_qituvchi');
+            const pass = generatePassword();
             await setDoc(userDocRef, {
               uid: user.uid,
               displayName: user.displayName || "Mustaqil O'qituvchi",
               email: user.email,
               login: nextId,
               systemId: nextId,
+              password: pass,
               role: 'mustaqil_o_qituvchi',
               teacherId: uyOrgId,
               createdAt: serverTimestamp(),
@@ -115,6 +118,9 @@ export default function Register() {
               total_spent: 0,
               ...defaultLimits
             });
+            // Optionally alert the user about their new ID and password,
+            // but that's hard with the current redirect logic.
+            // For now, save them and assume the user can log in with them later.
           }
         } else {
           // Document exists, update it to be a mustaqil_o_qituvchi and assign to UY
