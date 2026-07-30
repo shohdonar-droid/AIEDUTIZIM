@@ -217,9 +217,6 @@ export default function TeacherDashboard() {
               <p className="text-[8px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-0.5">
                 {user?.role === 'staff' ? 'Xodim' : (user?.role === 'admin' ? 'Administrator' : ((user?.role as string) === 'mustaqil_o_qituvchi' ? "Mustaqil O'qituvchi" : 'Tashkilot'))}
               </p>
-              <p className="text-[9px] text-emerald-600 font-black mt-1">
-                Balans: {Number((user as any)?.balance ?? 0).toLocaleString('uz-UZ')} UZS
-              </p>
             </motion.div>
           )}
           {user?.isImpersonated && !isCollapsed && (

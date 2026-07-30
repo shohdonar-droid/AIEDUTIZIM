@@ -258,7 +258,6 @@ export default function Navbar() {
                     <LayoutDashboard className="h-4 w-4" />
                     <div className="flex flex-col text-left leading-none">
                       <span className="font-bold text-xs">{user.displayName || 'Profil'}</span>
-                      <span className="text-[10px] font-black text-emerald-600 mt-0.5">{Number((user as any)?.balance ?? 0).toLocaleString('uz-UZ')} UZS</span>
                     </div>
                   </Link>
                   <button
