@@ -113,16 +113,33 @@ export default function TeacherBilling() {
         );
         const subSnap = await getDocs(q);
         if (!subSnap.empty) {
-          // Sort by start date to get most recent
-          const subs = subSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          subs.sort((a: any, b: any) => (b.startDate?.toMillis?.() || 0) - (a.startDate?.toMillis?.() || 0));
-          setCurrentSubscription(subs[0]);
-        } else if ((user as any).assignedTariff) {
-          setCurrentSubscription({
-            tariffName: (user as any).assignedTariff,
-            tariffPrice: (user as any).tariffPrice || 0,
-            startDate: (user as any).createdAt || new Date()
-          });
+          // Sort by start date to get most recent and filter out balance top ups
+          const subs = subSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as any))
+            .filter(sub => !(sub.tariffName || "").toLowerCase().includes("balans to'ldirish"));
+            
+          if (subs.length > 0) {
+            subs.sort((a: any, b: any) => (b.startDate?.toMillis?.() || 0) - (a.startDate?.toMillis?.() || 0));
+            setCurrentSubscription(subs[0]);
+          } else {
+            const fallbackTariff = (user as any).tariffName || (user as any).assignedTariff;
+            if (fallbackTariff && !fallbackTariff.toLowerCase().includes("balans to'ldirish")) {
+              setCurrentSubscription({
+                tariffName: fallbackTariff,
+                tariffPrice: (user as any).tariffPrice || 0,
+                startDate: (user as any).createdAt || new Date()
+              });
+            }
+          }
+        } else {
+          const fallbackTariff = (user as any).tariffName || (user as any).assignedTariff;
+          if (fallbackTariff && !fallbackTariff.toLowerCase().includes("balans to'ldirish")) {
+            setCurrentSubscription({
+              tariffName: fallbackTariff,
+              tariffPrice: (user as any).tariffPrice || 0,
+              startDate: (user as any).createdAt || new Date()
+            });
+          }
         }
       } catch (err) {
         console.error("Billing load error:", err);

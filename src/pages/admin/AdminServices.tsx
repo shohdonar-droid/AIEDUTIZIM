@@ -98,7 +98,15 @@ export default function AdminServices() {
 
       await updateDoc(doc(db, "connection_requests", req.id), { status: 'approved' });
       
-      if (req.isLimitsRequest) {
+      if (req.isBalanceTopUp) {
+        const userRef = doc(db, "users", targetUserId);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          const currentBalance = Number(userData.balance ?? userData.ball ?? 0);
+          await updateDoc(userRef, { balance: currentBalance + Number(req.tariffPrice || 0) });
+        }
+      } else if (req.isLimitsRequest) {
         // Update Independent Teacher limits
         const userRef = doc(db, "users", targetUserId);
         const userSnap = await getDoc(userRef);

@@ -215,7 +215,7 @@ export default function AdminActiveSubscriptions() {
             id: d.id,
             ...raw,
           } as ActiveSubscription;
-        });
+        }).filter(sub => !(sub.tariffName || "").toLowerCase().includes("balans to'ldirish"));
 
         setSubscriptions(subsData);
         if (subsData.length === 0) {

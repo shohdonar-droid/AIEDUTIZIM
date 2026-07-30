@@ -114,6 +114,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
         tariffPrice: finalAmount,
         paymentType,
         receiptUrl,
+        isBalanceTopUp: true,
         status: 'pending',
         timestamp: serverTimestamp()
       });
