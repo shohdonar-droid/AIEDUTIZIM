@@ -358,16 +358,18 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
             onClick={onClose}
             className="px-5 py-3 rounded-xl border border-gray-200 font-bold text-xs text-slate-600 hover:bg-gray-50 transition-all"
           >
-            Bekor qilish
+            {paymentType === 'Karta' ? 'Bekor qilish' : 'Yopish'}
           </button>
-          <button
-            type="button"
-            disabled={isSubmitting || !receiptUrl}
-            onClick={handleSubmit}
-            className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
-          >
-            {isSubmitting ? "Yuborilmoqda..." : "So'rovni yuborish"}
-          </button>
+          {paymentType === 'Karta' && (
+            <button
+              type="button"
+              disabled={isSubmitting || !receiptUrl}
+              onClick={handleSubmit}
+              className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
+            >
+              {isSubmitting ? "Yuborilmoqda..." : "So'rovni yuborish"}
+            </button>
+          )}
         </div>
       </motion.div>
     </div>
