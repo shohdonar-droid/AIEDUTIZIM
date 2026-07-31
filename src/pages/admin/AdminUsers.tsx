@@ -629,10 +629,9 @@ export default function AdminUsers() {
   const saveTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
-      !editingTeacher?.displayName ||
-      !editingTeacher?.password
+      !editingTeacher?.displayName
     ) {
-      alert("Nomi va parolni to'ldiring.");
+      alert("Nomi to'ldiring.");
       return;
     }
     setTeacherSaving(true);
