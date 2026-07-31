@@ -221,7 +221,10 @@ export default function TeacherBilling() {
   };
 
   // Filter tariffs for upgrade (exclude current)
-  const upgradeOptions = Object.values(configs || defaultTariffs).filter((t: any) => {
+  const upgradeOptions = Object.entries(configs || defaultTariffs).map(([key, val]: [string, any]) => ({
+    ...val,
+    name: val.name || key.toUpperCase()
+  })).filter((t: any) => {
     const tName = t.name || "";
     const currentName = currentSubscription?.tariffName || "";
     return tName.toLowerCase() !== currentName.toLowerCase() && 

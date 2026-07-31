@@ -634,6 +634,8 @@ export default function AdminUsers() {
       alert("Nomi to'ldiring.");
       return;
     }
+    // Debug
+    // alert("SAVE_TEACHER_CALLED: " + editingTeacher?.displayName);
     setTeacherSaving(true);
     try {
       const cleanLogin = editingTeacher.login?.trim() || await getNextSequentialId('teacher');
