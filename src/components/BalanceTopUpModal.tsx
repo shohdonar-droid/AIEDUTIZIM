@@ -220,7 +220,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
               2. To'lov tizimini tanlang
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {['Click', 'Payme', 'Uzum Bank', 'Paynet', 'Karta'].map((type) => (
+              {['Click', 'Payme', 'Uzum Bank', 'Karta'].map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -299,9 +299,6 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
                     payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&ac.user_id=${uId}&amount=${finalAmount * 100}`;
                   } else if (paymentType === 'Uzum Bank') {
                     payUrl = `https://uzumbank.uz/pay?merchant_id=platform&account=${uId}&amount=${finalAmount}`;
-                  } else if (paymentType === 'Paynet') {
-                    alert("Paynet to'lovi uchun tizim administratoriga murojaat qiling.");
-                    return;
                   }
                   window.open(payUrl, '_blank');
                 }}

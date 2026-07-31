@@ -37,6 +37,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { logSystemAction } from "../../lib/logUtils";
 import { getNextSequentialId } from "../../lib/idUtils";
 import { generatePassword } from "../../lib/helpers";
+import { defaultTariffs } from "../Tariffs";
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -590,8 +591,21 @@ export default function AdminUsers() {
       
     try {
       // 1. Soft delete user document
-      const targetUser = users.find(u => u.uid === uid);
+      const targetUser = users.find(u => u.uid === uid) || 
+                         teachers.find(u => u.uid === uid) || 
+                         independentTeachers.find(u => u.uid === uid) ||
+                         staffUsers.find(u => u.uid === uid) ||
+                         subadmins.find(u => u.uid === uid);
+
       await updateDoc(doc(db, "users", uid), { status: "deleted" });
+      
+      // Update local state for immediate feedback
+      setUsers(prev => prev.filter(u => u.uid !== uid));
+      setTeachers(prev => prev.filter(u => u.uid !== uid));
+      setIndependentTeachers(prev => prev.filter(u => u.uid !== uid));
+      setStaffUsers(prev => prev.filter(u => u.uid !== uid));
+      setSubadmins(prev => prev.filter(u => u.uid !== uid));
+
       await logSystemAction(
         `Foydalanuvchi bloklandi (o'chirildi): ${targetUser?.displayName || uid}`,
         "Foydalanuvchilar",
@@ -640,6 +654,8 @@ export default function AdminUsers() {
     try {
       const cleanLogin = editingTeacher.login?.trim() || await getNextSequentialId('teacher');
       const pass = editingTeacher.password?.trim() || generatePassword();
+      const selectedTariff = defaultTariffs[(editingTeacher.assignedTariff || "START").toLowerCase() as keyof typeof defaultTariffs];
+
       if (editingTeacher.uid) {
         await setDoc(doc(db, "users", editingTeacher.uid), {
           displayName: editingTeacher.displayName,
@@ -649,7 +665,7 @@ export default function AdminUsers() {
           ball: Number(editingTeacher.ball) || 0,
           aiTestLimit: Number(editingTeacher.aiTestLimit) || 999999,
           assignedTariff: editingTeacher.assignedTariff || "START",
-          tariffPrice: Number(editingTeacher.tariffPrice) || 0,
+          tariffPrice: selectedTariff.price || 0,
         }, { merge: true });
       } else {
         const q = query(
@@ -691,8 +707,17 @@ export default function AdminUsers() {
           role: "teacher",
           email: email,
           assignedTariff: editingTeacher.assignedTariff || "START",
-          tariffPrice: Number(editingTeacher.tariffPrice) || 0,
+          tariffPrice: selectedTariff.price || 0,
           createdAt: serverTimestamp(),
+        });
+        
+        // Add active subscription
+        await setDoc(doc(db, "active_subscriptions", uid), {
+          uid: uid,
+          tariffName: editingTeacher.assignedTariff || "START",
+          status: "active",
+          startDate: serverTimestamp(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 days
         });
       }
       setEditingTeacher(null);
@@ -1460,12 +1485,20 @@ export default function AdminUsers() {
                   <select
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold"
                     value={editingTeacher.assignedTariff || "START"}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const tariffKey = e.target.value.toLowerCase() as keyof typeof defaultTariffs;
+                      const tariff = defaultTariffs[tariffKey];
                       setEditingTeacher({
                         ...editingTeacher,
                         assignedTariff: e.target.value,
-                      })
-                    }
+                        tariffPrice: tariff.price || 0,
+                        limit_students: tariff.students || 0,
+                        limit_subjects: tariff.maxSubjects || 0,
+                        limit_tests: tariff.maxTests || 0,
+                        limit_exams: tariff.maxExams || 0,
+                        limit_quizizz: tariff.maxQuizizz || 0,
+                      });
+                    }}
                   >
                     <option value="START">START</option>
                     <option value="STANDARD">STANDARD</option>
