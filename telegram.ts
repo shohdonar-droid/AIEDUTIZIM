@@ -33,6 +33,7 @@ const Type = SDKType || {
 };
 import { generateContentWithRotation } from "./src/lib/gemini";
 import { generateCourseWorkDataWithGemini, buildCourseWorkDocxBuffer } from "./src/lib/courseworkGenerator.js";
+import { process3x4PassportPhoto } from "./src/lib/passportProcessor.js";
 import dotenv from "dotenv";
 import sharp from "sharp";
 import fs from "fs";
@@ -3537,135 +3538,12 @@ async function handleAntiplagiatAnalysis(ctx: any, input: string) {
     }
   }
 
-async function process3x4PassportPhoto(
-  inputBuffer: Buffer,
-  personBox?: { ymin: number; xmin: number; ymax: number; xmax: number }
-): Promise<Buffer> {
-  const rotated = sharp(inputBuffer).rotate();
-  const meta = await rotated.metadata();
-  const width = meta.width || 600;
-  const height = meta.height || 800;
-
-  const targetWidth = 600;
-  const targetHeight = 800;
-
-  let cropWidth = width;
-  let cropHeight = Math.round((width * 4) / 3);
-  if (cropHeight > height) {
-    cropHeight = height;
-    cropWidth = Math.round((height * 3) / 4);
-  }
-
-  let left = Math.round((width - cropWidth) / 2);
-  let top = Math.round((height - cropHeight) / 2);
-
-  if (personBox) {
-    const pX = Math.round((((personBox.xmin + personBox.xmax) / 2) * width) / 1000);
-    const pYmin = Math.round((personBox.ymin * height) / 1000);
-
-    left = Math.max(0, Math.min(width - cropWidth, pX - Math.round(cropWidth / 2)));
-    top = Math.max(0, Math.min(height - cropHeight, pYmin - Math.round(cropHeight * 0.12)));
-  }
-
-  const cropped = await rotated
-    .extract({ left, top, width: cropWidth, height: cropHeight })
-    .resize(targetWidth, targetHeight, { fit: "cover" })
-    .toBuffer();
-
-  const { data, info } = await sharp(cropped)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const buf = Buffer.from(data);
-
-  const cornerCoords = [
-    [0, 0],
-    [info.width - 1, 0],
-    [0, Math.round(info.height * 0.15)],
-    [info.width - 1, Math.round(info.height * 0.15)],
-    [Math.round(info.width / 2), 0]
-  ];
-
-  const seeds: [number, number, number][] = [];
-  for (const [x, y] of cornerCoords) {
-    const idx = (y * info.width + x) * 4;
-    seeds.push([buf[idx], buf[idx + 1], buf[idx + 2]]);
-  }
-
-  const avgSeed = [
-    Math.round(seeds.reduce((s, c) => s + c[0], 0) / seeds.length),
-    Math.round(seeds.reduce((s, c) => s + c[1], 0) / seeds.length),
-    Math.round(seeds.reduce((s, c) => s + c[2], 0) / seeds.length)
-  ];
-
-  function colorDiff(r1: number, g1: number, b1: number, r2: number, g2: number, b2: number) {
-    return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
-  }
-
-  const visited = new Uint8Array(info.width * info.height);
-  const queue: number[] = [];
-
-  for (let x = 0; x < info.width; x++) {
-    queue.push(x);
-    visited[x] = 1;
-  }
-  for (let y = 0; y < Math.round(info.height * 0.6); y++) {
-    const idxL = y * info.width;
-    const idxR = y * info.width + (info.width - 1);
-    if (!visited[idxL]) { visited[idxL] = 1; queue.push(idxL); }
-    if (!visited[idxR]) { visited[idxR] = 1; queue.push(idxR); }
-  }
-
-  let head = 0;
-  while (head < queue.length) {
-    const curr = queue[head++];
-    const cx = curr % info.width;
-    const cy = Math.floor(curr / info.width);
-    const idx = (cy * info.width + cx) * 4;
-
-    const r = buf[idx];
-    const g = buf[idx + 1];
-    const b = buf[idx + 2];
-
-    const diff = colorDiff(r, g, b, avgSeed[0], avgSeed[1], avgSeed[2]);
-    const isBrightBg = r > 180 && g > 180 && b > 180;
-
-    if (diff < 70 || (cy < info.height * 0.4 && isBrightBg)) {
-      buf[idx] = 255;
-      buf[idx + 1] = 255;
-      buf[idx + 2] = 255;
-      buf[idx + 3] = 255;
-
-      const neighbors = [
-        [cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1]
-      ];
-      for (const [nx, ny] of neighbors) {
-        if (nx >= 0 && nx < info.width && ny >= 0 && ny < info.height) {
-          const nIdx = ny * info.width + nx;
-          if (!visited[nIdx]) {
-            visited[nIdx] = 1;
-            queue.push(nIdx);
-          }
-        }
-      }
-    }
-  }
-
-  return await sharp(buf, {
-    raw: { width: info.width, height: info.height, channels: 4 }
-  })
-    .withMetadata({ density: 300 })
-    .jpeg({ quality: 98 })
-    .toBuffer();
-}
-
 async function handle3x4PhotoGeneration(ctx: any, fileId: string) {
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
 
   const loadingMsg = await ctx.reply(
-    "⏳ <b>3x4 o'lchamdagi rasm tayyorlanmoqda...</b>\n\n<i>Inson aniqlanmoqda, orqa fon toza oq (#FFFFFF) rangga o'tkazilmoqda va 3x4 nisbatiga moslashtirilmoqda...</i>",
+    "⏳ <b>3x4 o'lchamdagi rasm tayyorlanmoqda...</b>\n\n<i>Sun'iy intellekt inson qiyofasini aniqlamoqda, yuzi va sochlarini to'liq muhofaza qilgan holda orqa fonni toza oq (#FFFFFF) rangga o'tkazmoqda...</i>",
     { parse_mode: "HTML" }
   );
 
@@ -3679,45 +3557,8 @@ async function handle3x4PhotoGeneration(ctx: any, fileId: string) {
     }
     const inputBuffer = Buffer.from(await fetchRes.arrayBuffer());
 
-    let personBox: { ymin: number; xmin: number; ymax: number; xmax: number } | undefined;
-    try {
-      const base64Img = inputBuffer.toString("base64");
-      const visionPrompt = `Analyze this image of a person for a formal 3x4 document/passport photo.
-Locate the main person's face/head and upper body.
-Return ONLY a valid JSON object in this format (no markdown code blocks, no other text):
-{"face": [ymin, xmin, ymax, xmax], "person": [ymin, xmin, ymax, xmax]}
-where ymin, xmin, ymax, xmax are normalized integers from 0 to 1000.`;
-
-      const aiRes = await generateContentWithRotation({
-        model: "gemini-3.6-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { inlineData: { mimeType: "image/jpeg", data: base64Img } },
-              { text: visionPrompt }
-            ]
-          }
-        ]
-      });
-
-      if (aiRes && aiRes.text) {
-        const cleanJson = aiRes.text.replace(/```json/g, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleanJson);
-        if (parsed.face && Array.isArray(parsed.face) && parsed.face.length === 4) {
-          personBox = {
-            ymin: parsed.face[0],
-            xmin: parsed.face[1],
-            ymax: parsed.face[2],
-            xmax: parsed.face[3]
-          };
-        }
-      }
-    } catch (visionErr) {
-      console.warn("[3x4 Photo] Vision detection warning (falling back to auto crop):", visionErr);
-    }
-
-    const processedBuffer = await process3x4PassportPhoto(inputBuffer, personBox);
+    // Call our advanced AI passport processor with face/hair protection & smart cropping
+    const processedBuffer = await process3x4PassportPhoto(inputBuffer);
 
     await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
 
@@ -3727,7 +3568,7 @@ where ymin, xmin, ymax, xmax are normalized integers from 0 to 1000.`;
         caption: "✅ <b>3x4 o'lchamdagi hujjat rasmingiz tayyor bo'ldi!</b>\n\n" +
           "• <b>Orqa fon:</b> Toza oq (#FFFFFF)\n" +
           "• <b>O'lcham:</b> 3x4 (600x800 px / 300 DPI)\n" +
-          "• <b>Odam qiyofasi:</b> O'zgartirishlarsiz saqlangan",
+          "• <b>Yuz va sochlar:</b> 100% asl holatda muhofaza qilingan",
         parse_mode: "HTML"
       }
     );
