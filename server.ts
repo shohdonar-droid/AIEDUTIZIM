@@ -879,6 +879,34 @@ app.get("/api/health", (req, res) => {
           13. Uy vazifasi
 
           Natija: Pedagogik hujjat shaklida, professional va amaliy foydalanishga to'liq tayyor bo'lsin.`;
+        } else if (docType === "test") {
+          const qCount = options?.questionCount || 10;
+          const optsCount = options?.optionsCount || 4;
+          const subject = options?.subject || "Umumiy fan";
+
+          prompt = `Siz AIEDUTIZIM botining professional Test Yaratuvchi sun'iy intellekt ekspertisiz.
+          Vazifa: "${topic}" mavzusi bo'yicha (${subject} fani) ${qCount} ta yuqori sifatli, mantiqiy va savollari aniq bo'lgan test savollarini tuzish.
+
+          TALABLAR:
+          - Savollar soni: ${qCount} ta.
+          - Variantlar soni: har bir savolda ${optsCount} ta variant (A, B, C, D).
+          - Har bir savol aniq va ravshan tuzilgan bo'lsin.
+          - Variantlardan faqat 1 tasi to'g'ri bo'lsin, qolganlari mantiqiy chalg'ituvchi variantlar bo'lsin.
+          - Hujjat oxirida alohida "TO'G'RI JAVOBLAR KALITI" bo'limi bo'lsin (masalan: 1-A, 2-C, 3-B...).
+
+          FORMAT:
+          # ${topic} bo'yicha test savollari (${subject})
+
+          1-savol matni...
+          A) ...
+          B) ...
+          C) ...
+          D) ...
+
+          ...
+
+          ## TO'G'RI JAVOBLAR KALITI
+          1-..., 2-..., 3-...`;
         } else if (docType === "tarjimon") {
           prompt = `${ACADEMIC_PERSONA}
           [TASK: TARJIMON]

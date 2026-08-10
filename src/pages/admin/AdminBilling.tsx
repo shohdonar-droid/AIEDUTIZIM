@@ -341,7 +341,7 @@ export default function AdminBilling() {
       test: 100,
       subject: 50,
       quizizz: 150,
-      exam: 1000,
+      exam: 100,
     },
     botFixed: 10000,               // Bot server yuklamasi (per org)
     aiFixed: 15000,                // AI bazaviy oylik xarajat (per org)
@@ -1433,193 +1433,180 @@ export default function AdminBilling() {
 
           {/* RIGHT COLUMN: Simulation Office */}
           <div className="lg:col-span-1">
-             <div className="sticky top-10 space-y-6">
-                <div className="bg-gray-900 rounded-[40px] p-8 border border-white/10 shadow-2xl relative overflow-hidden group">
-                   <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500 rounded-full blur-3xl opacity-20"></div>
-                   
-                   <div className="relative z-10 space-y-8">
-                      <div className="flex items-center gap-3">
-                         <div className="p-3 bg-indigo-500 text-white rounded-2xl shadow-lg shadow-indigo-500/20">
-                            <Calculator className="w-5 h-5" />
+             <div className="sticky top-10 space-y-4">
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                   <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                         <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                            <Calculator className="w-4 h-4" />
                          </div>
                          <div>
-                            <h3 className="text-lg font-black text-white leading-none">Simulator Dashboard</h3>
-                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">Tariflar kalkulyatsiyasi</p>
+                            <h3 className="text-sm font-bold text-slate-800 leading-none">Simulator Dashboard</h3>
+                            <p className="text-[10px] text-slate-400 font-medium mt-0.5">Gemini API & Tarif kalkulyatsiyasi</p>
                          </div>
                       </div>
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-bold">Gemini API</span>
+                   </div>
 
-                      {/* Filters */}
-                      <div className="space-y-5">
-                         <div className="space-y-2">
-                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest pl-1">Tanlangan tarif</label>
-                            <select 
-                              value={simTariffKey}
-                              onChange={(e) => setSimTariffKey(e.target.value as any)}
-                              className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-black uppercase text-xs cursor-pointer hover:bg-white/10"
-                            >
-                               <option value="start" className="bg-gray-900">START</option>
-                               <option value="standard" className="bg-gray-900">STANDARD</option>
-                               <option value="professional" className="bg-gray-900">PROFESSIONAL</option>
-                               <option value="corporate" className="bg-gray-900">CORPORATE</option>
-                            </select>
-                         </div>
-
-                         <div className="space-y-2">
-                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest pl-1">Tashkilotlar soni</label>
-                            <div className="relative">
-                               <input 
-                                 type="number" 
-                                 value={simOrgCount}
-                                 onChange={(e) => setSimOrgCount(Math.max(1, Number(e.target.value)))}
-                                 className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-black text-xl font-mono"
-                               />
-                               <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-white/20 uppercase tracking-widest">orgs</span>
-                            </div>
-                         </div>
-
-                         <div className="pt-2">
-                            <button 
-                              onClick={() => setSimAiOptimized(!simAiOptimized)}
-                              className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group ${simAiOptimized ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' : 'bg-white/5 border-white/10 text-white/60 hover:border-white/20'}`}
-                            >
-                               <div className="flex items-center gap-3">
-                                  <Sparkles className={`w-5 h-5 ${simAiOptimized ? 'animate-pulse' : ''}`} />
-                                  <div className="text-left">
-                                     <p className="text-[10px] font-black uppercase tracking-tighter">Intellektual Optimizatsiya</p>
-                                     <p className="text-[8px] font-bold opacity-60 uppercase">Gemini 2.0 Flash & Lite</p>
-                                  </div>
-                               </div>
-                               <div className={`w-10 h-5 rounded-full relative transition-colors ${simAiOptimized ? 'bg-emerald-500' : 'bg-white/20'}`}>
-                                  <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${simAiOptimized ? 'right-1' : 'left-1'}`}></div>
-                                </div>
-                            </button>
-                         </div>
+                   {/* Filters */}
+                   <div className="grid grid-cols-2 gap-3">
+                      <div>
+                         <label className="text-[10px] font-bold text-slate-500 block mb-1">Tarif reja</label>
+                         <select 
+                           value={simTariffKey}
+                           onChange={(e) => setSimTariffKey(e.target.value as any)}
+                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                         >
+                            <option value="start">START</option>
+                            <option value="standard">STANDARD</option>
+                            <option value="professional">PROFESSIONAL</option>
+                            <option value="corporate">CORPORATE</option>
+                         </select>
                       </div>
 
-                      {/* Calculation results */}
-                      <div className="pt-8 border-t border-white/10 space-y-6">
-                         {(() => {
-                           const tariff = tariffsConfig[simTariffKey];
-                           const footprint = calculateGlobalFootprint(tariff, simOrgCount);
-                           
-                           const sPrice = (simTariffKey === 'corporate' ? calcCorpPrice() : (tariff.price || 0));
-                           const rev = sPrice * simOrgCount;
-                           const cost = footprint.total;
-                           const profit = rev - cost;
-                           const isProfit = profit > 0;
-
-                           return (
-                             <>
-                                <div className="space-y-1">
-                                   <div className="flex justify-between items-end">
-                                      <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Global Yuklama</p>
-                                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${footprint.isFree ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                                         {footprint.isFree ? 'BEPUL LIMIT ICHIDA' : 'LIMITDAN OSHDI'}
-                                      </span>
-                                   </div>
-                                   <div className="text-xl font-black text-white font-mono">{footprint.totalOps.toLocaleString()} <span className="text-[8px] opacity-30 uppercase">ops/oy</span></div>
-                                   <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mt-2">
-                                      <div 
-                                        className={`h-full transition-all duration-1000 ${footprint.isFree ? 'bg-emerald-500' : 'bg-amber-500'}`} 
-                                        style={{ width: `${Math.min(100, (footprint.totalOps / footprint.freeLimit) * 100)}%` }}
-                                      ></div>
-                                   </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Jami oylik tushum</p>
-                                   <div className="text-2xl font-black text-white font-mono tracking-tighter">{rev.toLocaleString()} <span className="text-[10px] text-white/30 uppercase">sum</span></div>
-                                </div>
-                                
-                                <div className="space-y-1">
-                                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">AI orqali yaratish xarajatlari</p>
-                                   <div className="text-sm font-black text-amber-400 font-mono tracking-tight">
-                                      {footprint.ai === 0 ? '0' : `-${footprint.ai.toLocaleString()}`} 
-                                      <span className="text-[9px] opacity-40 uppercase ml-1">sum</span>
-                                   </div>
-                                   <p className="text-[8px] text-white/20 italic">(kurs, test, mavzu, quizizz, imtihon)</p>
-                                </div>
-
-                                <div className="space-y-1">
-                                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Tizim oylik to'lovlari (Paid)</p>
-                                   <div className="text-sm font-black text-indigo-400 font-mono tracking-tight">
-                                      {(footprint.total - footprint.ai) === 0 ? '0' : `-${(footprint.total - footprint.ai).toLocaleString()}`} 
-                                      <span className="text-[9px] opacity-40 uppercase ml-1">sum</span>
-                                   </div>
-                                   {footprint.isFree ? (
-                                     <p className="text-[8px] text-emerald-400/50 italic">Hozirgi yuklama Bepul limit ichida.</p>
-                                   ) : (
-                                     <p className="text-[8px] text-amber-400/50 italic">Limitdan oshgan {footprint.exceedsByOps.toLocaleString()} operatsiya xarajati.</p>
-                                   )}
-                                </div>
-
-                                <div className={`p-5 rounded-[28px] border transition-all ${isProfit ? 'bg-emerald-500/10 border-emerald-500/20 shadow-lg shadow-emerald-500/5' : 'bg-red-500/10 border-red-500/20'}`}>
-                                   <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-                                      {isProfit ? 'Sof foyda (oylik)' : 'Zarar (oylik)'}
-                                   </p>
-                                   <div className={`text-2xl font-black font-mono tracking-tighter ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-                                      {isProfit ? "+" : "-"}{Math.abs(profit).toLocaleString()}
-                                      <span className="text-[10px] ml-1 opacity-60 uppercase">sum</span>
-                                   </div>
-                                   {rev > 0 && (
-                                     <div className={`text-[10px] font-black mt-1 opacity-50 ${isProfit ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        Rentabellik: {((profit/rev)*100).toFixed(1)}%
-                                     </div>
-                                   )}
-                                </div>
-                             </>
-                           );
-                         })()}
+                      <div>
+                         <label className="text-[10px] font-bold text-slate-500 block mb-1">Tashkilotlar soni</label>
+                         <input 
+                           type="number" 
+                           value={simOrgCount}
+                           onChange={(e) => setSimOrgCount(Math.max(1, Number(e.target.value)))}
+                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                         />
                       </div>
+                   </div>
+
+                   <button 
+                     onClick={() => setSimAiOptimized(!simAiOptimized)}
+                     className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${simAiOptimized ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                   >
+                      <div className="flex items-center gap-2">
+                         <Sparkles className={`w-4 h-4 ${simAiOptimized ? 'text-emerald-600' : 'text-slate-400'}`} />
+                         <div>
+                            <p className="text-[11px] font-bold leading-tight">Gemini 2.5 Flash / Lite API Tariff</p>
+                            <p className="text-[9px] opacity-70">Token narxi bo'yicha tejamkor hisob</p>
+                         </div>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${simAiOptimized ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                         <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${simAiOptimized ? 'right-0.5' : 'left-0.5'}`}></div>
+                      </div>
+                   </button>
+
+                   {/* Calculation results */}
+                   <div className="pt-3 border-t border-slate-100 space-y-3">
+                      {(() => {
+                        const tariff = tariffsConfig[simTariffKey];
+                        const footprint = calculateGlobalFootprint(tariff, simOrgCount);
+                        
+                        const sPrice = (simTariffKey === 'corporate' ? calcCorpPrice() : (tariff.price || 0));
+                        const rev = sPrice * simOrgCount;
+                        const cost = footprint.total;
+                        const profit = rev - cost;
+                        const isProfit = profit > 0;
+
+                        return (
+                          <>
+                             <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500 font-medium">Jami oylik tushum:</span>
+                                <span className="font-bold text-slate-800 font-mono">{rev.toLocaleString()} so'm</span>
+                             </div>
+
+                             <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500 font-medium">Gemini API xarajati:</span>
+                                <span className="font-bold text-amber-600 font-mono">
+                                   {footprint.ai === 0 ? "0 so'm" : `-${footprint.ai.toLocaleString()} so'm`}
+                                </span>
+                             </div>
+
+                             <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500 font-medium">Infrastruktura (Paid):</span>
+                                <span className="font-bold text-indigo-600 font-mono">
+                                   {(footprint.total - footprint.ai) === 0 ? "0 so'm" : `-${(footprint.total - footprint.ai).toLocaleString()} so'm`}
+                                </span>
+                             </div>
+
+                             <div className={`p-3 rounded-xl border flex items-center justify-between ${isProfit ? 'bg-emerald-50/50 border-emerald-200 text-emerald-900' : 'bg-rose-50/50 border-rose-200 text-rose-900'}`}>
+                                <div>
+                                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{isProfit ? 'Sof foyda (oylik)' : 'Zarar (oylik)'}</p>
+                                   <div className="text-lg font-extrabold font-mono tracking-tight mt-0.5">
+                                      {isProfit ? "+" : "-"}{Math.abs(profit).toLocaleString()} <span className="text-xs font-normal">so'm</span>
+                                   </div>
+                                </div>
+                                {rev > 0 && (
+                                   <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${isProfit ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                      {((profit/rev)*100).toFixed(1)}% rentabellik
+                                   </span>
+                                )}
+                             </div>
+                          </>
+                        );
+                      })()}
                    </div>
                 </div>
                 
-                <div className="p-8 bg-white border border-gray-100 rounded-[40px] space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                      <Sparkles className="w-5 h-5" />
-                    </div>
-                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">AI Operatsiyasi Narxi (1 dona)</h4>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2.5">
-                    {[
-                      { label: "Kurs yaratish", price: systemCosts.aiUnitCosts.course, icon: BookOpen },
-                      { label: "Test yaratish", price: systemCosts.aiUnitCosts.test, icon: FileText },
-                      { label: "Imtihon yaratish", price: systemCosts.aiUnitCosts.exam, icon: Zap },
-                      { label: "Quizizz yaratish", price: systemCosts.aiUnitCosts.quizizz, icon: HardDrive },
-                      { label: "Mavzu yaratish", price: systemCosts.aiUnitCosts.subject, icon: LayoutDashboard },
-                    ].map((unit, idx) => {
-                      const finalPrice = simAiOptimized ? Math.ceil(unit.price * 0.3) : unit.price;
-                      return (
-                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 hover:border-amber-200 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <unit.icon className="w-3.5 h-3.5 text-gray-400" />
-                            <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{unit.label}</span>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xs font-black text-amber-600 font-mono tracking-tighter">{finalPrice.toLocaleString()} sum</div>
-                            {simAiOptimized && <div className="text-[7px] text-emerald-500 font-black uppercase">Lite Optimized</div>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[9px] font-bold text-gray-400 leading-relaxed italic">
-                    * Gemini 2.0 Flash bepul limiti har 24 soatda yangilanadi (kuniga 1500 request gacha).
-                  </p>
-                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
+                   <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                         Resurs Yaratish Xarajatlari (2 Xil Usul)
+                      </h4>
+                      <span className="text-[10px] text-slate-400 font-medium">Usullar bo'yicha</span>
+                   </div>
 
-                <div className="p-8 bg-gray-50 border border-gray-100 rounded-[40px] space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-xs font-black text-gray-900 uppercase">Analysis</h4>
-                    <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                  </div>
-                  <p className="text-[10px] font-bold text-gray-400 leading-relaxed italic">
-                    Tariflar iqtisodiyoti tranzaksiyalar, saqlash va API yuklamalariga asoslangan holda real vaqtda hisoblanadi.
-                  </p>
+                   <div className="space-y-2">
+                      {/* AI Generation Mode */}
+                      <div className="p-2.5 bg-slate-50/90 rounded-xl space-y-2 border border-slate-100">
+                         <div className="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+                            <div className="flex items-center gap-1.5">
+                               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                               <span className="text-xs font-bold text-slate-800">1. AI orqali avto-yaratish (Gemini Flash API)</span>
+                            </div>
+                            <span className="text-[9px] px-1.5 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded">Token sarfi</span>
+                         </div>
+                         <div className="space-y-1.5 pt-0.5">
+                            {[
+                              { label: "AI Test (mavzu + soni)", price: systemCosts.aiUnitCosts.test, tokens: "~15k token", desc: "Mavzu yoziladi, testlar soni beriladi", icon: FileText },
+                              { label: "AI Imtihon (vaqt oralig'i bilan)", price: systemCosts.aiUnitCosts.exam, tokens: "~15k token", desc: "Test bilan bir xil, faqat ko'rinish vaqti chegaralangan", icon: Zap },
+                              { label: "AI Kurs (Modullar)", price: systemCosts.aiUnitCosts.course, tokens: "~50k token", desc: "To'liq o'quv dasturi strukturasi", icon: BookOpen },
+                              { label: "AI Quizizz to'plami", price: systemCosts.aiUnitCosts.quizizz, tokens: "~15k token", desc: "Interaktiv viktorina darsligi", icon: HardDrive },
+                              { label: "AI Mavzu darsi", price: systemCosts.aiUnitCosts.subject, tokens: "~5k token", desc: "Nazariy matn va mashqlar", icon: LayoutDashboard },
+                            ].map((unit, idx) => {
+                              const finalPrice = simAiOptimized ? Math.ceil(unit.price * 0.3) : unit.price;
+                              return (
+                                <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+                                   <div className="flex items-center gap-2">
+                                      <unit.icon className="w-3 h-3 text-slate-400" />
+                                      <span className="font-semibold text-slate-700">{unit.label}</span>
+                                      <span className="text-[9px] text-slate-400">({unit.tokens})</span>
+                                   </div>
+                                   <div className="font-bold text-slate-800 font-mono text-[11px]">{finalPrice.toLocaleString()} so'm</div>
+                                </div>
+                              );
+                            })}
+                         </div>
+                      </div>
+
+                      {/* Manual / Template Mode */}
+                      <div className="p-2.5 bg-emerald-50/50 rounded-xl space-y-1 border border-emerald-100">
+                         <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                               <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                               <span className="text-xs font-bold text-emerald-900">2. Qo'lda kiritish va Shablon (Matn / Fayl yuklash)</span>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold rounded-md">0 SO'M (BEPUL)</span>
+                         </div>
+                         <p className="text-[9.5px] text-emerald-700/90 leading-relaxed pt-0.5">
+                            Foydalanuvchi shablon bo'yicha tayyorlangan matn yoki faylni yuklaganda, tizim uni avtomatik lokal formatlaydi. Gemini API chaqirilmaydi va <strong>0 token</strong> sarflanadi.
+                         </p>
+                      </div>
+                   </div>
+
+                   <div className="p-2.5 bg-amber-50/60 border border-amber-200/50 rounded-xl text-[9.5px] text-amber-900 leading-relaxed space-y-1">
+                      <p className="font-bold">💡 AI Edu Tizimida Resurs Yaratish Xarajatlari Xulosasi:</p>
+                      <ul className="list-disc pl-4 space-y-0.5">
+                         <li><strong>AI orqali:</strong> Foydalanuvchi faqat mavzu va sonini kiritib buyruq beradi. Gemini 2.5/2.0 Flash tokenlari ishlatiladi.</li>
+                         <li><strong>Qo'lda / Shablon fayl orqali:</strong> Tizim tayyor shablonli fayl yoki matnni o'zi parse qilgani uchun hechnarsa sarflanmaydi (0 so'm).</li>
+                      </ul>
+                   </div>
                 </div>
              </div>
           </div>
