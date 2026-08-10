@@ -32,6 +32,7 @@ const Type = SDKType || {
   OBJECT: "OBJECT",
 };
 import { generateContentWithRotation } from "./src/lib/gemini";
+import { generateCourseWorkDataWithGemini, buildCourseWorkDocxBuffer } from "./src/lib/courseworkGenerator.js";
 import dotenv from "dotenv";
 import sharp from "sharp";
 import fs from "fs";
@@ -2635,7 +2636,76 @@ async function runPresentationGeneration(ctx: any, data: any) {
   }
 }
 
+async function runCourseWorkDocxGeneration(ctx: any, data: any) {
+  const userId = ctx.from.id;
+  const chatId = ctx.chat?.id;
+
+  const loadingMsg = await ctx.reply(
+    `⏳ <b>Akademik Kurs Ishi generatsiya qilinmoqda...</b>\n\n` +
+    `<i>1. OAK va akademik standartlar bo'yicha 3 bob va 6 paragrafli reja shakllantirilmoqda...\n` +
+    `2. Nazariy va amaliy bo'limlar, manbalar hamda oraliq xulosalar tahlil qilinmoqda...\n` +
+    `3. Word (.docx) standarti bo'yicha shakllantirilmoqda...</i>\n\n` +
+    `Iltimos kuting, bu biroz vaqt olishi mumkin.`,
+    { parse_mode: "HTML" }
+  );
+
+  try {
+    const courseWorkData = await generateCourseWorkDataWithGemini({
+      topic: data.topic || "Mavzu ko'rsatilmadi",
+      subject: data.subject || "Fan ko'rsatilmadi",
+      university: data.university || "OTM ko'rsatilmadi",
+      faculty: data.faculty,
+      department: data.department,
+      direction: data.direction,
+      studentName: data.studentName,
+      advisor: data.advisor,
+      city: data.city || "Toshkent",
+      year: data.year || "2026",
+      pageCount: data.pageCount || "30",
+      object: data.object,
+      subjectItem: data.subjectItem,
+      extraRequirements: data.extraRequirements
+    });
+
+    const docxBuffer = await buildCourseWorkDocxBuffer(courseWorkData);
+
+    await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+
+    const cleanStr = (s: string) => (s || "kurs_ishi").substring(0, 30).replace(/[^a-zA-Z0-9]/g, "_");
+    const filename = `Kurs_ishi_${cleanStr(data.topic)}_${cleanStr(data.studentName)}.docx`;
+
+    await ctx.replyWithDocument(
+      { source: docxBuffer, filename },
+      {
+        caption: `✅ <b>AKADEMIK KURS ISHI TAYYOR BO'LDI!</b>\n\n` +
+          `📌 <b>Mavzu:</b> ${data.topic}\n` +
+          `🎓 <b>Talaba:</b> ${data.studentName || "Ko'rsatilmadi"}\n` +
+          `🏛 <b>OTM:</b> ${data.university || "Ko'rsatilmadi"}\n` +
+          `📑 <b>Struktura:</b> Titul varaqasi, Mundarija, Kirish, 3 ta bob (6 paragraf), Xulosa, Ilmiy-amaliy tavsiyalar, Adabiyotlar ro'yxati.\n\n` +
+          `✨ <i>Fayl OAK va oliy ta'lim standartlariga mos Word (.docx) formatida tayyorlandi.</i>`,
+        parse_mode: "HTML"
+      }
+    );
+
+    return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: await getAiAssistantKeyboard(userId),
+        resize_keyboard: true
+      }
+    });
+  } catch (err: any) {
+    console.error("[CourseWork Generation Error]:", err);
+    await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+    return ctx.reply(`❌ <b>Kurs ishi yaratishda xatolik yuz berdi:</b> ${err.message || "Noma'lum xato"}`, { parse_mode: "HTML" });
+  }
+}
+
 async function runDocumentGeneration(ctx: any, docType: string, data: any) {
+  if (docType === "kurs_ishi") {
+    return runCourseWorkDocxGeneration(ctx, data);
+  }
+
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
   const loadingMsg = await ctx.reply(`⏳ <b>Hujjat tayyorlanmoqda...</b>\n\nIltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
@@ -3801,21 +3871,21 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     } else if (step === 3) {
       data.university = input;
       userWizardStates.set(userId, { service, step: 4, data });
-      return ctx.reply("📄 <b>Fakultetni kiriting:</b>", {
+      return ctx.reply("📄 <b>Fakultet nomini kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
     } else if (step === 4) {
       data.faculty = input;
       userWizardStates.set(userId, { service, step: 5, data });
-      return ctx.reply("📄 <b>Kafedrani kiriting:</b>", {
+      return ctx.reply("📄 <b>Kafedra nomini kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
     } else if (step === 5) {
       data.department = input;
       userWizardStates.set(userId, { service, step: 6, data });
-      return ctx.reply("📄 <b>Yo'nalishni kiriting:</b>", {
+      return ctx.reply("📄 <b>Ta'lim yo'nalishini kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
@@ -3829,28 +3899,84 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     } else if (step === 7) {
       data.studentName = input;
       userWizardStates.set(userId, { service, step: 8, data });
-      return ctx.reply("📄 <b>Rahbar F.I.Sh. kiriting:</b>", {
+      return ctx.reply("📄 <b>Ilmiy rahbar F.I.Sh. kiriting:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
     } else if (step === 8) {
       data.advisor = input;
       userWizardStates.set(userId, { service, step: 9, data });
-      return ctx.reply("📄 <b>Sahifalar sonini kiriting:</b>", {
+      return ctx.reply("📄 <b>Shahar va o'quv yilini kiriting (Masalan: Toshkent - 2026):</b>", {
         parse_mode: "HTML",
-        reply_markup: { 
+        reply_markup: {
           keyboard: [
-            [{ text: "15" }, { text: "20" }, { text: "25" }], 
-            [{ text: "30" }, { text: "40" }, { text: "50" }], 
+            [{ text: "Toshkent - 2026" }, { text: "Chirchiq - 2026" }],
+            [{ text: "O'tkazib yuborish (Toshkent - 2026) ➡️" }],
             [{ text: "⬅️ Asosiy menyu" }]
-          ], 
-          resize_keyboard: true 
+          ],
+          resize_keyboard: true
         }
       });
     } else if (step === 9) {
-      data.pageCount = input;
+      if (input.includes("O'tkazib") || !input.trim()) {
+        data.city = "Toshkent";
+        data.year = "2026";
+      } else {
+        const parts = input.split("-");
+        data.city = parts[0]?.trim() || "Toshkent";
+        data.year = parts[1]?.trim() || "2026";
+      }
+      userWizardStates.set(userId, { service, step: 10, data });
+      return ctx.reply("📄 <b>Kurs ishi hajmini (sahifalar soni) tanlang:</b>", {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [
+            [{ text: "30" }, { text: "35" }],
+            [{ text: "40" }, { text: "50" }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
+          resize_keyboard: true
+        }
+      });
+    } else if (step === 10) {
+      data.pageCount = input.replace(/\D/g, '') || "30";
+      userWizardStates.set(userId, { service, step: 11, data });
+      return ctx.reply("📄 <b>Tadqiqot obyekti va predmetini kiriting:</b>\n\n<i>Masalan: Obyekt: Boshlang'ich sinf o'quvchilarida kreativlikni rivojlantirish jarayoni. Predmet: Kreativlikni rivojlantirishning interfaol metodlari va shart-sharoitlari.</i>", {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [
+            [{ text: "O'tkazib yuborish (Avto) ➡️" }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
+          resize_keyboard: true
+        }
+      });
+    } else if (step === 11) {
+      if (input.includes("O'tkazib")) {
+        data.object = "";
+        data.subjectItem = "";
+      } else {
+        data.object = input;
+      }
+      userWizardStates.set(userId, { service, step: 12, data });
+      return ctx.reply("📄 <b>Real tajriba-sinov ma'lumotlari yoki qo'shimcha talablarni kiriting:</b>\n\n⚠️ <i>ESLATMA: Agar sizda real tajriba-sinov natijalari bo'lmasa, quyidagi tugmani bosing. Bot soxta statistika uydurmaydi, balki tajriba-sinov ishlarini tashkil etishning nazariy-amaliy tavsiya modelini yaratadi!</i>", {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [
+            [{ text: "Tajriba ma'lumoti yo'q (Standart model) ➡️" }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
+          resize_keyboard: true
+        }
+      });
+    } else if (step === 12) {
+      if (input.includes("Tajriba ma'lumoti yo'q")) {
+        data.extraRequirements = "";
+      } else {
+        data.extraRequirements = input;
+      }
       userWizardStates.delete(userId);
-      await runDocumentGeneration(ctx, "kurs_ishi", data);
+      await runCourseWorkDocxGeneration(ctx, data);
     }
   }
 
