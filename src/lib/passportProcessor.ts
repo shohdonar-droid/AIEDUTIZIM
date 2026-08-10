@@ -1,5 +1,7 @@
 import sharp from "sharp";
 import { generateContentWithRotation } from "./gemini.js";
+import fetch from "node-fetch";
+import FormData from "form-data";
 
 export interface DetectionBox {
   ymin: number; // 0-1000
@@ -92,11 +94,43 @@ function hexToRgb(hex: string): [number, number, number] | null {
 
 /**
  * Main 3x4 Passport Photo Processing Engine.
- * Ensures clean white background (#FFFFFF), perfect 3:4 cropping, and 100% protection of face/hair/clothes without scanlines or artifacts.
+ * If PASSPORT_SERVICE_URL env variable is present, proxies to Railway FastAPI microservice.
+ * Otherwise uses built-in segmentation & cropping pipeline.
  */
 export async function process3x4PassportPhoto(
   inputBuffer: Buffer
 ): Promise<Buffer> {
+  const serviceUrl = process.env.PASSPORT_SERVICE_URL;
+
+  if (serviceUrl) {
+    try {
+      const form = new FormData();
+      form.append("file", inputBuffer, { filename: "input.jpg", contentType: "image/jpeg" });
+
+      const res = await fetch(`${serviceUrl.replace(/\/$/, '')}/process-3x4`, {
+        method: "POST",
+        body: form as any,
+        headers: form.getHeaders(),
+      });
+
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer();
+        return Buffer.from(arrayBuf);
+      } else {
+        const errJson: any = await res.json().catch(() => ({}));
+        if (errJson.detail) {
+          throw new Error(errJson.detail);
+        }
+      }
+    } catch (microserviceErr: any) {
+      console.warn("[Passport Microservice Proxy Warning]:", microserviceErr.message);
+      if (microserviceErr.message && microserviceErr.message.includes("Yuzingiz aniq")) {
+        throw microserviceErr;
+      }
+    }
+  }
+
+  // Built-in fallback segmentation & face detection pipeline
   const rotated = sharp(inputBuffer).rotate();
   const meta = await rotated.metadata();
   const origW = meta.width || 600;
@@ -105,25 +139,20 @@ export async function process3x4PassportPhoto(
   const base64Jpg = (await rotated.jpeg({ quality: 80 }).toBuffer()).toString("base64");
   const vision = await analyzePassportPhotoWithGemini(base64Jpg);
 
-  // Default fallback boxes if vision fails
   const headBox = vision.head || vision.face || { ymin: 150, xmin: 250, ymax: 600, xmax: 750 };
   const personBox = vision.person || { ymin: 150, xmin: 150, ymax: 950, xmax: 850 };
 
-  // Target dimensions: 600 x 800 (standard 3x4 @ 300 DPI)
-  const targetW = 600;
-  const targetH = 800;
+  const targetW = 354;
+  const targetH = 472;
 
-  // Head center X in original coordinates
   const headCenterX = Math.round((((headBox.xmin + headBox.xmax) / 2) * origW) / 1000);
   const headTopY = Math.round((headBox.ymin * origH) / 1000);
   const headBottomY = Math.round((headBox.ymax * origH) / 1000);
   const headHeightPx = Math.max(50, headBottomY - headTopY);
 
-  // In standard passport photos, head height should be ~60% of crop height
-  let cropH = Math.round(headHeightPx / 0.60);
+  let cropH = Math.round(headHeightPx / 0.72);
   let cropW = Math.round((cropH * 3) / 4);
 
-  // Clamp crop size to image bounds
   if (cropH > origH) {
     cropH = origH;
     cropW = Math.round((origH * 3) / 4);
@@ -133,21 +162,17 @@ export async function process3x4PassportPhoto(
     cropH = Math.round((origW * 4) / 3);
   }
 
-  // Position top edge so top margin (above top of hair) is ~10% of crop height
-  let cropTop = Math.round(headTopY - cropH * 0.10);
+  let cropTop = Math.round(headTopY - cropH * 0.12);
   let cropLeft = Math.round(headCenterX - cropW / 2);
 
-  // Clamp left and top
   cropLeft = Math.max(0, Math.min(origW - cropW, cropLeft));
   cropTop = Math.max(0, Math.min(origH - cropH, cropTop));
 
-  // Extract crop and resize to exactly 600 x 800 px
   const croppedBuf = await rotated
     .extract({ left: cropLeft, top: cropTop, width: cropW, height: cropH })
     .resize(targetW, targetH, { fit: "cover" })
     .toBuffer();
 
-  // Convert vision normalized coordinates to cropped target canvas (600x800)
   const toCanvasX = (normX: number) => {
     const origX = (normX * origW) / 1000;
     return Math.round(((origX - cropLeft) / cropW) * targetW);
@@ -171,19 +196,17 @@ export async function process3x4PassportPhoto(
     ymax: Math.min(targetH - 1, toCanvasY(personBox.ymax)),
   };
 
-  // Convert image to EXACT 3-channel RGB raw buffer (3 bytes per pixel)
   const { data: rawPixels, info } = await sharp(croppedBuf)
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  const channels = 3; // Strict 3 channels (RGB)
+  const channels = 3;
   const width = info.width;
   const height = info.height;
   const totalPixels = width * height;
   const buf = Buffer.from(rawPixels);
 
-  // Protected Mask: 0 = BG, 1 = Body/Person, 2 = Core Head/Face (IMMUTABLE)
   const protectedMask = new Uint8Array(totalPixels);
 
   const headMidX = (cHead.xmin + cHead.xmax) / 2;
@@ -197,20 +220,17 @@ export async function process3x4PassportPhoto(
       const dx = (x - headMidX) / headRadiusX;
       const dy = (y - headMidY) / headRadiusY;
 
-      // Inside head ellipse -> Immutable Core
       if (dx * dx + dy * dy <= 1.0) {
         protectedMask[idx] = 2;
         continue;
       }
 
-      // Inside person bounding box -> Protected Person
       if (x >= cPerson.xmin && x <= cPerson.xmax && y >= cPerson.ymin) {
         protectedMask[idx] = 1;
       }
     }
   }
 
-  // Sample background colors from outer border
   const bgSamples: [number, number, number][] = [];
   const addBgSample = (x: number, y: number) => {
     if (x >= 0 && x < width && y >= 0 && y < height) {
@@ -249,7 +269,6 @@ export async function process3x4PassportPhoto(
     return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
   }
 
-  // Flood fill background detection
   const isBgPixel = new Uint8Array(totalPixels);
   const queue: number[] = [];
 
@@ -279,7 +298,7 @@ export async function process3x4PassportPhoto(
 
     const d = colorDist(r, g, b, avgBgR, avgBgG, avgBgB);
 
-    if (protectedMask[curr] === 2) continue; // Immutable head core
+    if (protectedMask[curr] === 2) continue;
 
     const maxAllowedDist = protectedMask[curr] === 1 ? 40 : 65;
 
@@ -299,7 +318,6 @@ export async function process3x4PassportPhoto(
     }
   }
 
-  // Replace background pixels in 3-channel buffer with solid white (#FFFFFF -> 255, 255, 255)
   for (let i = 0; i < totalPixels; i++) {
     if (isBgPixel[i]) {
       const pixIdx = i * channels;
@@ -309,11 +327,75 @@ export async function process3x4PassportPhoto(
     }
   }
 
-  // Return crisp 600x800 px JPEG at 300 DPI
   return await sharp(buf, {
     raw: { width, height, channels: 3 }
   })
     .withMetadata({ density: 300 })
-    .jpeg({ quality: 98, chromaSubsampling: "4:4:4" })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+}
+
+/**
+ * Creates a 10x15 cm print sheet containing 4 copies of the 3x4 photo.
+ */
+export async function createPrintSheet(photo3x4Buffer: Buffer, copies: number = 4): Promise<Buffer> {
+  const serviceUrl = process.env.PASSPORT_SERVICE_URL;
+
+  if (serviceUrl) {
+    try {
+      const form = new FormData();
+      form.append("file", photo3x4Buffer, { filename: "3x4.jpg", contentType: "image/jpeg" });
+      form.append("copies", copies.toString());
+
+      const res = await fetch(`${serviceUrl.replace(/\/$/, '')}/create-print-sheet`, {
+        method: "POST",
+        body: form as any,
+        headers: form.getHeaders(),
+      });
+
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer();
+        return Buffer.from(arrayBuf);
+      }
+    } catch (e) {
+      console.warn("[Print Sheet Proxy Warning]:", e);
+    }
+  }
+
+  // Node.js sharp fallback for 10x15 cm canvas (1181 x 1772 px @ 300 DPI)
+  const sheetW = 1181;
+  const sheetH = 1772;
+  const photo3x4 = await sharp(photo3x4Buffer).resize(354, 472).toBuffer();
+
+  const cols = 2;
+  const rows = copies <= 4 ? 2 : 3;
+
+  const marginX = Math.floor((sheetW - cols * 354) / (cols + 1));
+  const marginY = Math.floor((sheetH - rows * 472) / (rows + 1));
+
+  const compositeItems: { input: Buffer; left: number; top: number }[] = [];
+
+  let count = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (count >= copies) break;
+      const left = marginX + c * (354 + marginX);
+      const top = marginY + r * (472 + marginY);
+      compositeItems.push({ input: photo3x4, left, top });
+      count++;
+    }
+  }
+
+  return await sharp({
+    create: {
+      width: sheetW,
+      height: sheetH,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 }
+    }
+  })
+    .composite(compositeItems)
+    .withMetadata({ density: 300 })
+    .jpeg({ quality: 95 })
     .toBuffer();
 }
