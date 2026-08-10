@@ -3781,41 +3781,6 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       });
     } else if (step === 10) {
       data.pageCount = input.replace(/\D/g, '') || "30";
-      userWizardStates.set(userId, { service, step: 11, data });
-      return ctx.reply("📄 <b>Tadqiqot obyekti va predmetini kiriting:</b>\n\n<i>Masalan: Obyekt: Boshlang'ich sinf o'quvchilarida kreativlikni rivojlantirish jarayoni. Predmet: Kreativlikni rivojlantirishning interfaol metodlari va shart-sharoitlari.</i>", {
-        parse_mode: "HTML",
-        reply_markup: {
-          keyboard: [
-            [{ text: "O'tkazib yuborish (Avto) ➡️" }],
-            [{ text: "⬅️ Asosiy menyu" }]
-          ],
-          resize_keyboard: true
-        }
-      });
-    } else if (step === 11) {
-      if (input.includes("O'tkazib")) {
-        data.object = "";
-        data.subjectItem = "";
-      } else {
-        data.object = input;
-      }
-      userWizardStates.set(userId, { service, step: 12, data });
-      return ctx.reply("📄 <b>Real tajriba-sinov ma'lumotlari yoki qo'shimcha talablarni kiriting:</b>\n\n⚠️ <i>ESLATMA: Agar sizda real tajriba-sinov natijalari bo'lmasa, quyidagi tugmani bosing. Bot soxta statistika uydurmaydi, balki tajriba-sinov ishlarini tashkil etishning nazariy-amaliy tavsiya modelini yaratadi!</i>", {
-        parse_mode: "HTML",
-        reply_markup: {
-          keyboard: [
-            [{ text: "Tajriba ma'lumoti yo'q (Standart model) ➡️" }],
-            [{ text: "⬅️ Asosiy menyu" }]
-          ],
-          resize_keyboard: true
-        }
-      });
-    } else if (step === 12) {
-      if (input.includes("Tajriba ma'lumoti yo'q")) {
-        data.extraRequirements = "";
-      } else {
-        data.extraRequirements = input;
-      }
       userWizardStates.delete(userId);
       await runCourseWorkDocxGeneration(ctx, data);
     }
