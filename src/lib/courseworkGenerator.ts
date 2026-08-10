@@ -991,7 +991,19 @@ export async function generateCourseWorkDataWithGemini(input: CourseWorkInput): 
   const pageTarget = parseInt(input.pageCount || "30", 10) || 30;
   const hasRealExp = Boolean(input.extraRequirements && input.extraRequirements.length > 10);
 
-  const prompt = `Siz O'zbekiston Oliy ta'lim tizimi OAK standartlariga to'liq mos keladigan, professional va akademik KURS ISHI yaratuvchi yetakchi ekspert-olim va professorsiz.
+  const prompt = `SEN — AIEDUTIZIM platformasining PROFESSIONAL KURS ISHI YARATUVCHI AKADEMIK AI yordamchisisan.
+
+Sening asosiy vazifang — foydalanuvchi bergan mavzu va ma'lumotlar asosida O'zbekiston oliy ta'lim muassasalarida foydalanishga mos, ilmiy-akademik uslubda yozilgan, mantiqan izchil va to'liq KURS ISHI tayyorlash.
+
+MUHIM:
+Kurs ishi oddiy referat yoki uzun AI matni bo'lmasligi kerak. U:
+- kurs ishi standartidagi strukturaga;
+- ilmiy-akademik uslubga;
+- mantiqiy 3 bob va 6 paragraflar tizimiga;
+- tadqiqot apparatiga (dolzarblik, muammo, obyekt, predmet, maqsad, vazifalar, ilmiy yangilik, amaliy ahamiyat);
+- ilmiy tahlilga;
+- amaliy tavsiyalarga;
+- bibliografik tartibga javob berishi kerak.
 
 TOPILGAN FAKTLAR VA METADATA:
 - Mavzu: "${input.topic}"
@@ -1007,29 +1019,30 @@ TOPILGAN FAKTLAR VA METADATA:
 - Mo'ljallangan hajm: ${pageTarget} sahifa
 - Tadqiqot obyekti: "${input.object || "Mavzuga mos akademik pedagogik/amaliy jarayon"}"
 - Tadqiqot predmeti: "${input.subjectItem || "Mavzuga mos usul, mexanizm va metodik shart-sharoitlar"}"
-- Real tajriba ma'lumotlari mavjudligi: ${hasRealExp ? "HA (" + input.extraRequirements + ")" : "YO'Q"}
+- Real tajriba ma'lumotlari: ${hasRealExp ? "HA (" + input.extraRequirements + ")" : "YO'Q"}
 
 QAT'IY TASHKILIY VA AKADEMIK QOIDALAR:
 1. AKADEMIK HALOLLIK (SOXTA TAJRIBA TAQIQLANADI):
    ${
      !hasRealExp
-       ? "Foydalanuvchi real tajriba-sinov ma'lumotlarini bermadi. SHUNING UCHUN HECH QACHON SOXTA RESPONDENTLAR SONI (masalan: '52 nafar o'quvchi'), FOIZLAR, BALLAR, STUDENT T-TEST, P-VALUE UYDURMA! III bobdagi tajriba bo'limini 'Tajriba-sinov ishlarini tashkil etishning tavsiya etilayotgan modeli' shaklida yoz. Tajriba maqsadi, bosqichlari, diagnostika va baholash mezonlari hamda kutilayotgan natijalarni ber."
+       ? "Foydalanuvchi real tajriba-sinov ma'lumotlarini bermadi. SHUNING UCHUN HECH QACHON SOXTA RESPONDENTLAR SONI (masalan: '52 nafar o'quvchi'), FOIZLAR, BALLAR, STUDENT T-TEST, P-VALUE UYDURMA! III bobdagi 3.2-paragrafni 'Tajriba-sinov ishlarini tashkil etishning tavsiya etilayotgan modeli' yoki 'Taklif etilayotgan metodikaning amaliy qo'llash mexanizmi' deb yoz. Maqsad, bosqichlar, diagnostika, baholash mezonlari va kutilayotgan natijalarni ber."
        : "Foydalanuvchi kiritgan ushbu real tajriba ma'lumotlariga tayan: " + input.extraRequirements
    }
 
 2. STRUKTURA (3 BOB, 6 PARAGRAF):
-   - KIRISH (dolzarblik, muammo, obyekt, predmet, maqsad, 6 ta vazifa, metodologik asos, usullar, ilmiy yangilik, amaliy ahamiyat, tuzilishi)
-   - I BOB: Nazariy-metodologik asoslar (1.1 va 1.2 paragraflar, I bob bo'yicha xulosa)
-   - II BOB: Amaliy holat va zamonaviy metodlar (2.1 va 2.2 paragraflar, II bob bo'yicha xulosa)
-   - III BOB: Takomillashtirish va amaliy yechimlar / tavsiya etilayotgan model (3.1 va 3.2 paragraflar, III bob bo'yicha xulosa)
+   - KIRISH (dolzarblik, muammoning o'rganilganlik darajasi, tadqiqot muammosi, obyekt, predmet, maqsad, 6-8 ta vazifa, metodologik asos va usullar, ilmiy yangilik, amaliy ahamiyat, kurs ishining tuzilishi)
+   - I BOB: Nazariy-metodologik asoslar (1.1 va 1.2 paragraflar, I bob bo'yicha oraliq xulosa)
+   - II BOB: Amaliy holat va zamonaviy yondashuvlar (2.1 va 2.2 paragraflar, II bob bo'yicha oraliq xulosa)
+   - III BOB: Takomillashtirish va amaliy yechimlar / tavsiya etilayotgan model (3.1 va 3.2 paragraflar, III bob bo'yicha oraliq xulosa)
    - XULOSA (maqsad va vazifalarga muvofiq, qayta tiklanmaydigan mantiqiy umumlashtirish)
    - ILMIY-AMALIY TAVSIYALAR (o'qituvchi, muassasa, talaba va baholash uchun)
-   - FOYDALANILGAN ADABIYOTLAR RO'YXATI (I. Normativ, II. Darsliklar, III. Maqolalar, IV. Xorijiy adabiyotlar, V. Internet manbalar — kamida 20-30 ta real ilmiy manbalar)
+   - FOYDALANILGAN ADABIYOTLAR RO'YXATI (I. Normativ, II. Darsliklar va o'quv qo'llanmalar, III. Maqolalar, IV. Xorijiy adabiyotlar, V. Internet resurslari — kamida 25-30 ta tartibli ilmiy manbalar)
 
 3. TIL VA USLUB:
-   - Toza o'zbek tili, rasmiy-akademik va ilmiy.
+   - Toza o'zbek adabiy tilida, rasmiy-akademik va ilmiy.
    - HECH QANDAY SHABLON AI GAPLARI ("ushbu mavzu juda dolzarb va muhim hisoblanadi" kabi) TAKRORLANMASIN.
-   - Izchil terminologiya (Vygotsky, Guilford, Torrance va mahalliy olimlar qarashlari tahlili).
+   - Izchil terminologiya va mavzuga aloqador haqiqiy olimlar qarashlari tahlili.
+   - Matn ichida texnik belgilar (markdown ###, **, html taglar, debug) umuman bo'lmasin.
 
 JAVOB FAQAT TO'LIQ VA MUKAMMAL JSON FORMATIDA BO'LISHI SHART.`;
 
