@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /settings
+Disallow: /billing
+Disallow: /api/
+
+Sitemap: https://www.aide.uz/sitemap.xml

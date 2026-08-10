@@ -293,10 +293,102 @@ export const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
+// Canonical 301 Redirect Middleware from apex domain (aide.uz) to www (www.aide.uz)
+app.use((req, res, next) => {
+  const host = (req.headers.host || "").toLowerCase();
+  if (host === "aide.uz") {
+    return res.redirect(301, `https://www.aide.uz${req.originalUrl || req.url}`);
+  }
+  next();
+});
+
 app.get("/api/health", (req, res) => {
     // Log for debugging
     const keys = Object.keys(process.env).filter(k => k.includes("GEMINI") || k.includes("API"));
     res.json({ status: "ok", keysFound: keys, poolSize: getGeminiKeysPool().length });
+  });
+
+  // SEO Robots & Sitemap endpoints
+  app.get("/robots.txt", (req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.status(200).send(`User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /settings
+Disallow: /billing
+Disallow: /api/
+
+Sitemap: https://www.aide.uz/sitemap.xml`);
+  });
+
+  app.get("/sitemap.xml", (req, res) => {
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.aide.uz/</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/info</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/leadership</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/partners</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/tariffs</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/courses</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/tests</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/quizizz</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/search-cert</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.aide.uz/contact</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+</urlset>`);
   });
 
   app.get("/api/db-health", async (req, res) => {
