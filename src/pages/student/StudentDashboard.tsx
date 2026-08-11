@@ -79,7 +79,7 @@ export default function StudentDashboard() {
             >
               <p className="font-black text-gray-900 truncate uppercase text-[10px] tracking-tight">{user?.displayName}</p>
               <p className="text-[8px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-0.5">Talaba</p>
-              <p className="text-[9px] text-amber-600 font-extrabold font-mono tracking-wide mt-0.5 truncate">ID: {user?.systemId || user?.uid}</p>
+              <p className="text-xs font-black text-amber-600 font-mono tracking-wider mt-1 truncate">ID: {user?.systemId || user?.uid}</p>
             </motion.div>
           )}
         </div>

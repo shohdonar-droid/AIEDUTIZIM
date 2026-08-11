@@ -202,7 +202,7 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
                 <span className="font-bold text-[9px] text-blue-600 tracking-widest uppercase mt-0.5">
                   {user?.role === 'superadmin' ? 'SUPER ADMINISTRATOR' : (user?.role === 'subadmin' ? 'KICHIK ADMINISTRATOR' : 'ADMINISTRATOR')}
                 </span>
-                <span className="font-black text-[10px] text-amber-600 font-mono tracking-wide mt-0.5">
+                <span className="font-black text-xs text-amber-600 font-mono tracking-wider mt-1">
                   ID: {user?.systemId || user?.uid}
                 </span>
               </div>
