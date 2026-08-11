@@ -17,6 +17,7 @@ import {
 import safeOnSnapshot from "../../lib/safeSnapshot";
 import { Message, UserProfile } from "../../types";
 import { Send, User as UserIcon } from "lucide-react";
+import { compareUsersById } from "../../lib/idUtils";
 
 export default function TeacherChat() {
   const { user } = useAuth();
@@ -119,9 +120,7 @@ export default function TeacherChat() {
       // Sort students alphabetically by FISH
 
       // Sort students alphabetically by FISH
-      students.sort((a, b) =>
-        (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"),
-      );
+      students.sort(compareUsersById);
 
       const finalContacts: UserProfile[] = [...sysContact];
       // Only show ONE admin, prioritizing Elyorbek

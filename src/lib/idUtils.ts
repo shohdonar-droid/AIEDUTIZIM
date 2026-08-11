@@ -55,3 +55,30 @@ export async function getNextSequentialId(role: UserRoleIDType): Promise<string>
     return baseNumber.toString();
   }
 }
+
+/**
+ * Utility function to sort users by ID (systemId, login, or uid) in ascending numerical/alphanumeric order.
+ * Falls back to displayName if IDs are not present.
+ */
+export function compareUsersById(a: any, b: any): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+
+  const idA = String(a.systemId || a.login || a.system_id || a.id || a.uid || '').trim();
+  const idB = String(b.systemId || b.login || b.system_id || b.id || b.uid || '').trim();
+
+  if (idA && idB) {
+    const cmp = idA.localeCompare(idB, undefined, { numeric: true, sensitivity: 'base' });
+    if (cmp !== 0) return cmp;
+  } else if (idA) {
+    return -1;
+  } else if (idB) {
+    return 1;
+  }
+
+  const nameA = a.displayName || a.name || '';
+  const nameB = b.displayName || b.name || '';
+  return nameA.localeCompare(nameB, 'uz-UZ');
+}
+

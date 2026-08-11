@@ -35,7 +35,7 @@ import firebaseConfig from "../../../firebase-applet-config.json";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../hooks/useAuth";
 import { logSystemAction } from "../../lib/logUtils";
-import { getNextSequentialId } from "../../lib/idUtils";
+import { getNextSequentialId, compareUsersById } from "../../lib/idUtils";
 import { generatePassword } from "../../lib/helpers";
 import { defaultTariffs } from "../Tariffs";
 
@@ -322,24 +322,23 @@ export default function AdminUsers() {
         const students = studentsSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
           .filter(u => !u.isBotUser && !u.fromTelegram && !u.displayName?.endsWith("(Telegram)"))
-          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+          .sort(compareUsersById);
         const teachersList = teachersSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+          .sort(compareUsersById);
         const independentList = independentTeachersSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+          .sort(compareUsersById);
         const staffList = staffSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+          .sort(compareUsersById);
         const subadminsList = subadminsSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
           .sort((a, b) => {
             // Sort by role first ('admin' before 'subadmin')
             if (a.role === 'admin' && b.role !== 'admin') return -1;
             if (a.role !== 'admin' && b.role === 'admin') return 1;
-            // Then sort by displayName
-            return (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ");
+            return compareUsersById(a, b);
           });
         const tgUsers = tgSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const botConfigs = botConfigsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -383,10 +382,10 @@ export default function AdminUsers() {
 
         const students = studentsSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+          .sort(compareUsersById);
         const staffList = staffSnap.docs
           .map(d => ({ uid: d.id, ...d.data() }) as UserProfile)
-          .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ"));
+          .sort(compareUsersById);
 
         setDepartments(depts);
         setGroups(grps);

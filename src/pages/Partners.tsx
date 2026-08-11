@@ -5,6 +5,7 @@ import { UserProfile } from '../types';
 import { motion } from 'motion/react';
 import { Loader2, Mail, Phone, MapPin, Building2, Briefcase } from 'lucide-react';
 import { makeDirectImageUrl } from '../lib/helpers';
+import { compareUsersById } from '../lib/idUtils';
 
 const DEFAULT_ORG_IMAGE = "https://cdn-icons-png.flaticon.com/512/2830/2830312.png";
 
@@ -24,12 +25,8 @@ export default function Partners() {
         const orgList = orgSnap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile));
         const indList = independentSnap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile));
         
-        setPartners(orgList.sort((a, b) => 
-          (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ")
-        ));
-        setIndependentTeachers(indList.sort((a, b) => 
-          (a.displayName || "").localeCompare(b.displayName || "", "uz-UZ")
-        ));
+        setPartners(orgList.sort(compareUsersById));
+        setIndependentTeachers(indList.sort(compareUsersById));
       } catch (err) {
         console.error("Error fetching partners:", err);
       } finally {

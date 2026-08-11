@@ -7,7 +7,7 @@ import { Search, Trash2, Filter, Key, Plus, X, Save, Loader2, Download, Edit } f
 import { useAuth } from '../../hooks/useAuth';
 import * as XLSX from 'xlsx';
 import firebaseConfig from '../../../firebase-applet-config.json';
-import { getNextSequentialId } from '../../lib/idUtils';
+import { getNextSequentialId, compareUsersById } from '../../lib/idUtils';
 
 export default function TeacherStudents() {
   const { user } = useAuth();
@@ -211,7 +211,7 @@ export default function TeacherStudents() {
         );
         const unsub = safeOnSnapshot(q, (snap) => {
           const dbUsers = snap.docs.map(doc => ({ ...doc.data() } as UserProfile));
-          dbUsers.sort((a, b) => a.displayName.localeCompare(b.displayName, 'uz-UZ'));
+          dbUsers.sort(compareUsersById);
           setUsers(dbUsers);
           setLoading(false);
         }, (err: any) => {

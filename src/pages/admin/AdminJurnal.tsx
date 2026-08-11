@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import CertificateViewer from "../../components/CertificateViewer";
+import { compareUsersById } from "../../lib/idUtils";
 import * as XLSX from "xlsx";
 
 export default function AdminJurnal() {
@@ -240,7 +241,7 @@ export default function AdminJurnal() {
       s.name.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   filteredStudents = filteredStudents.sort((a, b) =>
-    a.name.localeCompare(b.name),
+    compareUsersById(a, b),
   );
 
   const tableData = selectedCourse
@@ -341,7 +342,7 @@ export default function AdminJurnal() {
       .sort((a, b) => {
         const studentA = allSystemUsers.find((u) => u.uid === a.userId);
         const studentB = allSystemUsers.find((u) => u.uid === b.userId);
-        return (studentA?.name || "").localeCompare(studentB?.name || "");
+        return compareUsersById(studentA, studentB);
       });
 
     const exportData = filteredResults.map((r, idx) => {

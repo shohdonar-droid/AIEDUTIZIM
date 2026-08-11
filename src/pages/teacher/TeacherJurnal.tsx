@@ -19,6 +19,7 @@ import {
   Course,
   Test,
 } from "../../types";
+import { compareUsersById } from "../../lib/idUtils";
 import {
   Loader2,
   Download,
@@ -243,7 +244,7 @@ export default function TeacherJurnal() {
 
   // Total Student List for "Matrix" like view
   const allTeacherStudents = Object.values(studentProfiles).sort((a, b) =>
-    (a.displayName || "").localeCompare(b.displayName || ""),
+    compareUsersById(a, b),
   );
 
   // Filtering Course
@@ -354,9 +355,7 @@ export default function TeacherJurnal() {
         .sort((a, b) => {
           const studentA = studentProfiles[a.userId];
           const studentB = studentProfiles[b.userId];
-          return (studentA?.displayName || "").localeCompare(
-            studentB?.displayName || "",
-          );
+          return compareUsersById(studentA, studentB);
         });
 
       exportData = filteredResults.map((r, i) => {

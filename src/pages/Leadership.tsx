@@ -5,6 +5,7 @@ import { UserProfile } from '../types';
 import { motion } from 'motion/react';
 import { Loader2, Mail, Phone, User, Briefcase, Star } from 'lucide-react';
 import { makeDirectImageUrl } from '../lib/helpers';
+import { compareUsersById } from '../lib/idUtils';
 
 const DEFAULT_ADMIN_IMAGE = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
 
@@ -33,7 +34,7 @@ export default function Leadership() {
         const subadminList = subadminSnap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile));
 
         // Group super admins first
-        setAdmins([...adminList, ...subadminList.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""))]);
+        setAdmins([...adminList.sort(compareUsersById), ...subadminList.sort(compareUsersById)]);
       } catch (err) {
         console.error("Error fetching leadership:", err);
       } finally {
