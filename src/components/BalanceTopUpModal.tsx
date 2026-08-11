@@ -295,8 +295,20 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
                   const cleanCard = cardSettings.number.replace(/\s+/g, '');
                   let payUrl = "#";
                   if (paymentType === 'Click') {
-                    // Click P2P Direct App Deep Link
-                    payUrl = `https://click.uz/p2p/${cleanCard}`;
+                    const deepLink = `clickuz://p2p/${cleanCard}`;
+                    const webUrl = `https://my.click.uz/p2p/${cleanCard}`;
+                    
+                    // Try to launch native app via deep link scheme
+                    try {
+                      window.location.href = deepLink;
+                      // Fallback to web link if app isn't triggered within short delay
+                      setTimeout(() => {
+                        window.open(webUrl, '_blank');
+                      }, 1000);
+                    } catch (e) {
+                      window.open(webUrl, '_blank');
+                    }
+                    return;
                   } else if (paymentType === 'Payme') {
                     payUrl = `https://payme.uz/`;
                   } else if (paymentType === 'Uzum Bank') {
