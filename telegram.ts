@@ -1182,8 +1182,50 @@ async function getAuthedUser(userId: number) {
   return authed;
 }
 
+async function getPaymentInstructions() {
+  let cardNum = "5614 6812 9015 3646";
+  let cardOwner = "IBODULLAYEVA SH";
+  let cardType = "Humo / Uzcard";
+
+  if (db) {
+    try {
+      const snap = await getDoc(doc(db, "settings", "payment_card"));
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.number) cardNum = d.number;
+        if (d.owner) cardOwner = d.owner;
+        if (d.type) cardType = d.type;
+      }
+    } catch (e) {}
+  }
+
+  const cleanCard = cardNum.replace(/\s+/g, '');
+  const clickP2pUrl = `https://click.uz/p2p/${cleanCard}`;
+
+  const text = 
+    `💳 <b>BALANSNI TO'LDIRISH VA TO'LOV QILISH</b>\n\n` +
+    `📲 <b>Click orqali to'lov (Ilova orqali avtomatik):</b>\n` +
+    `Quyidagi <b>"📲 Click ilovasida o'tkazish"</b> tugmasini bossangiz, telefoningizdagi Click ilovasi avtomatik ochiladi va o'tkazmalar (P2P) oynasiga karta raqami kiritilgan holda o'tadi!\n\n` +
+    `💳 <b>Admin karta ma'lumotlari:</b>\n` +
+    `• Karta raqami: <code>${cardNum}</code>\n` +
+    `• Karta egasi: <b>${cardOwner}</b> (${cardType})\n\n` +
+    `📝 <b>Ketma-ketlik:</b>\n` +
+    `1. <b>"📲 Click ilovasida o'tkazish"</b> tugmasini bosing (Click ilovasi ochiladi).\n` +
+    `2. Kerakli summani kiritib to'lovni bajaring.\n` +
+    `3. To'lov amalga oshgach, <b>to'lov chekini (skrinshotini)</b> ushbu botga rasm holida yuboring.\n` +
+    `4. Administrator tekshirib balansingizga mablag' qo'shadi!`;
+
+  const keyboard = [
+    [{ text: "📲 Click ilovasida o'tkazish (P2P)", url: clickP2pUrl }],
+    [{ text: "💳 Payme", url: "https://payme.uz/" }, { text: "📲 Uzum Bank", url: "https://uzumbank.uz/" }],
+    [{ text: "🌐 Sayt orqali to'lov", url: `${APP_URL}/tariffs` }]
+  ];
+
+  return { text, keyboard };
+}
+
 const paymentInstructionsText = `💳 <b>Balansni to'ldirish yo'riqnomasi:</b>\n\n` +
-                     `1.  Click, Payme yoki uzum orqali to'lovni amalga oshiring.\n\n` +
+                     `1. Click, Payme yoki Uzum orqali to'lovni amalga oshiring.\n\n` +
                      `Yoki quyidagi karta raqamiga o'tkazma qiling va botga skrinshotini yuboring:\n` +
                      `💳 <code>5614 6812 9015 3646</code>\n` +
                      `Ibodullayeva SH`;
@@ -1981,12 +2023,11 @@ bot.action(/admin_reject_pay_(\d+)/, async (ctx) => {
 bot.action("add_balance", async (ctx) => {
   try {
     await ctx.answerCbQuery();
-    await ctx.reply(paymentInstructionsText, { 
+    const info = await getPaymentInstructions();
+    await ctx.reply(info.text, { 
       parse_mode: "HTML",
       reply_markup: {
-        inline_keyboard: [
-          [{ text: "Click", url: "https://click.uz/" }, { text: "Payme", url: "https://payme.uz/" }, { text: "Uzum", url: "https://uzum.com/" }]
-        ]
+        inline_keyboard: info.keyboard
       }
     });
   } catch (e) {}
@@ -5439,12 +5480,11 @@ Foydalanuvchi xabari: ${prompt}`;
   if (normText === "💳 Balansni to'ldirish") {
     aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
-    return ctx.reply(paymentInstructionsText, { 
+    const info = await getPaymentInstructions();
+    return ctx.reply(info.text, { 
       parse_mode: "HTML",
       reply_markup: {
-        inline_keyboard: [
-          [{ text: "Click", url: "https://click.uz/" }, { text: "Payme", url: "https://payme.uz/" }, { text: "Uzum", url: "https://uzum.com/" }]
-        ]
+        inline_keyboard: info.keyboard
       }
     });
   }

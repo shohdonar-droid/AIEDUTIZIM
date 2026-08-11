@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, GraduationCap, LayoutGrid, BarChart3, Users, 
   Award, ArrowRight, BrainCircuit, Download, FileText, CheckCircle2, Send, 
   Instagram, Youtube, BookText, Presentation, CheckSquare, Sparkles, 
-  Bot, Zap, Layers, Info, X, ExternalLink, ShieldCheck
+  Bot, Zap, Layers, Info, X, ExternalLink, ShieldCheck, MessageSquare
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -203,8 +203,8 @@ export default function Home() {
       link: "/quizizz"
     },
     { 
-      title: "Sun'iy intellekt bilan test va hujjat yaratish", 
-      desc: "O'qituvchilar va talabalar uchun AI orqali mavzuga oid savollar, OAK standartida Kurs ishi, Referat va Taqdimotlarni avtomatik shakllantirish.", 
+      title: "Sun'iy intellekt bilan test yaratish", 
+      desc: "O'qituvchilar uchun AI orqali mavzuga oid savollarni avtomatik shakllantirish, o'quv jarayonini sezilarli darajada tezlashtirish.", 
       icon: FileText,
       link: "/tariffs"
     },
@@ -217,20 +217,20 @@ export default function Home() {
     { 
       title: "Zamonaviy modulli ta'lim", 
       desc: "Talabalarning kurs doirasidagi barcha qadamlarini interaktiv modullar orqali kuzatish va ilg'or o'zlashtirish statistikasi.", 
-      icon: GraduationCap,
+      icon: BarChart3,
       link: "/courses"
     },
     { 
       title: "Xavfsizlik va avtomatlashgan jurnal", 
-      desc: "Baholar, davomat, sertifikatlar haqqoniyligi va ishtirokchilar tarixi mutlaqo xavfsiz va tizimli kataloglanadi.", 
+      desc: "Baholar, sertifikatlar haqqoniyligi va ishtirokchilar tarixi mutlaqo xavfsiz va tizimli kataloglanadi.", 
       icon: CheckCircle2,
       link: "/courses"
     },
     { 
-      title: "Telegram bot xizmatlari (@aiedutizim_bot)", 
-      desc: "Telegram bot orqali mobil telefonlarda AI imkoniyatlaridan tezkor foydalanish, akademik hujjatlar generatsiyasi va yagona balans tizimi.", 
-      icon: Bot,
-      link: "https://t.me/aiedutizim_bot"
+      title: "O'zaro muloqot va chat", 
+      desc: "Tashkilotlar, talabalar va adminlar o'rtasida to'g'ridan-to'g'ri integratsiyalashgan, guruhli muloqot va ijtimoiy muhit.", 
+      icon: Users,
+      link: "/chat"
     },
   ];
 
@@ -387,37 +387,25 @@ export default function Home() {
           {features.map((f, i) => {
             const IconComponent = f.icon;
             const isExternal = f.link?.startsWith('http');
+            const CardWrapper = isExternal ? 'a' : Link;
+            const linkProps = isExternal 
+              ? { href: f.link, target: "_blank", rel: "noopener noreferrer" }
+              : { to: f.link };
+
             return (
-              <div key={i} className="p-8 mac-window bg-white hover:-translate-y-1 transition-transform border border-gray-100/80 rounded-2xl shadow-sm flex flex-col justify-between">
+              <CardWrapper
+                key={i}
+                {...linkProps as any}
+                className="p-8 bg-white hover:-translate-y-1 transition-all border border-gray-100 rounded-3xl shadow-sm hover:shadow-md flex flex-col justify-between group"
+              >
                 <div>
-                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-6">
+                  <div className="w-12 h-12 bg-blue-50/80 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-100 transition-colors">
                     <IconComponent className="h-6 w-6 text-[#007aff]" />
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">{f.title}</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed mb-4">{f.desc}</p>
+                  <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-[#007aff] transition-colors">{f.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
                 </div>
-                {f.link && (
-                  <div>
-                    {isExternal ? (
-                      <a 
-                        href={f.link} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:text-blue-700 transition-colors pt-2 border-t border-gray-100 w-full"
-                      >
-                        Batafsil / O'tish <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    ) : (
-                      <Link 
-                        to={f.link} 
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:text-blue-700 transition-colors pt-2 border-t border-gray-100 w-full"
-                      >
-                        Batafsil / O'tish <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    )}
-                  </div>
-                )}
-              </div>
+              </CardWrapper>
             );
           })}
         </div>

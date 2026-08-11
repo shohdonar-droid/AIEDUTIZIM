@@ -269,12 +269,6 @@ export default function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setIsBalanceModalOpen(true)}
-                    className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5"
-                  >
-                    💳 Balans
-                  </button>
                   <Link
                     to="/search-cert"
                     className={`px-3 py-1.5 font-bold text-sm tracking-wide rounded-xl border-2 transition-all ${
@@ -387,21 +381,20 @@ export default function Navbar() {
                 >
                   Sertifikat tekshirish (ID)
                 </Link>
-
-                <button
-                  onClick={() => {
-                    setIsBalanceModalOpen(true);
-                    setIsOpen(false);
-                  }}
-                  className={`block w-full text-left px-4 py-3 text-base font-bold flex items-center gap-2 text-emerald-600 ${
-                    isWhiteText ? 'hover:bg-white/5' : 'hover:bg-emerald-50'
-                  }`}
-                >
-                  💳 Balansni to'ldirish
-                </button>
                 
                 {user ? (
                   <>
+                    <button
+                      onClick={() => {
+                        setIsBalanceModalOpen(true);
+                        setIsOpen(false);
+                      }}
+                      className={`block w-full text-left px-4 py-3 text-base font-bold flex items-center gap-2 text-emerald-600 ${
+                        isWhiteText ? 'hover:bg-white/5' : 'hover:bg-emerald-50'
+                      }`}
+                    >
+                      💳 Balansni to'ldirish
+                    </button>
                     <Link
                       to={isAdmin ? '/admin' : (user.role === 'teacher' || user.role === 'staff' || (user.role as string) === 'mustaqil_o_qituvchi' ? '/teacher' : '/student')}
                       onClick={() => setIsOpen(false)}

@@ -237,8 +237,8 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
             </div>
           </div>
 
-          {/* Admin Card Details (Only if 'Karta') */}
-          {paymentType === 'Karta' && (
+          {/* Admin Card & Quick Transfer Details */}
+          {(paymentType === 'Karta' || paymentType === 'Click') && (
             <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl text-white space-y-4 shadow-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -285,37 +285,45 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
             </div>
           )}
 
-          {/* Direct online payment button */}
-          {paymentType !== 'Karta' && finalAmount > 0 && user && (
-            <div className="mt-4">
+          {/* Direct online payment / Click App Launch button */}
+          {paymentType !== 'Karta' && user && (
+            <div className="mt-4 space-y-2">
               <button
                 type="button"
                 onClick={() => {
                   const uId = user.systemId || user.uid;
+                  const cleanCard = cardSettings.number.replace(/\s+/g, '');
                   let payUrl = "#";
                   if (paymentType === 'Click') {
-                    payUrl = `https://my.click.uz/services/pay?id=12345&merchant_id=9999&amount=${finalAmount}&transaction_param=${uId}`;
+                    // Click P2P Direct App Deep Link
+                    payUrl = `https://click.uz/p2p/${cleanCard}`;
                   } else if (paymentType === 'Payme') {
-                    payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&ac.user_id=${uId}&amount=${finalAmount * 100}`;
+                    payUrl = `https://payme.uz/`;
                   } else if (paymentType === 'Uzum Bank') {
-                    payUrl = `https://uzumbank.uz/pay?merchant_id=platform&account=${uId}&amount=${finalAmount}`;
+                    payUrl = `https://uzumbank.uz/`;
                   }
                   window.open(payUrl, '_blank');
                 }}
-                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
-                {paymentType} orqali onlayn to'lov qilish ({finalAmount.toLocaleString()} so'm)
+                {paymentType === 'Click' 
+                  ? "📲 Click ilovasida to'lov qilish (O'tkazmalar oynasi)" 
+                  : `${paymentType} orqali to'lov qilish (${finalAmount > 0 ? finalAmount.toLocaleString() + " so'm" : ''})`}
               </button>
+              {paymentType === 'Click' && (
+                <p className="text-[11px] text-slate-500 font-medium text-center">
+                  💡 Tugmani bossangiz, telefoningizdagi Click ilovasi avtomatik ochilib admin kartasini joylab beradi.
+                </p>
+              )}
             </div>
           )}
 
-          {/* Receipt Upload (Only if 'Karta') */}
-          {paymentType === 'Karta' && (
-            <div>
-              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                3. To'lov chekini (skrinshotini) yuklang
-              </label>
+          {/* Receipt Upload */}
+          <div>
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
+              3. To'lov chekini (skrinshotini) yuklang
+            </label>
               <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-emerald-500 transition-all bg-gray-50/50">
                 {receiptUrl ? (
                   <div className="space-y-3">
@@ -347,7 +355,6 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
               </div>
               {fileError && <p className="text-xs text-red-500 mt-1 font-bold">{fileError}</p>}
             </div>
-          )}
         </div>
 
         <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 mt-4">
@@ -356,18 +363,16 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
             onClick={onClose}
             className="px-5 py-3 rounded-xl border border-gray-200 font-bold text-xs text-slate-600 hover:bg-gray-50 transition-all"
           >
-            {paymentType === 'Karta' ? 'Bekor qilish' : 'Yopish'}
+            Yopish
           </button>
-          {paymentType === 'Karta' && (
-            <button
-              type="button"
-              disabled={isSubmitting || !receiptUrl}
-              onClick={handleSubmit}
-              className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
-            >
-              {isSubmitting ? "Yuborilmoqda..." : "So'rovni yuborish"}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={isSubmitting || !receiptUrl}
+            onClick={handleSubmit}
+            className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
+          >
+            {isSubmitting ? "Yuborilmoqda..." : "Chekni tasdiqlashga yuborish"}
+          </button>
         </div>
       </motion.div>
     </div>
