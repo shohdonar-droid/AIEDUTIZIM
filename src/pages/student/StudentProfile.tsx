@@ -190,34 +190,8 @@ export default function StudentProfile() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-6 border-t border-gray-50">
-              <div>
-                <label className="flex items-center gap-2 text-xs font-black text-amber-500 mb-2 uppercase tracking-widest">
-                  <Key className="h-4 w-4" />
-                  Platforma ID (UID)
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl font-black text-amber-800 select-all font-mono text-sm">
-                    {user?.systemId || user?.uid}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const uIdToCopy = user?.systemId || user?.uid;
-                      if (uIdToCopy) {
-                        navigator.clipboard.writeText(uIdToCopy);
-                        alert("UID nusxalandi! To'lov ilovasida ushbu ID orqali to'lov qilishingiz mumkin.");
-                      }
-                    }}
-                    className="px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-md shrink-0"
-                  >
-                    Nusxalash
-                  </button>
-                </div>
-                <p className="text-[10px] text-gray-400 mt-1.5 font-bold">
-                  💡 Payme, Click yoki Uzum Bank ilovasida ushbu ID raqamingiz orqali to'g'ridan-to'g'ri balansni to'ldirishingiz mumkin.
-                </p>
-              </div>
+            {/* Login, Parol, E-pochta qatori */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-gray-50">
               <div>
                 <label className="flex items-center gap-2 text-xs font-black text-amber-500 mb-2 uppercase tracking-widest">
                   <Key className="h-4 w-4" />
@@ -241,10 +215,39 @@ export default function StudentProfile() {
                   <Mail className="h-4 w-4" />
                   E-pochta
                 </label>
-                <div className="px-4 py-2 text-xs bg-gray-100 border border-gray-200 rounded-2xl font-bold text-gray-400 break-all">
+                <div className="px-4 py-3 text-xs bg-gray-100 border border-gray-200 rounded-2xl font-bold text-gray-400 break-all">
                   {user?.email}
                 </div>
               </div>
+            </div>
+
+            {/* Platforma ID (UID) qatori - Login va Parol qatoridan PASTDA */}
+            <div className="pt-6 border-t border-gray-50">
+              <label className="flex items-center gap-2 text-xs font-black text-amber-500 mb-2 uppercase tracking-widest">
+                <Key className="h-4 w-4" />
+                Platforma ID (UID)
+              </label>
+              <div className="flex items-center gap-2 max-w-xl">
+                <div className="flex-1 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl font-black text-amber-800 select-all font-mono text-sm">
+                  {user?.systemId || user?.uid}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const uIdToCopy = user?.systemId || user?.uid;
+                    if (uIdToCopy) {
+                      navigator.clipboard.writeText(uIdToCopy);
+                      alert("UID nusxalandi! To'lov ilovasida ushbu ID orqali to'lov qilishingiz mumkin.");
+                    }
+                  }}
+                  className="px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-md shrink-0 cursor-pointer"
+                >
+                  Nusxalash
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2 font-bold">
+                💡 Payme, Click yoki Uzum Bank ilovasida ushbu ID raqamingiz orqali to'g'ridan-to'g'ri balansni to'ldirishingiz mumkin.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-50">

@@ -217,6 +217,9 @@ export default function TeacherDashboard() {
               <p className="text-[8px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-0.5">
                 {user?.role === 'staff' ? 'Xodim' : (user?.role === 'admin' ? 'Administrator' : ((user?.role as string) === 'mustaqil_o_qituvchi' ? "Mustaqil O'qituvchi" : 'Tashkilot'))}
               </p>
+              <p className="text-[9px] text-amber-600 font-extrabold font-mono tracking-wide mt-0.5 truncate">
+                ID: {user?.systemId || user?.uid}
+              </p>
             </motion.div>
           )}
           {user?.isImpersonated && !isCollapsed && (

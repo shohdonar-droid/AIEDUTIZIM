@@ -596,7 +596,16 @@ export default function AdminUsers() {
                          staffUsers.find(u => u.uid === uid) ||
                          subadmins.find(u => u.uid === uid);
 
-      await updateDoc(doc(db, "users", uid), { status: "deleted" });
+      await setDoc(doc(db, "users", uid), { status: "deleted", isBlocked: true }, { merge: true });
+
+      // Also clean up or soft-delete if it is a Telegram user
+      const rawTgId = uid.replace("tg_", "");
+      try {
+        await setDoc(doc(db, "telegram_users", rawTgId), { status: "deleted", isBlocked: true }, { merge: true });
+      } catch (e) {}
+      try {
+        await setDoc(doc(db, "telegram_users", uid), { status: "deleted", isBlocked: true }, { merge: true });
+      } catch (e) {}
       
       // Update local state for immediate feedback
       setUsers(prev => prev.filter(u => u.uid !== uid));
