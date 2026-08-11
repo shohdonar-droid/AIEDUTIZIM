@@ -15,7 +15,7 @@ import { makeDirectImageUrl } from '../lib/helpers';
 
 interface CapabilityFeature {
   id: string;
-  category: 'all' | 'documents' | 'tests' | 'lms' | 'certificates' | 'bot';
+  category: 'all' | 'documents' | 'lms' | 'tests' | 'certificates';
   title: string;
   badge: string;
   badgeBg: string;
@@ -195,175 +195,44 @@ export default function Home() {
     }
   }, [content]);
 
-  const [activeCategory, setActiveCategory] = useState<'all' | 'documents' | 'tests' | 'lms' | 'certificates' | 'bot'>('all');
-  const [selectedFeature, setSelectedFeature] = useState<CapabilityFeature | null>(null);
-
-  const platformFeatures: CapabilityFeature[] = [
-    {
-      id: 'coursework',
-      category: 'documents',
-      title: "AI Kurs Ishi, Referat & Mustaqil Ish Generator",
-      badge: "OAK Standarti",
-      badgeBg: "bg-gray-100 border-gray-200",
-      badgeTextColor: "text-gray-700",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      icon: BookText,
-      shortDesc: "Sun'iy intellekt yordamida OAK va OTM talablariga mos reja, kirish, boblar va adabiyotlar ro'yxatiga ega tayyor hujjatlar shakllantirish.",
-      highlights: [
-        "15-50 sahifalik akademik va ilmiy struktura",
-        "OTM va kafedra talablariga mos manbalar",
-        "Word (.docx) hamda PDF shaklida yuklab olish"
-      ],
-      fullDescription: "AIEDUTIZIM platformasining ushbu moduli o'qituvchilar va talabalarga har qanday mavzu bo'yicha ilmiy-akademik talablarga mos keluvchi Kurs ishi, Referat, Mustaqil ish hamda Tezislarni sanoqli daqiqalarda shakllantirish imkonini beradi. Generatsiya qilingan hujjatlar reja, kirish qismi, tahliliy boblar, amaliy xulosalar hamda adabiyotlar ro'yxatini qamrab oladi.",
-      linkTo: "/tariffs",
-      actionText: "Yaratish"
+  const features = [
+    { 
+      title: "Interaktiv quizizz va test tizimi", 
+      desc: "Tashkilotlar va talabalar uchun vaqt rejimida real-time musobaqalar uyushtirish. Bilimlarni geymifikatsiya orqali mustahkamlash.", 
+      icon: LayoutGrid,
+      link: "/quizizz"
     },
-    {
-      id: 'presentation',
-      category: 'documents',
-      title: "AI Taqdimot & Slaydlar Generator (PPTX)",
-      badge: "PowerPoint PPTX",
-      badgeBg: "bg-gray-100 border-gray-200",
-      badgeTextColor: "text-gray-700",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      icon: Presentation,
-      shortDesc: "Mavzu bo'yicha slaydlar mazmuni, struktura hamda ma'ruzachining tayyor nutq matni (Speech Note) bilan taqdimotlar.",
-      highlights: [
-        "PowerPoint (.pptx) va PDF formatlarida shakllantirish",
-        "Har bir slayd uchun ma'ruzachi nutq matni",
-        "Sodda va tushunarli vizual struktura"
-      ],
-      fullDescription: "Ushbu imkoniyat ma'ruzachilar va talabalar uchun taqdimot tayyorlash jarayonini tezlashtiradi. AI mavzuni chuqur tahlil qilib, slayd ma'lumotlarini qisqa va tushunarli punktlarga ajratadi va har bir slayd uchun ma'ruzachi nutqini taqdim etadi.",
-      linkTo: "/tariffs",
-      actionText: "Slayd Tayyorlash"
-    },
-    {
-      id: 'testbuilder',
-      category: 'tests',
-      title: "AI Test Generator & Quizizz Integratsiyasi",
-      badge: "Test & Geymifikatsiya",
-      badgeBg: "bg-gray-100 border-gray-200",
-      badgeTextColor: "text-gray-700",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      icon: CheckSquare,
-      shortDesc: "Mavzu yoki matn asosida 4 variantli testlar hamda real-time Quizizz musobaqalarini o'tkazish.",
-      highlights: [
-        "Matndan avtomatik test savollari shakllantirish",
-        "Quizizz orqali real vaqt rejimida turnirlar",
-        "Natijalarni avtomatik hisoblash va jurnalga kiritish"
-      ],
-      fullDescription: "O'qituvchi ma'ruza matnini kiritib, istalgan darajadagi test topshiriqlarini avtomatik tuzib olishi mumkin. Shuningdek, talabalarning bilimini geymifikatsiya orqali sinash uchun Quizizz musobaqalari o'tkaziladi.",
-      linkTo: "/quizizz",
-      actionText: "Quizizz / Testlar"
-    },
-    {
-      id: 'lms',
-      category: 'lms',
-      title: "Modulli LMS va Ta'lim Tizimi",
-      badge: "LMS & Boshqaruv",
-      badgeBg: "bg-gray-100 border-gray-200",
-      badgeTextColor: "text-gray-700",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      icon: GraduationCap,
-      shortDesc: "Modulli onlayn darslar, videoma'ruzalar, guruhlar boshqaruvi hamda elektron jurnal va davomat nazorati.",
-      highlights: [
-        "Guruhlar va kafedralar raqamli strukturasi",
-        "Talaba va o'qituvchilar uchun moslashtirilgan panellar",
-        "O'zlashtirish statistikasi va baholash jurnali"
-      ],
-      fullDescription: "AIEDUTIZIM platformasi OTM va ta'lim muassasalari uchun mo'ljallangan LMS tizimidir. O'qituvchilar o'z kurslarini modullarga ajratib joylaydilar, talabalar topshiriqlarni bajaradi va natijalar haqqoniy qayd etiladi.",
-      linkTo: "/courses",
-      actionText: "Kurslar"
-    },
-    {
-      id: 'certificates',
-      category: 'certificates',
-      title: "QR-Kodli Sertifikatlar va Reestr",
-      badge: "Verifikatsiya",
-      badgeBg: "bg-gray-100 border-gray-200",
-      badgeTextColor: "text-gray-700",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      icon: Award,
-      shortDesc: "Muvaffaqiyatli yakunlangan kurs hamda testlar uchun QR-kodli rasmiy sertifikatlarni taqdim etish.",
-      highlights: [
-        "Har bir sertifikat uchun unikal seriyali raqam va QR-kod",
-        "Onlayn verifikatsiya va haqiqiylikni tekshirish",
-        "PDF va rasm ko'rinishida saqlash"
-      ],
-      fullDescription: "Talaba kursni yakunlaganda yoki musobaqalarda g'olib bo'lganda, tizim avtomatik ravishda rasmiy sertifikat taqdim etadi. Sertifikatlarning haqiqiyligini QR-kodni skanerlash orqali tekshirish mumkin.",
-      linkTo: "/search-cert",
-      actionText: "Sertifikat Tekshirish"
-    },
-    {
-      id: 'telegrambot',
-      category: 'bot',
-      title: "Telegram Bot (@aiedutizim_bot)",
-      badge: "Mobil Bot",
-      badgeBg: "bg-gray-100 border-gray-200",
-      badgeTextColor: "text-gray-700",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      icon: Bot,
-      shortDesc: "Telegram ilovasi orqali mobil telefonda AI yordamida akademik hujjatlar va konsultatsiya olish.",
-      highlights: [
-        "Mobil telefondan turib tezkor foydalanish",
-        "Veb-platforma bilan yagona balans va akkaunt",
-        "24/7 rejimida tezkor javoblar"
-      ],
-      fullDescription: "Telegram botimiz foydalanuvchilarga istalgan vaqtda va joyda AI imkoniyatlaridan foydalanish imkonini beradi. Telegram orqali ham Kurs ishlari, ma'ruzalar va taqdimotlarni shakllantirishingiz mumkin.",
-      linkTo: "https://t.me/aiedutizim_bot",
-      actionText: "Telegram Bot"
-    },
-    {
-      id: 'antiplagiarism',
-      category: 'documents',
-      title: "AI Antiplagiat va Akademik Tahlil",
-      badge: "Tahlil Moduli",
-      badgeBg: "bg-gray-100 border-gray-200",
-      badgeTextColor: "text-gray-700",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      icon: Sparkles,
-      shortDesc: "Ilmiy va akademik matnlarning unikalligini tahlil qilish, takrorlanishlarni aniqlash hamda tahrirlash.",
-      highlights: [
-        "Matn originalligi va unikallik darajasi",
-        "Akademik uslub va til xatolarini tuzatish",
-        "Tahliliy hisobot va tavsiyalar"
-      ],
-      fullDescription: "AI Antiplagiat moduli foydalanuvchi yuklagan matnlarni tahlil qiladi hamda akademik standartlarga mosligini baholaydi. Matnning unikal darajasini oshirish bo'yicha tavsiyalar beradi.",
-      linkTo: "/tariffs",
-      actionText: "Matnni Tahlil Qilish"
-    },
-    {
-      id: 'cv_builder',
-      category: 'documents',
-      title: "Obektivka va Professional CV Generator",
-      badge: "Davlat Standarti",
-      badgeBg: "bg-gray-100 border-gray-200",
-      badgeTextColor: "text-gray-700",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
+    { 
+      title: "Sun'iy intellekt bilan test va hujjat yaratish", 
+      desc: "O'qituvchilar va talabalar uchun AI orqali mavzuga oid savollar, OAK standartida Kurs ishi, Referat va Taqdimotlarni avtomatik shakllantirish.", 
       icon: FileText,
-      shortDesc: "Davlat xizmati standartlaridagi rasmiy Ma'lumotnoma (Obektivka) va rezyume yaratish.",
-      highlights: [
-        "Davlat xizmati standartlariga mos shakl",
-        "Tartibli va tushunarli struktura",
-        "Word (.docx) hamda PDF formatida yuklab olish"
-      ],
-      fullDescription: "O'qituvchilar va talabalar uchun mehnat faoliyati hamda ma'lumotnomalarni tezkor shakllantirish vositasi. Kiritilgan ma'lumotlar avtomatik ravishda rasmiy Obektivka shabloniga tushadi.",
-      linkTo: "/tariffs",
-      actionText: "Obektivka Yaratish"
-    }
+      link: "/tariffs"
+    },
+    { 
+      title: "Avtomatik sertifikatlar", 
+      desc: "Kurslar yoki testlardan muvaffaqiyatli o'tganlarga (shuningdek, Quizizz g'oliblariga) real vaqtda QR kodli sertifikat taqdim etish.", 
+      icon: Award,
+      link: "/search-cert"
+    },
+    { 
+      title: "Zamonaviy modulli ta'lim", 
+      desc: "Talabalarning kurs doirasidagi barcha qadamlarini interaktiv modullar orqali kuzatish va ilg'or o'zlashtirish statistikasi.", 
+      icon: GraduationCap,
+      link: "/courses"
+    },
+    { 
+      title: "Xavfsizlik va avtomatlashgan jurnal", 
+      desc: "Baholar, davomat, sertifikatlar haqqoniyligi va ishtirokchilar tarixi mutlaqo xavfsiz va tizimli kataloglanadi.", 
+      icon: CheckCircle2,
+      link: "/courses"
+    },
+    { 
+      title: "Telegram bot xizmatlari (@aiedutizim_bot)", 
+      desc: "Telegram bot orqali mobil telefonlarda AI imkoniyatlaridan tezkor foydalanish, akademik hujjatlar generatsiyasi va yagona balans tizimi.", 
+      icon: Bot,
+      link: "https://t.me/aiedutizim_bot"
+    },
   ];
-
-  const filteredFeatures = activeCategory === 'all' 
-    ? platformFeatures 
-    : platformFeatures.filter(f => f.category === activeCategory);
 
   if (!content) return (
     <div className="flex h-screen items-center justify-center">
@@ -510,235 +379,49 @@ export default function Home() {
 
       {/* Features / Capabilities Section */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full py-16" id="imkoniyatlar">
-        {/* Section Header */}
-        <div className="text-center mb-10">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-600 font-semibold text-xs uppercase tracking-wider mb-3">
-            <BrainCircuit className="h-3.5 w-3.5" /> Platforma Imkoniyatlari
-          </span>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">
-            PLATFORMAMIZ IMKONIYATLARI
-          </h2>
-          <p className="mt-2 text-gray-500 font-normal text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-            AIEDUTIZIM — Ta'lim sifatini oshirish va akademik jarayonlarni raqamlashtirishga qaratilgan ekotizim.
-          </p>
+        <div className="text-center mb-16">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">PLATFORMAMIZ IMKONIYATLARI</h2>
+          <p className="mt-3 text-gray-500 font-medium text-sm max-w-lg mx-auto">Tizim platformamiz eng so'nggi ta'lim yechimlari bilan boyitilgan imkoniyatlarni taqdim etadi.</p>
         </div>
-
-        {/* High-level Overview Card */}
-        <div className="bg-slate-900 text-white p-6 md:p-8 mb-10 rounded-2xl shadow-sm border border-slate-800">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-            <div className="lg:col-span-8 space-y-2">
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 text-xs font-medium">
-                <Zap className="h-3.5 w-3.5 text-blue-400" /> Veb-Platforma & Telegram Bot
-              </div>
-              <h3 className="text-xl md:text-2xl font-bold">
-                Ta'lim va Ilmiy Faoliyat uchun Birlashgan Ekotizim
-              </h3>
-              <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
-                Tizim Veb-portal va <strong>@aiedutizim_bot</strong> orqali o'qituvchilar hamda talabalarga uzluksiz raqamli xizmat ko'rsatadi.
-              </p>
-            </div>
-            <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-2.5 justify-center">
-              <Link 
-                to="/info" 
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-center text-xs transition-all flex items-center justify-center gap-2"
-              >
-                <Info className="h-3.5 w-3.5" /> Batafsil ma'lumot
-              </Link>
-              <a 
-                href="https://t.me/aiedutizim_bot" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium rounded-xl text-center text-xs transition-all flex items-center justify-center gap-2"
-              >
-                <Send className="h-3.5 w-3.5 text-sky-400" /> Telegram Bot
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* Category Filter Tabs */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
-          {[
-            { id: 'all', label: 'Barchasi' },
-            { id: 'documents', label: 'AI Hujjatlar' },
-            { id: 'tests', label: 'Test & Quizizz' },
-            { id: 'lms', label: 'Modulli LMS' },
-            { id: 'certificates', label: 'Sertifikatlar' },
-            { id: 'bot', label: 'Telegram Bot' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveCategory(tab.id as any)}
-              className={`px-4 py-2 rounded-xl font-medium text-xs transition-all ${
-                activeCategory === tab.id
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Feature Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredFeatures.map((f) => {
-            const IconComp = f.icon;
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {features.map((f, i) => {
+            const IconComponent = f.icon;
+            const isExternal = f.link?.startsWith('http');
             return (
-              <motion.div
-                key={f.id}
-                layout
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 15 }}
-                className="bg-white border border-gray-200/80 rounded-2xl p-6 flex flex-col justify-between hover:border-blue-300 hover:shadow-md transition-all duration-200"
-              >
+              <div key={i} className="p-8 mac-window bg-white hover:-translate-y-1 transition-transform border border-gray-100/80 rounded-2xl shadow-sm flex flex-col justify-between">
                 <div>
-                  {/* Top Badge & Icon */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                      <IconComp className="h-5 w-5" />
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                      {f.badge}
-                    </span>
+                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-6">
+                    <IconComponent className="h-6 w-6 text-[#007aff]" />
                   </div>
-
-                  {/* Title & Short Desc */}
-                  <h3 className="text-base font-bold text-gray-900 mb-2 leading-snug">
-                    {f.title}
-                  </h3>
-                  <p className="text-gray-500 text-xs leading-relaxed mb-4">
-                    {f.shortDesc}
-                  </p>
-
-                  {/* Bullet Highlights */}
-                  <div className="space-y-1.5 mb-5 border-t border-gray-100 pt-3">
-                    {f.highlights.map((item, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs text-gray-600">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <span className="leading-tight">{item}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{f.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed mb-4">{f.desc}</p>
                 </div>
-
-                {/* Bottom Actions */}
-                <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-                  <button
-                    onClick={() => setSelectedFeature(f)}
-                    className="flex-1 py-2 px-3 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 font-medium rounded-lg text-xs transition-colors text-center"
-                  >
-                    Batafsil
-                  </button>
-                  {f.linkTo && (
-                    f.linkTo.startsWith('http') ? (
-                      <a
-                        href={f.linkTo}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                {f.link && (
+                  <div>
+                    {isExternal ? (
+                      <a 
+                        href={f.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:text-blue-700 transition-colors pt-2 border-t border-gray-100 w-full"
                       >
-                        {f.actionText || "O'tish"} <ExternalLink className="h-3 w-3" />
+                        Batafsil / O'tish <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                     ) : (
-                      <Link
-                        to={f.linkTo}
-                        className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                      <Link 
+                        to={f.link} 
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:text-blue-700 transition-colors pt-2 border-t border-gray-100 w-full"
                       >
-                        {f.actionText || "O'tish"} <ArrowRight className="h-3 w-3" />
+                        Batafsil / O'tish <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
-                    )
-                  )}
-                </div>
-              </motion.div>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       </section>
-
-      {/* Feature Details Modal */}
-      <AnimatePresence>
-        {selectedFeature && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              className="bg-white rounded-2xl max-w-xl w-full p-6 border border-gray-200 shadow-xl relative max-h-[90vh] overflow-y-auto"
-            >
-              <button
-                onClick={() => setSelectedFeature(null)}
-                className="absolute top-5 right-5 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div className="flex items-center gap-3.5 mb-5">
-                <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <selectedFeature.icon className="h-5 w-5" />
-                </div>
-                <div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600 border border-gray-200 inline-block mb-1">
-                    {selectedFeature.badge}
-                  </span>
-                  <h3 className="text-lg font-bold text-gray-900">{selectedFeature.title}</h3>
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Tavsif</h4>
-                  <p className="text-gray-700 text-xs md:text-sm leading-relaxed bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    {selectedFeature.fullDescription}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Afzalliklari</h4>
-                  <div className="space-y-2">
-                    {selectedFeature.highlights.map((h, i) => (
-                      <div key={i} className="flex items-start gap-2 bg-white p-3 rounded-lg border border-gray-200/70">
-                        <CheckCircle2 className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-xs text-gray-700 font-medium">{h}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-3 flex items-center gap-2 border-t border-gray-100">
-                  <button
-                    onClick={() => setSelectedFeature(null)}
-                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-xs transition-colors"
-                  >
-                    Yopish
-                  </button>
-                  {selectedFeature.linkTo && (
-                    selectedFeature.linkTo.startsWith('http') ? (
-                      <a
-                        href={selectedFeature.linkTo}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-xs transition-colors text-center flex items-center justify-center gap-1.5"
-                      >
-                        {selectedFeature.actionText || "O'tish"} <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    ) : (
-                      <Link
-                        to={selectedFeature.linkTo}
-                        onClick={() => setSelectedFeature(null)}
-                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-xs transition-colors text-center flex items-center justify-center gap-1.5"
-                      >
-                        {selectedFeature.actionText || "O'tish"} <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    )
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Stats Section / Platform Statistics */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full py-16 border-t border-gray-100">
