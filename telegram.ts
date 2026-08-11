@@ -33,7 +33,6 @@ const Type = SDKType || {
 };
 import { generateContentWithRotation } from "./src/lib/gemini";
 import { generateCourseWorkDataWithGemini, buildCourseWorkDocxBuffer } from "./src/lib/courseworkGenerator.js";
-import { process3x4PassportPhoto, createPrintSheet } from "./src/lib/passportProcessor.js";
 import dotenv from "dotenv";
 import sharp from "sharp";
 import fs from "fs";
@@ -697,8 +696,7 @@ const AI_COSTS: Record<string, number> = {
   "📄 CV yaratish": 5000,
   "💬 Savol-javob": 1000,
   "📄 AI Antiplagiat": 5000,
-  "📄 Obektivka yaratish": 15000,
-  "📸 3x4 rasm": 3000
+  "📄 Obektivka yaratish": 15000
 };
 
 const requestHistory = new Map<number, number[]>();
@@ -1042,7 +1040,6 @@ async function getAiAssistantKeyboard(userId?: number) {
     [{ text: "📝 Dars ishlanma yaratish" }, { text: "📋 Test yaratish" }],
     [{ text: "🌐 Tarjimon" }, { text: "📄 CV yaratish" }],
     [{ text: "📄 AI Antiplagiat" }, { text: "📄 Obektivka yaratish" }],
-    [{ text: "📸 3x4 rasm" }],
     [{ text: "⬅️ Asosiy menyu" }]
   ];
 
@@ -2051,32 +2048,6 @@ bot.action(/reply_(.+)/, async (ctx) => {
     originalText,
   } as any);
   ctx.answerCbQuery();
-});
-
-bot.action("generate_print_sheet_4", async (ctx) => {
-  const userId = ctx.from.id;
-  await ctx.answerCbQuery("🖨 4 nusxali varaq tayyorlanmoqda...");
-
-  const photo3x4 = photo3x4Cache.get(`user_${userId}`);
-  if (!photo3x4) {
-    return ctx.reply("❌ Biror tayyor 3x4 rasm topilmadi. Iltimos, avval rasm yuboring.");
-  }
-
-  try {
-    const sheetBuffer = await createPrintSheet(photo3x4, 4);
-
-    await ctx.replyWithPhoto(
-      { source: sheetBuffer },
-      { caption: "🖨 <b>4 nusxali varaq tayyor bo'ldi! (10x15 sm / 300 DPI)</b>", parse_mode: "HTML" }
-    );
-
-    await ctx.replyWithDocument(
-      { source: sheetBuffer, filename: "3x4_4nusxa_10x15.jpg" },
-      { caption: "📄 <b>Fotosalonda 10x15 sm qog'ozga bosish uchun yuqori sifatli fayl</b>", parse_mode: "HTML" }
-    );
-  } catch (e: any) {
-    await ctx.reply(`❌ <b>Varaq yaratishda xatolik:</b> ${e.message || "Keyinroq urinib ko'ring."}`, { parse_mode: "HTML" });
-  }
 });
 
 bot.action(/viewmsg_(.+)/, async (ctx) => {
@@ -3564,112 +3535,6 @@ async function handleAntiplagiatAnalysis(ctx: any, input: string) {
     }
   }
 
-// In-memory cache for generated 3x4 photos for print sheet generation
-const photo3x4Cache = new Map<string, Buffer>();
-
-async function handle3x4PhotoGeneration(ctx: any, fileId: string) {
-  const userId = ctx.from.id;
-  const chatId = ctx.chat?.id;
-  const startTime = Date.now();
-
-  const loadingMsg = await ctx.reply(
-    "⏳ <b>3x4 o'lchamdagi rasm tayyorlanmoqda...</b>\n\n<i>Sun'iy intellekt inson qiyofasini aniqlamoqda, yuzi va sochlarini to'liq muhofaza qilgan holda orqa fonni toza oq (#FFFFFF) rangga o'tkazmoqda...</i>",
-    { parse_mode: "HTML" }
-  );
-
-  try {
-    const fileLink = await ctx.telegram.getFileLink(fileId);
-    const downloadUrl = fileLink.href || fileLink.toString();
-
-    const fetchRes = await fetch(downloadUrl);
-    if (!fetchRes.ok) {
-      throw new Error("Telegram serveridan rasmni yuklab olish imkoni bo'lmadi.");
-    }
-    const inputBuffer = Buffer.from(await fetchRes.arrayBuffer());
-
-    // Call 5-step passport processor (FastAPI microservice or fallback)
-    const processedBuffer = await process3x4PassportPhoto(inputBuffer);
-    const procTimeMs = Date.now() - startTime;
-
-    // Cache processed buffer for print sheet creation
-    photo3x4Cache.set(`user_${userId}`, processedBuffer);
-
-    // Log request in Firestore photo_logs collection
-    try {
-      await addDoc(collection(db, "photo_logs"), {
-        user_id: userId,
-        status: "success",
-        processing_time_ms: procTimeMs,
-        timestamp: serverTimestamp()
-      });
-    } catch (logErr) {
-      console.warn("[Firestore Photo Log Warning]:", logErr);
-    }
-
-    await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
-
-    await ctx.replyWithPhoto(
-      { source: processedBuffer },
-      {
-        caption: "✅ <b>3x4 o'lchamdagi hujjat rasmingiz tayyor bo'ldi!</b>\n\n" +
-          "• <b>Orqa fon:</b> Toza oq (#FFFFFF)\n" +
-          "• <b>O'lcham:</b> 3x4 sm (354x472 px / 300 DPI)\n" +
-          "• <b>Sifat:</b> Yuz va kiyim asl holatda 100% muhofaza qilingan",
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🖨 4 nusxali varaq yaratish (10x15 sm)", callback_data: "generate_print_sheet_4" }]
-          ]
-        }
-      }
-    );
-
-    await ctx.replyWithDocument(
-      { source: processedBuffer, filename: "3x4_hujjat_rasmi.jpg" },
-      { caption: "📄 <b>Bosib chiqarish (pechat) uchun asl 300 DPI JPEG fayli</b>", parse_mode: "HTML" }
-    );
-
-    return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
-      parse_mode: "HTML",
-      reply_markup: {
-        keyboard: await getAiAssistantKeyboard(userId),
-        resize_keyboard: true
-      }
-    });
-
-  } catch (err: any) {
-    const procTimeMs = Date.now() - startTime;
-    console.error("[3x4 Photo Error]:", err);
-
-    // Log failure in Firestore
-    try {
-      await addDoc(collection(db, "photo_logs"), {
-        user_id: userId,
-        status: "error",
-        error_message: err.message || "Noma'lum xatolik",
-        processing_time_ms: procTimeMs,
-        timestamp: serverTimestamp()
-      });
-    } catch (logErr) {}
-
-    await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
-
-    const userFriendlyError = err.message && err.message.includes("Yuzingiz aniq")
-      ? err.message
-      : "Rasmda yuz aniqlanmadi yoki sifat yetarli emas. Iltimos, yuzingiz aniq ko'rinadigan, yaxshi yorug'likdagi rasmni yuboring.";
-
-    await ctx.reply(`❌ <b>Xatolik:</b> ${userFriendlyError}`, { parse_mode: "HTML" });
-
-    return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
-      parse_mode: "HTML",
-      reply_markup: {
-        keyboard: await getAiAssistantKeyboard(userId),
-        resize_keyboard: true
-      }
-    });
-  }
-}
-
 async function handleWizardStep(ctx: any, wizard: any, input: string) {
   const userId = ctx.from.id;
   const service = wizard.service;
@@ -4318,32 +4183,6 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       });
     }
   }
-
-  else if (service === "📸 3x4 rasm") {
-    let fileId: string | null = null;
-    if (ctx.message && "photo" in ctx.message && ctx.message.photo && ctx.message.photo.length > 0) {
-      fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-    } else if (ctx.message && "document" in ctx.message && ctx.message.document) {
-      const doc = ctx.message.document;
-      if (doc.mime_type && doc.mime_type.startsWith("image/")) {
-        fileId = doc.file_id;
-      }
-    }
-
-    if (!fileId) {
-      return ctx.reply("📸 <b>Iltimos, 3x4 rasm uchun shaxsiy rasmingizni foto yoki hujjat fayli ko'rinishida yuboring:</b>", {
-        parse_mode: "HTML",
-        reply_markup: {
-          keyboard: [[{ text: "⬅️ Asosiy menyu" }]],
-          resize_keyboard: true
-        }
-      });
-    }
-
-    userWizardStates.delete(userId);
-    await handle3x4PhotoGeneration(ctx, fileId);
-    return;
-  }
 }
 
 bot.on("message", async (ctx) => {
@@ -4468,7 +4307,6 @@ bot.on("message", async (ctx) => {
     else if (normText === "📄 CV yaratish") { promptText = "📄 <b>Foydalanuvchi F.I.Sh. kiriting:</b>"; }
     else if (normText === "📄 AI Antiplagiat") { promptText = "📄 <b>Matn yuboring yoki fayl (PDF, DOCX, TXT) yuklang:</b>"; }
     else if (normText === "📄 Obektivka yaratish") { promptText = "FISH ni kiriting: (Ortiqov Elyorbek Jasurbek o'g'li )"; }
-    else if (normText === "📸 3x4 rasm") { promptText = "📸 <b>3x4 o'lchamdagi hujjat rasmini tayyorlash</b>\n\nIltimos, shaxsiy rasmingizni yuboring (foto yoki fayl ko'rinishida):\n\n<i>Sun'iy intellekt insonni aniqlaydi, orqa fonni toza oq (#FFFFFF) rangga o'zgartiradi va rasmni 3x4 (600x800 px) o'lchamga moslab beradi. Odamning yuzi va ko'rinishiga o'zgartirish kiritilmaydi.</i>"; }
 
     userWizardStates.set(userId, { service: normText, step: 1, data: {} });
     
