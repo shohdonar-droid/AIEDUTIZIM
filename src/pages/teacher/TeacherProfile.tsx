@@ -55,7 +55,24 @@ export default function TeacherProfile() {
                 <Camera className="h-6 w-6 text-white" />
               </div>
             </div>
-            <div className="mt-6 w-full">
+
+            {/* Profile Name, Role & ID Badge */}
+            <div className="mt-4 text-center space-y-1 w-full">
+              <h3 className="font-extrabold text-gray-900 text-lg tracking-tight">
+                {formData.displayName || user?.displayName || 'Foydalanuvchi'}
+              </h3>
+              <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider">
+                {user?.role === 'staff' ? 'Xodim' : user?.role === 'mustaqil_o_qituvchi' ? 'Mustaqil o\'qituvchi' : 'Tashkilot bosh o\'qituvchisi'}
+              </p>
+              <div className="pt-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 font-extrabold text-xs font-mono shadow-sm">
+                  <span className="text-amber-600 font-black">ID:</span>
+                  <span>{user?.systemId || user?.uid}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 w-full pt-4 border-t border-gray-100">
               <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider text-center">Rasm URL</label>
               <input
                 type="text"
