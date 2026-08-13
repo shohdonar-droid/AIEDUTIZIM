@@ -148,6 +148,7 @@ export default function Tariffs() {
   const [fileError, setFileError] = useState('');
   const [isCorpModalOpen, setIsCorpModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState(false); // Used in some other context? No.
+  const [activeTab, setActiveTab] = useState<'tariffs' | 'calculator'>('tariffs');
 
   const compressImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -381,20 +382,46 @@ export default function Tariffs() {
   if (loading) return <div>Yuklanmoqda...</div>;
 
   return (
-    <div className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-24">
-      <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-        <div>
-          <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">Joriy balans</h2>
-          <p className="text-3xl font-black text-emerald-600 mt-1">
+    <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-row items-center justify-between bg-white px-5 py-3 rounded-2xl border border-gray-100 shadow-sm text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-gray-400 uppercase tracking-wider">Hisobingiz:</span>
+          <span className="font-black text-emerald-600 text-sm">
             {Number((user as any)?.balance ?? (user as any)?.ball ?? 0).toLocaleString('uz-UZ')} UZS
-          </p>
+          </span>
         </div>
         <button 
           onClick={() => setIsBalanceModalOpen(true)}
-          className="px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 uppercase text-xs tracking-widest"
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl transition-all text-[10px] uppercase tracking-wider"
         >
           Hisobni to'ldirish
         </button>
+      </div>
+
+      {/* Tabs Switcher for high density */}
+      <div className="flex justify-center">
+        <div className="bg-gray-100/80 p-1 rounded-xl flex gap-1 border border-gray-200/40">
+          <button
+            onClick={() => setActiveTab('tariffs')}
+            className={`px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all duration-300 ${
+              activeTab === 'tariffs'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            🏢 Tashkilot Tariflari
+          </button>
+          <button
+            onClick={() => setActiveTab('calculator')}
+            className={`px-5 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all duration-300 ${
+              activeTab === 'calculator'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            🧮 Hisoblagich & Qo'shimcha Limitlar
+          </button>
+        </div>
       </div>
 
       {/* Modal for Connection Request */}
@@ -498,7 +525,7 @@ export default function Tariffs() {
                   <p className="text-sm font-black font-mono text-gray-800">{cardSettings.number}</p>
                   <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase">{cardSettings.owner}</p>
                   <p className="text-[10px] text-amber-600 font-bold mt-2">
-                    💡 Ushbu karta raqamiga to'lov qilib, pastda to'lov cheki (skrinshot) rasmini yuklang.
+                    💡 Usbhu karta raqamiga to'lov qilib, pastda to'lov cheki (skrinshot) rasmini yuklang.
                   </p>
                 </div>
               </div>
@@ -547,293 +574,420 @@ export default function Tariffs() {
         </div>
       )}
 
-      {/* Header section with Centered styling */}
-      <div className="text-center space-y-6 max-w-3xl mx-auto">
-        <span className="px-4 py-2 rounded-full text-xs font-black bg-blue-50 text-blue-600 tracking-widest uppercase inline-block">
-          Biznesingiz uchun eng yaxshi yechim
-        </span>
-        <h1 className="text-4xl sm:text-5xl font-black text-gray-900 tracking-tight leading-tight">
-          Tariflar rejalari & Limitlar
-        </h1>
-        <p className="text-gray-500 font-bold text-lg leading-relaxed">
-          Oʻzingizning tashkilotingiz uchun mos tarifni tanlang. Agarda sizga kattaroq imkoniyatlar kerak boʻlsa, 
-          maxsus hisoblagichlarimiz orqali oʻzingiz istagan limitlarni kiriting va narxlarni real vaqtda hisoblatib oling!
-        </p>
-      </div>
-
-      {/* SECTION 1: TASHKILOT UCHUN TARIFLAR */}
-      <div className="space-y-6 pt-4">
-        <div className="border-b border-gray-100 pb-4">
-          <h2 className="text-2xl sm:text-3xl font-black text-gray-950 tracking-tight">
-            🏢 Tashkilot uchun tariflar
-          </h2>
-          <p className="text-gray-400 text-sm font-semibold mt-1">
-            Tashkilotingiz o'lchami va ehtiyojlariga mos keladigan tariflar to'plami.
-          </p>
-        </div>
-
-        {/* Grid of 3 Tariffs in one row on desktop: START, STANDARD, PROFESSIONAL */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          
-          {/* START */}
-          <div className="p-6 rounded-[32px] border-2 border-gray-100 hover:border-orange-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-3xl">🥉</span>
-                <span className="px-2.5 py-1 bg-orange-50 rounded-full text-[9px] font-black text-orange-500 uppercase tracking-widest border border-orange-100">START</span>
-              </div>
-              <h3 className="text-xl font-black text-gray-950 mb-1">START TARIF</h3>
-              <div className="text-2xl font-black text-orange-600 mb-4 font-mono">
-                {(configs.start.price ?? 300000).toLocaleString()} <span className="text-xs font-black text-gray-400">so'm/oy</span>
-              </div>
-              
-              <p className="text-gray-400 text-xs font-bold mb-4 line-clamp-2">Kichik guruhlar va individual oʻqituvchilar uchun ideal boshlang'ich paket.</p>
-              
-              <ul className="space-y-2.5 mb-6 border-t border-gray-50 pt-3">
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.students ?? 50} ta-talabalar
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.staff ?? 2} ta-xodimlar
-                </li>
-                <div className="mx-7 py-1.5 px-3 bg-orange-50 rounded-lg border border-orange-100/50 flex items-center gap-2 mb-2">
-                   <Users className="w-3.5 h-3.5 text-orange-600" />
-                   <span className="text-[9px] font-black text-orange-700 uppercase tracking-tighter">Har bir xodim uchun limit:</span>
-                </div>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxCourses ?? 3} ta kurs
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxTests ?? 15} ta test
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxExams ?? 2} ta imtihon
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxSubjects ?? 5} ta mavzu
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxQuizizz ?? 4} ta quizizz
-                </li>
-                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.start.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                  {configs.start.hasAI ? <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt
-                </li>
-                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.start.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                  {configs.start.hasBot ? <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> : <XIcon />} Telegram Bot
-                </li>
-              </ul>
-            </div>
-            <button 
-              onClick={() => user ? setSelectedTariff(configs.start) : setShowNewOrgModal(configs.start)}
-              className="w-full py-3 bg-gray-50 text-gray-800 rounded-xl font-black hover:bg-orange-600 hover:text-white hover:shadow-lg transition-all uppercase text-xs tracking-wider"
-            >
-              {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
-            </button>
-          </div>
-
-          {/* STANDARD */}
-          <div className="p-6 rounded-[32px] border-2 border-blue-600 bg-white relative group flex flex-col justify-between shadow-xl shadow-blue-50">
-            <div className="absolute -top-3.5 right-6 bg-blue-600 text-white text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-md">Ommabop</div>
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-3xl">🥈</span>
-                <span className="px-2.5 py-1 bg-blue-50 rounded-full text-[9px] font-black text-blue-600 uppercase tracking-widest border border-blue-100">STANDARD</span>
-              </div>
-              <h3 className="text-xl font-black text-gray-950 mb-1">STANDARD TARIF</h3>
-              <div className="text-2xl font-black text-blue-600 mb-4 font-mono">
-                {(configs.standard.price ?? 700000).toLocaleString()} <span className="text-xs font-black text-gray-400">so'm/oy</span>
-              </div>
-              
-              <p className="text-gray-400 text-xs font-bold mb-4 line-clamp-2">Oʻrta hajmdagi oʻquv markazlari va guruhlar boshqaruvi uchun keng qamrovli tizim.</p>
-              
-              <ul className="space-y-2.5 mb-6 border-t border-gray-50 pt-3">
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.students ?? 200} ta-talabalar
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.staff ?? 5} ta-xodimlar
-                </li>
-                <div className="mx-7 py-1.5 px-3 bg-blue-50 rounded-lg border border-blue-100/50 flex items-center gap-2 mb-2">
-                   <Users className="w-3.5 h-3.5 text-blue-600" />
-                   <span className="text-[9px] font-black text-blue-700 uppercase tracking-tighter">Har bir xodim uchun limit:</span>
-                </div>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxCourses ?? 10} ta kurs
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxTests ?? 50} ta test
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxExams ?? 10} ta imtihon
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxSubjects ?? 20} ta mavzu
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxQuizizz ?? 15} ta quizizz
-                </li>
-                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.standard.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                  {configs.standard.hasAI ? <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt
-                </li>
-                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.standard.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                  {configs.standard.hasBot ? <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> : <XIcon />} Telegram Bot
-                </li>
-              </ul>
-            </div>
-            <button 
-              onClick={() => user ? setSelectedTariff(configs.standard) : setShowNewOrgModal(configs.standard)}
-              className="w-full py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all uppercase text-xs tracking-wider"
-            >
-              {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
-            </button>
-          </div>
-
-          {/* PROFESSIONAL */}
-          <div className="p-6 rounded-[32px] border-2 border-gray-100 hover:border-amber-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-3xl">🥇</span>
-                <span className="px-2.5 py-1 bg-amber-50 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest border border-amber-100">PROFESSIONAL</span>
-              </div>
-              <h3 className="text-xl font-black text-gray-950 mb-1">PROFESSIONAL TARIF</h3>
-              <div className="text-2xl font-black text-amber-500 mb-4 font-mono">
-                {(configs.professional.price ?? 1500000).toLocaleString()} <span className="text-xs font-black text-gray-400">so'm/oy</span>
-              </div>
-              
-              <p className="text-gray-400 text-xs font-bold mb-4 line-clamp-2">Katta oʻquv maskanlari va ilgʻor AI-innovatsiyalardan foydalanuvchi brendlar.</p>
-              
-              <ul className="space-y-2.5 mb-6 border-t border-gray-50 pt-3">
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.students ?? 1000} ta-talabalar
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.staff ?? 20} ta-xodimlar
-                </li>
-                <div className="mx-7 py-1.5 px-3 bg-amber-50 rounded-lg border border-amber-100/50 flex items-center gap-2 mb-2">
-                   <Users className="w-3.5 h-3.5 text-amber-600" />
-                   <span className="text-[9px] font-black text-amber-700 uppercase tracking-tighter">Har bir xodim uchun limit:</span>
-                </div>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxCourses ?? 50} ta kurs
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxTests ?? 300} ta test
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxExams ?? 50} ta imtihon
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxSubjects ?? 100} ta mavzu
-                </li>
-                <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
-                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxQuizizz ?? 100} ta quizizz
-                </li>
-                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.professional.hasAI ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                  {configs.professional.hasAI ? <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> : <XIcon />} Sun'iy Intellekt
-                </li>
-                <li className={`text-xs font-bold flex items-center gap-2.5 ${configs.professional.hasBot ? "text-gray-600" : "text-gray-400 line-through"}`}>
-                  {configs.professional.hasBot ? <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> : <XIcon />} Telegram Bot
-                </li>
-              </ul>
-            </div>
-            <button 
-              onClick={() => user ? setSelectedTariff(configs.professional) : setShowNewOrgModal(configs.professional)}
-              className="w-full py-3 bg-gray-50 text-gray-800 rounded-xl font-black hover:bg-amber-500 hover:text-white hover:shadow-lg transition-all uppercase text-xs tracking-wider"
-            >
-              {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
-            </button>
-          </div>
-
-        </div>
-      </div>
-
-      {/* SECTION 2: TASHKILOT XODIMLARI VA MUSTAQIL O'QITUVCHILAR UCHUN TARIFLAR */}
-      <div className="space-y-6 pt-4">
-        <div className="border-b border-gray-100 pb-4">
-          <h2 className="text-2xl sm:text-3xl font-black text-gray-950 tracking-tight">
-            tashkilot xodimlari va mustaqil o'qituvchilar uchun tarif
-          </h2>
-          <p className="text-gray-400 text-sm font-semibold mt-1">
-            Qo'shimcha resursga ehtiyoji bor joriy foydalanuvchilar va mustaqil o'qituvchilar uchun ideal qo'shimcha limitlar.
-          </p>
-        </div>
-
-        {/* ➕ EXTRA LIMITS: Static Pricing Card */}
-        <div className="bg-white rounded-[32px] border border-emerald-100 shadow-sm overflow-hidden flex flex-col md:flex-row max-w-5xl">
-          <div className="p-8 bg-emerald-50/50 md:w-1/3 flex flex-col justify-center border-b md:border-b-0 md:border-r border-emerald-100">
-            <h3 className="text-3xl font-black text-gray-950 flex items-center gap-3">
-              ➕ EXTRA LIMITS
-            </h3>
-            <p className="text-gray-500 text-sm font-semibold mt-4 leading-relaxed">
-              Tashkilotingizning joriy tarifiga qo'shimcha ravishda faqatgina kerakli resurslarni sotib oling. Ushbu limitlar har bir birlik uchun maxsus hisoblanadi.
+      {/* TAB 1: TARIFFS CONTAINER */}
+      {activeTab === 'tariffs' && (
+        <div className="space-y-6">
+          {/* Header section with Centered styling */}
+          <div className="text-center space-y-2 max-w-3xl mx-auto">
+            <span className="px-3 py-1 rounded-full text-[10px] font-black bg-blue-50 text-blue-600 tracking-widest uppercase inline-block">
+              Biznesingiz uchun eng yaxshi yechim
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight leading-none">
+              Tariflar rejalari & Limitlar
+            </h1>
+            <p className="text-gray-400 font-bold text-xs leading-normal max-w-xl mx-auto">
+              Oʻzingizning tashkilotingiz uchun mos tarifni tanlang. Agarda sizga kattaroq imkoniyatlar kerak boʻlsa, 
+              o'ng tomondagi maxsus hisoblagich orqali narxlarni real vaqtda hisoblatib oling!
             </p>
           </div>
-          
-          <div className="p-8 md:w-2/3">
-            <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-4">Tarifstavkalar (Birlik narxlari)</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Talaba qo'shish</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.perStudent ?? 1500).toLocaleString()} UZS</span>
-              </div>
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Xodim qo'shish</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.perStaff ?? 15000).toLocaleString()} UZS</span>
-              </div>
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Kurs / Darslik</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.perCourse ?? 50000).toLocaleString()} UZS</span>
-              </div>
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Test yaratish</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.perTest ?? 3000).toLocaleString()} UZS</span>
-              </div>
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Imtihon yaratish</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.perExam ?? 20000).toLocaleString()} UZS</span>
-              </div>
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Mavzu qo'shish</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.perSubject ?? 6000).toLocaleString()} UZS</span>
-              </div>
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Quizizz</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.perQuizizz ?? 6000).toLocaleString()} UZS</span>
-              </div>
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">AI / Sun'iy Intellekt (oy)</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.aiPrice ?? 350000).toLocaleString()} UZS</span>
-              </div>
-              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Telegram Bot (oy)</span>
-                <span className="text-xs font-black text-emerald-600">{(configs.extra.botPrice ?? 250000).toLocaleString()} UZS</span>
-              </div>
-            </div>
+
+          {/* Grid of 3 Tariffs in one row on desktop: START, STANDARD, PROFESSIONAL */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             
-            <p className="text-[10px] font-semibold text-emerald-600 leading-normal italic mt-4 text-right">
-              * Ushbu qo'shimcha resurslarni xarid qilish uchun admin botga (Telegram) murojaat qiling yoki platforma orqali administrator bilan bog'laning.
-            </p>
+            {/* START */}
+            <div className="p-5 rounded-2xl border border-gray-100 hover:border-orange-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-2xl">🥉</span>
+                  <span className="px-2.5 py-1 bg-orange-50 rounded-full text-[9px] font-black text-orange-500 uppercase tracking-widest border border-orange-100">START</span>
+                </div>
+                <h3 className="text-base font-black text-gray-950 mb-0.5">START TARIF</h3>
+                <div className="text-lg font-black text-orange-600 mb-2 font-mono">
+                  {(configs.start.price ?? 300000).toLocaleString()} <span className="text-[10px] font-black text-gray-400">so'm/oy</span>
+                </div>
+                
+                <p className="text-gray-400 text-[11px] font-bold mb-3 leading-snug line-clamp-2">Kichik guruhlar va individual oʻqituvchilar uchun ideal boshlang'ich paket.</p>
+                
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-bold text-gray-600 border-t border-gray-50 pt-3 mb-4">
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span>{configs.start.students ?? 50} talaba</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span>{configs.start.staff ?? 2} xodim</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span>{configs.start.maxCourses ?? 3} ta kurs</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span>{configs.start.maxTests ?? 15} ta test</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span>{configs.start.maxExams ?? 2} imtihon</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span>{configs.start.maxSubjects ?? 5} mavzu</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span>{configs.start.maxQuizizz ?? 4} quizizz</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${configs.start.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                    {configs.start.hasAI ? <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" /> : <XIcon />}
+                    <span>AI AI</span>
+                  </div>
+                  <div className={`col-span-2 flex items-center gap-1.5 ${configs.start.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                    {configs.start.hasBot ? <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" /> : <XIcon />}
+                    <span>Telegram Bot</span>
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => user ? setSelectedTariff(configs.start) : setShowNewOrgModal(configs.start)}
+                className="w-full py-2.5 bg-gray-50 text-gray-800 rounded-xl font-black hover:bg-orange-600 hover:text-white hover:shadow-lg transition-all uppercase text-[10px] tracking-wider"
+              >
+                {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
+              </button>
+            </div>
+
+            {/* STANDARD */}
+            <div className="p-5 rounded-2xl border-2 border-blue-600 bg-white relative group flex flex-col justify-between shadow-xl shadow-blue-50/50">
+              <div className="absolute -top-3.5 right-6 bg-blue-600 text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-md">Ommabop</div>
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-2xl">🥈</span>
+                  <span className="px-2.5 py-1 bg-blue-50 rounded-full text-[9px] font-black text-blue-600 uppercase tracking-widest border border-blue-100">STANDARD</span>
+                </div>
+                <h3 className="text-base font-black text-gray-950 mb-0.5">STANDARD TARIF</h3>
+                <div className="text-lg font-black text-blue-600 mb-2 font-mono">
+                  {(configs.standard.price ?? 700000).toLocaleString()} <span className="text-[10px] font-black text-gray-400">so'm/oy</span>
+                </div>
+                
+                <p className="text-gray-400 text-[11px] font-bold mb-3 leading-snug line-clamp-2">Oʻrta hajmdagi oʻquv markazlari va guruhlar boshqaruvi uchun keng qamrovli tizim.</p>
+                
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-bold text-gray-600 border-t border-gray-50 pt-3 mb-4">
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{configs.standard.students ?? 200} talaba</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{configs.standard.staff ?? 5} xodim</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{configs.standard.maxCourses ?? 10} ta kurs</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{configs.standard.maxTests ?? 50} ta test</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{configs.standard.maxExams ?? 10} imtihon</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{configs.standard.maxSubjects ?? 20} mavzu</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <span>{configs.standard.maxQuizizz ?? 15} quizizz</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${configs.standard.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                    {configs.standard.hasAI ? <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" /> : <XIcon />}
+                    <span>Sun'iy Intellekt</span>
+                  </div>
+                  <div className={`col-span-2 flex items-center gap-1.5 ${configs.standard.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                    {configs.standard.hasBot ? <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" /> : <XIcon />}
+                    <span>Telegram Bot</span>
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => user ? setSelectedTariff(configs.standard) : setShowNewOrgModal(configs.standard)}
+                className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all uppercase text-[10px] tracking-wider"
+              >
+                {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
+              </button>
+            </div>
+
+            {/* PROFESSIONAL */}
+            <div className="p-5 rounded-2xl border border-gray-100 hover:border-amber-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-2xl">🥇</span>
+                  <span className="px-2.5 py-1 bg-amber-50 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest border border-amber-100">PROFESSIONAL</span>
+                </div>
+                <h3 className="text-base font-black text-gray-950 mb-0.5">PROFESSIONAL TARIF</h3>
+                <div className="text-lg font-black text-amber-500 mb-2 font-mono">
+                  {(configs.professional.price ?? 1500000).toLocaleString()} <span className="text-[10px] font-black text-gray-400">so'm/oy</span>
+                </div>
+                
+                <p className="text-gray-400 text-[11px] font-bold mb-3 leading-snug line-clamp-2">Katta oʻquv maskanlari va ilgʻor AI-innovatsiyalardan foydalanuvchi brendlar.</p>
+                
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-bold text-gray-600 border-t border-gray-50 pt-3 mb-4">
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{configs.professional.students ?? 1000} talaba</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{configs.professional.staff ?? 20} xodim</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{configs.professional.maxCourses ?? 50} ta kurs</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{configs.professional.maxTests ?? 300} ta test</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{configs.professional.maxExams ?? 50} imtihon</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{configs.professional.maxSubjects ?? 100} mavzu</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{configs.professional.maxQuizizz ?? 100} quizizz</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${configs.professional.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                    {configs.professional.hasAI ? <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : <XIcon />}
+                    <span>Sun'iy Intellekt</span>
+                  </div>
+                  <div className={`col-span-2 flex items-center gap-1.5 ${configs.professional.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                    {configs.professional.hasBot ? <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : <XIcon />}
+                    <span>Telegram Bot</span>
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => user ? setSelectedTariff(configs.professional) : setShowNewOrgModal(configs.professional)}
+                className="w-full py-2.5 bg-gray-50 text-gray-800 rounded-xl font-black hover:bg-amber-500 hover:text-white hover:shadow-lg transition-all uppercase text-[10px] tracking-wider"
+              >
+                {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
+              </button>
+            </div>
+
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Visual divider design */}
-      <div className="rounded-[40px] border border-gray-100 bg-gray-50/50 flex flex-col md:flex-row items-center gap-6 justify-between p-8">
+      {/* TAB 2: CALCULATOR & EXTRA LIMITS */}
+      {activeTab === 'calculator' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm max-w-4xl mx-auto">
+            <div className="text-center mb-6">
+              <h2 className="text-lg font-black text-gray-950">🧮 Shaxsiy Limitlar Hisoblagichi</h2>
+              <p className="text-gray-400 text-xs mt-1">O'zingizga kerakli bo'lgan limitlarni tanlang va tizim narxini real vaqtda hisoblang.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Sliders side */}
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                    <span>Talabalar soni</span>
+                    <span className="text-blue-600 font-black">{extraCalc.students} ta</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="2000"
+                    step="10"
+                    value={extraCalc.students}
+                    onChange={(e) => setExtraCalc({ ...extraCalc, students: parseInt(e.target.value) })}
+                    className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                    <span>Xodimlar soni</span>
+                    <span className="text-blue-600 font-black">{extraCalc.staff} ta</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={extraCalc.staff}
+                    onChange={(e) => setExtraCalc({ ...extraCalc, staff: parseInt(e.target.value) })}
+                    className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                    <span>Kurslar soni</span>
+                    <span className="text-blue-600 font-black">{extraCalc.courses} ta</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={extraCalc.courses}
+                    onChange={(e) => setExtraCalc({ ...extraCalc, courses: parseInt(e.target.value) })}
+                    className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-bold text-gray-600 mb-1">
+                    <span>Testlar soni</span>
+                    <span className="text-blue-600 font-black">{extraCalc.tests} ta</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="500"
+                    step="5"
+                    value={extraCalc.tests}
+                    onChange={(e) => setExtraCalc({ ...extraCalc, tests: parseInt(e.target.value) })}
+                    className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <label className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer">
+                    <span className="text-xs font-bold text-gray-600">AI Assistant</span>
+                    <input
+                      type="checkbox"
+                      checked={extraCalc.ai}
+                      onChange={(e) => setExtraCalc({ ...extraCalc, ai: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 accent-blue-600 cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer">
+                    <span className="text-xs font-bold text-gray-600">Telegram Bot</span>
+                    <input
+                      type="checkbox"
+                      checked={extraCalc.bot}
+                      onChange={(e) => setExtraCalc({ ...extraCalc, bot: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 accent-blue-600 cursor-pointer"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Price display side */}
+              <div className="bg-blue-50/50 rounded-2xl border border-blue-100/30 p-6 flex flex-col justify-between">
+                <div>
+                  <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Hisoblangan jami narx</h4>
+                  <div className="text-2xl font-black text-gray-900 font-mono">
+                    {calcExtraPrice().toLocaleString()} <span className="text-xs font-black text-gray-500">so'm/oy</span>
+                  </div>
+                  <p className="text-gray-500 text-xs mt-3 leading-relaxed font-bold">
+                    Ushbu narx siz tanlagan parametrlar va qo'shimcha limitlarga asosan real vaqtda avtomatik tarzda hisoblandi.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const customTariff: TariffConfig = {
+                      name: "MAXSUS TARIF",
+                      price: calcExtraPrice(),
+                      students: extraCalc.students,
+                      staff: extraCalc.staff,
+                      maxCourses: extraCalc.courses,
+                      maxTests: extraCalc.tests,
+                      maxExams: extraCalc.exams,
+                      maxSubjects: extraCalc.subjects,
+                      maxQuizizz: extraCalc.quizizz,
+                      hasAI: extraCalc.ai,
+                      hasBot: extraCalc.bot
+                    };
+                    if (user) {
+                      setSelectedTariff(customTariff);
+                    } else {
+                      setShowNewOrgModal(customTariff);
+                    }
+                  }}
+                  className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-md shadow-blue-100"
+                >
+                  Ulanish so'rovini yuborish
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Unit Price Table for transparency */}
+          <div className="bg-white rounded-2xl border border-emerald-100 p-6 shadow-sm max-w-4xl mx-auto">
+            <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-3">Tarifstavkalar (Birlik narxlari)</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">Talaba qo'shish</span>
+                <span className="font-black text-emerald-600">{(configs.extra.perStudent ?? 1500).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">Xodim qo'shish</span>
+                <span className="font-black text-emerald-600">{(configs.extra.perStaff ?? 15000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">Kurs / Darslik</span>
+                <span className="font-black text-emerald-600">{(configs.extra.perCourse ?? 50000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">Test yaratish</span>
+                <span className="font-black text-emerald-600">{(configs.extra.perTest ?? 3000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">Imtihon yaratish</span>
+                <span className="font-black text-emerald-600">{(configs.extra.perExam ?? 20000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">Mavzu qo'shish</span>
+                <span className="font-black text-emerald-600">{(configs.extra.perSubject ?? 6000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">Quizizz</span>
+                <span className="font-black text-emerald-600">{(configs.extra.perQuizizz ?? 6000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">AI Assistant (oy)</span>
+                <span className="font-black text-emerald-600">{(configs.extra.aiPrice ?? 350000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100/60 text-xs">
+                <span className="font-bold text-slate-600">Telegram Bot (oy)</span>
+                <span className="font-black text-emerald-600">{(configs.extra.botPrice ?? 250000).toLocaleString()} UZS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 100% Guarantee & Safe system container - Exactly matches user's screenshot */}
+      <div className="rounded-[24px] border border-gray-100 bg-white/80 backdrop-blur-sm flex flex-col sm:flex-row items-center gap-4 justify-between p-5 shadow-sm max-w-7xl mx-auto">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl">
-            <ShieldCheck className="w-6 h-6" />
+          <div className="w-11 h-11 bg-blue-50 text-blue-600 rounded-[14px] border border-blue-100/20 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-lg font-black text-gray-900">100% Kafolat & Xavfsiz tizim</h4>
-            <p className="text-xs font-medium text-gray-400">Bizning barcha to'lov shartnomalarimiz rasmiy ravishda yuritiladi.</p>
+            <h4 className="text-sm font-black text-gray-900 leading-none">100% Kafolat & Xavfsiz tizim</h4>
+            <p className="text-[11px] font-bold text-gray-400 mt-1">Bizning barcha to'lov shartnomalarimiz rasmiy ravishda yuritiladi.</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <a href="/contact" className="px-6 py-3 bg-gray-900 hover:bg-black text-white text-xs font-black rounded-xl transition-all uppercase tracking-wide">
+        <div>
+          <a 
+            href="/contact" 
+            className="px-6 py-3.5 bg-[#111827] hover:bg-black text-white text-[10px] font-black rounded-xl transition-all uppercase tracking-widest whitespace-nowrap inline-block"
+          >
             Biz bilan bog'lanish
           </a>
         </div>
       </div>
+
     </div>
   );
 }
