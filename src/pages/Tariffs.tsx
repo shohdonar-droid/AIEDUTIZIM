@@ -421,19 +421,23 @@ export default function Tariffs() {
             className="bg-white rounded-[2rem] w-full max-w-2xl p-8 shadow-2xl overflow-y-auto max-h-[95vh] scrollbar-hide"
           >
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Tashkilot sifatida ro'yxatdan o'tish</h3>
+              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                {showNewOrgModal.name?.includes("MUSTAQIL") ? "O'QITUVCHI SIFATIDA RO'YXATDAN O'TISH" : "TASHKILOT SIFATIDA RO'YXATDAN O'TISH"}
+              </h3>
               <button onClick={() => setShowNewOrgModal(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Tashkilot nomi</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">
+                    {showNewOrgModal.name?.includes("MUSTAQIL") ? "O'qituvchi F.I.SH" : "Tashkilot nomi"}
+                  </label>
                   <input 
                     type="text" 
                     value={newOrgData.name}
                     onChange={e => setNewOrgData({...newOrgData, name: e.target.value})}
-                    placeholder="Masalan: Innovatsiya O'quv Markazi"
+                    placeholder={showNewOrgModal.name?.includes("MUSTAQIL") ? "Masalan: Alisher Ortiqov" : "Masalan: Innovatsiya O'quv Markazi"}
                     className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm"
                   />
                 </div>
@@ -454,7 +458,7 @@ export default function Tariffs() {
                     <div>
                       <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider mb-0.5">Xavfsiz Kirish tizimi</h4>
                       <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
-                        Tizimga kirish uchun **tizimli ID raqam** (masalan: `1000004`) va maxfiy parol so'rov admin tomonidan tasdiqlanishi bilan avtomatik yaratiladi.
+                        Tizimga kirish uchun **tizimli ID raqam** (masalan: `1000004`) va maxfiy parol so'rov admin tomonidan tasdiqlanishi bilan avtomatik yaratiladi hamda ko'rsatib o'tgan telefon raqamingizga SMS xabarnomada yuboriladi.
                       </p>
                     </div>
                   </div>
@@ -723,106 +727,98 @@ export default function Tariffs() {
             </button>
           </div>
 
-          {/* EXTRA PLUS (QO'SHIMCHA LIMIT) */}
+          {/* MUSTAQIL O'QITUVCHI TARIFI */}
           <div className="p-5 rounded-2xl border border-emerald-100 hover:border-emerald-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
             <div>
               <div className="flex justify-between items-center mb-3">
-                <span className="text-2xl">➕</span>
-                <span className="px-2.5 py-1 bg-emerald-50 rounded-full text-[9px] font-black text-emerald-600 uppercase tracking-widest border border-emerald-100">EXTRA PLUS</span>
+                <span className="text-2xl">👨‍🏫</span>
+                <span className="px-2.5 py-1 bg-emerald-50 rounded-full text-[9px] font-black text-emerald-600 uppercase tracking-widest border border-emerald-100">MUSTAQIL O'QITUVCHI</span>
               </div>
-              <h3 className="text-base font-black text-gray-950 mb-0.5">EXTRA PLUS</h3>
+              <h3 className="text-base font-black text-gray-950 mb-0.5">MUSTAQIL O'QITUVCHI</h3>
               <div className="text-lg font-black text-emerald-600 mb-2 font-mono">
-                Qo'shimcha <span className="text-[10px] font-black text-gray-400">Limitlar</span>
+                20 000 UZS <span className="text-[10px] font-black text-gray-400">/ oy</span>
               </div>
               
-              <p className="text-gray-400 text-[11px] font-bold mb-3 leading-snug line-clamp-2">Kerakli miqdordagi limitlarni alohida xarid qilib hisobingizga qo'shing.</p>
+              <p className="text-gray-400 text-[11px] font-bold mb-3 leading-snug">Mustaqil dars beruvchi va repititorlar uchun maxsus, yengillashtirilgan tarif.</p>
               
               <div className="flex flex-col gap-y-1 text-[9px] font-bold text-gray-600 border-t border-gray-50 pt-3 mb-4">
                 <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
                   <span className="flex items-center gap-1">
                     <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Talaba qo'shish</span>
+                    <span>Bo'lim / Kafedra</span>
                   </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.perStudent ?? 1500).toLocaleString()} UZS</span>
+                  <span className="text-emerald-600 font-mono">1 ta</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
                   <span className="flex items-center gap-1">
                     <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Xodim qo'shish</span>
+                    <span>Guruhlar soni</span>
                   </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.perStaff ?? 15000).toLocaleString()} UZS</span>
+                  <span className="text-emerald-600 font-mono">1 ta</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
                   <span className="flex items-center gap-1">
                     <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Kurs / Darslik</span>
+                    <span>Talabalar soni</span>
                   </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.perCourse ?? 50000).toLocaleString()} UZS</span>
+                  <span className="text-emerald-600 font-mono">5 ta</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
+                  <span className="flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span>Fan mavzulari</span>
+                  </span>
+                  <span className="text-emerald-600 font-mono">2 ta</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
                   <span className="flex items-center gap-1">
                     <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     <span>Test yaratish</span>
                   </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.perTest ?? 3000).toLocaleString()} UZS</span>
+                  <span className="text-emerald-600 font-mono">2 ta</span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
+                  <span className="flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span>Quizizz test</span>
+                  </span>
+                  <span className="text-emerald-600 font-mono">1 ta</span>
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
                   <span className="flex items-center gap-1">
                     <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     <span>Imtihon yaratish</span>
                   </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.perExam ?? 20000).toLocaleString()} UZS</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Mavzu qo'shish</span>
-                  </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.perSubject ?? 6000).toLocaleString()} UZS</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Quizizz</span>
-                  </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.perQuizizz ?? 6000).toLocaleString()} UZS</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-gray-50/60">
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Sun'iy Intellekt</span>
-                  </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.aiPrice ?? 350000).toLocaleString()} UZS</span>
+                  <span className="text-emerald-600 font-mono">1 ta</span>
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <span className="flex items-center gap-1">
                     <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>Telegram Bot</span>
+                    <span>Sertifikat berish</span>
                   </span>
-                  <span className="text-emerald-600 font-mono">{(configs.extra.botPrice ?? 250000).toLocaleString()} UZS</span>
+                  <span className="text-emerald-600 font-mono">5 ta</span>
                 </div>
               </div>
             </div>
             <button 
               onClick={() => {
-                const extraPlusTariff = {
-                  name: "EXTRA PLUS (QO'SHIMCHA LIMIT)",
-                  price: 0,
-                  students: 0,
+                const mustaqilTariff = {
+                  name: "MUSTAQIL O'QITUVCHI TARIFI",
+                  price: 20000,
+                  students: 5,
                   staff: 0,
                   maxCourses: 0,
-                  maxTests: 0,
-                  maxExams: 0,
-                  maxSubjects: 0,
-                  maxQuizizz: 0,
+                  maxTests: 2,
+                  maxExams: 1,
+                  maxSubjects: 2,
+                  maxQuizizz: 1,
                   hasAI: false,
-                  hasBot: false,
-                  isExtraPlus: true
+                  hasBot: false
                 };
                 if (user) {
-                  setSelectedTariff(extraPlusTariff);
+                  setSelectedTariff(mustaqilTariff);
                 } else {
-                  setShowNewOrgModal(extraPlusTariff);
+                  setShowNewOrgModal(mustaqilTariff);
                 }
               }}
               className="w-full py-2.5 bg-emerald-50 text-emerald-700 rounded-xl font-black hover:bg-emerald-600 hover:text-white hover:shadow-lg transition-all uppercase text-[10px] tracking-wider"

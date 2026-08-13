@@ -42,8 +42,11 @@ export default function AdminServices() {
       let approvedPassword = "";
 
       if (req.isNewOrgRequest) {
-        // Create new organization user with a sequential systematic ID starting with 1
-        const cleanLogin = await getNextSequentialId('teacher');
+        // Create new user (either "teacher" for organizations or "mustaqil_o_qituvchi" for independent teachers)
+        const isMustaqil = req.tariffName?.toLowerCase().includes("mustaqil");
+        const role = isMustaqil ? "mustaqil_o_qituvchi" : "teacher";
+        
+        const cleanLogin = await getNextSequentialId(role);
         const pass = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit random password
         approvedLogin = cleanLogin;
         approvedPassword = pass;
@@ -66,46 +69,105 @@ export default function AdminServices() {
         const uid = data.localId;
         targetUserId = uid;
 
-        // Map limits if provided (CORPORATE calculator)
-        const customLimits: any = {};
-        if (req.limits) {
-          customLimits.studentLimit = Number(req.limits.students) || 0;
-          customLimits.staffLimit = Number(req.limits.staff) || 0;
-          customLimits.courseLimit = Number(req.limits.courses) || 0;
-          customLimits.testLimit = Number(req.limits.tests) || 0;
-          customLimits.examLimit = Number(req.limits.exams) || 0;
-          customLimits.subjectLimit = Number(req.limits.subjects) || 0;
-          customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
-          customLimits.hasAi = !!req.limits.ai;
-          customLimits.hasBot = !!req.limits.bot;
-        } else {
-          // Default limits based on requested tariff
-          const isStandard = req.tariffName?.toLowerCase() === "standard";
-          const isProfessional = req.tariffName?.toLowerCase() === "professional";
-          customLimits.studentLimit = isStandard ? 200 : (isProfessional ? 1000 : 50);
-          customLimits.staffLimit = isStandard ? 5 : (isProfessional ? 20 : 2);
-          customLimits.courseLimit = isStandard ? 10 : (isProfessional ? 50 : 3);
-          customLimits.testLimit = isStandard ? 50 : (isProfessional ? 300 : 15);
-          customLimits.examLimit = isStandard ? 10 : (isProfessional ? 50 : 2);
-          customLimits.subjectLimit = isStandard ? 20 : (isProfessional ? 100 : 5);
-          customLimits.quizizzLimit = isStandard ? 15 : (isProfessional ? 100 : 4);
-          customLimits.hasAi = isStandard || isProfessional;
-          customLimits.hasBot = isStandard || isProfessional;
-        }
+        if (isMustaqil) {
+          // Get UY Home organization Id as teacherId
+          let uyOrgId = "";
+          const qUy = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
+          const uySnap = await getDocs(qUy);
+          if (!uySnap.empty) {
+            uyOrgId = uySnap.docs[0].id;
+          } else {
+            const uyRef = await addDoc(collection(db, 'users'), {
+              displayName: 'UY',
+              role: 'teacher',
+              status: 'active',
+              createdAt: serverTimestamp(),
+              limit_departments: 9999,
+              limit_groups: 9999,
+              limit_students: 9999,
+              limit_subjects: 9999,
+              limit_tests: 9999,
+              limit_quizizz: 9999,
+              limit_exams: 9999,
+              limit_certificates: 9999
+            });
+            uyOrgId = uyRef.id;
+          }
 
-        await setDoc(doc(db, "users", uid), {
-          uid: uid,
-          displayName: req.userName,
-          phone: req.phone || "",
-          login: cleanLogin,
-          systemId: cleanLogin,
-          password: pass,
-          role: "teacher",
-          email: email,
-          tariffName: req.tariffName,
-          createdAt: serverTimestamp(),
-          ...customLimits
-        });
+          const defaultLimits = {
+            limit_departments: 1,
+            limit_groups: 1,
+            limit_students: 5,
+            limit_subjects: 2,
+            limit_tests: 2,
+            limit_quizizz: 1,
+            limit_exams: 1,
+            limit_courses: 0,
+            limit_certificates: 5,
+            limit_tests_per_subject: 10,
+            limit_questions_per_test: 10,
+            limit_questions_per_quizizz: 5,
+            limit_questions_per_exam: 10,
+          };
+
+          await setDoc(doc(db, "users", uid), {
+            uid: uid,
+            displayName: req.userName,
+            phone: req.phone || "",
+            login: cleanLogin,
+            systemId: cleanLogin,
+            password: pass,
+            role: "mustaqil_o_qituvchi",
+            teacherId: uyOrgId,
+            email: email,
+            status: 'active',
+            total_spent: 0,
+            customLimitPrices: {},
+            createdAt: serverTimestamp(),
+            ...defaultLimits
+          });
+        } else {
+          // Map limits if provided (CORPORATE calculator)
+          const customLimits: any = {};
+          if (req.limits) {
+            customLimits.studentLimit = Number(req.limits.students) || 0;
+            customLimits.staffLimit = Number(req.limits.staff) || 0;
+            customLimits.courseLimit = Number(req.limits.courses) || 0;
+            customLimits.testLimit = Number(req.limits.tests) || 0;
+            customLimits.examLimit = Number(req.limits.exams) || 0;
+            customLimits.subjectLimit = Number(req.limits.subjects) || 0;
+            customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
+            customLimits.hasAi = !!req.limits.ai;
+            customLimits.hasBot = !!req.limits.bot;
+          } else {
+            // Default limits based on requested tariff
+            const isStandard = req.tariffName?.toLowerCase() === "standard";
+            const isProfessional = req.tariffName?.toLowerCase() === "professional";
+            customLimits.studentLimit = isStandard ? 200 : (isProfessional ? 1000 : 50);
+            customLimits.staffLimit = isStandard ? 5 : (isProfessional ? 20 : 2);
+            customLimits.courseLimit = isStandard ? 10 : (isProfessional ? 50 : 3);
+            customLimits.testLimit = isStandard ? 50 : (isProfessional ? 300 : 15);
+            customLimits.examLimit = isStandard ? 10 : (isProfessional ? 50 : 2);
+            customLimits.subjectLimit = isStandard ? 20 : (isProfessional ? 100 : 5);
+            customLimits.quizizzLimit = isStandard ? 15 : (isProfessional ? 100 : 4);
+            customLimits.hasAi = isStandard || isProfessional;
+            customLimits.hasBot = isStandard || isProfessional;
+          }
+
+          await setDoc(doc(db, "users", uid), {
+            uid: uid,
+            displayName: req.userName,
+            phone: req.phone || "",
+            login: cleanLogin,
+            systemId: cleanLogin,
+            password: pass,
+            role: "teacher",
+            email: email,
+            tariffName: req.tariffName,
+            createdAt: serverTimestamp(),
+            ...customLimits
+          });
+        }
       }
 
       const updatePayload: any = { status: 'approved' };
