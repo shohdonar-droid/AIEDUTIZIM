@@ -274,27 +274,6 @@ export default function Tariffs() {
     loadConfig();
   }, []);
 
-  useEffect(() => {
-    if (showNewOrgModal) {
-      const randomId = Math.floor(10000 + Math.random() * 90000); // 5-digit random id
-      const autoLogin = `org_${randomId}`;
-      const autoPass = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit random password
-      setNewOrgData({
-        name: '',
-        phone: '',
-        login: autoLogin,
-        password: autoPass
-      });
-    } else {
-      setNewOrgData({
-        name: '',
-        phone: '',
-        login: '',
-        password: ''
-      });
-    }
-  }, [showNewOrgModal]);
-
   const handleActivateTariff = async () => {
     if (!user) return alert('Iltimos, tizimga kiring');
     
@@ -328,7 +307,7 @@ export default function Tariffs() {
 
   const handleNewOrgSignup = async () => {
     if (!showNewOrgModal) return;
-    if (!newOrgData.name || !newOrgData.phone || !newOrgData.login || !newOrgData.password || !receiptUrl) {
+    if (!newOrgData.name || !newOrgData.phone || !receiptUrl) {
       return alert("Barcha maydonlarni to'ldiring va chekni yuklang.");
     }
     setIsSubmitting(true);
@@ -337,8 +316,6 @@ export default function Tariffs() {
         isNewOrgRequest: true,
         userName: newOrgData.name,
         phone: newOrgData.phone,
-        login: newOrgData.login,
-        password: newOrgData.password,
         tariffName: showNewOrgModal.name,
         tariffPrice: showNewOrgModal.price || showNewOrgModal.basePrice || 0,
         limits: null,
@@ -358,8 +335,6 @@ export default function Tariffs() {
             data: {
               userName: newOrgData.name,
               phone: newOrgData.phone,
-              login: newOrgData.login,
-              password: newOrgData.password,
               tariffName: showNewOrgModal.name,
               tariffPrice: showNewOrgModal.price || showNewOrgModal.basePrice || 0,
               paymentType,
@@ -371,7 +346,7 @@ export default function Tariffs() {
         });
       } catch (e) {}
 
-      alert("Ro'yxatdan o'tish so'rovi yuborildi! Admin tasdiqlagandan so'ng login/parol orqali kirishingiz mumkin.");
+      alert("Ro'yxatdan o'tish so'rovi yuborildi! Admin tasdiqlagandan so'ng sizga tizimli ID raqam va maxfiy parol taqdim etiladi.");
       setShowNewOrgModal(null);
       setNewOrgData({ name: '', phone: '', login: '', password: '' });
       setReceiptUrl('');
@@ -472,29 +447,17 @@ export default function Tariffs() {
                     className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm"
                   />
                 </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1 px-1">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Login</label>
-                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-wider">🔑 Tizim tomonidan yaratildi</span>
+                
+                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/60 mt-2">
+                  <div className="flex gap-2">
+                    <span className="text-emerald-600 font-bold text-sm">🔒</span>
+                    <div>
+                      <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider mb-0.5">Xavfsiz Kirish tizimi</h4>
+                      <p className="text-[11px] text-emerald-700 font-medium leading-relaxed">
+                        Tizimga kirish uchun **tizimli ID raqam** (masalan: `1000004`) va maxfiy parol so'rov admin tomonidan tasdiqlanishi bilan avtomatik yaratiladi.
+                      </p>
+                    </div>
                   </div>
-                  <input 
-                    type="text" 
-                    value={newOrgData.login}
-                    readOnly
-                    className="w-full px-5 py-3 bg-blue-50/20 border border-blue-100 rounded-xl outline-none text-sm font-bold font-mono text-blue-900 cursor-not-allowed select-all"
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-1 px-1">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Parol</label>
-                    <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">🔒 Maxfiy</span>
-                  </div>
-                  <input 
-                    type="text" 
-                    value={newOrgData.password}
-                    readOnly
-                    className="w-full px-5 py-3 bg-emerald-50/10 border border-emerald-100 rounded-xl outline-none text-sm font-bold font-mono text-emerald-900 cursor-not-allowed select-all"
-                  />
                 </div>
               </div>
 

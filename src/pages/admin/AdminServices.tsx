@@ -16,6 +16,7 @@ import {
   getDocs
 } from "firebase/firestore";
 import { Check, X, Eye, Clock, User, CreditCard } from "lucide-react";
+import { getNextSequentialId } from "../../lib/idUtils";
 
 export default function AdminServices() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -37,20 +38,17 @@ export default function AdminServices() {
     if (!confirm("Ushbu so'rovni tasdiqlaysizmi?")) return;
     try {
       let targetUserId = req.userId;
+      let approvedLogin = "";
+      let approvedPassword = "";
 
       if (req.isNewOrgRequest) {
-        // Create new organization user
-        const q = query(
-          collection(db, "users"),
-          where("login", "==", req.login.trim()),
-        );
-        const qSnap = await getDocs(q);
-        if (!qSnap.empty) {
-          alert("Ushbu login band! Ro'yxatdan o'tish so'rovi tasdiqlanmadi.");
-          return;
-        }
+        // Create new organization user with a sequential systematic ID starting with 1
+        const cleanLogin = await getNextSequentialId('teacher');
+        const pass = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit random password
+        approvedLogin = cleanLogin;
+        approvedPassword = pass;
 
-        const email = `${req.login.trim().toLowerCase()}@teacher.uz`;
+        const email = `${cleanLogin}@teacher.uz`;
         const response = await fetch(
           `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
           {
@@ -58,7 +56,7 @@ export default function AdminServices() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email,
-              password: req.password,
+              password: pass,
               returnSecureToken: false,
             }),
           },
@@ -80,14 +78,28 @@ export default function AdminServices() {
           customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
           customLimits.hasAi = !!req.limits.ai;
           customLimits.hasBot = !!req.limits.bot;
+        } else {
+          // Default limits based on requested tariff
+          const isStandard = req.tariffName?.toLowerCase() === "standard";
+          const isProfessional = req.tariffName?.toLowerCase() === "professional";
+          customLimits.studentLimit = isStandard ? 200 : (isProfessional ? 1000 : 50);
+          customLimits.staffLimit = isStandard ? 5 : (isProfessional ? 20 : 2);
+          customLimits.courseLimit = isStandard ? 10 : (isProfessional ? 50 : 3);
+          customLimits.testLimit = isStandard ? 50 : (isProfessional ? 300 : 15);
+          customLimits.examLimit = isStandard ? 10 : (isProfessional ? 50 : 2);
+          customLimits.subjectLimit = isStandard ? 20 : (isProfessional ? 100 : 5);
+          customLimits.quizizzLimit = isStandard ? 15 : (isProfessional ? 100 : 4);
+          customLimits.hasAi = isStandard || isProfessional;
+          customLimits.hasBot = isStandard || isProfessional;
         }
 
         await setDoc(doc(db, "users", uid), {
           uid: uid,
           displayName: req.userName,
           phone: req.phone || "",
-          login: req.login.trim(),
-          password: req.password,
+          login: cleanLogin,
+          systemId: cleanLogin,
+          password: pass,
           role: "teacher",
           email: email,
           tariffName: req.tariffName,
@@ -96,7 +108,12 @@ export default function AdminServices() {
         });
       }
 
-      await updateDoc(doc(db, "connection_requests", req.id), { status: 'approved' });
+      const updatePayload: any = { status: 'approved' };
+      if (req.isNewOrgRequest) {
+        updatePayload.approvedLogin = approvedLogin;
+        updatePayload.approvedPassword = approvedPassword;
+      }
+      await updateDoc(doc(db, "connection_requests", req.id), updatePayload);
       
       if (req.isBalanceTopUp) {
         const userRef = doc(db, "users", targetUserId);
@@ -269,7 +286,17 @@ export default function AdminServices() {
                       <span className="text-[10px] font-mono">{req.timestamp?.toDate().toLocaleString('uz-UZ')}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-bold text-gray-900 text-sm">{req.userName}</td>
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-gray-900 text-sm">{req.userName}</div>
+                    {req.phone && <div className="text-[11px] font-bold text-slate-400 mt-0.5">{req.phone}</div>}
+                    {req.approvedLogin && (
+                      <div className="mt-1.5 inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        <span>ID: <span className="font-mono underline">{req.approvedLogin}</span></span>
+                        <span className="text-emerald-300">|</span>
+                        <span>Parol: <span className="font-mono">{req.approvedPassword}</span></span>
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
                       <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded uppercase tracking-tighter w-fit">
