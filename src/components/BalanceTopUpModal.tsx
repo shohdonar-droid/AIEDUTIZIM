@@ -93,11 +93,6 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
       alert("Iltimos, avval tizimga kiring.");
       return;
     }
-    const finalAmount = customAmount ? parseFloat(customAmount) : amount;
-    if (!finalAmount || isNaN(finalAmount) || finalAmount <= 0) {
-      alert("Iltimos, to'ldirish summasini to'g'ri kiriting.");
-      return;
-    }
     if (!receiptUrl) {
       alert("Iltimos, to'lov chekini (kvitansiyasini) yuklang.");
       return;
@@ -115,9 +110,9 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
         userRole: userRole,
         systemId: userSystemId,
         phone: user.phone || '',
-        tariffName: `Balans to'ldirish: ${finalAmount.toLocaleString()} UZS`,
-        tariffPrice: finalAmount,
-        amount: finalAmount,
+        tariffName: `Balans to'ldirish`,
+        tariffPrice: 0,
+        amount: 0,
         paymentType: "Karta orqali o'tkazma",
         receiptUrl: receiptUrl,
         isBalanceTopUp: true,
@@ -139,9 +134,9 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
               userRole: userRole,
               systemId: userSystemId,
               phone: user.phone || '',
-              tariffName: `Balans to'ldirish (${finalAmount.toLocaleString()} UZS)`,
-              tariffPrice: finalAmount,
-              amount: finalAmount,
+              tariffName: `Balans to'ldirish`,
+              tariffPrice: 0,
+              amount: 0,
               paymentType: "Karta orqali o'tkazma",
               receiptUrl: receiptUrl,
               isBalanceTopUp: true
@@ -161,8 +156,6 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
       setIsSubmitting(false);
     }
   };
-
-  const finalAmount = customAmount ? parseFloat(customAmount) || 0 : amount;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
@@ -191,45 +184,10 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
         </div>
 
         <div className="space-y-6 pt-6 overflow-y-auto pr-1 flex-1">
-          {/* 1. Summa tanlash */}
+          {/* 1. Admin Karta Ma'lumotlari */}
           <div>
             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              1. To'ldirish summasini tanlang
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-              {[10000, 25000, 50000, 100000].map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => {
-                    setAmount(val);
-                    setCustomAmount('');
-                  }}
-                  className={`py-3 rounded-xl border-2 font-black text-xs sm:text-sm transition-all cursor-pointer ${
-                    amount === val && !customAmount
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm'
-                      : 'border-gray-100 text-slate-700 hover:border-gray-200 bg-gray-50/50'
-                  }`}
-                >
-                  {val.toLocaleString()} UZS
-                </button>
-              ))}
-            </div>
-            <div>
-              <input
-                type="number"
-                placeholder="Yoki o'zingiz summa kiriting (UZS)"
-                value={customAmount}
-                onChange={(e) => setCustomAmount(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-emerald-500 focus:outline-none font-bold text-sm text-slate-800 bg-gray-50/30"
-              />
-            </div>
-          </div>
-
-          {/* 2. Admin Karta Ma'lumotlari */}
-          <div>
-            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              2. Karta raqamiga to'lov qiling
+              1. Karta raqamiga to'lov qiling
             </label>
             <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl text-white space-y-4 shadow-lg">
               <div className="flex items-center justify-between">
@@ -277,10 +235,10 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
             </div>
           </div>
 
-          {/* 3. Chek yuklash */}
+          {/* 2. Chek yuklash */}
           <div>
             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">
-              3. To'lov chekini (kvitansiyasini) yuklang
+              2. To'lov chekini (kvitansiyasini) yuklang
             </label>
             <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-emerald-500 transition-all bg-gray-50/50">
               {receiptUrl ? (
@@ -325,7 +283,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
           </button>
           <button
             type="button"
-            disabled={isSubmitting || !receiptUrl || finalAmount <= 0}
+            disabled={isSubmitting || !receiptUrl}
             onClick={handleSubmit}
             className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer"
           >

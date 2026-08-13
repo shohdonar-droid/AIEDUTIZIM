@@ -35,7 +35,19 @@ export default function AdminServices() {
   }, []);
 
   const handleApprove = async (req: any) => {
-    if (!confirm("Ushbu so'rovni tasdiqlaysizmi?")) return;
+    let finalApprovedAmount = req.tariffPrice || 0;
+    if (req.isBalanceTopUp) {
+      const inputStr = prompt("Tasdiqlanadigan balans to'ldirish summasini kiriting (UZS):", "50000");
+      if (inputStr === null) return; // user cancelled prompt
+      const enteredAmount = parseFloat(inputStr.replace(/\s+/g, ''));
+      if (isNaN(enteredAmount) || enteredAmount <= 0) {
+        alert("Iltimos, to'g'ri summa kiriting!");
+        return;
+      }
+      finalApprovedAmount = enteredAmount;
+    } else {
+      if (!confirm("Ushbu so'rovni tasdiqlaysizmi?")) return;
+    }
     try {
       let targetUserId = req.userId;
       let approvedLogin = "";
@@ -175,6 +187,11 @@ export default function AdminServices() {
         updatePayload.approvedLogin = approvedLogin;
         updatePayload.approvedPassword = approvedPassword;
       }
+      if (req.isBalanceTopUp) {
+        updatePayload.tariffPrice = finalApprovedAmount;
+        updatePayload.amount = finalApprovedAmount;
+        updatePayload.tariffName = `Balans to'ldirish (${finalApprovedAmount.toLocaleString()} UZS)`;
+      }
       await updateDoc(doc(db, "connection_requests", req.id), updatePayload);
       
       if (req.isBalanceTopUp) {
@@ -183,7 +200,7 @@ export default function AdminServices() {
         if (userSnap.exists()) {
           const userData = userSnap.data();
           const currentBalance = Number(userData.balance ?? userData.ball ?? 0);
-          await updateDoc(userRef, { balance: currentBalance + Number(req.tariffPrice || 0) });
+          await updateDoc(userRef, { balance: currentBalance + finalApprovedAmount });
         }
       } else if (req.isLimitsRequest) {
         // Update Independent Teacher limits
@@ -256,8 +273,8 @@ export default function AdminServices() {
         userId: targetUserId,
         payerName: payerName,
         payerType: payerType,
-        amount: req.tariffPrice || req.totalPrice || 0,
-        tariffName: req.tariffName || "Noma'lum",
+        amount: req.isBalanceTopUp ? finalApprovedAmount : (req.tariffPrice || req.totalPrice || 0),
+        tariffName: req.isBalanceTopUp ? `Balans to'ldirish (${finalApprovedAmount.toLocaleString()} UZS)` : (req.tariffName || "Noma'lum"),
         paymentType: req.paymentType || "Chek",
         timestamp: serverTimestamp()
       });
@@ -372,7 +389,11 @@ export default function AdminServices() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-black font-mono whitespace-nowrap">
-                    {(req.tariffPrice || 0).toLocaleString()} UZS
+                    {req.isBalanceTopUp && !req.tariffPrice ? (
+                      <span className="text-amber-600 bg-amber-50 px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-tight">Kiritilmagan</span>
+                    ) : (
+                      `${(req.tariffPrice || 0).toLocaleString()} UZS`
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <button 
