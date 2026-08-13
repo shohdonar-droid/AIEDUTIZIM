@@ -925,202 +925,62 @@ export default function Tariffs() {
           </p>
         </div>
 
-        {/* ➕ EXTRA LIMITS: Beautiful Horizontal Dynamic Card */}
-        <div className="bg-white rounded-[40px] border-2 border-emerald-500/80 shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+        {/* ➕ EXTRA LIMITS: Static Pricing Card */}
+        <div className="bg-white rounded-[32px] border border-emerald-100 shadow-sm overflow-hidden flex flex-col md:flex-row max-w-5xl">
+          <div className="p-8 bg-emerald-50/50 md:w-1/3 flex flex-col justify-center border-b md:border-b-0 md:border-r border-emerald-100">
+            <h3 className="text-3xl font-black text-gray-950 flex items-center gap-3">
+              ➕ EXTRA LIMITS
+            </h3>
+            <p className="text-gray-500 text-sm font-semibold mt-4 leading-relaxed">
+              Tashkilotingizning joriy tarifiga qo'shimcha ravishda faqatgina kerakli resurslarni sotib oling. Ushbu limitlar har bir birlik uchun maxsus hisoblanadi.
+            </p>
+          </div>
           
-          {/* Left panel: Info about EXTRA LIMITS */}
-          <div className="lg:col-span-4 bg-emerald-50/20 p-8 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-emerald-100/60 font-sans">
-            <div className="space-y-6">
-              <div className="flex items-center gap-3.5">
-                <span className="text-3xl">➕</span>
-                <div>
-                  <h3 className="text-2xl font-black text-gray-950">EXTRA LIMITS</h3>
-                  <span className="px-2.5 py-1 bg-emerald-100 rounded-full text-[10px] font-black text-emerald-800 uppercase tracking-widest border border-emerald-200 block mt-1 w-max">
-                    MOSLASHUVCHAN
-                  </span>
-                </div>
+          <div className="p-8 md:w-2/3">
+            <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-4">Tarifstavkalar (Birlik narxlari)</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">Talaba qo'shish</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.perStudent ?? 1500).toLocaleString()} UZS</span>
               </div>
-              
-              <div className="space-y-4">
-                <p className="text-gray-500 text-sm font-bold leading-relaxed">
-                  Tashkilotingizning joriy tarifiga qo'shimcha ravishda faqatgina kerakli resurslarni sotib oling.
-                </p>
-                <div className="p-4 bg-white/80 rounded-2xl border border-emerald-100/70 space-y-2">
-                  <div className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Qo'shimcha Tarifstavkalari</div>
-                  <ul className="text-xs font-bold text-gray-600 space-y-1">
-                    <li>• Talaba: {(configs.extra.perStudent ?? 1500).toLocaleString()} so'm</li>
-                    <li>• Xodim: {(configs.extra.perStaff ?? 15000).toLocaleString()} so'm</li>
-                    <li>• Kurs/Darslik: {(configs.extra.perCourse ?? 50000).toLocaleString()} so'm</li>
-                    <li>• Test materiallari: {(configs.extra.perTest ?? 3000).toLocaleString()} so'm</li>
-                  </ul>
-                </div>
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">Xodim qo'shish</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.perStaff ?? 15000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">Kurs / Darslik</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.perCourse ?? 50000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">Test yaratish</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.perTest ?? 3000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">Imtihon yaratish</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.perExam ?? 20000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">Mavzu qo'shish</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.perSubject ?? 6000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">Quizizz</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.perQuizizz ?? 6000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">AI / Sun'iy Intellekt (oy)</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.aiPrice ?? 350000).toLocaleString()} UZS</span>
+              </div>
+              <div className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-600">Telegram Bot (oy)</span>
+                <span className="text-xs font-black text-emerald-600">{(configs.extra.botPrice ?? 250000).toLocaleString()} UZS</span>
               </div>
             </div>
-
-            <div className="mt-8 pt-6 border-t border-emerald-100/60">
-              <p className="text-[10px] font-semibold text-emerald-600 leading-normal italic">
-                * Diqqat: Qoʻshimcha sotib olinadigan limitlar faqat xarid qilingan joriy oy ichida amal qiladi. Keyingi oydan tarif standart qiymatiga qaytadi.
-              </p>
-            </div>
+            
+            <p className="text-[10px] font-semibold text-emerald-600 leading-normal italic mt-4 text-right">
+              * Ushbu qo'shimcha resurslarni xarid qilish uchun admin botga (Telegram) murojaat qiling yoki platforma orqali administrator bilan bog'laning.
+            </p>
           </div>
-
-          {/* Right panel: Active sliders & Inputs for EXTRA LIMITS */}
-          <div className="lg:col-span-8 p-8 space-y-6">
-            <div className="text-slate-900 font-bold text-sm border-b border-gray-100 pb-3 flex items-center justify-between">
-              <span>Limitlarni qo'shish paneli</span>
-              <span className="text-xs text-gray-400 font-semibold font-mono">Real-vaqtda hisoblanadi</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                  Qoʻshimcha talabalar ({configs.extra.perStudent ?? 1500} soʻm/ta)
-                </label>
-                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={extraCalc.students}
-                    onChange={(e) => setExtraCalc({...extraCalc, students: Math.max(0, Number(e.target.value))})}
-                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                  />
-                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                  Qoʻshimcha xodimi ({configs.extra.perStaff ?? 15000} soʻm/ta)
-                </label>
-                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={extraCalc.staff}
-                    onChange={(e) => setExtraCalc({...extraCalc, staff: Math.max(0, Number(e.target.value))})}
-                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                  />
-                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                  Qoʻshimcha kurslar ({(configs.extra.perCourse ?? 50000).toLocaleString()} soʻm/ta)
-                </label>
-                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={extraCalc.courses}
-                    onChange={(e) => setExtraCalc({...extraCalc, courses: Math.max(0, Number(e.target.value))})}
-                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                  />
-                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                  Qoʻshimcha testlar ({(configs.extra.perTest ?? 3000).toLocaleString()} soʻm/ta)
-                </label>
-                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={extraCalc.tests}
-                    onChange={(e) => setExtraCalc({...extraCalc, tests: Math.max(0, Number(e.target.value))})}
-                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                  />
-                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                  Qoʻshimcha imtihonlar ({(configs.extra.perExam ?? 20000).toLocaleString()} soʻm/ta)
-                </label>
-                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={extraCalc.exams}
-                    onChange={(e) => setExtraCalc({...extraCalc, exams: Math.max(0, Number(e.target.value))})}
-                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                  />
-                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                  Qoʻshimcha mavzular ({(configs.extra.perSubject ?? 6000).toLocaleString()} soʻm/ta)
-                </label>
-                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={extraCalc.subjects}
-                    onChange={(e) => setExtraCalc({...extraCalc, subjects: Math.max(0, Number(e.target.value))})}
-                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                  />
-                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider pl-1 block">
-                  Qoʻshimcha quizizzlar ({(configs.extra.perQuizizz ?? 6000).toLocaleString()} soʻm/ta)
-                </label>
-                <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 overflow-hidden pr-3 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100 transition-all">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={extraCalc.quizizz}
-                    onChange={(e) => setExtraCalc({...extraCalc, quizizz: Math.max(0, Number(e.target.value))})}
-                    className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                  />
-                  <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
-                <span className="text-xs font-bold text-slate-700">AI / Darsliklar qoʻshimcha (+{(configs.extra.aiPrice ?? 350000).toLocaleString()} sum/oy)</span>
-                <input 
-                  type="checkbox" 
-                  checked={extraCalc.ai}
-                  onChange={(e) => setExtraCalc({...extraCalc, ai: e.target.checked})}
-                  className="w-5 h-5 rounded-md accent-emerald-600 shrink-0 cursor-pointer" 
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-150 hover:bg-slate-100/55 transition-all">
-                <span className="text-xs font-bold text-slate-700">Xabar yuborish / Bot (+{(configs.extra.botPrice ?? 250000).toLocaleString()} sum/oy)</span>
-                <input 
-                  type="checkbox" 
-                  checked={extraCalc.bot}
-                  onChange={(e) => setExtraCalc({...extraCalc, bot: e.target.checked})}
-                  className="w-5 h-5 rounded-md accent-emerald-600 shrink-0 cursor-pointer" 
-                />
-              </div>
-            </div>
-
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-4">
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Bir martalik jami summa:</p>
-                <div className="text-2xl sm:text-3xl font-mono font-black text-emerald-600 mt-0.5">
-                  {calcExtraPrice().toLocaleString()} <span className="text-xs font-bold text-slate-400">sum</span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setSelectedTariff({...configs.extra, name: 'EXTRA', price: calcExtraPrice()})}
-                className="w-full sm:w-auto px-8 py-3 bg-emerald-600 text-white font-black rounded-xl hover:bg-emerald-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-emerald-100"
-              >
-                Faollashtirish
-              </button>
-            </div>
-          </div>
-
         </div>
       </div>
 

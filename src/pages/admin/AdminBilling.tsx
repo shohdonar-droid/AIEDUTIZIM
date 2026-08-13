@@ -90,7 +90,6 @@ interface AllTariffsConfig {
   start: TariffConfig;
   standard: TariffConfig;
   professional: TariffConfig;
-  corporate: TariffConfig;
   extra: TariffConfig;
 }
 
@@ -151,30 +150,6 @@ const defaultTariffs: AllTariffsConfig = {
     limit_tests_price: 2000,
     limit_quizizz_price: 2500,
     limit_exams_price: 12000
-  },
-  corporate: {
-    basePrice: 500000,
-    perStudent: 1000,
-    perStaff: 10000,
-    aiPrice: 300000,
-    botPrice: 200000,
-    maxCourses: 999,
-    maxTests: 9999,
-    maxExams: 999,
-    maxSubjects: 999,
-    maxQuizizz: 999,
-    perCourse: 40000,
-    perTest: 2000,
-    perExam: 15000,
-    perSubject: 5000,
-    perQuizizz: 5000,
-    limit_departments_price: 8000,
-    limit_groups_price: 10000,
-    limit_students_price: 2000,
-    limit_subjects_price: 8000,
-    limit_tests_price: 1500,
-    limit_quizizz_price: 2000,
-    limit_exams_price: 10000
   },
   extra: {
     perStudent: 1500,
@@ -260,17 +235,6 @@ export default function AdminBilling() {
   };
   
   // Custom Calculators
-  const [corpCalc, setCorpCalc] = useState({
-    students: 1000,
-    staff: 20,
-    ai: true,
-    bot: true,
-    courses: 50,
-    tests: 300,
-    exams: 50,
-    subjects: 100,
-    quizizz: 100,
-  });
   const [extraCalc, setExtraCalc] = useState({
     students: 0,
     staff: 0,
@@ -288,21 +252,6 @@ export default function AdminBilling() {
   const [simOrgCount, setSimOrgCount] = useState(200);
   const [simAiOptimized, setSimAiOptimized] = useState(false);
 
-  const calcCorpPrice = () => {
-    const base = tariffsConfig.corporate.basePrice ?? 500000;
-    const stdPrice = corpCalc.students * (tariffsConfig.corporate.perStudent ?? 1000);
-    const staffPrice = corpCalc.staff * (tariffsConfig.corporate.perStaff ?? 10000);
-    const aiPrice = corpCalc.ai ? (tariffsConfig.corporate.aiPrice ?? 300000) : 0;
-    const botPrice = corpCalc.bot ? (tariffsConfig.corporate.botPrice ?? 200000) : 0;
-    
-    const coursesPrice = (corpCalc.courses ?? 0) * (tariffsConfig.corporate.perCourse ?? 40000);
-    const testsPrice = (corpCalc.tests ?? 0) * (tariffsConfig.corporate.perTest ?? 2000);
-    const examsPrice = (corpCalc.exams ?? 0) * (tariffsConfig.corporate.perExam ?? 15000);
-    const subjectsPrice = (corpCalc.subjects ?? 0) * (tariffsConfig.corporate.perSubject ?? 5000);
-    const quizizzPrice = (corpCalc.quizizz ?? 0) * (tariffsConfig.corporate.perQuizizz ?? 5000);
-    
-    return base + stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
-  };
 
   const calcExtraPrice = () => {
     const stdPrice = extraCalc.students * (tariffsConfig.extra.perStudent ?? 1500);
@@ -1326,28 +1275,6 @@ export default function AdminBilling() {
                   <button className="w-full py-2.5 bg-white border border-amber-100 text-amber-600 rounded-xl font-black hover:bg-amber-600 hover:text-white transition-all text-[10px] uppercase tracking-widest">Tanlash</button>
                 </div>
 
-                {/* CORPORATE */}
-                <div className="p-6 rounded-[32px] border-2 border-gray-50 bg-indigo-50/20 hover:border-indigo-200 transition-all group relative flex flex-col justify-between">
-                  <div className="flex justify-between items-start mb-4">
-                    <span className="text-3xl">👑</span>
-                    <button
-                      onClick={() => { setEditingTariffKey("corporate"); setEditingTariffForm(tariffsConfig.corporate); }}
-                      className="p-2 bg-white text-gray-400 hover:text-indigo-500 rounded-xl border border-gray-100 transition-all opacity-0 group-hover:opacity-100"
-                    >
-                      <Settings className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-gray-900 mb-1">CORPORATE</h3>
-                    <div className="text-xl font-black text-indigo-900 mb-4">Maxsus <small className="text-[10px] text-gray-400 uppercase font-bold">hisob</small></div>
-                    <ul className="space-y-1.5 text-[10px] font-bold text-gray-500 mb-6">
-                      <li className="flex items-center gap-2"><Check className="w-3 h-3 text-indigo-600" /> Cheksiz imkoniyat</li>
-                      <li className="flex items-center gap-2"><Check className="w-3 h-3 text-indigo-600" /> Shaxsiy menejer</li>
-                      <li className="flex items-center gap-2"><Check className="w-3 h-3 text-indigo-600" /> API Access</li>
-                    </ul>
-                  </div>
-                  <button className="w-full py-2.5 bg-indigo-900 text-white rounded-xl font-black hover:bg-black transition-all text-[10px] uppercase tracking-widest">Bog'lanish</button>
-                </div>
               </div>
             </div>
 
@@ -1460,7 +1387,6 @@ export default function AdminBilling() {
                             <option value="start">START</option>
                             <option value="standard">STANDARD</option>
                             <option value="professional">PROFESSIONAL</option>
-                            <option value="corporate">CORPORATE</option>
                          </select>
                       </div>
 
@@ -1497,7 +1423,7 @@ export default function AdminBilling() {
                         const tariff = tariffsConfig[simTariffKey];
                         const footprint = calculateGlobalFootprint(tariff, simOrgCount);
                         
-                        const sPrice = (simTariffKey === 'corporate' ? calcCorpPrice() : (tariff.price || 0));
+                        const sPrice = (tariff.price || 0);
                         const rev = sPrice * simOrgCount;
                         const cost = footprint.total;
                         const profit = rev - cost;
@@ -2022,132 +1948,6 @@ export default function AdminBilling() {
                 </>
               )}
 
-              {/* For Corporate tier */}
-              {editingTariffKey === "corporate" && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                      Asosiy oylik to'lov (Base Price) - so'm
-                    </label>
-                    <input
-                      type="number"
-                      value={editingTariffForm.basePrice ?? 0}
-                      onChange={(e) => setEditingTariffForm({ ...editingTariffForm, basePrice: Number(e.target.value) })}
-                      className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold text-lg"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                        1 ta Talaba narxi/oy
-                      </label>
-                      <input
-                        type="number"
-                        value={editingTariffForm.perStudent ?? 0}
-                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perStudent: Number(e.target.value) })}
-                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                        1 ta Xodim narxi/oy
-                      </label>
-                      <input
-                        type="number"
-                        value={editingTariffForm.perStaff ?? 0}
-                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perStaff: Number(e.target.value) })}
-                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                        AI modulu narxi/oy
-                      </label>
-                      <input
-                        type="number"
-                        value={editingTariffForm.aiPrice ?? 0}
-                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, aiPrice: Number(e.target.value) })}
-                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                        Telegram Bot narxi/oy
-                      </label>
-                      <input
-                        type="number"
-                        value={editingTariffForm.botPrice ?? 0}
-                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, botPrice: Number(e.target.value) })}
-                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                        1 ta Kurs narxi/oy (Corporate)
-                      </label>
-                      <input
-                        type="number"
-                        value={editingTariffForm.perCourse ?? 0}
-                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perCourse: Number(e.target.value) })}
-                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                        1 ta Test narxi/oy (Corporate)
-                      </label>
-                      <input
-                        type="number"
-                        value={editingTariffForm.perTest ?? 0}
-                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perTest: Number(e.target.value) })}
-                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                        1 ta Imtihon narxi/oy (Corporate)
-                      </label>
-                      <input
-                        type="number"
-                        value={editingTariffForm.perExam ?? 0}
-                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perExam: Number(e.target.value) })}
-                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                        1 ta Mavzu narxi/oy (Corporate)
-                      </label>
-                      <input
-                        type="number"
-                        value={editingTariffForm.perSubject ?? 0}
-                        onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perSubject: Number(e.target.value) })}
-                        className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
-                      1 ta Quizizz narxi/oy (Corporate)
-                    </label>
-                    <input
-                      type="number"
-                      value={editingTariffForm.perQuizizz ?? 0}
-                      onChange={(e) => setEditingTariffForm({ ...editingTariffForm, perQuizizz: Number(e.target.value) })}
-                      className="w-full px-5 py-4 bg-indigo-50/20 rounded-2xl border-2 border-indigo-50 focus:border-indigo-600 outline-none font-bold shadow-sm"
-                    />
-                  </div>
-                </>
-              )}
 
               {/* For Extra Limits */}
               {editingTariffKey === "extra" && (
