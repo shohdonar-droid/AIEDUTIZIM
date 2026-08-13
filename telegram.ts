@@ -5893,10 +5893,12 @@ Foydalanuvchi xabari: ${prompt}`;
                      `🔗 <b>Nick (Username):</b> ${nick}\n` +
                      `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n` +
                      `📞 <b>Tel nomeri:</b> <code>${phone}</code>\n` +
-                     `🛡️ <b>Roli:</b> <code>${roleDisplay}</code>\n` +
-                     `🏷️ <b>ID raqami:</b> <code>${systemId}</code>\n` +
-                     `💰 <b>Balansi:</b> <code>${balance.toLocaleString()} UZS</code>\n` +
-                     `━━━━━━━━━━━━━━━━━━━━━━━━━`;
+                     `🛡️ <b>Roli:</b> <code>${roleDisplay}</code>\n`;
+    if (roleText !== "bot_user") {
+      profileMsg += `🏷️ <b>ID raqami:</b> <code>${systemId}</code>\n`;
+    }
+    profileMsg += `💰 <b>Balansi:</b> <code>${balance.toLocaleString()} UZS</code>\n` +
+                  `━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
     return ctx.reply(profileMsg, {
       parse_mode: "HTML",
