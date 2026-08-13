@@ -565,41 +565,41 @@ export default function Tariffs() {
               
               <p className="text-gray-400 text-[11px] font-bold mb-3 leading-snug line-clamp-2">Kichik guruhlar va individual oʻqituvchilar uchun ideal boshlang'ich paket.</p>
               
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-bold text-gray-600 border-t border-gray-50 pt-3 mb-4">
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+              <div className="flex flex-col gap-y-2.5 text-xs font-bold text-gray-600 border-t border-gray-50 pt-3 mb-6">
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" />
                   <span>{configs.start.students ?? 50} talaba</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" />
                   <span>{configs.start.staff ?? 2} xodim</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" />
                   <span>{configs.start.maxCourses ?? 3} ta kurs</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" />
                   <span>{configs.start.maxTests ?? 15} ta test</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" />
                   <span>{configs.start.maxExams ?? 2} imtihon</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" />
                   <span>{configs.start.maxSubjects ?? 5} mavzu</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" />
                   <span>{configs.start.maxQuizizz ?? 4} quizizz</span>
                 </div>
-                <div className={`flex items-center gap-1.5 ${configs.start.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
-                  {configs.start.hasAI ? <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" /> : <XIcon />}
+                <div className={`flex items-center gap-2.5 ${configs.start.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                  {configs.start.hasAI ? <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> : <XIcon />}
                   <span>AI AI</span>
                 </div>
-                <div className={`col-span-2 flex items-center gap-1.5 ${configs.start.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
-                  {configs.start.hasBot ? <Check className="w-3.5 h-3.5 text-orange-500 shrink-0" /> : <XIcon />}
+                <div className={`flex items-center gap-2.5 ${configs.start.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                  {configs.start.hasBot ? <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> : <XIcon />}
                   <span>Telegram Bot</span>
                 </div>
               </div>
@@ -627,41 +627,41 @@ export default function Tariffs() {
               
               <p className="text-gray-400 text-[11px] font-bold mb-3 leading-snug line-clamp-2">Oʻrta hajmdagi oʻquv markazlari va guruhlar boshqaruvi uchun keng qamrovli tizim.</p>
               
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-bold text-gray-600 border-t border-gray-50 pt-3 mb-4">
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <div className="flex flex-col gap-y-2.5 text-xs font-bold text-gray-600 border-t border-gray-50 pt-3 mb-6">
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" />
                   <span>{configs.standard.students ?? 200} talaba</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" />
                   <span>{configs.standard.staff ?? 5} xodim</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" />
                   <span>{configs.standard.maxCourses ?? 10} ta kurs</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" />
                   <span>{configs.standard.maxTests ?? 50} ta test</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" />
                   <span>{configs.standard.maxExams ?? 10} imtihon</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" />
                   <span>{configs.standard.maxSubjects ?? 20} mavzu</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" />
                   <span>{configs.standard.maxQuizizz ?? 15} quizizz</span>
                 </div>
-                <div className={`flex items-center gap-1.5 ${configs.standard.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
-                  {configs.standard.hasAI ? <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" /> : <XIcon />}
+                <div className={`flex items-center gap-2.5 ${configs.standard.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                  {configs.standard.hasAI ? <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> : <XIcon />}
                   <span>Sun'iy Intellekt</span>
                 </div>
-                <div className={`col-span-2 flex items-center gap-1.5 ${configs.standard.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
-                  {configs.standard.hasBot ? <Check className="w-3.5 h-3.5 text-blue-500 shrink-0" /> : <XIcon />}
+                <div className={`flex items-center gap-2.5 ${configs.standard.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                  {configs.standard.hasBot ? <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> : <XIcon />}
                   <span>Telegram Bot</span>
                 </div>
               </div>
@@ -688,41 +688,41 @@ export default function Tariffs() {
               
               <p className="text-gray-400 text-[11px] font-bold mb-3 leading-snug line-clamp-2">Katta oʻquv maskanlari va ilgʻor AI-innovatsiyalardan foydalanuvchi brendlar.</p>
               
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-bold text-gray-600 border-t border-gray-50 pt-3 mb-4">
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <div className="flex flex-col gap-y-2.5 text-xs font-bold text-gray-600 border-t border-gray-50 pt-3 mb-6">
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" />
                   <span>{configs.professional.students ?? 1000} talaba</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" />
                   <span>{configs.professional.staff ?? 20} xodim</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" />
                   <span>{configs.professional.maxCourses ?? 50} ta kurs</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" />
                   <span>{configs.professional.maxTests ?? 300} ta test</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" />
                   <span>{configs.professional.maxExams ?? 50} imtihon</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" />
                   <span>{configs.professional.maxSubjects ?? 100} mavzu</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="flex items-center gap-2.5">
+                  <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" />
                   <span>{configs.professional.maxQuizizz ?? 100} quizizz</span>
                 </div>
-                <div className={`flex items-center gap-1.5 ${configs.professional.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
-                  {configs.professional.hasAI ? <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : <XIcon />}
+                <div className={`flex items-center gap-2.5 ${configs.professional.hasAI ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                  {configs.professional.hasAI ? <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> : <XIcon />}
                   <span>Sun'iy Intellekt</span>
                 </div>
-                <div className={`col-span-2 flex items-center gap-1.5 ${configs.professional.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
-                  {configs.professional.hasBot ? <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : <XIcon />}
+                <div className={`flex items-center gap-2.5 ${configs.professional.hasBot ? "text-gray-600" : "text-gray-300 line-through"}`}>
+                  {configs.professional.hasBot ? <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> : <XIcon />}
                   <span>Telegram Bot</span>
                 </div>
               </div>
