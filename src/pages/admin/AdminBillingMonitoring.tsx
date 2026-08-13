@@ -91,6 +91,31 @@ export default function AdminBillingMonitoring() {
       });
 
       const recordsMap = new Map<string, UserBillingRecord>();
+      const keyLookupMap = new Map<string, string>();
+
+      const findExistingRecordKey = (data: any, docId: string, systemId: string) => {
+        const tgId = data.telegramId ? String(data.telegramId).trim() : "";
+        const uname = data.username ? String(data.username).replace("@", "").trim().toLowerCase() : "";
+        const sysId = systemId ? String(systemId).trim() : "";
+
+        if (tgId && keyLookupMap.has("tg_" + tgId)) return keyLookupMap.get("tg_" + tgId)!;
+        if (uname && keyLookupMap.has("uname_" + uname)) return keyLookupMap.get("uname_" + uname)!;
+        if (sysId && keyLookupMap.has("sys_" + sysId)) return keyLookupMap.get("sys_" + sysId)!;
+        if (docId && keyLookupMap.has("doc_" + docId)) return keyLookupMap.get("doc_" + docId)!;
+
+        return null;
+      };
+
+      const registerKeys = (mainKey: string, data: any, docId: string, systemId: string) => {
+        const tgId = data.telegramId ? String(data.telegramId).trim() : "";
+        const uname = data.username ? String(data.username).replace("@", "").trim().toLowerCase() : "";
+        const sysId = systemId ? String(systemId).trim() : "";
+
+        if (tgId) keyLookupMap.set("tg_" + tgId, mainKey);
+        if (uname) keyLookupMap.set("uname_" + uname, mainKey);
+        if (sysId) keyLookupMap.set("sys_" + sysId, mainKey);
+        if (docId) keyLookupMap.set("doc_" + docId, mainKey);
+      };
 
       // Process site users
       usersSnap.docs.forEach((docSnap) => {
@@ -102,26 +127,45 @@ export default function AdminBillingMonitoring() {
         const platform: "site" | "bot" = isBot ? "bot" : "site";
 
         const paidFromDb = Number(data.totalPaid || 0);
-        const paidFromHistory = (paymentMap[docId] || 0) + (paymentMap[systemId] || 0);
+        const paidFromHistory = (paymentMap[docId] || 0) + (paymentMap[systemId] || 0) + (data.telegramId ? (paymentMap[String(data.telegramId)] || 0) : 0);
         const totalPaid = Math.max(paidFromDb, paidFromHistory);
 
         const usedTokens = Number(data.usedTokens || data.tokensUsed || data.aiTokens || data.tokens || 0);
+        const balance = Number(data.balance !== undefined ? data.balance : (data.ball || 0));
 
-        recordsMap.set(systemId || docId, {
-          id: docId,
-          systemId: systemId || docId,
-          displayName: data.displayName || data.name || data.login || "Noma'lum",
-          username: data.username || data.login || "",
-          email: data.email || "",
-          login: data.login || "",
-          role: data.role || (isBot ? "bot_user" : "student"),
-          platform,
-          usedTokens,
-          totalPaid,
-          balance: Number(data.balance || data.ball || 0),
-          lastActive: data.updatedAt || data.createdAt,
-          createdAt: data.createdAt,
-        });
+        const existingKey = findExistingRecordKey(data, docId, systemId);
+
+        if (existingKey && recordsMap.has(existingKey)) {
+          const existing = recordsMap.get(existingKey)!;
+          existing.totalPaid = Math.max(existing.totalPaid, totalPaid);
+          existing.balance = Math.max(existing.balance, balance);
+          existing.usedTokens = Math.max(existing.usedTokens, usedTokens);
+          if (!existing.displayName || existing.displayName === "Noma'lum" || existing.displayName === "Telegram Foydalanuvchi") {
+            existing.displayName = data.displayName || data.name || data.login || existing.displayName;
+          }
+          if (data.username && !existing.username) existing.username = data.username;
+          if (data.email && !existing.email) existing.email = data.email;
+          if (isBot && existing.platform === "site") existing.platform = "both";
+          registerKeys(existingKey, data, docId, systemId);
+        } else {
+          const mainKey = (data.telegramId ? `tg_${data.telegramId}` : (data.username ? `uname_${String(data.username).replace("@", "").toLowerCase()}` : `doc_${docId}`));
+          recordsMap.set(mainKey, {
+            id: docId,
+            systemId: data.systemId ? String(data.systemId) : (data.telegramId ? String(data.telegramId) : docId),
+            displayName: data.displayName || data.name || data.login || "Noma'lum",
+            username: data.username || data.login || "",
+            email: data.email || "",
+            login: data.login || "",
+            role: data.role || (isBot ? "bot_user" : "student"),
+            platform,
+            usedTokens,
+            totalPaid,
+            balance,
+            lastActive: data.updatedAt || data.createdAt,
+            createdAt: data.createdAt,
+          });
+          registerKeys(mainKey, data, docId, systemId);
+        }
       });
 
       // Process telegram_users
@@ -130,24 +174,26 @@ export default function AdminBillingMonitoring() {
         const docId = docSnap.id;
         const systemId = String(data.systemId || data.telegramId || docId).trim();
 
-        const existing = recordsMap.get(systemId) || recordsMap.get(docId);
-
-        const paidFromHistory = (paymentMap[docId] || 0) + (paymentMap[systemId] || 0);
+        const paidFromHistory = (paymentMap[docId] || 0) + (paymentMap[systemId] || 0) + (data.telegramId ? (paymentMap[String(data.telegramId)] || 0) : 0);
         const paidFromDb = Number(data.totalPaid || data.totalPayment || 0);
-        const totalPaid = Math.max(paidFromDb, paidFromHistory, existing?.totalPaid || 0);
+        const totalPaid = Math.max(paidFromDb, paidFromHistory);
 
-        const usedTokens = Math.max(
-          Number(data.usedTokens || data.tokensUsed || data.tokens || 0),
-          existing?.usedTokens || 0
-        );
+        const usedTokens = Number(data.usedTokens || data.tokensUsed || data.tokens || 0);
+        const balance = Number(data.balance !== undefined ? data.balance : (data.ball || 0));
 
-        if (existing) {
+        const existingKey = findExistingRecordKey(data, docId, systemId);
+
+        if (existingKey && recordsMap.has(existingKey)) {
+          const existing = recordsMap.get(existingKey)!;
           existing.platform = "both";
-          existing.usedTokens = usedTokens;
-          existing.totalPaid = totalPaid;
-          if (data.username) existing.username = data.username;
+          existing.usedTokens = Math.max(existing.usedTokens, usedTokens);
+          existing.totalPaid = Math.max(existing.totalPaid, totalPaid);
+          existing.balance = Math.max(existing.balance, balance);
+          if (data.username && !existing.username) existing.username = data.username;
+          registerKeys(existingKey, data, docId, systemId);
         } else {
-          recordsMap.set(systemId || docId, {
+          const mainKey = (data.telegramId ? `tg_${data.telegramId}` : `doc_${docId}`);
+          recordsMap.set(mainKey, {
             id: docId,
             systemId: systemId || String(data.telegramId || docId),
             displayName: data.name || data.firstName || data.displayName || "Telegram Foydalanuvchi",
@@ -156,10 +202,11 @@ export default function AdminBillingMonitoring() {
             platform: "bot",
             usedTokens,
             totalPaid,
-            balance: Number(data.balance || data.ball || 0),
+            balance,
             lastActive: data.createdAt,
             createdAt: data.createdAt,
           });
+          registerKeys(mainKey, data, docId, systemId);
         }
       });
 

@@ -27,17 +27,7 @@ export default function Login() {
             const pass = decoded.slice(separatorIdx + 1);
             setLoading(true);
             signInWithEmailAndPassword(auth, email, pass).then(async (res) => {
-               // Link Telegram ID if running inside Telegram Mini App (Web App)
-               try {
-                 const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-                 if (tgUser && tgUser.id) {
-                   await setDoc(doc(db, 'users', res.user.uid), {
-                     telegramId: Number(tgUser.id)
-                   }, { merge: true });
-                 }
-               } catch (tgErr) {
-                 console.error("Failed to link telegramId in auto login:", tgErr);
-               }
+               // Not linking Telegram ID intentionally as requested by user
             }).catch(e => {
                setError("Avtomatik kirishda xatolik: " + e.message);
                setLoading(false);
@@ -260,14 +250,9 @@ export default function Login() {
              return;
           }
 
-          // Link Telegram ID if running inside Telegram Mini App (Web App)
+          // Not linking Telegram ID intentionally as requested by user
           try {
-            const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-            if (tgUser && tgUser.id) {
-              await setDoc(doc(db, 'users', res.user.uid), {
-                telegramId: Number(tgUser.id)
-              }, { merge: true });
-            }
+             // We do not save telegramId to keep the bot and the web profile independent
           } catch (tgErr) {}
 
           // Log activity

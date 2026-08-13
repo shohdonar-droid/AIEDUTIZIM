@@ -42,7 +42,11 @@ import path from "path";
 dotenv.config();
 setLogLevel("error");
 
-const APP_URL = (process.env.APP_URL || "https://aiedutizim.vercel.app").replace(/\/$/, "");
+let rawAppUrl = process.env.APP_URL || "https://aiedutizim.vercel.app";
+if (!rawAppUrl.startsWith("http://") && !rawAppUrl.startsWith("https://")) {
+  rawAppUrl = "https://" + rawAppUrl;
+}
+const APP_URL = rawAppUrl.replace(/\/$/, "");
 
 function getApiUrl(subPath: string): string {
   // Use port 3000 as per environment constraints
@@ -259,16 +263,30 @@ export let telegramUsersCount = 0;
 const adminIdsPath = path.join(process.cwd(), "admin_telegram_ids.json");
 
 export function getAdminIds(): number[] {
-  const hardcodedAdmins = [1834968503];
-  let ids: number[] = [...hardcodedAdmins];
+  let ids: number[] = [];
   
   if (adminTelegramIds && adminTelegramIds.length > 0) {
-    ids = [...ids, ...adminTelegramIds];
+    ids = [...adminTelegramIds];
   }
   if (adminTelegramId && !ids.includes(adminTelegramId)) {
-    ids.push(adminTelegramId);
+    ids.unshift(adminTelegramId);
   }
   
+  if (process.env.TELEGRAM_ADMIN_ID) {
+    const envVal = process.env.TELEGRAM_ADMIN_ID.trim();
+    if (envVal) {
+      if (envVal.includes(",")) {
+        envVal.split(",").forEach(x => {
+          const num = Number(x.trim());
+          if (!isNaN(num) && num > 0 && !ids.includes(num)) ids.push(num);
+        });
+      } else {
+        const num = Number(envVal);
+        if (!isNaN(num) && num > 0 && !ids.includes(num)) ids.push(num);
+      }
+    }
+  }
+
   try {
     if (fs.existsSync(adminIdsPath)) {
       const stored = JSON.parse(fs.readFileSync(adminIdsPath, "utf8"));
@@ -972,14 +990,16 @@ async function getKeyboard(
   // If userId is provided, we try to find the user to determine their role
   // EXCEPT if isAuthenticated is explicitly false (which means we are doing a logout)
   if (userId && isAuthenticated !== false) {
-    const user = await getAuthedUser(userId);
     const adminIds = getAdminIds();
-    if (user) {
-      authed = true;
-      userRole = user.role || role;
-    } else if (adminIds.includes(userId)) {
+    if (adminIds.includes(userId)) {
       authed = true;
       userRole = "admin";
+    } else {
+      const user = await getAuthedUser(userId);
+      if (user) {
+        authed = true;
+        userRole = user.role || role;
+      }
     }
   }
 
@@ -996,7 +1016,7 @@ async function getKeyboard(
     const isPrimary = adminIds.length === 0 || adminIds[0] === userId;
 
     return [
-      [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
+      [{ text: "👤 Profil" }],
       [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
       [{ text: "💵 Balans to'ldirish (Admin)" }],
       [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
@@ -1083,18 +1103,28 @@ async function checkAndDeductBalance(userId: number, cost: number): Promise<bool
 }
 
 async function getAuthedUser(userId: number) {
+  const adminIds = getAdminIds();
+  const isAdminBySettings = adminIds.includes(userId);
+
   if (authedUsers.has(userId)) {
     const cached = authedUsers.get(userId);
     if (cached) {
-      if (cached.role === "admin" || cached.role === "subadmin") {
-        registerAdminId(userId);
+      if (isAdminBySettings) {
+        cached.role = "admin";
+      } else if (cached.role === "admin" || cached.role === "subadmin") {
+        const emailLower = (cached.email || "").toLowerCase().trim();
+        if (emailLower !== "elyorbek@admin.uz" && cached.docId !== "admin_offline_elyorbek") {
+          cached.role = "bot_user";
+        }
       }
       return cached;
     }
   }
-  let authed = null;
+
+  let authed: any = null;
   let queryAttempted = false;
   let querySuccess = false;
+
   if (db) {
     queryAttempted = true;
     try {
@@ -1120,7 +1150,7 @@ async function getAuthedUser(userId: number) {
           }
         }
         const uData = uDoc.data();
-        let derivedRole = uData.role || "student";
+        let derivedRole = uData.role || "bot_user";
         const emailLower = (uData.email || "").toLowerCase().trim();
         const loginLower = (uData.login || "").toLowerCase().trim();
         
@@ -1130,7 +1160,7 @@ async function getAuthedUser(userId: number) {
 
         authed = {
           uid: uData.uid,
-          displayName: uData.displayName || uData.email,
+          displayName: uData.displayName || uData.email || "Foydalanuvchi",
           role: derivedRole,
           email: uData.email,
           docId: uDoc.id,
@@ -1139,17 +1169,27 @@ async function getAuthedUser(userId: number) {
       querySuccess = true;
     } catch (e) {
       console.error("DB check auth error:", e);
-      // Fallback: If DB query fails (such as quota exceeded), return cached user if we have one
-      if (authedUsers.has(userId)) {
-        const cached = authedUsers.get(userId);
-        if (cached && (cached.role === "admin" || cached.role === "subadmin")) {
-          registerAdminId(userId);
-        }
-        return cached;
-      }
     }
   }
-  if (!queryAttempted || querySuccess) {
+
+  if (isAdminBySettings) {
+    if (!authed) {
+      authed = {
+        uid: "tg_" + userId,
+        displayName: "Admin (" + userId + ")",
+        role: "admin",
+      };
+    } else {
+      authed.role = "admin";
+    }
+  } else if (authed) {
+    const emailLower = (authed.email || "").toLowerCase().trim();
+    if (authed.role === "admin" && emailLower !== "elyorbek@admin.uz" && authed.docId !== "admin_offline_elyorbek") {
+      authed.role = "bot_user";
+    }
+  }
+
+  if (!queryAttempted || querySuccess || isAdminBySettings) {
     if (authed) {
       authedUsers.set(userId, authed);
       if (authed.role === "admin" || authed.role === "subadmin") {
@@ -1229,8 +1269,12 @@ bot.start(async (ctx) => {
   if (db) {
     try {
       const usersRef = collection(db, "users");
-      const q = query(usersRef, where("telegramId", "==", userId));
-      const snap = await getDocs(q);
+      let q = query(usersRef, where("telegramId", "==", userId));
+      let snap = await getDocs(q);
+      if (snap.empty) {
+        q = query(usersRef, where("telegramId", "==", String(userId)));
+        snap = await getDocs(q);
+      }
       if (!snap.empty) {
         const uData = snap.docs[0].data();
         if (uData.phone || uData.phoneNumber) {
@@ -1300,8 +1344,12 @@ bot.on("contact", async (ctx) => {
   if (db) {
     try {
       const usersRef = collection(db, "users");
-      const q = query(usersRef, where("telegramId", "==", userId));
-      const snap = await getDocs(q);
+      let q = query(usersRef, where("telegramId", "==", userId));
+      let snap = await getDocs(q);
+      if (snap.empty) {
+        q = query(usersRef, where("telegramId", "==", String(userId)));
+        snap = await getDocs(q);
+      }
 
       if (!snap.empty) {
         const uDoc = snap.docs[0];
@@ -1341,12 +1389,25 @@ bot.on("contact", async (ctx) => {
         if (referrerId && String(referrerId) !== String(userId)) {
           try {
             const referrerNum = Number(referrerId);
-            const rq = query(usersRef, where("telegramId", "==", referrerNum));
-            const rSnap = await getDocs(rq);
+            let rq = query(usersRef, where("telegramId", "==", referrerNum));
+            let rSnap = await getDocs(rq);
+            if (rSnap.empty) {
+              rq = query(usersRef, where("telegramId", "==", String(referrerId)));
+              rSnap = await getDocs(rq);
+            }
+            if (rSnap.empty && !isNaN(referrerNum)) {
+              rq = query(usersRef, where("systemId", "==", referrerNum));
+              rSnap = await getDocs(rq);
+            }
+            if (rSnap.empty) {
+              rq = query(usersRef, where("systemId", "==", String(referrerId)));
+              rSnap = await getDocs(rq);
+            }
+
             if (!rSnap.empty) {
               const rDoc = rSnap.docs[0];
               const rData = rDoc.data();
-              const oldBal = Number(rData.balance || rData.ball || 0);
+              const oldBal = Number(rData.balance !== undefined ? rData.balance : (rData.ball || 0));
               const oldBall = Number(rData.ball || 0);
               const oldRefCount = Number(rData.referralCount || rData.referrals || 0);
 
@@ -1358,10 +1419,10 @@ bot.on("contact", async (ctx) => {
                 updatedAt: serverTimestamp()
               });
 
-              // Send notification to referrer
+              const notifyTgId = rData.telegramId || referrerNum;
               try {
                 await bot.telegram.sendMessage(
-                  referrerNum,
+                  Number(notifyTgId),
                   `🎉 <b>YANGI DO'ST TAKLIF QILINDI!</b>\n\n` +
                   `Siz taklif qilgan do'stingiz (<b>${displayName}</b>) botga a'zo bo'ldi.\n` +
                   `💰 Balansingizga <b>+5 000 UZS</b> bonus qo'shildi!`,
@@ -1861,25 +1922,51 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
 
     if (req.isBalanceTopUp) {
       console.log(`[Telegram] Processing balance top-up for user ${targetUserId}`);
-      const userRef = doc(db, "users", targetUserId);
-      const userSnap = await getDoc(userRef);
+      let userRef = doc(db, "users", targetUserId);
+      let userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        const usersRef = collection(db, "users");
+        let qSnap = await getDocs(query(usersRef, where("telegramId", "==", Number(targetUserId))));
+        if (qSnap.empty) {
+          qSnap = await getDocs(query(usersRef, where("telegramId", "==", String(targetUserId))));
+        }
+        if (qSnap.empty) {
+          qSnap = await getDocs(query(usersRef, where("systemId", "==", Number(targetUserId))));
+        }
+        if (qSnap.empty) {
+          qSnap = await getDocs(query(usersRef, where("systemId", "==", String(targetUserId))));
+        }
+        if (!qSnap.empty) {
+          userRef = doc(db, "users", qSnap.docs[0].id);
+          userSnap = qSnap.docs[0];
+        }
+      }
+
       let newBalance = 0;
       const topUpAmount = Number(req.tariffPrice || req.amount || 0);
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
-        const currentBalance = Number(userData.balance || userData.ball || 0);
+        const currentBalance = Number(userData.balance !== undefined ? userData.balance : (userData.ball || 0));
+        const currentTotalPaid = Number(userData.totalPaid || 0);
         newBalance = currentBalance + topUpAmount;
-        await updateDoc(userRef, { balance: newBalance });
-        console.log(`[Telegram] Balance updated for ${targetUserId}: ${currentBalance} -> ${newBalance}`);
+        await updateDoc(userRef, { 
+          balance: newBalance,
+          ball: newBalance,
+          totalPaid: currentTotalPaid + topUpAmount,
+          updatedAt: serverTimestamp()
+        });
+        console.log(`[Telegram] Balance updated for ${userRef.id}: ${currentBalance} -> ${newBalance}`);
       }
 
       await ctx.reply(`✅ Balans muvaffaqiyatli to'ldirildi!\n👤 ${req.userName} (ID: ${req.systemId || targetUserId})\n💰 Qo'shildi: +${topUpAmount.toLocaleString()} UZS\n💳 Yangi balans: ${newBalance.toLocaleString()} UZS`);
 
-      if (userSnap.exists() && userSnap.data().telegramId) {
+      const notifyTgId = userSnap.exists() ? (userSnap.data().telegramId || targetUserId) : targetUserId;
+      if (notifyTgId) {
         try {
           await bot.telegram.sendMessage(
-            userSnap.data().telegramId,
+            Number(notifyTgId),
             `✅ <b>To'lovingiz tasdiqlandi!</b>\n\n💰 Balansingizga <b>+${topUpAmount.toLocaleString()} UZS</b> qo'shildi.\n💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
             { parse_mode: "HTML" }
           );
@@ -2078,34 +2165,14 @@ bot.action("add_balance", async (ctx) => {
   try {
     await ctx.answerCbQuery();
     await ctx.reply(paymentInstructionsText, { 
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "Click", url: "https://click.uz/" }, { text: "Payme", url: "https://payme.uz/" }, { text: "Uzum", url: "https://uzum.com/" }]
-        ]
-      }
+      parse_mode: "HTML"
     });
   } catch (e) {}
 });
 
 bot.action("logout", async (ctx) => {
   const userId = ctx.from.id;
-  const authed = await getAuthedUser(userId);
   pendingLogins.delete(userId);
-  if (authed && db) {
-    try {
-      const snap = await getDocs(
-        query(collection(db, "users"), where("telegramId", "==", userId)),
-      );
-      if (!snap.empty) {
-        await updateDoc(doc(db, "users", snap.docs[0].id), {
-          telegramId: deleteField(),
-        });
-      }
-    } catch (e) {
-      console.error("Logout error", e);
-    }
-  }
   authedUsers.delete(userId);
   aiAssistantActiveUsers.delete(userId);
   await ctx.reply("✅ Siz tizimdan muvaffaqiyatli chiqdingiz.", {
@@ -5540,11 +5607,31 @@ Foydalanuvchi xabari: ${prompt}`;
     if (db) {
       try {
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("telegramId", "==", userId));
-        const snap = await getDocs(q);
+        let q = query(usersRef, where("telegramId", "==", userId));
+        let snap = await getDocs(q);
+        if (snap.empty) {
+          q = query(usersRef, where("telegramId", "==", String(userId)));
+          snap = await getDocs(q);
+        }
+
         if (!snap.empty) {
           const uData = snap.docs[0].data();
           invitedCount = Number(uData.referralCount || uData.referrals || 0);
+
+          try {
+            const invQ1 = query(usersRef, where("invitedBy", "==", String(userId)));
+            const invSnap1 = await getDocs(invQ1);
+            const invQ2 = query(usersRef, where("invitedBy", "==", userId));
+            const invSnap2 = await getDocs(invQ2);
+            let invCount3 = 0;
+            if (uData.systemId) {
+              const invQ3 = query(usersRef, where("invitedBy", "==", String(uData.systemId)));
+              const invSnap3 = await getDocs(invQ3);
+              invCount3 = invSnap3.size;
+            }
+            const directCount = Math.max(invSnap1.size, invSnap2.size, invCount3);
+            invitedCount = Math.max(invitedCount, directCount);
+          } catch (e) {}
         }
       } catch (e) {}
     }
@@ -5558,15 +5645,16 @@ Foydalanuvchi xabari: ${prompt}`;
                    `🎁 Har bir taklif qilingan do'stingiz botga kirib kontaktini tasdiqlaganida balansingizga <b>5 000 UZS</b> avtomatik qo'shiladi!\n\n` +
                    `📊 <b>Sizning statistikangiz:</b>\n` +
                    `• Taklif qilingan do'stlar: <b>${invitedCount} ta</b>\n` +
-                   `• Ishlangan umumiysummasi: <b>${earnedBonus.toLocaleString()} UZS</b>\n\n` +
-                   `🔗 <b>Sizning Telegram bot referal havolangiz:</b>\n` +
-                   `<code>${botRefLink}</code>\n\n` +
+                   `• Ishlangan umumiy summa: <b>${earnedBonus.toLocaleString()} UZS</b>\n\n` +
+                   `🔗 <b>Telegram bot referal havolangiz:</b>\n` +
+                   `${botRefLink}\n\n` +
                    `🔗 <b>Veb-sayt havolangiz:</b>\n` +
-                   `<code>${webRefLink}</code>\n\n` +
+                   `${webRefLink}\n\n` +
                    `👉 Havolani do'stlaringizga ulashing va balansingizni to'ldiring!`;
 
     return ctx.reply(refMsg, {
       parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
       reply_markup: {
         inline_keyboard: [
           [{ text: "📲 Do'stlarga ulashish", url: `https://t.me/share/url?url=${encodeURIComponent(botRefLink)}&text=${encodeURIComponent("🔥 Zo'r AI Ta'lim botiga taklif qilaman! Kirib foydalanib ko'ring:")}` }]
@@ -5606,12 +5694,7 @@ Foydalanuvchi xabari: ${prompt}`;
                  `👉 ID raqamingiz va summani kiritishingiz bilan ismingiz tasdiqlanadi hamda to'lov bajarilishi bilanoq balansingiz <b>avtomatik tarzda to'ldiriladi</b>!`;
 
     return ctx.reply(text, { 
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "📲 Click", url: "https://click.uz/" }, { text: "📲 Payme", url: "https://payme.uz/" }]
-        ]
-      }
+      parse_mode: "HTML"
     });
   }
 
@@ -5644,24 +5727,48 @@ Foydalanuvchi xabari: ${prompt}`;
     aiAssistantActiveUsers.delete(userId);
     
     let uData: any = null;
+    let tgData: any = null;
     if (db) {
       try {
-        const q = query(collection(db, "users"), where("telegramId", "==", userId));
-        const qSnap = await getDocs(q);
+        const usersRef = collection(db, "users");
+        let q = query(usersRef, where("telegramId", "==", userId));
+        let qSnap = await getDocs(q);
+        if (qSnap.empty) {
+          q = query(usersRef, where("telegramId", "==", String(userId)));
+          qSnap = await getDocs(q);
+        }
+        if (qSnap.empty) {
+          q = query(usersRef, where("systemId", "==", userId));
+          qSnap = await getDocs(q);
+        }
+        if (qSnap.empty) {
+          q = query(usersRef, where("systemId", "==", String(userId)));
+          qSnap = await getDocs(q);
+        }
+
         if (!qSnap.empty) {
           uData = qSnap.docs[0].data();
-        } else if (authed?.docId) {
+        }
+
+        try {
+          const tgSnap = await getDoc(doc(db, "telegram_users", String(userId)));
+          if (tgSnap.exists()) {
+            tgData = tgSnap.data();
+          }
+        } catch (e) {}
+
+        if (!uData && authed?.docId) {
           const res = await getDoc(doc(db, "users", authed.docId));
           if (res.exists()) uData = res.data();
         }
       } catch (e) {}
     }
 
-    const tgName = `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim() || uData?.displayName || "Foydalanuvchi";
-    const nick = ctx.from.username ? `@${ctx.from.username}` : (uData?.username ? `@${uData.username}` : "Mavjud emas");
-    const phone = uData?.phone || uData?.phoneNumber || "Kiritilmagan";
-    const systemId = uData?.systemId || userId;
-    const balance = Number(uData?.balance !== undefined ? uData.balance : (uData?.ball || 0));
+    const tgName = `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim() || uData?.displayName || tgData?.firstName || "Foydalanuvchi";
+    const nick = ctx.from.username ? `@${ctx.from.username}` : (uData?.username || tgData?.username ? `@${uData?.username || tgData?.username}` : "Mavjud emas");
+    const phone = uData?.phone || uData?.phoneNumber || tgData?.phone || tgData?.phoneNumber || "Kiritilmagan";
+    const systemId = uData?.systemId || tgData?.systemId || userId;
+    const balance = Number(uData?.balance !== undefined ? uData.balance : (uData?.ball !== undefined ? uData.ball : (tgData?.balance || 0)));
 
     const roleText = uData?.role || authed?.role || "bot_user";
     let roleDisplay = "Bot foydalanuvchisi";
@@ -5685,8 +5792,7 @@ Foydalanuvchi xabari: ${prompt}`;
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🌐 Rasmiy saytga o'tish", url: APP_URL }],
-          [{ text: "🚪 Chiqish / Logout", callback_data: "logout" }]
+          [{ text: "🌐 Rasmiy saytga o'tish", url: APP_URL }]
         ]
       }
     });
@@ -6500,16 +6606,7 @@ Foydalanuvchi xabari: ${prompt}`;
             }
 
             try {
-              // Delete telegramId from any auto-created student dummy docs to avoid collision
-              const existTgDocs = await getDocs(query(collection(db, "users"), where("telegramId", "==", userId)));
-              for (const tgDoc of existTgDocs.docs) {
-                if (tgDoc.id !== docId) {
-                  await updateDoc(doc(db, "users", tgDoc.id), { telegramId: deleteField() });
-                }
-              }
-
               await updateDoc(doc(db, "users", docId), { 
-                telegramId: userId,
                 role: role 
               });
             } catch (e) {}
@@ -7158,7 +7255,7 @@ export async function launchBot() {
     }
 
     bot.telegram.setChatMenuButton({
-      menuButton: { type: "web_app", text: "📱 Tizimga kirish", web_app: { url: `${appUrl || "https://ai-edutizim.uz"}/login` } },
+      menuButton: { type: "web_app", text: "📱 Tizimga kirish", web_app: { url: `${APP_URL}/login` } },
     }).catch(() => {});
   }
 
