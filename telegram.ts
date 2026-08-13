@@ -361,8 +361,7 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
   text += `📞 <b>Tel:</b> <code>${req.phone || "Kiritilmagan"}</code>\n`;
   
   if (req.isBalanceTopUp) {
-    const amount = Number(req.tariffPrice || req.amount || 0);
-    text += `💰 <b>To'ldirish summasi:</b> <code>${amount.toLocaleString()} UZS</code>\n`;
+    text += `💰 <b>To'ldirish summasi:</b> <code>Qo'lda kiritiladi</code>\n`;
   } else if (req.isLimitsRequest) {
     text += `💰 <b>Jami summa:</b> <code>${(req.totalPrice || req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
     text += `⚙️ <b>So'ralgan limitlar:</b>\n`;
@@ -645,6 +644,8 @@ const pendingLogins = new Map<
     promptMessageId?: number;
     foundUser?: any;
     referrerId?: string;
+    requestId?: string;
+    req?: any;
   }
 >();
 
@@ -1847,6 +1848,19 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
     if (req.status !== "pending") {
       await ctx.reply(`⚠️ Ushbu so'rov allaqachon ${req.status === 'approved' ? 'tasdiqlangan' : 'rad etilgan'}.`);
       return ctx.answerCbQuery();
+    }
+
+    if (req.isBalanceTopUp) {
+      pendingLogins.set(adminId, {
+        step: "admin_approve_topup_amount",
+        requestId: requestId,
+        req: req,
+        originalChatId: ctx.callbackQuery?.message?.chat?.id,
+        originalMessageId: ctx.callbackQuery?.message?.message_id
+      });
+      await ctx.reply(`👤 <b>Foydalanuvchi:</b> <code>${req.userName || "Foydalanuvchi"}</code>\n💰 Ushbu foydalanuvchi balansiga qancha kiritmoqchisiz? Faqat raqam kiriting (masalan: 50000):`, { parse_mode: "HTML" });
+      try { ctx.answerCbQuery(); } catch(e){}
+      return;
     }
 
     await ctx.reply("⏳ So'rov tasdiqlanmoqda, iltimos kuting...");
@@ -5979,6 +5993,128 @@ Foydalanuvchi xabari: ${prompt}`;
 
   // Handle remaining logic
   if (pending) {
+    if (pending.step === "admin_approve_topup_amount") {
+      const amountStr = userText.trim();
+      if (amountStr === "/cancel" || amountStr.toLowerCase() === "bekor qilish") {
+        pendingLogins.delete(userId);
+        return ctx.reply("❌ Amal bekor qilindi.");
+      }
+
+      const cleanNum = amountStr.replace(/[^0-9]/g, '');
+      const amount = parseInt(cleanNum);
+
+      if (isNaN(amount) || amount <= 0) {
+        return ctx.reply("❌ <b>Noto'g'ri summa!</b>\n\nIltimos, faqat raqamlarda kiriting (masalan: 50000):", { parse_mode: "HTML" });
+      }
+
+      const requestId = pending.requestId;
+      const req = pending.req;
+
+      pendingLogins.delete(userId);
+
+      try {
+        let targetUserId = req.userId;
+        if (!targetUserId) {
+          throw new Error("So'rovda foydalanuvchi ID si topilmadi.");
+        }
+
+        // Update connection request
+        const updatePayload: any = { 
+          status: 'approved',
+          processedBy: userId,
+          processedAt: serverTimestamp(),
+          tariffPrice: amount,
+          amount: amount,
+          tariffName: `Balans to'ldirish (${amount.toLocaleString()} UZS)`
+        };
+        await updateDoc(doc(db, "connection_requests", requestId), updatePayload);
+
+        // Update user balance
+        let userRef = doc(db, "users", targetUserId);
+        let userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          const usersRef = collection(db, "users");
+          let qSnap = await getDocs(query(usersRef, where("telegramId", "==", Number(targetUserId))));
+          if (qSnap.empty) {
+            qSnap = await getDocs(query(usersRef, where("telegramId", "==", String(targetUserId))));
+          }
+          if (qSnap.empty) {
+            qSnap = await getDocs(query(usersRef, where("systemId", "==", Number(targetUserId))));
+          }
+          if (qSnap.empty) {
+            qSnap = await getDocs(query(usersRef, where("systemId", "==", String(targetUserId))));
+          }
+          if (!qSnap.empty) {
+            userRef = doc(db, "users", qSnap.docs[0].id);
+            userSnap = qSnap.docs[0];
+          }
+        }
+
+        let newBalance = 0;
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          const currentBalance = Number(userData.balance !== undefined ? userData.balance : (userData.ball || 0));
+          const currentTotalPaid = Number(userData.totalPaid || 0);
+          newBalance = currentBalance + amount;
+          await updateDoc(userRef, { 
+            balance: newBalance,
+            ball: newBalance,
+            totalPaid: currentTotalPaid + amount,
+            updatedAt: serverTimestamp()
+          });
+        }
+
+        // Add payment history
+        let payerType = "tashkilot";
+        let payerName = req.userName;
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          if (uData.displayName) payerName = uData.displayName;
+          if (uData.role === "staff") payerType = "xodim";
+          else if (uData.role === "mustaqil_o_qituvchi") payerType = "mustaqil_o_qituvchi";
+          else if (uData.role === "student" || uData.role === "talaba") payerType = "talaba";
+        }
+
+        await addDoc(collection(db, "payment_history"), {
+          userId: userRef.id,
+          payerName: payerName,
+          payerType: payerType,
+          amount: amount,
+          tariffName: `Balans to'ldirish (${amount.toLocaleString()} UZS)`,
+          paymentType: req.paymentType || "Karta orqali o'tkazma",
+          timestamp: serverTimestamp()
+        });
+
+        // Notify admin
+        await ctx.reply(`✅ Balans muvaffaqiyatli to'ldirildi!\n👤 ${req.userName} (ID: ${req.systemId || userRef.id})\n💰 Qo'shildi: +${amount.toLocaleString()} UZS\n💳 Yangi balans: ${newBalance.toLocaleString()} UZS`);
+
+        // Notify user
+        const notifyTgId = userSnap.exists() ? (userSnap.data().telegramId || targetUserId) : targetUserId;
+        if (notifyTgId) {
+          try {
+            await bot.telegram.sendMessage(
+              Number(notifyTgId),
+              `✅ <b>To'lovingiz tasdiqlandi!</b>\n\n💰 Balansingizga <b>+${amount.toLocaleString()} UZS</b> qo'shildi.\n💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
+              { parse_mode: "HTML" }
+            );
+          } catch (e) {
+            console.error("Could not notify user:", e);
+          }
+        }
+
+        // Delete administrative message to keep chat clean
+        if (pending.originalChatId && pending.originalMessageId) {
+          await bot.telegram.deleteMessage(pending.originalChatId, pending.originalMessageId).catch(() => {});
+        }
+
+      } catch (err: any) {
+        console.error("Approve topup amount error:", err);
+        await ctx.reply("❌ Xatolik yuz berdi: " + (err.message || String(err)));
+      }
+      return;
+    }
+
     if (pending.step === "admin_manual_topup_id") {
       const cleanId = userText.trim();
       if (cleanId === "/cancel" || cleanId.toLowerCase() === "bekor qilish") {
