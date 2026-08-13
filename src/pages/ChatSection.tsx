@@ -21,6 +21,7 @@ export default function ChatSection() {
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [lastMessageTimes, setLastMessageTimes] = useState<Record<string, number>>({});
+  const [msgUserData, setMsgUserData] = useState<Record<string, { displayName: string; role: string }>>({});
   const [adminTab, setAdminTab] = useState<'teachers' | 'students' | 'staff' | 'inquiries'>('teachers');
 
   // Multi-menu student tabs state: AI Assistant and Admin Messaging
@@ -34,20 +35,6 @@ export default function ChatSection() {
       timestamp: Timestamp.now()
     }
   ]);
-
-  // Auto-selection of Admin contact to seamlessly sync messages with Firebase messages thread
-  useEffect(() => {
-    if (!isAdmin && userTab === 'admin' && !selectedContactId) {
-      const adminContact = contacts.find(c => c.role === 'admin' || c.email === 'elyorbek@admin.uz');
-      if (adminContact) {
-        setSelectedContactId(adminContact.uid);
-      } else if (contacts.length > 0) {
-        setSelectedContactId(contacts[0].uid);
-      } else {
-        setSelectedContactId('SYSTEM_ADMIN');
-      }
-    }
-  }, [userTab, contacts, selectedContactId, isAdmin]);
 
   // Load contacts
   useEffect(() => {
@@ -125,23 +112,38 @@ export default function ChatSection() {
      let newContacts = [...contacts];
      const existingIds = new Set(contacts.map(c => c.uid));
      
-     if (isAdmin) {
-        Object.keys(lastMessageTimes).forEach(senderId => {
-           if (senderId && senderId !== 'undefined' && !existingIds.has(senderId) && senderId !== user?.uid && senderId !== 'SYSTEM_ADMIN') {
-              newContacts.push({
-                 uid: senderId,
-                 id: senderId,
-                 displayName: senderId.startsWith('anon_') ? 'Mehmon ' + senderId.slice(-4) : (senderId.startsWith('chatbot_admin_') ? 'ADMIN' : "Noma'lum Foydalanuvchi"),
-                 role: 'inquiry',
-                 isAnonymousContact: true,
-                 createdAt: Timestamp.now()
-              } as any);
-              existingIds.add(senderId);
-           }
-        });
-     }
+     Object.keys(lastMessageTimes).forEach(senderId => {
+        if (senderId && senderId !== 'undefined' && !existingIds.has(senderId) && senderId !== user?.uid) {
+           const meta = msgUserData[senderId];
+           const displayName = meta?.displayName || (senderId === 'SYSTEM_ADMIN' ? '🔔 Tizim bildirishnomasi' : (senderId.startsWith('anon_') ? 'Mehmon ' + senderId.slice(-4) : (senderId.startsWith('chatbot_admin_') ? 'ADMIN' : "Administrator")));
+           const role = meta?.role || (senderId === 'SYSTEM_ADMIN' || senderId.startsWith('chatbot_admin_') ? 'admin' : (senderId.startsWith('anon_') ? 'inquiry' : 'admin'));
+           const isAnonymousContact = senderId.startsWith('anon_') || senderId === 'SYSTEM_ADMIN';
+
+           newContacts.push({
+              uid: senderId,
+              id: senderId,
+              displayName,
+              role,
+              isAnonymousContact,
+              createdAt: Timestamp.now()
+           } as any);
+           existingIds.add(senderId);
+        }
+     });
      setCompleteContacts(newContacts);
-  }, [contacts, lastMessageTimes, isAdmin, user?.uid]);
+  }, [contacts, lastMessageTimes, isAdmin, user?.uid, msgUserData]);
+
+  // Auto-selection of first/best contact to seamlessly sync messages
+  useEffect(() => {
+    if (!selectedContactId && completeContacts.length > 0) {
+      const adminContact = completeContacts.find(c => c.role === 'admin' || c.uid === 'SYSTEM_ADMIN');
+      if (adminContact) {
+        setSelectedContactId(adminContact.uid);
+      } else {
+        setSelectedContactId(completeContacts[0].uid);
+      }
+    }
+  }, [completeContacts, selectedContactId]);
 
   const filteredContacts = isAdmin 
     ? completeContacts.filter(c => {
@@ -205,6 +207,7 @@ export default function ChatSection() {
       const unsub1 = safeOnSnapshot(q1, (snap) => {
         const counts: Record<string, number> = {};
         const t: Record<string, number> = {};
+        const meta: Record<string, { displayName: string; role: string }> = {};
         snap.docs.forEach(doc => {
           const d = doc.data();
           const senderId = d.senderId;
@@ -213,9 +216,16 @@ export default function ChatSection() {
           if (!d.isRead) {
              counts[senderId] = (counts[senderId] || 0) + 1;
           }
+          if (senderId && d.senderName) {
+             meta[senderId] = {
+                displayName: d.senderName,
+                role: d.senderRole || 'user'
+             };
+          }
         });
         counts1 = counts;
         times1 = t;
+        setMsgUserData(prev => ({ ...prev, ...meta }));
         updateAllCountsAndTimes();
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-counts-times-1'));
 
@@ -266,16 +276,20 @@ export default function ChatSection() {
        return;
     }
 
-    // Use a single map to track messages to prevent duplication and simplify logic
-    const messagesMap = new Map<string, Message>();
+    let msgs1: Message[] = [];
+    let msgs2: Message[] = [];
 
-    const updateMessages = (newMsgs: Message[]) => {
-      newMsgs.forEach(m => messagesMap.set(m.id, m));
-      const sorted = Array.from(messagesMap.values()).sort((a, b) => {
+    const mergeAndSet = () => {
+      const mergedMap = new Map<string, Message>();
+      msgs1.forEach(m => mergedMap.set(m.id, m));
+      msgs2.forEach(m => mergedMap.set(m.id, m));
+      
+      const sorted = Array.from(mergedMap.values()).sort((a, b) => {
         const t1 = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
         const t2 = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
         return t1 - t2;
       });
+      
       setMessages(sorted);
       
       if (sorted.length > 0) {
@@ -301,33 +315,29 @@ export default function ChatSection() {
     };
 
     // Query 1: Messages sent by this contact
-    const q1 = query(
-      collection(db, 'messages'),
-      where('senderId', '==', selectedContactId)
-    );
+    const q1 = isAdmin 
+      ? query(collection(db, 'messages'), where('senderId', '==', selectedContactId))
+      : query(collection(db, 'messages'), where('senderId', '==', selectedContactId), where('receiverId', '==', user.uid));
 
     // Query 2: Messages sent TO this contact
-    const q2 = query(
-      collection(db, 'messages'),
-      where('receiverId', '==', selectedContactId)
-    );
+    const q2 = isAdmin
+      ? query(collection(db, 'messages'), where('receiverId', '==', selectedContactId))
+      : query(collection(db, 'messages'), where('receiverId', '==', selectedContactId), where('senderId', '==', user.uid));
 
     const unsub1 = safeOnSnapshot(q1, (snap) => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
-      // For non-admins, filter to only show messages where we are the receiver
-      // For admins, show messages where they are the receiver or it's an admin message
-      const filtered = (isAdmin) 
+      msgs1 = isAdmin 
         ? msgs.filter(m => m.receiverId === user.uid || m.receiverRole === 'admin') 
-        : msgs.filter(m => m.receiverId === user.uid);
-      updateMessages(filtered);
+        : msgs;
+      mergeAndSet();
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-messages-1'));
 
     const unsub2 = safeOnSnapshot(q2, (snap) => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
-      // For non-admins, filter to only show messages where we are the sender
-      // For admins, show messages sent by ANY admin if it's a conversation with this contact
-      const filtered = (isAdmin) ? msgs : msgs.filter(m => m.senderId === user.uid);
-      updateMessages(filtered);
+      msgs2 = isAdmin 
+        ? msgs 
+        : msgs;
+      mergeAndSet();
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'chat-messages-2'));
 
     return () => {
