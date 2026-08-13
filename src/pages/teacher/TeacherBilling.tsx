@@ -53,14 +53,6 @@ const defaultTariffs: Record<string, TariffConfig> = {
     staff: 20,
     hasAI: true,
     hasBot: true
-  },
-  corporate: {
-    name: "CORPORATE",
-    price: 500000, // This is usually a base price
-    students: 999,
-    staff: 999,
-    hasAI: true,
-    hasBot: true
   }
 };
 
@@ -228,7 +220,7 @@ export default function TeacherBilling() {
     const tName = t.name || "";
     const currentName = currentSubscription?.tariffName || "";
     return tName.toLowerCase() !== currentName.toLowerCase() && 
-           ["start", "standard", "professional", "corporate"].includes(tName.toLowerCase());
+           ["start", "standard", "professional"].includes(tName.toLowerCase());
   });
 
   if (loading) return <div className="p-8 text-center font-black">Yuklanmoqda...</div>;

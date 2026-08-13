@@ -58,7 +58,6 @@ interface AllTariffsConfig {
   start: TariffConfig;
   standard: TariffConfig;
   professional: TariffConfig;
-  corporate: TariffConfig;
   extra: TariffConfig;
 }
 
@@ -102,24 +101,6 @@ export const defaultTariffs: AllTariffsConfig = {
     maxExams: 50,
     maxSubjects: 100,
     maxQuizizz: 100
-  },
-  corporate: {
-    name: "CORPORATE",
-    basePrice: 500000,
-    perStudent: 1000,
-    perStaff: 10000,
-    aiPrice: 300000,
-    botPrice: 200000,
-    maxCourses: 999,
-    maxTests: 9999,
-    maxExams: 999,
-    maxSubjects: 999,
-    maxQuizizz: 999,
-    perCourse: 40000,
-    perTest: 2000,
-    perExam: 15000,
-    perSubject: 5000,
-    perQuizizz: 5000
   },
   extra: {
     name: "EXTRA",
@@ -252,19 +233,6 @@ export default function Tariffs() {
     }
   };
 
-  // Corporate calculator state
-  const [corpCalc, setCorpCalc] = useState({
-    students: 1,
-    staff: 1,
-    ai: true,
-    bot: true,
-    courses: 1,
-    tests: 1,
-    exams: 1,
-    subjects: 1,
-    quizizz: 1,
-  });
-
   // Extra limits calculator state
   const [extraCalc, setExtraCalc] = useState({
     students: 100,
@@ -352,7 +320,7 @@ export default function Tariffs() {
         password: newOrgData.password,
         tariffName: showNewOrgModal.name,
         tariffPrice: showNewOrgModal.price || showNewOrgModal.basePrice || 0,
-        limits: showNewOrgModal.name === 'CORPORATE' ? corpCalc : null,
+        limits: null,
         paymentType,
         receiptUrl,
         status: 'pending',
@@ -376,7 +344,7 @@ export default function Tariffs() {
               paymentType,
               receiptUrl,
               isNewOrgRequest: true,
-              limits: showNewOrgModal.name === 'CORPORATE' ? corpCalc : null
+              limits: null
             }
           })
         });
@@ -393,22 +361,6 @@ export default function Tariffs() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const calcCorpPrice = () => {
-    const base = configs.corporate.basePrice ?? 500000;
-    const stdPrice = corpCalc.students * (configs.corporate.perStudent ?? 1000);
-    const staffPrice = corpCalc.staff * (configs.corporate.perStaff ?? 10000);
-    const aiPrice = corpCalc.ai ? (configs.corporate.aiPrice ?? 300000) : 0;
-    const botPrice = corpCalc.bot ? (configs.corporate.botPrice ?? 200000) : 0;
-    
-    const coursesPrice = (corpCalc.courses ?? 0) * (configs.corporate.perCourse ?? 40000);
-    const testsPrice = (corpCalc.tests ?? 0) * (configs.corporate.perTest ?? 2000);
-    const examsPrice = (corpCalc.exams ?? 0) * (configs.corporate.perExam ?? 15000);
-    const subjectsPrice = (corpCalc.subjects ?? 0) * (configs.corporate.perSubject ?? 5000);
-    const quizizzPrice = (corpCalc.quizizz ?? 0) * (configs.corporate.perQuizizz ?? 5000);
-    
-    return base + stdPrice + staffPrice + aiPrice + botPrice + coursesPrice + testsPrice + examsPrice + subjectsPrice + quizizzPrice;
   };
 
   const calcExtraPrice = () => {
@@ -620,8 +572,8 @@ export default function Tariffs() {
           </p>
         </div>
 
-        {/* Grid of 4 Tariffs in one row on desktop: START, STANDARD, PROFESSIONAL, CORPORATE */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {/* Grid of 3 Tariffs in one row on desktop: START, STANDARD, PROFESSIONAL */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           
           {/* START */}
           <div className="p-6 rounded-[32px] border-2 border-gray-100 hover:border-orange-200 transition-all bg-white relative group flex flex-col justify-between shadow-sm">
@@ -646,7 +598,7 @@ export default function Tariffs() {
                 </li>
                 <div className="mx-7 py-1.5 px-3 bg-orange-50 rounded-lg border border-orange-100/50 flex items-center gap-2 mb-2">
                    <Users className="w-3.5 h-3.5 text-orange-600" />
-                   <span className="text-[9px] font-black text-orange-700 uppercase tracking-tighter">Sig'imi: 100-200 nafar talaba</span>
+                   <span className="text-[9px] font-black text-orange-700 uppercase tracking-tighter">LIMITLAR HAR BIR XODIM UCHUN ALOHIDALIKDA HISOBLANADI</span>
                 </div>
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-orange-500 shrink-0" /> {configs.start.maxCourses ?? 3} ta kurs
@@ -703,7 +655,7 @@ export default function Tariffs() {
                 </li>
                 <div className="mx-7 py-1.5 px-3 bg-blue-50 rounded-lg border border-blue-100/50 flex items-center gap-2 mb-2">
                    <Users className="w-3.5 h-3.5 text-blue-600" />
-                   <span className="text-[9px] font-black text-blue-700 uppercase tracking-tighter">Sig'imi: 250-500 nafar talaba</span>
+                   <span className="text-[9px] font-black text-blue-700 uppercase tracking-tighter">LIMITLAR HAR BIR XODIM UCHUN ALOHIDALIKDA HISOBLANADI</span>
                 </div>
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-blue-500 shrink-0" /> {configs.standard.maxCourses ?? 10} ta kurs
@@ -759,7 +711,7 @@ export default function Tariffs() {
                 </li>
                 <div className="mx-7 py-1.5 px-3 bg-amber-50 rounded-lg border border-amber-100/50 flex items-center gap-2 mb-2">
                    <Users className="w-3.5 h-3.5 text-amber-600" />
-                   <span className="text-[9px] font-black text-amber-700 uppercase tracking-tighter">Sig'imi: 1000-2000 nafar talaba</span>
+                   <span className="text-[9px] font-black text-amber-700 uppercase tracking-tighter">LIMITLAR HAR BIR XODIM UCHUN ALOHIDALIKDA HISOBLANADI</span>
                 </div>
                 <li className="text-xs font-bold text-gray-600 flex items-center gap-2.5">
                   <Check className="w-4.5 h-4.5 text-amber-500 shrink-0" /> {configs.professional.maxCourses ?? 50} ta kurs
@@ -790,125 +742,6 @@ export default function Tariffs() {
             >
               {user ? "Tashkilotga ulash" : "Tanlangan tarifga ulanish"}
             </button>
-          </div>
-
-          {/* CORPORATE */}
-          <div className="p-6 rounded-[32px] border-2 border-indigo-100 hover:border-indigo-300 transition-all bg-gradient-to-b from-indigo-50/10 to-indigo-50/40 relative group flex flex-col justify-between shadow-sm">
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-10 h-10 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600">
-                  <Calculator className="w-6 h-6" />
-                </div>
-                <span className="px-2.5 py-1 bg-indigo-50 rounded-full text-[9px] font-black text-indigo-600 uppercase tracking-widest border border-indigo-100">CORPORATE</span>
-              </div>
-              <h3 className="text-xl font-black text-gray-950 mb-1">CORPORATE</h3>
-              <div className="text-3xl font-black text-indigo-600 mb-6 font-mono">
-                {calcCorpPrice().toLocaleString()} <span className="text-sm font-black text-gray-400">sum/oy</span>
-              </div>
-
-              <div className="space-y-2 mb-6 bg-white/40 p-3 rounded-2xl border border-indigo-100/50">
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <div className="flex items-center gap-2">
-                      <input 
-                        type="number" min="0" value={corpCalc.students} 
-                        onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
-                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
-                      />
-                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">nafar talaba</span>
-                   </div>
-                </div>
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <div className="flex items-center gap-2">
-                      <input 
-                        type="number" min="0" value={corpCalc.staff} 
-                        onChange={(e) => setCorpCalc({...corpCalc, staff: Math.max(0, Number(e.target.value))})}
-                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
-                      />
-                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">nafar xodimlar</span>
-                   </div>
-                </div>
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <div className="flex items-center gap-2">
-                      <input 
-                        type="number" min="0" value={corpCalc.courses} 
-                        onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
-                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
-                      />
-                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta kurs</span>
-                   </div>
-                </div>
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <div className="flex items-center gap-2">
-                      <input 
-                        type="number" min="0" value={corpCalc.tests} 
-                        onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
-                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
-                      />
-                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta test</span>
-                   </div>
-                </div>
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <div className="flex items-center gap-2">
-                      <input 
-                        type="number" min="0" value={corpCalc.exams} 
-                        onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
-                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
-                      />
-                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta imtihon</span>
-                   </div>
-                </div>
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <div className="flex items-center gap-2">
-                      <input 
-                        type="number" min="0" value={corpCalc.subjects} 
-                        onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
-                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
-                      />
-                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta mavzu</span>
-                   </div>
-                </div>
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <div className="flex items-center gap-2">
-                      <input 
-                        type="number" min="0" value={corpCalc.quizizz} 
-                        onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
-                        className="w-14 bg-slate-50 rounded-lg text-center font-black text-xs py-1.5 outline-none border border-transparent focus:border-indigo-400"
-                      />
-                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">ta quizizz</span>
-                   </div>
-                </div>
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Sun'iy Intellekt</span>
-                   <input 
-                      type="checkbox" checked={corpCalc.ai} 
-                      onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
-                      className="w-4 h-4 accent-indigo-600"
-                   />
-                </div>
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-xl shadow-sm border border-indigo-50">
-                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">Telegram Bot</span>
-                   <input 
-                      type="checkbox" checked={corpCalc.bot} 
-                      onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
-                      className="w-4 h-4 accent-indigo-600"
-                   />
-                </div>
-              </div>
-
-              <button 
-                onClick={() => user ? setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()}) : setShowNewOrgModal({...configs.corporate, name: 'CORPORATE', price: calcCorpPrice()})}
-                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest flex items-center justify-center gap-2"
-              >
-                Tanlangan tarifga ulanish
-              </button>
-
-              <button 
-                 onClick={() => setIsCorpModalOpen(true)}
-                 className="w-full mt-3 py-3 bg-white/60 text-indigo-600 border border-indigo-200 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-white transition-all"
-              >
-                 To'liq kalkulyator <ArrowRight className="w-3 h-3 inline ml-1" />
-              </button>
-            </div>
           </div>
 
         </div>
@@ -984,285 +817,6 @@ export default function Tariffs() {
         </div>
       </div>
 
-      {/* 👑 SPECIAL MODAL: CORPORATE CALCULATOR DESIGN */}
-      {isCorpModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white rounded-[40px] w-full max-w-2xl p-8 shadow-3xl relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setIsCorpModalOpen(false)}
-              className="absolute top-6 right-6 p-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            <div className="flex items-center gap-3.5 mb-6">
-              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black">
-                 <Calculator className="w-7 h-7" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-black text-gray-950">CORPORATE CALCULATOR</h3>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider">Erkin ravishda istagan limitlarni hisoblang</p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-5">
-                {/* Base price row */}
-                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block">Tizimdan foydalanish (Base)</span>
-                    <span className="text-xs font-bold text-slate-400">Xizmat ko'rsatish va server xarajatlari</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-black text-indigo-700">{(configs.corporate.basePrice ?? 500000).toLocaleString()} UZS</span>
-                  </div>
-                </div>
-
-                {/* Students */}
-                <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                  <div className="flex justify-between items-end px-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Talabalar soni</label>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perStudent ?? 1000).toLocaleString()} UZS</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={corpCalc.students}
-                        onChange={(e) => setCorpCalc({...corpCalc, students: Math.max(0, Number(e.target.value))})}
-                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                      />
-                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                    </div>
-                    <div className="text-right shrink-0 min-w-[120px]">
-                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perStudent ?? 1000).toLocaleString()} x {corpCalc.students}</span>
-                      <span className="text-sm font-black text-slate-700">{(corpCalc.students * (configs.corporate.perStudent ?? 1000)).toLocaleString()} UZS</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Staff */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-end px-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Xodimlar soni</label>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perStaff ?? 10000).toLocaleString()} UZS</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={corpCalc.staff}
-                        onChange={(e) => setCorpCalc({...corpCalc, staff: Math.max(0, Number(e.target.value))})}
-                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                      />
-                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                    </div>
-                    <div className="text-right shrink-0 min-w-[120px]">
-                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perStaff ?? 10000).toLocaleString()} x {corpCalc.staff}</span>
-                      <span className="text-sm font-black text-slate-700">{(corpCalc.staff * (configs.corporate.perStaff ?? 10000)).toLocaleString()} UZS</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Courses */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-end px-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kurslar soni</label>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perCourse ?? 40000).toLocaleString()} UZS</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={corpCalc.courses}
-                        onChange={(e) => setCorpCalc({...corpCalc, courses: Math.max(0, Number(e.target.value))})}
-                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                      />
-                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                    </div>
-                    <div className="text-right shrink-0 min-w-[120px]">
-                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perCourse ?? 40000).toLocaleString()} x {corpCalc.courses}</span>
-                      <span className="text-sm font-black text-slate-700">{(corpCalc.courses * (configs.corporate.perCourse ?? 40000)).toLocaleString()} UZS</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tests */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-end px-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Testlar soni</label>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perTest ?? 2000).toLocaleString()} UZS</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={corpCalc.tests}
-                        onChange={(e) => setCorpCalc({...corpCalc, tests: Math.max(0, Number(e.target.value))})}
-                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                      />
-                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                    </div>
-                    <div className="text-right shrink-0 min-w-[120px]">
-                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perTest ?? 2000).toLocaleString()} x {corpCalc.tests}</span>
-                      <span className="text-sm font-black text-slate-700">{(corpCalc.tests * (configs.corporate.perTest ?? 2000)).toLocaleString()} UZS</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Exams */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-end px-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Imtihonlar soni</label>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perExam ?? 15000).toLocaleString()} UZS</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={corpCalc.exams}
-                        onChange={(e) => setCorpCalc({...corpCalc, exams: Math.max(0, Number(e.target.value))})}
-                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                      />
-                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                    </div>
-                    <div className="text-right shrink-0 min-w-[120px]">
-                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perExam ?? 15000).toLocaleString()} x {corpCalc.exams}</span>
-                      <span className="text-sm font-black text-slate-700">{(corpCalc.exams * (configs.corporate.perExam ?? 15000)).toLocaleString()} UZS</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Subjects */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-end px-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Mavzular soni</label>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perSubject ?? 5000).toLocaleString()} UZS</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={corpCalc.subjects}
-                        onChange={(e) => setCorpCalc({...corpCalc, subjects: Math.max(0, Number(e.target.value))})}
-                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                      />
-                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                    </div>
-                    <div className="text-right shrink-0 min-w-[120px]">
-                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perSubject ?? 5000).toLocaleString()} x {corpCalc.subjects}</span>
-                      <span className="text-sm font-black text-slate-700">{(corpCalc.subjects * (configs.corporate.perSubject ?? 5000)).toLocaleString()} UZS</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quizizz */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-end px-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Quizizzlar soni</label>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Birlik narxi: {(configs.corporate.perQuizizz ?? 5000).toLocaleString()} UZS</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center bg-slate-50 rounded-xl border border-slate-200 pr-3 focus-within:border-indigo-500 transition-all">
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={corpCalc.quizizz}
-                        onChange={(e) => setCorpCalc({...corpCalc, quizizz: Math.max(0, Number(e.target.value))})}
-                        className="w-full px-4 py-2.5 bg-transparent outline-none font-bold text-sm text-slate-800"
-                      />
-                      <span className="text-xs font-bold text-slate-400 shrink-0 select-none">ta</span>
-                    </div>
-                    <div className="text-right shrink-0 min-w-[120px]">
-                      <span className="text-[10px] font-bold text-slate-400 block leading-none mb-1">{(configs.corporate.perQuizizz ?? 5000).toLocaleString()} x {corpCalc.quizizz}</span>
-                      <span className="text-sm font-black text-slate-700">{(corpCalc.quizizz * (configs.corporate.perQuizizz ?? 5000)).toLocaleString()} UZS</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Modules */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* AI module */}
-                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
-                    <div>
-                      <span className="text-xs font-bold text-slate-700 block">AI Test Generator</span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Narxi: {(configs.corporate.aiPrice ?? 300000).toLocaleString()} sum/oy</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="checkbox" 
-                        checked={corpCalc.ai}
-                        onChange={(e) => setCorpCalc({...corpCalc, ai: e.target.checked})}
-                        className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
-                      />
-                      <div className="text-right shrink-0 min-w-[100px]">
-                        <span className="text-sm font-black text-slate-700">{corpCalc.ai ? (configs.corporate.aiPrice ?? 300000).toLocaleString() : 0} UZS</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bot module */}
-                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
-                    <div>
-                      <span className="text-xs font-bold text-slate-700 block">Shaxsiy Telegram Bot</span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Narxi: {(configs.corporate.botPrice ?? 200000).toLocaleString()} sum/oy</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="checkbox" 
-                        checked={corpCalc.bot}
-                        onChange={(e) => setCorpCalc({...corpCalc, bot: e.target.checked})}
-                        className="w-5 h-5 rounded-md accent-indigo-600 shrink-0 cursor-pointer" 
-                      />
-                      <div className="text-right shrink-0 min-w-[100px]">
-                        <span className="text-sm font-black text-slate-700">{corpCalc.bot ? (configs.corporate.botPrice ?? 200000).toLocaleString() : 0} UZS</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200/60 flex flex-col sm:flex-row justify-between items-center gap-4 mt-6">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Jami oylik to'lov:</p>
-                  <div className="text-2xl sm:text-3xl font-mono font-black text-indigo-700 mt-0.5">
-                    {calcCorpPrice().toLocaleString()} <span className="text-xs font-bold text-slate-400">sum/oy</span>
-                  </div>
-                </div>
-                <div className="flex gap-3 w-full sm:w-auto">
-                  <button 
-                    onClick={() => setIsCorpModalOpen(false)}
-                    className="flex-1 sm:flex-none px-6 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-all uppercase text-xs tracking-wider"
-                  >
-                    Yopish
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const finalPrice = calcCorpPrice();
-                      if (user) {
-                        setSelectedTariff({...configs.corporate, name: 'CORPORATE', price: finalPrice});
-                      } else {
-                        setShowNewOrgModal({...configs.corporate, name: 'CORPORATE', price: finalPrice});
-                      }
-                      setIsCorpModalOpen(false);
-                    }}
-                    className="flex-1 sm:flex-none px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all uppercase text-xs tracking-wider shadow-sm shadow-indigo-100"
-                  >
-                    Shartnoma Tuzish
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
       {/* Visual divider design */}
       <div className="rounded-[40px] border border-gray-100 bg-gray-50/50 flex flex-col md:flex-row items-center gap-6 justify-between p-8">
         <div className="flex items-center gap-4">
