@@ -5848,10 +5848,11 @@ Foydalanuvchi xabari: ${prompt}`;
   }
 
   if (
-    normText === "💵 balans to'ldirish (admin)" ||
-    normText === "💰 balans to'ldirish (admin)" ||
-    normText === "balans to'ldirish (admin)" ||
-    normText === "💵 balans to'ldirish" ||
+    normText === "💵 Balans to'ldirish (Admin)" ||
+    normText.toLowerCase() === "💵 balans to'ldirish (admin)" ||
+    normText.toLowerCase() === "💰 balans to'ldirish (admin)" ||
+    normText.toLowerCase() === "balans to'ldirish (admin)" ||
+    normText.toLowerCase() === "💵 balans to'ldirish" ||
     userText === "/topup"
   ) {
     const adminIds = getAdminIds();
