@@ -33,6 +33,7 @@ const Type = SDKType || {
 };
 import { generateContentWithRotation } from "./src/lib/gemini";
 import { generateCourseWorkDataWithGemini, buildCourseWorkDocxBuffer } from "./src/lib/courseworkGenerator.js";
+import { findUserBySystemId } from "./src/lib/serverPayment.js";
 import dotenv from "dotenv";
 import sharp from "sharp";
 import fs from "fs";
@@ -323,16 +324,27 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
   const ids = getAdminIds();
   console.log("[Telegram] Notifying admins about new connection request:", requestId);
   
-  let typeLabel = "YANGI ULANISH SO'ROVI";
+  let userRoleLabel = "O'quvchi / Talaba";
+  if (req.userRole === 'teacher' || req.role === 'teacher') userRoleLabel = "O'qituvchi / Tashkilot";
+  else if (req.userRole === 'mustaqil_o_qituvchi' || req.role === 'mustaqil_o_qituvchi') userRoleLabel = "Mustaqil O'qituvchi";
+  else if (req.userRole === 'staff' || req.role === 'staff') userRoleLabel = "Xodim";
+  else if (req.userRole === 'admin' || req.role === 'admin' || req.userRole === 'superadmin') userRoleLabel = "Administrator";
+
+  let typeLabel = req.isBalanceTopUp ? "BALANS TO'LDIRISH SO'ROVI" : "YANGI ULANISH SO'ROVI";
   if (req.isUpgradeRequest) typeLabel = "TARIFNI O'ZGARTIRISH SO'ROVI";
   if (req.isLimitsRequest) typeLabel = "LIMIT SOTIB OLISH SO'ROVI";
 
-  let text = `📥 <b>${typeLabel}</b>\n`;
+  let text = `📸 <b>${typeLabel}</b>\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `👤 <b>Foydalanuvchi:</b> <code>${req.userName}</code>\n`;
+  text += `👤 <b>Foydalanuvchi:</b> <code>${req.userName || "Foydalanuvchi"}</code>\n`;
+  text += `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>\n`;
+  text += `🆔 <b>ID raqami:</b> <code>${req.systemId || req.userId || "Kiritilmagan"}</code>\n`;
   text += `📞 <b>Tel:</b> <code>${req.phone || "Kiritilmagan"}</code>\n`;
   
-  if (req.isLimitsRequest) {
+  if (req.isBalanceTopUp) {
+    const amount = Number(req.tariffPrice || req.amount || 0);
+    text += `💰 <b>To'ldirish summasi:</b> <code>${amount.toLocaleString()} UZS</code>\n`;
+  } else if (req.isLimitsRequest) {
     text += `💰 <b>Jami summa:</b> <code>${(req.totalPrice || req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
     text += `⚙️ <b>So'ralgan limitlar:</b>\n`;
     const ITEM_LABELS: Record<string, string> = {
@@ -349,11 +361,11 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
       text += `  - ${ITEM_LABELS[key] || key}: +${qty} ta\n`;
     });
   } else {
-    text += `💎 <b>Tarif:</b> <code>${req.tariffName}</code>\n`;
+    text += `💎 <b>Tarif:</b> <code>${req.tariffName || "Standart"}</code>\n`;
     text += `💰 <b>Narxi:</b> <code>${(req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
   }
   
-  text += `💳 <b>To'lov turi:</b> <code>${req.paymentType}</code>\n`;
+  text += `💳 <b>To'lov turi:</b> <code>${req.paymentType || "Karta orqali o'tkazma"}</code>\n`;
   
   if (req.isNewOrgRequest) {
     text += `🆕 <b>Yangi tashkilot:</b> HA\n`;
@@ -373,7 +385,7 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
 
   const inline_keyboard = [
     [
-      { text: "✅ Tasdiqlash", callback_data: `admin_approve_req_${requestId}` },
+      { text: "💳 To'ldirish (Tasdiqlash)", callback_data: `admin_approve_req_${requestId}` },
       { text: "❌ Rad etish", callback_data: `admin_reject_req_${requestId}` }
     ]
   ];
@@ -381,17 +393,17 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
   for (const adminId of ids) {
     try {
       if (req.receiptUrl) {
-        if (req.receiptUrl.startsWith('data:')) {
+        if (typeof req.receiptUrl === 'string' && req.receiptUrl.startsWith('data:')) {
           const base64Data = req.receiptUrl.split(',')[1];
           const buffer = Buffer.from(base64Data, 'base64');
-          await bot.telegram.sendPhoto(adminId, { source: buffer }, {
-            caption: text,
+          await bot.telegram.sendPhoto(adminId, { source: buffer, filename: 'receipt.png' }, {
+            caption: text.substring(0, 1000),
             parse_mode: "HTML",
             reply_markup: { inline_keyboard }
           });
         } else {
           await bot.telegram.sendPhoto(adminId, req.receiptUrl, {
-            caption: text,
+            caption: text.substring(0, 1000),
             parse_mode: "HTML",
             reply_markup: { inline_keyboard }
           });
@@ -403,7 +415,43 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
         });
       }
     } catch (err) {
-      console.error(`Failed to notify admin ${adminId} about request ${requestId}:`, err);
+      console.error(`Failed to send photo to admin ${adminId}, attempting fallback text message:`, err);
+      try {
+        await bot.telegram.sendMessage(adminId, text, {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard }
+        });
+      } catch (e2) {
+        console.error(`Fallback sendMessage also failed for admin ${adminId}:`, e2);
+      }
+    }
+  }
+}
+
+export async function notifyPaymentCompleted(info: {
+  userName: string;
+  systemId: string;
+  amount: number;
+  provider: string;
+  transactionId: string;
+  newBalance: number;
+}) {
+  const ids = getAdminIds();
+  const text = `⚡ <b>ONLAYN TO'LOV QABUL QILINDI (${info.provider.toUpperCase()})</b>\n` +
+               `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+               `👤 <b>Foydalanuvchi:</b> <code>${info.userName}</code>\n` +
+               `🆔 <b>ID raqami:</b> <code>${info.systemId}</code>\n` +
+               `💰 <b>To'lov summasi:</b> <code>+${info.amount.toLocaleString()} UZS</code>\n` +
+               `💳 <b>Yangi balans:</b> <code>${info.newBalance.toLocaleString()} UZS</code>\n` +
+               `🧾 <b>Tranzaksiya ID:</b> <code>${info.transactionId}</code>\n` +
+               `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+               `📅 <code>${new Date().toLocaleString('uz-UZ')}</code>`;
+
+  for (const adminId of ids) {
+    try {
+      await bot.telegram.sendMessage(adminId, text, { parse_mode: "HTML" });
+    } catch (e) {
+      console.error(`Failed to notify admin ${adminId} about automated payment:`, e);
     }
   }
 }
@@ -576,6 +624,8 @@ const pendingLogins = new Map<
     originalMessageId?: number;
     originalChatId?: number;
     promptMessageId?: number;
+    foundUser?: any;
+    referrerId?: string;
   }
 >();
 
@@ -933,101 +983,31 @@ async function getKeyboard(
     }
   }
 
-  // Check for dynamic menu in Firestore
-  try {
-    const menuDoc = await getDoc(doc(db, "botConfig", "mainMenu"));
-    if (menuDoc.exists()) {
-      const data = menuDoc.data();
-      if (data.keyboard) {
-        let kb = [...data.keyboard];
-         
-        // List of items that should be treated as features rather than generic buttons
-        const alwaysExclude = ["🤖 AI yordamchi", "🤖 AI Yordamchi", "💬 Savol-javob"];
-         
-        if (authed && (userRole === "admin" || userRole === "subadmin")) {
-          const excludeForAdmin = ["💬 Adminga murojaat", "💰 Balans", "💳 Balansni to'ldirish", ...alwaysExclude];
-          kb = kb.map(row => row.filter((btn: any) => !excludeForAdmin.includes(btn.text))).filter(row => row.length > 0);
+  const userHeader = [
+    [{ text: "👤 Profil" }],
+    [{ text: "🤖 AI Yordamchi" }, { text: "💬 Adminga murojaat" }],
+    [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
+    [{ text: "👥 Do'stlarni taklif qilish" }],
+    [{ text: "🌐 Rasmiy sayt" }]
+  ];
 
-          const adminIds = getAdminIds();
-          const isPrimary = adminIds.length === 0 || adminIds[0] === userId;
+  if (authed && (userRole === "admin" || userRole === "subadmin")) {
+    const adminIds = getAdminIds();
+    const isPrimary = adminIds.length === 0 || adminIds[0] === userId;
 
-          const adminHeader = [
-            [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
-            [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
-            [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
-            isPrimary 
-              ? [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Bot sozlamalari" }]
-              : [{ text: "📥 Javob berilmaganlar" }],
-            [{ text: "ℹ️ Tizim haqida" }]
-          ];
-          return [...adminHeader, ...kb];
-        }
-
-        if (authed) {
-          const excludeForUser = ["📢 E'lon yuborish", "📊 Statistika", "📥 Javob berilmaganlar", "⚙️ Bot sozlamalari", "👤 Profil", "🚪 Chiqish", ...alwaysExclude];
-          kb = kb.map(row => row.filter((btn: any) => {
-            const txt = btn.text || "";
-            return !excludeForUser.includes(txt) && !txt.startsWith("📊 Statistika");
-          })).filter(row => row.length > 0);
-
-          const userHeader = [
-            [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
-            [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
-            [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
-            [{ text: "👥 Do'stlarni taklif qilish" }, { text: "🎁 Bepul ball" }]
-          ];
-          return [...userHeader, ...kb];
-        } else {
-          const excludeForGuest = ["📢 E'lon yuborish", "📊 Statistika", "📥 Javob berilmaganlar", "⚙️ Bot sozlamalari", "👤 Profil", "🚪 Chiqish", "🔑 Kirish", ...alwaysExclude];
-          kb = kb.map(row => row.filter((btn: any) => {
-            const txt = btn.text || "";
-            return !excludeForGuest.includes(txt) && !txt.startsWith("📊 Statistika");
-          })).filter(row => row.length > 0);
-
-          const guestHeader = [
-            [{ text: "🔑 Kirish" }],
-            [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
-            [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
-            [{ text: "👥 Do'stlarni taklif qilish" }, { text: "🎁 Bepul ball" }]
-          ];
-          return [...guestHeader, ...kb];
-        }
-      }
-    }
-  } catch (e: any) {
-    if (!e?.message?.includes("Quota")) {
-      console.error("Dynamic menu load error:", e);
-    }
+    return [
+      [{ text: "👤 Profil" }, { text: "🚪 Chiqish" }],
+      [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
+      [{ text: "💵 Balans to'ldirish (Admin)" }],
+      [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
+      isPrimary 
+        ? [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Bot sozlamalari" }]
+        : [{ text: "📥 Javob berilmaganlar" }],
+      [{ text: "🌐 Rasmiy sayt" }]
+    ];
   }
 
-  const rows: any[][] = [];
-  if (authed) {
-    if (userRole === "admin" || userRole === "subadmin") {
-      rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
-      rows.push([{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }]);
-      rows.push([{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }]);
-      rows.push([{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Bot sozlamalari" }]);
-      rows.push([{ text: "ℹ️ Tizim haqida" }]);
-      rows.push([{ text: "🌐 Rasmiy sayt" }]);
-      return rows;
-    }
-    rows.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
-    rows.push([{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }]);
-    rows.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
-  } else {
-    rows.push([{ text: "🔑 Kirish" }]);
-    rows.push([{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }]);
-    rows.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
-  }
-
-  rows.push([{ text: "ℹ️ Tizim haqida" }]);
-  if (userRole !== "admin" && userRole !== "subadmin") {
-    rows.push([{ text: "💬 Adminga murojaat" }, { text: "🌐 Rasmiy sayt" }]);
-  } else {
-    rows.push([{ text: "🌐 Rasmiy sayt" }]);
-  }
-  
-  return rows;
+  return userHeader;
 }
 async function getAiAssistantKeyboard(userId?: number) {
   const adminIds = getAdminIds();
@@ -1197,45 +1177,6 @@ bot.start(async (ctx) => {
   aiAssistantActiveUsers.delete(userId);
   aiServiceStates.delete(userId);
 
-  // Automatic Telegram Profile Creation in 'users' collection
-  if (db) {
-    try {
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("telegramId", "==", userId));
-      const snap = await getDocs(q);
-
-      if (snap.empty) {
-        // Create new user if not exists
-        await addDoc(usersRef, {
-          telegramId: userId,
-          uid: `tg_${userId}`,
-          displayName: `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim(),
-          name: ctx.from.first_name || "Foydalanuvchi",
-          username: ctx.from.username || "",
-          role: "bot_user",
-          departmentName: "bot",
-          groupName: "telegram",
-          ball: 0,
-          balance: 0,
-          spentBalls: 0,
-          referralCount: 0,
-          referrals: 0,
-          createdAt: serverTimestamp(),
-          isTelegramUser: true,
-          isBotUser: true
-        });
-        console.log(`[Telegram] Auto-created user profile for ${userId}`);
-      }
-    } catch (e: any) {
-      const errMsg = String(e?.message || "").toLowerCase();
-      if (errMsg.includes("quota") || errMsg.includes("limit") || errMsg.includes("exceeded")) {
-        console.warn(`[Telegram] Quota exceeded on auto-registration for ${userId}. Skipping.`);
-      } else {
-        console.error("Auto-registration error:", e);
-      }
-    }
-  }
-
   // Local cache file register for offline-first backup and real-time updates
   let isNewUser = false;
   const tgUsersListPath = path.join(process.cwd(), "telegram_users_list.json");
@@ -1253,45 +1194,6 @@ bot.start(async (ctx) => {
       const contentStr = JSON.stringify(userList);
       fs.writeFileSync(tgUsersListPath, contentStr, "utf8");
     } catch (err) {}
-
-    // Referral system handling
-    if (startPayload && startPayload.startsWith("ref_")) {
-      const referrerId = startPayload.replace("ref_", "");
-      if (referrerId !== String(userId)) {
-        try {
-          const referrerDocRef = doc(db, "telegram_users", referrerId);
-          const referrerSnap = await getDoc(referrerDocRef);
-          if (referrerSnap.exists()) {
-            const referrerData = referrerSnap.data();
-            const currentRefs = (referrerData.referrals || []).concat(userId);
-            
-            // Increment referral list in bot-specific collection
-            await updateDoc(referrerDocRef, {
-              referrals: currentRefs,
-              referralCount: currentRefs.length
-            });
-
-            // Update main users collection for balance/stats
-            const usersRef = collection(db, "users");
-            const rq = query(usersRef, where("telegramId", "==", Number(referrerId)));
-            const rSnap = await getDocs(rq);
-            if (!rSnap.empty) {
-              const rDoc = rSnap.docs[0];
-              const rData = rDoc.data();
-              const newRefCount = (rData.referralCount || 0) + 1;
-              const updates: any = { 
-                referralCount: newRefCount,
-                referrals: (rData.referrals || 0) + 1 
-              };
-              
-              await updateDoc(doc(db, "users", rDoc.id), updates);
-            }
-          }
-        } catch (e) {
-          console.error("Referral process error:", e);
-        }
-      }
-    }
   }
 
   telegramUsersCount = userList.length;
@@ -1305,41 +1207,209 @@ bot.start(async (ctx) => {
     await notifyAdminsDirectly(textDesc);
   }
 
-  // Save every user to telegram_users collection for broadcast purposes
+  const authed = await getAuthedUser(userId);
+  const isAdmin = getAdminIds().includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin"));
+
+  if (isAdmin) {
+    const greeting =
+      `🤖 <b>Assalomu alaykum Administrator!</b>\n\n` +
+      `AIEDUTIZIM boshqaruv paneliga xush kelibsiz. Kerakli menyuni tanlang:`;
+
+    return ctx.reply(greeting, {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: await getKeyboard("admin", userId, true),
+        resize_keyboard: true,
+      },
+    });
+  }
+
+  // Check if non-admin user already has a contact/phone saved in DB
+  let hasPhone = false;
   if (db) {
     try {
-      const docRef = doc(db, "telegram_users", String(userId));
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("telegramId", "==", userId));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const uData = snap.docs[0].data();
+        if (uData.phone || uData.phoneNumber) {
+          hasPhone = true;
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (hasPhone) {
+    const greeting =
+      `🤖 <b>Assalomu alaykum! AIEDUTIZIM Telegram botiga xush kelibsiz.</b>\n\n` +
+      `🎓 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Ta'lim Tizimi.\n\n` +
+      `Kerakli bo'limni tanlang:`;
+
+    return ctx.reply(greeting, {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: await getKeyboard("bot_user", userId, true),
+        resize_keyboard: true,
+      },
+    });
+  }
+
+  // User does not have a contact registered yet -> Prompt for contact
+  let referrerId: string | undefined = undefined;
+  if (startPayload && startPayload.startsWith("ref_")) {
+    referrerId = startPayload.replace("ref_", "");
+  }
+
+  pendingLogins.set(userId, { step: "await_contact", referrerId });
+
+  return ctx.reply(
+    `👋 <b>Assalomu alaykum! AIEDUTIZIM botiga xush kelibsiz.</b>\n\n` +
+    `Botdan foydalanish va ro'yxatdan o'tish uchun iltimos, pastdagi <b>"📱 Kontaktni yuborish"</b> tugmasini bosing:`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: [
+          [{ text: "📱 Kontaktni yuborish", request_contact: true }]
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      }
+    }
+  );
+});
+
+bot.on("contact", async (ctx) => {
+  const contact = ctx.message.contact;
+  if (!contact) return;
+  const userId = ctx.from.id;
+
+  let phone = (contact.phone_number || "").trim();
+  if (!phone.startsWith("+")) {
+    phone = "+" + phone;
+  }
+
+  const displayName = `${contact.first_name || ctx.from.first_name || ""} ${contact.last_name || ctx.from.last_name || ""}`.trim() || "Foydalanuvchi";
+  const username = ctx.from.username || "";
+
+  const pending = pendingLogins.get(userId);
+  const referrerId = pending?.referrerId;
+
+  let userSystemId = Math.floor(1000000 + Math.random() * 9000000);
+
+  if (db) {
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("telegramId", "==", userId));
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        const uDoc = snap.docs[0];
+        const uData = uDoc.data();
+        userSystemId = uData.systemId || userSystemId;
+
+        await updateDoc(doc(db, "users", uDoc.id), {
+          phone: phone,
+          displayName: displayName,
+          username: username,
+          isTelegramUser: true,
+          isBotUser: true,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await addDoc(usersRef, {
+          telegramId: userId,
+          uid: `tg_${userId}`,
+          displayName: displayName,
+          name: contact.first_name || ctx.from.first_name || "Foydalanuvchi",
+          username: username,
+          phone: phone,
+          role: "bot_user",
+          systemId: userSystemId,
+          ball: 0,
+          balance: 0,
+          spentBalls: 0,
+          referralCount: 0,
+          referrals: 0,
+          invitedBy: referrerId || null,
+          createdAt: serverTimestamp(),
+          isTelegramUser: true,
+          isBotUser: true
+        });
+
+        // Award referral bonus to referrer
+        if (referrerId && String(referrerId) !== String(userId)) {
+          try {
+            const referrerNum = Number(referrerId);
+            const rq = query(usersRef, where("telegramId", "==", referrerNum));
+            const rSnap = await getDocs(rq);
+            if (!rSnap.empty) {
+              const rDoc = rSnap.docs[0];
+              const rData = rDoc.data();
+              const oldBal = Number(rData.balance || rData.ball || 0);
+              const oldBall = Number(rData.ball || 0);
+              const oldRefCount = Number(rData.referralCount || rData.referrals || 0);
+
+              await updateDoc(doc(db, "users", rDoc.id), {
+                balance: oldBal + 5000,
+                ball: oldBall + 5000,
+                referralCount: oldRefCount + 1,
+                referrals: oldRefCount + 1,
+                updatedAt: serverTimestamp()
+              });
+
+              // Send notification to referrer
+              try {
+                await bot.telegram.sendMessage(
+                  referrerNum,
+                  `🎉 <b>YANGI DO'ST TAKLIF QILINDI!</b>\n\n` +
+                  `Siz taklif qilgan do'stingiz (<b>${displayName}</b>) botga a'zo bo'ldi.\n` +
+                  `💰 Balansingizga <b>+5 000 UZS</b> bonus qo'shildi!`,
+                  { parse_mode: "HTML" }
+                );
+              } catch (e) {}
+            }
+          } catch (e) {
+            console.error("Referral process error:", e);
+          }
+        }
+      }
+
       await setDoc(
-        docRef,
+        doc(db, "telegram_users", String(userId)),
         {
           telegramId: userId,
-          firstName: ctx.from.first_name || "",
-          lastName: ctx.from.last_name || "",
-          username: ctx.from.username || "",
-          lastActive: new Date().toISOString(),
+          firstName: contact.first_name || ctx.from.first_name || "",
+          lastName: contact.last_name || ctx.from.last_name || "",
+          username: username,
+          phone: phone,
+          lastActive: new Date().toISOString()
         },
-        { merge: true },
-      ).catch(() => {});
+        { merge: true }
+      );
     } catch (e) {
-      console.error("Failed to save telegram user doc:", e);
+      console.error("Save contact error:", e);
     }
   }
 
-  const authed = await getAuthedUser(userId);
-  const role = authed ? authed.role : "student";
+  pendingLogins.delete(userId);
+  authedUsers.delete(userId);
 
-  const greeting =
-    `🤖 <b>Assalomu alaykum! AIEDUTIZIM Telegram botiga xush kelibsiz.</b>\n\n` +
-    `🎓 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Ta'lim Tizimi bo‘lib, talabalar, o‘qituvchilar va tashkilotlar uchun mo‘ljallangan zamonaviy raqamli ta'lim platformasidir.\n\n` +
-    `Kerakli bo‘limni tanlang.`;
-
-  ctx.reply(greeting, {
-    parse_mode: "HTML",
-    reply_markup: {
-      keyboard: await getKeyboard(role, userId, !!authed),
-      resize_keyboard: true,
-    },
-  });
+  const keyboard = await getKeyboard("bot_user", userId, true);
+  await ctx.reply(
+    `✅ <b>Telefon raqamingiz muvaffaqiyatli qabul qilindi!</b>\n\n` +
+    `👤 <b>Ism:</b> ${displayName}\n` +
+    `📞 <b>Telefon:</b> ${phone}\n` +
+    `🆔 <b>ID raqamingiz:</b> <code>${userSystemId}</code>\n\n` +
+    `🤖 Bot ishchi holatga o'tdi. Kerakli menyuni tanlang:`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: keyboard,
+        resize_keyboard: true
+      }
+    }
+  );
 });
 
 
@@ -1789,7 +1859,33 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
       processedAt: serverTimestamp()
     });
 
-    if (req.isLimitsRequest) {
+    if (req.isBalanceTopUp) {
+      console.log(`[Telegram] Processing balance top-up for user ${targetUserId}`);
+      const userRef = doc(db, "users", targetUserId);
+      const userSnap = await getDoc(userRef);
+      let newBalance = 0;
+      const topUpAmount = Number(req.tariffPrice || req.amount || 0);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const currentBalance = Number(userData.balance || userData.ball || 0);
+        newBalance = currentBalance + topUpAmount;
+        await updateDoc(userRef, { balance: newBalance });
+        console.log(`[Telegram] Balance updated for ${targetUserId}: ${currentBalance} -> ${newBalance}`);
+      }
+
+      await ctx.reply(`✅ Balans muvaffaqiyatli to'ldirildi!\n👤 ${req.userName} (ID: ${req.systemId || targetUserId})\n💰 Qo'shildi: +${topUpAmount.toLocaleString()} UZS\n💳 Yangi balans: ${newBalance.toLocaleString()} UZS`);
+
+      if (userSnap.exists() && userSnap.data().telegramId) {
+        try {
+          await bot.telegram.sendMessage(
+            userSnap.data().telegramId,
+            `✅ <b>To'lovingiz tasdiqlandi!</b>\n\n💰 Balansingizga <b>+${topUpAmount.toLocaleString()} UZS</b> qo'shildi.\n💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
+            { parse_mode: "HTML" }
+          );
+        } catch (e) {}
+      }
+    } else if (req.isLimitsRequest) {
       console.log(`[Telegram] Processing limits request for user ${targetUserId}`);
       const userRef = doc(db, "users", targetUserId);
       const userSnap = await getDoc(userRef);
@@ -4353,7 +4449,23 @@ bot.on("message", async (ctx) => {
     }
 
     if (adminIds.length > 0) {
-      const caption = `🧾 Yangi to\x27lov cheki\n\n👤 Ism: ${ctx.from.first_name || ""} ${ctx.from.last_name || ""}\n🆔 ID: ${userId}\n🔗 Username: @${ctx.from.username || "yo\x27q"}\n\n💰 Status: Tekshiruvda`;
+      let userRoleLabel = "O'quvchi / Talaba";
+      if (authed?.role === 'teacher') userRoleLabel = "O'qituvchi / Tashkilot";
+      else if (authed?.role === 'mustaqil_o_qituvchi') userRoleLabel = "Mustaqil O'qituvchi";
+      else if (authed?.role === 'staff') userRoleLabel = "Xodim";
+      else if (authed?.role === 'admin' || authed?.role === 'superadmin') userRoleLabel = "Administrator";
+
+      const userDisplayName = authed?.displayName || `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim() || "Foydalanuvchi";
+      const userSystemId = authed?.systemId || userId;
+
+      const caption = `🧾 <b>YANGI TO'LOV CHEKI (TELEGRAM BOT)</b>\n` +
+                      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                      `👤 <b>Foydalanuvchi:</b> <code>${userDisplayName}</code>\n` +
+                      `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>\n` +
+                      `🆔 <b>ID raqami:</b> <code>${userSystemId}</code>\n` +
+                      `🔗 <b>Username:</b> @${ctx.from.username || "yo'q"}\n` +
+                      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                      `💰 <b>Status:</b> ⏳ Tekshiruvda`;
       
       const keyboard = {
         inline_keyboard: [
@@ -5422,28 +5534,82 @@ Foydalanuvchi xabari: ${prompt}`;
     );
   }
 
-  if (normText === "👥 Do'stlarni taklif qilish") {
+  if (normText === "👥 Do'stlarni taklif qilish" || normText === "👥 Do'stni taklif qilish") {
     aiModeDeactivate();
-    const refLink = `${APP_URL}/?r=${userId}`; // Web link
-    const botRefLink = `https://t.me/${ctx.botInfo.username}?start=ref_${userId}`; // Bot link
-    return ctx.reply(
-      `👥 <b>Do'stlarni taklif qiling va mablag' to'plang!</b>\n\n` +
-      `Sizning shaxsiy referal havolangiz:\n\n` +
-      `🔗 <b>Telegram bot uchun:</b> ${botRefLink}\n` +
-      `🔗 <b>Veb-sayt uchun:</b> ${refLink}\n\n` +
-      `🎁 Har bir taklif qilingan do'st uchun <b>5000 so'm</b> balansingizga qo'shiladi!`,
-      { parse_mode: "HTML" }
-    );
+    let invitedCount = 0;
+    if (db) {
+      try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("telegramId", "==", userId));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const uData = snap.docs[0].data();
+          invitedCount = Number(uData.referralCount || uData.referrals || 0);
+        }
+      } catch (e) {}
+    }
+
+    const earnedBonus = invitedCount * 5000;
+    const botUsername = ctx.botInfo?.username || "aiedutizim_bot";
+    const botRefLink = `https://t.me/${botUsername}?start=ref_${userId}`;
+    const webRefLink = `${APP_URL}/?r=${userId}`;
+
+    const refMsg = `👥 <b>DO'STLARNI TAKLIF QILISH (REFERAL TIZIMI)</b>\n\n` +
+                   `🎁 Har bir taklif qilingan do'stingiz botga kirib kontaktini tasdiqlaganida balansingizga <b>5 000 UZS</b> avtomatik qo'shiladi!\n\n` +
+                   `📊 <b>Sizning statistikangiz:</b>\n` +
+                   `• Taklif qilingan do'stlar: <b>${invitedCount} ta</b>\n` +
+                   `• Ishlangan umumiysummasi: <b>${earnedBonus.toLocaleString()} UZS</b>\n\n` +
+                   `🔗 <b>Sizning Telegram bot referal havolangiz:</b>\n` +
+                   `<code>${botRefLink}</code>\n\n` +
+                   `🔗 <b>Veb-sayt havolangiz:</b>\n` +
+                   `<code>${webRefLink}</code>\n\n` +
+                   `👉 Havolani do'stlaringizga ulashing va balansingizni to'ldiring!`;
+
+    return ctx.reply(refMsg, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "📲 Do'stlarga ulashish", url: `https://t.me/share/url?url=${encodeURIComponent(botRefLink)}&text=${encodeURIComponent("🔥 Zo'r AI Ta'lim botiga taklif qilaman! Kirib foydalanib ko'ring:")}` }]
+        ]
+      }
+    });
   }
 
   if (normText === "💳 Balansni to'ldirish") {
     aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
-    return ctx.reply(paymentInstructionsText, { 
+
+    let cardNumber = "5614 6812 9015 3646";
+    let cardOwner = "IBODULLAYEVA SH";
+    if (db) {
+      try {
+        const cardSnap = await getDoc(doc(db, "settings", "payment_card"));
+        if (cardSnap.exists()) {
+          const cData = cardSnap.data();
+          if (cData.number) cardNumber = cData.number;
+          if (cData.owner) cardOwner = cData.owner;
+        }
+      } catch (e) {}
+    }
+
+    const sysId = authed?.systemId || userId;
+
+    const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>\n\n` +
+                 `1️⃣ <b>1-USUL: Karta raqamiga o'tkazma qilish</b>\n` +
+                 `💳 Karta raqami: <code>${cardNumber}</code>\n` +
+                 `👤 Egasi: <b>${cardOwner}</b>\n\n` +
+                 `👉 Ushbu kartaga to'lov qilib, <b>to'lov cheki (skrinshot) rasmini</b> ushbu botga yuboring. Adminlarimiz tekshirib balansingizni to'ldiradi.\n\n` +
+                 `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                 `2️⃣ <b>2-USUL: Click / Payme orqali avtomatik to'lov</b>\n` +
+                 `📱 Click yoki Payme ilovasiga kiring va firmamiz / MCHJ nomini tanlang.\n` +
+                 `🆔 Sizning ID raqamingiz: <code>${sysId}</code>\n\n` +
+                 `👉 ID raqamingiz va summani kiritishingiz bilan ismingiz tasdiqlanadi hamda to'lov bajarilishi bilanoq balansingiz <b>avtomatik tarzda to'ldiriladi</b>!`;
+
+    return ctx.reply(text, { 
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "Click", url: "https://click.uz/" }, { text: "Payme", url: "https://payme.uz/" }, { text: "Uzum", url: "https://uzum.com/" }]
+          [{ text: "📲 Click", url: "https://click.uz/" }, { text: "📲 Payme", url: "https://payme.uz/" }]
         ]
       }
     });
@@ -5476,63 +5642,51 @@ Foydalanuvchi xabari: ${prompt}`;
 
   if (normText === "👤 Profil") {
     aiAssistantActiveUsers.delete(userId);
-    if (!authed) {
-      return ctx.reply(
-        "❌ Siz tizimga kirmagansiz.\n\nIltimos, \"🔑 Kirish\" tugmasi orqali tizimga kiring.",
-        {
-          reply_markup: {
-            keyboard: await getKeyboard(undefined, userId, false),
-            resize_keyboard: true,
-          },
-        }
-      );
-    }
-
-    let dbDoc = null;
-    if (authed.docId) {
+    
+    let uData: any = null;
+    if (db) {
       try {
-        const res = await getDoc(doc(db, "users", authed.docId));
-        if (res.exists()) dbDoc = res;
-      } catch (e) {}
-    }
-    if (!dbDoc) {
-      try {
-        const res = await getDoc(doc(db, 'users', authed.uid));
-        if (res.exists()) dbDoc = res;
-      } catch (e) {}
-    }
-    if (!dbDoc && db) {
-      try {
-        const q = query(collection(db, "users"), where("uid", "==", authed.uid));
+        const q = query(collection(db, "users"), where("telegramId", "==", userId));
         const qSnap = await getDocs(q);
         if (!qSnap.empty) {
-          dbDoc = qSnap.docs[0];
+          uData = qSnap.docs[0].data();
+        } else if (authed?.docId) {
+          const res = await getDoc(doc(db, "users", authed.docId));
+          if (res.exists()) uData = res.data();
         }
       } catch (e) {}
     }
 
-    let uData = dbDoc ? dbDoc.data() : null;
-    const roleText = uData?.role || authed.role || "student";
-    let roleDisplay = "Mehmon";
-    if (roleText === "admin") roleDisplay = "Administrator";
-    else if (roleText === "teacher") roleDisplay = "Tashkilot";
-    else if (roleText === "staff") roleDisplay = "Xodim";
-    else if (roleText === "student") roleDisplay = "Talaba";
+    const tgName = `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim() || uData?.displayName || "Foydalanuvchi";
+    const nick = ctx.from.username ? `@${ctx.from.username}` : (uData?.username ? `@${uData.username}` : "Mavjud emas");
+    const phone = uData?.phone || uData?.phoneNumber || "Kiritilmagan";
+    const systemId = uData?.systemId || userId;
+    const balance = Number(uData?.balance !== undefined ? uData.balance : (uData?.ball || 0));
 
-    let profileMsg = `👤 <b>Profil ma'lumotlari:</b>\n\n`;
-    profileMsg += `• <b>F.I.Sh.:</b> <code>${uData?.displayName || authed.displayName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `• <b>Email:</b> <code>${uData?.email || authed.email || "Kiritilmagan"}</code>\n`;
-    profileMsg += `• <b>Telefon:</b> <code>${uData?.phone || uData?.phoneNumber || "Kiritilmagan"}</code>\n`;
-    profileMsg += `• <b>Tashkilot:</b> <code>${uData?.teacherName || uData?.departmentName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `• <b>Lavozim yoki rol:</b> <code>${roleDisplay}</code>\n`;
-    profileMsg += `• <b>Profil rasmi:</b> <code>${uData?.photoURL || uData?.avatar || "Kiritilmagan"}</code>`;
+    const roleText = uData?.role || authed?.role || "bot_user";
+    let roleDisplay = "Bot foydalanuvchisi";
+    if (roleText === "admin" || roleText === "subadmin") roleDisplay = "Administrator";
+    else if (roleText === "teacher") roleDisplay = "Tashkilot / O'qituvchi";
+    else if (roleText === "staff") roleDisplay = "Xodim";
+    else if (roleText === "student") roleDisplay = "Talaba / O'quvchi";
+
+    let profileMsg = `👤 <b>PROFIL MA'LUMOTLARI</b>\n` +
+                     `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                     `👤 <b>Telegram nomi:</b> <code>${tgName}</code>\n` +
+                     `🔗 <b>Nick (Username):</b> ${nick}\n` +
+                     `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n` +
+                     `📞 <b>Tel nomeri:</b> <code>${phone}</code>\n` +
+                     `🛡️ <b>Roli:</b> <code>${roleDisplay}</code>\n` +
+                     `🏷️ <b>ID raqami:</b> <code>${systemId}</code>\n` +
+                     `💰 <b>Balansi:</b> <code>${balance.toLocaleString()} UZS</code>\n` +
+                     `━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
     return ctx.reply(profileMsg, {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "📱 Tizimga kirish", web_app: { url: "https://aiedutizim.vercel.app/login" } }],
-          [{ text: "🚪 Chiqish", callback_data: "logout" }]
+          [{ text: "🌐 Rasmiy saytga o'tish", url: APP_URL }],
+          [{ text: "🚪 Chiqish / Logout", callback_data: "logout" }]
         ]
       }
     });
@@ -5588,6 +5742,26 @@ Foydalanuvchi xabari: ${prompt}`;
   }
 
   if (
+    normText === "💵 balans to'ldirish (admin)" ||
+    normText === "💰 balans to'ldirish (admin)" ||
+    normText === "balans to'ldirish (admin)" ||
+    normText === "💵 balans to'ldirish" ||
+    userText === "/topup"
+  ) {
+    const adminIds = getAdminIds();
+    const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin"));
+    if (!isAdminUser) {
+      return ctx.reply("Sizda bu huquq yo'q.");
+    }
+    pendingLogins.set(userId, { step: "admin_manual_topup_id" });
+    return ctx.reply(
+      "🆔 <b>Foydalanuvchi ID raqamini kiriting:</b>\n\n" +
+      "<i>Foydalanuvchining 7 xonali ID raqami, Telegram ID yoki Firestore UID raqamini yozing.</i>",
+      { parse_mode: "HTML" }
+    );
+  }
+
+  if (
     normText === "📢 E'lon berish" ||
     normText === "📢 Umumiy e'lon yuborish" ||
     normText === "📢 E'lon yuborish" ||
@@ -5602,7 +5776,134 @@ Foydalanuvchi xabari: ${prompt}`;
 
   // Handle remaining logic
   if (pending) {
-    if (pending.step === "admin_add_button_name") {
+    if (pending.step === "admin_manual_topup_id") {
+      const cleanId = userText.trim();
+      if (cleanId === "/cancel" || cleanId.toLowerCase() === "bekor qilish") {
+        pendingLogins.delete(userId);
+        return ctx.reply("❌ Amal bekor qilindi.");
+      }
+
+      const foundUser = await findUserBySystemId(cleanId);
+      if (!foundUser) {
+        return ctx.reply(
+          `❌ <b>Foydalanuvchi topilmadi!</b>\n\n` +
+          `Kiritilgan ID: <code>${cleanId}</code>\n\n` +
+          `Iltimos, ID raqamni to'g'ri kiriting yoki bekor qilish uchun /cancel deb yozing:`,
+          { parse_mode: "HTML" }
+        );
+      }
+
+      pendingLogins.set(userId, {
+        step: "admin_manual_topup_amount",
+        foundUser
+      });
+
+      const sysId = foundUser.systemId || foundUser.docId;
+      const userPhone = foundUser.phone || "Kiritilmagan";
+      const currBal = Number(foundUser.balance || 0);
+
+      let userRoleLabel = "O'quvchi / Talaba";
+      if (foundUser.role === "teacher") userRoleLabel = "O'qituvchi / Tashkilot";
+      else if (foundUser.role === "mustaqil_o_qituvchi") userRoleLabel = "Mustaqil O'qituvchi";
+      else if (foundUser.role === "staff") userRoleLabel = "Xodim";
+      else if (foundUser.role === "admin" || foundUser.role === "subadmin") userRoleLabel = "Administrator";
+
+      return ctx.reply(
+        `👤 <b>FOYDALANUVCHI TOPILDI:</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 <b>Ismi:</b> <code>${foundUser.displayName}</code>\n` +
+        `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>\n` +
+        `📞 <b>Tel raqami:</b> <code>${userPhone}</code>\n` +
+        `🆔 <b>ID raqami:</b> <code>${sysId}</code>\n` +
+        `💳 <b>Joriy balansi:</b> <code>${currBal.toLocaleString()} UZS</code>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `💰 <b>Shu foydalanuvchining balansiga qancha to'lov qilmoqchisiz? To'lov summasini kiriting:</b>\n` +
+        `<i>(Masalan: 50000)</i>`,
+        { parse_mode: "HTML" }
+      );
+    } else if (pending.step === "admin_manual_topup_amount") {
+      const foundUser = pending.foundUser;
+      if (!foundUser) {
+        pendingLogins.delete(userId);
+        return ctx.reply("❌ Seans muddati o'tdi. Iltimos qaytadan boshlang.");
+      }
+
+      const cleanNum = userText.replace(/[^0-9]/g, '');
+      const amount = parseInt(cleanNum);
+
+      if (isNaN(amount) || amount <= 0) {
+        return ctx.reply("❌ <b>Noto'g'ri summa!</b>\n\nTo'lov summasini faqat raqamlarda kiriting (masalan: 50000):", { parse_mode: "HTML" });
+      }
+
+      pendingLogins.delete(userId);
+
+      try {
+        const userRef = doc(db, "users", foundUser.docId);
+        const uSnap = await getDoc(userRef);
+        let currentBal = Number(foundUser.balance || 0);
+        let currentBall = Number(foundUser.ball || 0);
+        let userTgId: any = null;
+
+        if (uSnap.exists()) {
+          const uData = uSnap.data();
+          currentBal = Number(uData.balance || uData.ball || 0);
+          currentBall = Number(uData.ball || 0);
+          userTgId = uData.telegramId;
+        }
+
+        const newBalance = currentBal + amount;
+        const newBall = currentBall + amount;
+
+        await updateDoc(userRef, {
+          balance: newBalance,
+          ball: newBall,
+          updatedAt: serverTimestamp()
+        });
+
+        try {
+          await addDoc(collection(db, "payment_transactions"), {
+            userId: foundUser.docId,
+            userName: foundUser.displayName,
+            systemId: foundUser.systemId || foundUser.docId,
+            amount: amount,
+            provider: "admin_manual",
+            adminUserId: userId,
+            status: "success",
+            createdAt: serverTimestamp(),
+          });
+        } catch (e) {
+          console.warn("Could not save payment transaction log:", e);
+        }
+
+        await ctx.reply(
+          `✅ <b>BALANS MUVAFFAQIYATLI TO'LDIRILDI!</b>\n\n` +
+          `👤 <b>Foydalanuvchi:</b> <code>${foundUser.displayName}</code>\n` +
+          `📞 <b>Tel raqami:</b> <code>${foundUser.phone || "Kiritilmagan"}</code>\n` +
+          `🆔 <b>ID raqami:</b> <code>${foundUser.systemId || foundUser.docId}</code>\n` +
+          `💰 <b>Qo'shilgan summa:</b> <code>+${amount.toLocaleString()} UZS</code>\n` +
+          `💳 <b>Yangi balans:</b> <code>${newBalance.toLocaleString()} UZS</code>`,
+          { parse_mode: "HTML" }
+        );
+
+        if (userTgId) {
+          try {
+            await bot.telegram.sendMessage(
+              userTgId,
+              `💰 <b>Balansingiz to'ldirildi!</b>\n\n` +
+              `Administrator tomonidan balansingizga <b>+${amount.toLocaleString()} UZS</b> qo'shildi.\n` +
+              `💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
+              { parse_mode: "HTML" }
+            );
+          } catch (e) {
+            console.error(`Notify user ${userTgId} failed:`, e);
+          }
+        }
+      } catch (err: any) {
+        console.error("Admin manual balance topup error:", err);
+        return ctx.reply("❌ Balansni to'ldirishda xatolik yuz berdi: " + (err.message || String(err)));
+      }
+      return;
+    } else if (pending.step === "admin_add_button_name") {
       pending.buttonName = userText;
       pending.step = "admin_add_button_row";
       return ctx.reply(`"${userText}" tugmasi nechanchi qatorga qo'shilsin? (Raqam yuboring, masalan: 1)`);

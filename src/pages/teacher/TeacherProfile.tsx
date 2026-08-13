@@ -64,10 +64,14 @@ export default function TeacherProfile() {
               <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider">
                 {user?.role === 'staff' ? 'Xodim' : user?.role === 'mustaqil_o_qituvchi' ? 'Mustaqil o\'qituvchi' : 'Tashkilot bosh o\'qituvchisi'}
               </p>
-              <div className="pt-2">
+              <div className="pt-2 flex flex-col items-center gap-1.5">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 font-extrabold text-xs font-mono shadow-sm">
                   <span className="text-amber-600 font-black">ID:</span>
                   <span>{user?.systemId || user?.uid}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-black text-xs font-mono shadow-sm">
+                  <span className="text-emerald-600 font-black">💳 Balans:</span>
+                  <span>{((user as any)?.balance || 0).toLocaleString()} UZS</span>
                 </span>
               </div>
             </div>

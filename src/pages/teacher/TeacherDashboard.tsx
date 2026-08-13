@@ -220,6 +220,9 @@ export default function TeacherDashboard() {
               <p className="text-xs font-black text-amber-600 font-mono tracking-wider mt-1 truncate">
                 ID: {user?.systemId || user?.uid}
               </p>
+              <p className="text-[10px] font-black text-emerald-600 font-mono tracking-wide mt-0.5 truncate">
+                Balans: {((user as any)?.balance || 0).toLocaleString()} UZS
+              </p>
             </motion.div>
           )}
           {user?.isImpersonated && !isCollapsed && (

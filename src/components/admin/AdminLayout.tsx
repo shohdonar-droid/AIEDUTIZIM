@@ -205,6 +205,9 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
                 <span className="font-black text-xs text-amber-600 font-mono tracking-wider mt-1">
                   ID: {user?.systemId || user?.uid}
                 </span>
+                <span className="font-black text-[10px] text-emerald-600 font-mono tracking-wide mt-0.5">
+                  Balans: {((user as any)?.balance || 0).toLocaleString()} UZS
+                </span>
               </div>
             )}
           </div>

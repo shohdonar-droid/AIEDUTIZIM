@@ -28,9 +28,15 @@ export function ProfileHeader({ user }: { user: any }) {
             <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">
               {user?.role === 'subadmin' ? 'Kichik administrator' : 'Tizim administratori'}
             </p>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 font-extrabold text-xs font-mono shadow-sm">
-              <span className="text-amber-600 font-black">ID:</span>
-              <span>{user?.systemId || user?.uid}</span>
+            <div className="flex flex-col items-center gap-1.5 pt-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 font-extrabold text-xs font-mono shadow-sm">
+                <span className="text-amber-600 font-black">ID:</span>
+                <span>{user?.systemId || user?.uid}</span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-black text-xs font-mono shadow-sm">
+                <span className="text-emerald-600 font-black">💳 Balans:</span>
+                <span>{((user as any)?.balance || 0).toLocaleString()} UZS</span>
+              </div>
             </div>
           </div>
         </div>

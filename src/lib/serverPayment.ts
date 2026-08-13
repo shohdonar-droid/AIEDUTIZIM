@@ -105,7 +105,47 @@ export async function findUserBySystemId(systemId: string): Promise<FoundUser | 
     };
   }
 
-  // 3. Direct Doc lookup (if systemId is Firestore UID)
+  // 3. Search by telegramId (number or string)
+  const numId = Number(cleanId);
+  if (!isNaN(numId)) {
+    const qTgNum = query(collection(db, "users"), where("telegramId", "==", numId));
+    const snapTgNum = await getDocs(qTgNum);
+    if (!snapTgNum.empty) {
+      const d = snapTgNum.docs[0];
+      const data = d.data();
+      return {
+        docId: d.id,
+        systemId: data.systemId || String(data.telegramId) || cleanId,
+        displayName: data.displayName || data.first_name || data.login || "Telegram Foydalanuvchisi",
+        login: data.login || "",
+        role: data.role || "student",
+        ball: Number(data.ball) || 0,
+        balance: Number(data.balance || data.ball) || 0,
+        phone: data.phone || "",
+        email: data.email || "",
+      };
+    }
+  }
+
+  const qTgStr = query(collection(db, "users"), where("telegramId", "==", cleanId));
+  const snapTgStr = await getDocs(qTgStr);
+  if (!snapTgStr.empty) {
+    const d = snapTgStr.docs[0];
+    const data = d.data();
+    return {
+      docId: d.id,
+      systemId: data.systemId || String(data.telegramId) || cleanId,
+      displayName: data.displayName || data.first_name || data.login || "Telegram Foydalanuvchisi",
+      login: data.login || "",
+      role: data.role || "student",
+      ball: Number(data.ball) || 0,
+      balance: Number(data.balance || data.ball) || 0,
+      phone: data.phone || "",
+      email: data.email || "",
+    };
+  }
+
+  // 4. Direct Doc lookup (if systemId is Firestore UID)
   try {
     const userDocRef = doc(db, "users", cleanId);
     const docSnap = await getDoc(userDocRef);
@@ -183,6 +223,23 @@ export async function addBalanceToUser(
     paymentType: provider,
     createdAt: serverTimestamp(),
   });
+
+  // 4. Notify Telegram admins
+  try {
+    const { notifyPaymentCompleted } = await import("../../telegram.js" as any);
+    if (notifyPaymentCompleted) {
+      await notifyPaymentCompleted({
+        userName: data.displayName || data.login || "Foydalanuvchi",
+        systemId: data.systemId || docId,
+        amount: amount,
+        provider: provider,
+        transactionId: transactionId,
+        newBalance: newBalance,
+      });
+    }
+  } catch (e) {
+    console.warn("Could not send telegram notification for automated payment:", e);
+  }
 
   return { newBall, newBalance };
 }

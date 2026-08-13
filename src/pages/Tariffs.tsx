@@ -541,48 +541,13 @@ export default function Tariffs() {
                   <div className="text-sm font-black text-slate-800">{showNewOrgModal.name} — {(showNewOrgModal.price || showNewOrgModal.basePrice || 0).toLocaleString()} UZS</div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">To'lov turini tanlang</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {['Click', 'Payme', 'Uzum Bank', 'Bank'].map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setPaymentType(type)}
-                        className={`py-2 px-3 rounded-xl border-2 font-bold text-[11px] sm:text-xs transition-all ${
-                          paymentType === type ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-50 text-gray-400 hover:border-gray-100'
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                  <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Karta raqami ({cardSettings.type}):</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Karta raqamimiz ({cardSettings.type}):</p>
                   <p className="text-sm font-black font-mono text-gray-800">{cardSettings.number}</p>
                   <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase">{cardSettings.owner}</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const amount = showNewOrgModal.price || showNewOrgModal.basePrice || 0;
-                      let payUrl = "#";
-                      if (paymentType === 'Click') {
-                        payUrl = `https://my.click.uz/services/pay?id=12345&merchant_id=9999&amount=${amount}`;
-                      } else if (paymentType === 'Payme') {
-                        payUrl = `https://checkout.paycom.uz/63a12b3c4d5e6f7a8b9c0d1e?m=63a12b3c4d5e6f7a8b9c0d1e&amount=${amount * 100}`;
-                      } else if (paymentType === 'Uzum Bank') {
-                        payUrl = `https://uzumbank.uz/pay?merchant_id=platform&amount=${amount}`;
-                      } else {
-                        alert(`Karta raqamimiz (${cardSettings.number}) ga o'tkazma qiling.`);
-                        return;
-                      }
-                      window.open(payUrl, '_blank');
-                    }}
-                    className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-xs uppercase tracking-widest shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    🚀 {paymentType} orqali onlayn to'lash
-                  </button>
+                  <p className="text-[10px] text-amber-600 font-bold mt-2">
+                    💡 Ushbu karta raqamiga to'lov qilib, pastda to'lov cheki (skrinshot) rasmini yuklang.
+                  </p>
                 </div>
               </div>
             </div>
