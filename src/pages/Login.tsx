@@ -240,10 +240,12 @@ export default function Login() {
           }
           const role = userDocData.role;
           
-          const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin') || (role === 'mustaqil_o_qituvchi' && activeRole === 'staff');
+          const isRoleMatch = (role === activeRole) || 
+                              (role === 'subadmin' && activeRole === 'admin') || 
+                              (role === 'mustaqil_o_qituvchi' && (activeRole === 'teacher' || activeRole === 'staff'));
           if (!isRoleMatch) {
              const rName = activeRole === 'admin' ? 'Admin/Kichik Admin' : activeRole === 'teacher' ? 'Tashkilot' : (activeRole === 'staff' ? 'Xodim' : 'Talaba');
-             const actualRoleName = role === 'admin' ? 'Admin' : role === 'subadmin' ? 'Kichik Admin' : role === 'teacher' ? 'Tashkilot' : (role === 'staff' ? 'Xodim' : 'Talaba');
+             const actualRoleName = role === 'admin' ? 'Admin' : role === 'subadmin' ? 'Kichik Admin' : role === 'teacher' ? 'Tashkilot' : (role === 'staff' ? 'Xodim' : (role === 'mustaqil_o_qituvchi' ? "Mustaqil o'qituvchi" : 'Talaba'));
              setError(`Ushbu hisob ${rName} emas, balki ${actualRoleName} profili. Iltimos, tepadan tegishli bo'limni tanlang.`);
              setLoading(false);
              await auth.signOut();
@@ -358,10 +360,12 @@ export default function Login() {
 
           if (foundUserDoc) {
             const role = foundUserDoc.role;
-            const isRoleMatch = (role === activeRole) || (role === 'subadmin' && activeRole === 'admin') || (role === 'mustaqil_o_qituvchi' && activeRole === 'staff');
+            const isRoleMatch = (role === activeRole) || 
+                                (role === 'subadmin' && activeRole === 'admin') || 
+                                (role === 'mustaqil_o_qituvchi' && (activeRole === 'teacher' || activeRole === 'staff'));
             if (!isRoleMatch) {
               const rName = activeRole === 'admin' ? 'Admin/Kichik Admin' : activeRole === 'teacher' ? 'Tashkilot' : (activeRole === 'staff' ? 'Xodim' : 'Talaba');
-              const actualRoleName = role === 'admin' ? 'Admin' : role === 'subadmin' ? 'Kichik Admin' : role === 'teacher' ? 'Tashkilot' : (role === 'staff' ? 'Xodim' : 'Talaba');
+              const actualRoleName = role === 'admin' ? 'Admin' : role === 'subadmin' ? 'Kichik Admin' : role === 'teacher' ? 'Tashkilot' : (role === 'staff' ? 'Xodim' : (role === 'mustaqil_o_qituvchi' ? "Mustaqil o'qituvchi" : 'Talaba'));
               setError(`Ushbu hisob ${rName} emas, balki ${actualRoleName} profili. Iltimos, tepadan tegishli bo'limni tanlang.`);
               setLoading(false);
               return;
