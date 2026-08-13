@@ -34,6 +34,7 @@ const Type = SDKType || {
 import { generateContentWithRotation } from "./src/lib/gemini";
 import { generateCourseWorkDataWithGemini, buildCourseWorkDocxBuffer } from "./src/lib/courseworkGenerator.js";
 import { findUserBySystemId } from "./src/lib/serverPayment.js";
+import { getNextSequentialId } from "./src/lib/idUtils";
 import dotenv from "dotenv";
 import sharp from "sharp";
 import fs from "fs";
@@ -387,7 +388,7 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
   
   if (req.isNewOrgRequest) {
     text += `🆕 <b>Yangi tashkilot:</b> HA\n`;
-    text += `🔑 <b>Login:</b> <code>${req.login}</code>\n`;
+    text += `🔑 <b>Login:</b> <code>${req.login || "Avtomatik (ID raqam)"}</code>\n`;
   }
   
   if (req.isUpgradeRequest) {
@@ -1857,16 +1858,21 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
       throw new Error("So'rovda foydalanuvchi ID si topilmadi.");
     }
 
-    if (req.isNewOrgRequest) {
-      console.log(`[Telegram] Creating new organization user with login: ${req.login}`);
-      const q = query(collection(db, "users"), where("login", "==", req.login.trim()));
-      const qSnap = await getDocs(q);
-      if (!qSnap.empty) {
-        await ctx.reply("❌ Ushbu login band! Ro'yxatdan o'tish so'rovi tasdiqlanmadi.");
-        return ctx.answerCbQuery();
-      }
+    let approvedLogin = "";
+    let approvedPassword = "";
 
-      const email = `${req.login.trim().toLowerCase()}@teacher.uz`;
+    if (req.isNewOrgRequest) {
+      const isMustaqil = req.tariffName?.toLowerCase().includes("mustaqil");
+      const role = isMustaqil ? "mustaqil_o_qituvchi" : "teacher";
+
+      const cleanLogin = await getNextSequentialId(role);
+      const pass = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit random password
+      approvedLogin = cleanLogin;
+      approvedPassword = pass;
+
+      console.log(`[Telegram] Creating new user for role: ${role} with login: ${cleanLogin}`);
+
+      const email = `${cleanLogin.toLowerCase()}@teacher.uz`;
       const response = await fetch(
         `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseApiKey}`,
         {
@@ -1874,7 +1880,7 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email,
-            password: req.password,
+            password: pass,
             returnSecureToken: false,
           }),
         },
@@ -1887,38 +1893,116 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
       targetUserId = authData.localId;
       console.log(`[Telegram] New user created with UID: ${targetUserId}`);
 
-      const customLimits: any = {};
-      if (req.limits) {
-        customLimits.studentLimit = Number(req.limits.students) || 0;
-        customLimits.staffLimit = Number(req.limits.staff) || 0;
-        customLimits.courseLimit = Number(req.limits.courses) || 0;
-        customLimits.testLimit = Number(req.limits.tests) || 0;
-        customLimits.examLimit = Number(req.limits.exams) || 0;
-        customLimits.subjectLimit = Number(req.limits.subjects) || 0;
-        customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
-        customLimits.hasAi = !!req.limits.ai;
-        customLimits.hasBot = !!req.limits.bot;
-      }
+      if (isMustaqil) {
+        // Get UY Home organization Id as teacherId
+        let uyOrgId = "";
+        const qUy = query(collection(db, 'users'), where('role', '==', 'teacher'), where('displayName', '==', 'UY'));
+        const uySnap = await getDocs(qUy);
+        if (!uySnap.empty) {
+          uyOrgId = uySnap.docs[0].id;
+        } else {
+          const uyRef = await addDoc(collection(db, 'users'), {
+            displayName: 'UY',
+            role: 'teacher',
+            status: 'active',
+            createdAt: serverTimestamp(),
+            limit_departments: 9999,
+            limit_groups: 9999,
+            limit_students: 9999,
+            limit_subjects: 9999,
+            limit_tests: 9999,
+            limit_quizizz: 9999,
+            limit_exams: 9999,
+            limit_certificates: 9999
+          });
+          uyOrgId = uyRef.id;
+        }
 
-      await setDoc(doc(db, "users", targetUserId), {
-        uid: targetUserId,
-        displayName: req.userName,
-        phone: req.phone || "",
-        login: req.login.trim(),
-        password: req.password,
-        role: "teacher",
-        email: email,
-        tariffName: req.tariffName,
-        createdAt: serverTimestamp(),
-        ...customLimits
-      });
+        const defaultLimits = {
+          limit_departments: 1,
+          limit_groups: 1,
+          limit_students: 5,
+          limit_subjects: 2,
+          limit_tests: 2,
+          limit_quizizz: 1,
+          limit_exams: 1,
+          limit_courses: 0,
+          limit_certificates: 5,
+          limit_tests_per_subject: 10,
+          limit_questions_per_test: 10,
+          limit_questions_per_quizizz: 5,
+          limit_questions_per_exam: 10,
+        };
+
+        await setDoc(doc(db, "users", targetUserId), {
+          uid: targetUserId,
+          displayName: req.userName,
+          phone: req.phone || "",
+          login: cleanLogin,
+          systemId: cleanLogin,
+          password: pass,
+          role: "mustaqil_o_qituvchi",
+          teacherId: uyOrgId,
+          email: email,
+          status: 'active',
+          total_spent: 0,
+          customLimitPrices: {},
+          createdAt: serverTimestamp(),
+          ...defaultLimits
+        });
+      } else {
+        const customLimits: any = {};
+        if (req.limits) {
+          customLimits.studentLimit = Number(req.limits.students) || 0;
+          customLimits.staffLimit = Number(req.limits.staff) || 0;
+          customLimits.courseLimit = Number(req.limits.courses) || 0;
+          customLimits.testLimit = Number(req.limits.tests) || 0;
+          customLimits.examLimit = Number(req.limits.exams) || 0;
+          customLimits.subjectLimit = Number(req.limits.subjects) || 0;
+          customLimits.quizizzLimit = Number(req.limits.quizizz) || 0;
+          customLimits.hasAi = !!req.limits.ai;
+          customLimits.hasBot = !!req.limits.bot;
+        } else {
+          // Default limits based on requested tariff
+          const isStandard = req.tariffName?.toLowerCase() === "standard";
+          const isProfessional = req.tariffName?.toLowerCase() === "professional";
+          customLimits.studentLimit = isStandard ? 200 : (isProfessional ? 1000 : 50);
+          customLimits.staffLimit = isStandard ? 5 : (isProfessional ? 20 : 2);
+          customLimits.courseLimit = isStandard ? 10 : (isProfessional ? 50 : 3);
+          customLimits.testLimit = isStandard ? 50 : (isProfessional ? 300 : 15);
+          customLimits.examLimit = isStandard ? 10 : (isProfessional ? 50 : 2);
+          customLimits.subjectLimit = isStandard ? 20 : (isProfessional ? 100 : 5);
+          customLimits.quizizzLimit = isStandard ? 15 : (isProfessional ? 100 : 4);
+          customLimits.hasAi = isStandard || isProfessional;
+          customLimits.hasBot = isStandard || isProfessional;
+        }
+
+        await setDoc(doc(db, "users", targetUserId), {
+          uid: targetUserId,
+          displayName: req.userName,
+          phone: req.phone || "",
+          login: cleanLogin,
+          systemId: cleanLogin,
+          password: pass,
+          role: "teacher",
+          email: email,
+          tariffName: req.tariffName,
+          createdAt: serverTimestamp(),
+          ...customLimits
+        });
+      }
     }
 
-    await updateDoc(doc(db, "connection_requests", requestId), { 
+    const updatePayload: any = { 
       status: 'approved',
       processedBy: adminId,
       processedAt: serverTimestamp()
-    });
+    };
+    if (req.isNewOrgRequest) {
+      updatePayload.approvedLogin = approvedLogin;
+      updatePayload.approvedPassword = approvedPassword;
+    }
+    await updateDoc(doc(db, "connection_requests", requestId), updatePayload);
 
     if (req.isBalanceTopUp) {
       console.log(`[Telegram] Processing balance top-up for user ${targetUserId}`);
@@ -2058,7 +2142,19 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
       timestamp: serverTimestamp()
     });
 
-    await ctx.reply(`✅ So'rov muvaffaqiyatli tasdiqlandi! (${req.userName})`);
+    if (req.isNewOrgRequest) {
+      await ctx.reply(
+        `✅ Yangi profil muvaffaqiyatli yaratildi!\n\n` +
+        `👤 <b>Foydalanuvchi:</b> ${req.userName}\n` +
+        `📞 <b>Telefon:</b> ${req.phone || "Kiritilmagan"}\n` +
+        `🔑 <b>Tizimli ID:</b> <code>${approvedLogin}</code>\n` +
+        `🔒 <b>Maxfiy Parol:</b> <code>${approvedPassword}</code>\n\n` +
+        `<i>Siz tomoningizdan ko'rsatib o'tilgan telefon raqamga SMS xabarnomada tizimga kirish login va paroli yuborildi.</i>`,
+        { parse_mode: "HTML" }
+      );
+    } else {
+      await ctx.reply(`✅ So'rov muvaffaqiyatli tasdiqlandi! (${req.userName})`);
+    }
     
     // Notify the user if we have their telegramId
     if (req.userId && !req.isNewOrgRequest) {
