@@ -274,6 +274,27 @@ export default function Tariffs() {
     loadConfig();
   }, []);
 
+  useEffect(() => {
+    if (showNewOrgModal) {
+      const randomId = Math.floor(10000 + Math.random() * 90000); // 5-digit random id
+      const autoLogin = `org_${randomId}`;
+      const autoPass = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit random password
+      setNewOrgData({
+        name: '',
+        phone: '',
+        login: autoLogin,
+        password: autoPass
+      });
+    } else {
+      setNewOrgData({
+        name: '',
+        phone: '',
+        login: '',
+        password: ''
+      });
+    }
+  }, [showNewOrgModal]);
+
   const handleActivateTariff = async () => {
     if (!user) return alert('Iltimos, tizimga kiring');
     
@@ -452,23 +473,27 @@ export default function Tariffs() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Login</label>
+                  <div className="flex justify-between items-center mb-1 px-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Login</label>
+                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-wider">🔑 Tizim tomonidan yaratildi</span>
+                  </div>
                   <input 
                     type="text" 
                     value={newOrgData.login}
-                    onChange={e => setNewOrgData({...newOrgData, login: e.target.value})}
-                    placeholder="shaxsiy_login"
-                    className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                    readOnly
+                    className="w-full px-5 py-3 bg-blue-50/20 border border-blue-100 rounded-xl outline-none text-sm font-bold font-mono text-blue-900 cursor-not-allowed select-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 px-1">Parol</label>
+                  <div className="flex justify-between items-center mb-1 px-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Parol</label>
+                    <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">🔒 Maxfiy</span>
+                  </div>
                   <input 
-                    type="password" 
+                    type="text" 
                     value={newOrgData.password}
-                    onChange={e => setNewOrgData({...newOrgData, password: e.target.value})}
-                    placeholder="******"
-                    className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none text-sm"
+                    readOnly
+                    className="w-full px-5 py-3 bg-emerald-50/10 border border-emerald-100 rounded-xl outline-none text-sm font-bold font-mono text-emerald-900 cursor-not-allowed select-all"
                   />
                 </div>
               </div>
