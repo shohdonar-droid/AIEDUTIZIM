@@ -758,14 +758,9 @@ const customMenuTexts = new PersistentMap<string, string>(
 const AI_COSTS: Record<string, number> = {
   "📊 Slayd yaratish": 4000,
   "📄 Kurs ishi yaratish": 35000,
-  "🎓 Tezis yaratish": 5000,
-  "📑 Maqola yaratish": 40000,
-  "📝 Dars ishlanma yaratish": 5000,
   "🌐 Tarjimon": 3000,
   "📋 Test yaratish": 3000,
-  "📄 CV yaratish": 5000,
   "💬 Savol-javob": 1000,
-  "📄 AI Antiplagiat": 5000,
   "📄 Obektivka yaratish": 15000
 };
 
@@ -1006,11 +1001,9 @@ async function getKeyboard(
   }
 
   const userHeader = [
-    [{ text: "👤 Profil" }],
-    [{ text: "🤖 AI Yordamchi" }, { text: "💬 Adminga murojaat" }],
-    [{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }],
-    [{ text: "👥 Do'stlarni taklif qilish" }],
-    [{ text: "🌐 Rasmiy sayt" }]
+    [{ text: "👤 Profil" }, { text: "💬 Adminga murojaat" }],
+    [{ text: "🤖 Xizmatlar" }, { text: "👥 Do'stlarni taklif qilish" }],
+    [{ text: "💰 Balans" }, { text: "🌐 Rasmiy sayt" }]
   ];
 
   if (authed && (userRole === "admin" || userRole === "subadmin")) {
@@ -1019,7 +1012,7 @@ async function getKeyboard(
 
     return [
       [{ text: "👤 Profil" }],
-      [{ text: "🤖 AI Yordamchi" }, { text: "💬 Savol-javob" }],
+      [{ text: "🤖 Xizmatlar" }, { text: "💬 Savol-javob" }],
       [{ text: "💵 Balans to'ldirish (Admin)" }],
       [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
       isPrimary 
@@ -1036,12 +1029,10 @@ async function getAiAssistantKeyboard(userId?: number) {
   const isAdmin = userId ? adminIds.includes(userId) : false;
 
   const rows: any[][] = [
-    [{ text: "🤖 AI Yordamchi" }],
+    [{ text: "🤖 Xizmatlar" }],
     [{ text: "📊 Slayd yaratish" }, { text: "📄 Kurs ishi yaratish" }],
-    [{ text: "🎓 Tezis yaratish" }, { text: "📑 Maqola yaratish" }],
-    [{ text: "📝 Dars ishlanma yaratish" }, { text: "📋 Test yaratish" }],
-    [{ text: "🌐 Tarjimon" }, { text: "📄 CV yaratish" }],
-    [{ text: "📄 AI Antiplagiat" }, { text: "📄 Obektivka yaratish" }],
+    [{ text: "📋 Test yaratish" }, { text: "🌐 Tarjimon" }],
+    [{ text: "📄 Obektivka yaratish" }],
     [{ text: "⬅️ Asosiy menyu" }]
   ];
 
@@ -4499,7 +4490,7 @@ bot.on("message", async (ctx) => {
     "ℹ️ Tizim haqida", "💰 Balans", "💳 Balansni to'ldirish",
     "💬 Adminga murojaat", "🌐 Rasmiy sayt",
     "🔙 Asosiy Menyu", "⬅️ Asosiy menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish",
-    "🤖 AI Yordamchi", "💬 Savol-javob"
+    "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob"
   ];
   
   if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu" || normText === "⬅️ Asosiy menyu") {
@@ -4538,8 +4529,8 @@ bot.on("message", async (ctx) => {
     );
   }
 
-  if (normText === "🤖 AI Yordamchi") {
-    return ctx.reply("🤖 <b>AI Yordamchi xizmatlari menyusiga xush kelibsiz!</b>\n\nKerakli xizmatni tanlang:", {
+  if (normText === "🤖 AI Yordamchi" || normText === "🤖 Xizmatlar" || normText === "Xizmatlar" || normText === "🤖 XIZMATLAR" || normText === "XIZMATLAR") {
+    return ctx.reply("🤖 <b>Xizmatlar menyusiga xush kelibsiz!</b>\n\nKerakli xizmatni tanlang:", {
       parse_mode: "HTML",
       reply_markup: {
         keyboard: await getAiAssistantKeyboard(userId),
@@ -5687,7 +5678,14 @@ Foydalanuvchi xabari: ${prompt}`;
                        `💎 Umumiy mablag': <b>${bal} so'm</b>\n` +
                        `📉 Ishlatilgan: <b>${spent} so'm</b>\n` +
                        `━━━━━━\n` +
-                       `✅ Mavjud balans: <b>${displayBalance} so'm</b>`, { parse_mode: "HTML" });
+                       `✅ Mavjud balans: <b>${displayBalance} so'm</b>`, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "💳 Balansni to'ldirish", callback_data: "add_balance" }]
+          ]
+        }
+      });
     } catch (e: any) {
       console.error("[Balance] CRITICAL ERROR:", e);
       // Absolute fallback - don't show error message, show 0 balance and log
@@ -5695,7 +5693,14 @@ Foydalanuvchi xabari: ${prompt}`;
                        `👤 Ism: <b>${ctx.from.first_name || "Foydalanuvchi"}</b>\n` +
                        `🆔 Telegram ID: <code>${userId}</code>\n` +
                        `💎 Mablag': <b>0 so'm</b>\n\n` +
-                       `<i>⚠️ Ma'lumotlarni yangilashda texnik uzilish. Tez orada tuzatiladi.</i>`, { parse_mode: "HTML" });
+                       `<i>⚠️ Ma'lumotlarni yangilashda texnik uzilish. Tez orada tuzatiladi.</i>`, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "💳 Balansni to'ldirish", callback_data: "add_balance" }]
+          ]
+        }
+      });
     }
   }
 
