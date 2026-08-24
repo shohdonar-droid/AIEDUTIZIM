@@ -765,14 +765,21 @@ const AI_COSTS: Record<string, number> = {
 };
 
 export async function getBotConfigCosts() {
+  const defaults: Record<string, number> = { ...AI_COSTS, "Referal bonus": 5000 };
   try {
     const snap = await getDoc(doc(db, "botConfig", "aiCosts"));
-    const dbCosts = snap.exists() ? snap.data() : {};
-    return { ...AI_COSTS, "Referal bonus": 5000, ...dbCosts };
+    if (snap.exists()) {
+      const dbCosts = snap.data();
+      for (const key of Object.keys(defaults)) {
+        if (dbCosts[key] !== undefined) {
+          defaults[key] = dbCosts[key];
+        }
+      }
+    }
   } catch (e) {
     console.error(e);
   }
-  return { ...AI_COSTS, "Referal bonus": 5000 };
+  return defaults;
 }
 
 const requestHistory = new Map<number, number[]>();
@@ -1776,8 +1783,7 @@ bot.action("admin_edit_system_about", async (ctx) => {
 
 bot.action("admin_price_settings", async (ctx) => {
   try {
-    const snap = await getDoc(doc(db, "botConfig", "aiCosts"));
-    const costs = snap.exists() ? snap.data() : AI_COSTS;
+    const costs = await getBotConfigCosts();
     
     let text = "💰 <b>Narxlar sozlamalari (so'mda):</b>\n\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n\n";
     const buttons = [];
@@ -2313,6 +2319,61 @@ bot.action("add_balance", async (ctx) => {
       parse_mode: "HTML"
     });
   } catch (e) {}
+});
+
+bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
+  const normText = ctx.match[1];
+  const userId = ctx.from.id;
+
+  try {
+    await ctx.answerCbQuery();
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+  } catch (e) {}
+
+  const dynamicCosts = await getBotConfigCosts();
+  const cost = dynamicCosts[normText] !== undefined ? dynamicCosts[normText] : (AI_COSTS[normText] || 0);
+  
+  const isAdmin = getAdminIds().includes(userId);
+  const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
+  
+  if (!hasBalance) {
+    await ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost.toLocaleString()} so'm.\nSizning balansingizda mablag' yetarli emas.`, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "💳 Balansni to'ldirish", callback_data: `add_balance` }]
+        ]
+      }
+    });
+    return;
+  }
+
+  // For services, disable open AI chat mode to prevent it from interfering with the wizard
+  aiAssistantActiveUsers.delete(userId);
+  aiServiceStates.delete(userId);
+
+  // Start Wizard state for document / slideshow!
+  let promptText = "Mavzuni kiriting:";
+  if (normText === "📊 Slayd yaratish") { promptText = "📊 <b>Taqdimot mavzusini kiriting:</b>"; }
+  else if (normText === "📄 Kurs ishi yaratish") { promptText = "📄 <b>Kurs ishi mavzusini kiriting:</b>"; }
+  else if (normText === "🎓 Tezis yaratish") { promptText = "🎓 <b>Tezis mavzusini kiriting:</b>"; }
+  else if (normText === "📑 Maqola yaratish") { promptText = "📑 <b>Maqola mavzusini kiriting:</b>"; }
+  else if (normText === "📝 Dars ishlanma yaratish") { promptText = "📝 <b>Fan nomini kiriting:</b>"; }
+  else if (normText === "📋 Test yaratish") { promptText = "📋 <b>Fan nomini kiriting:</b>"; }
+  else if (normText === "🌐 Tarjimon") { promptText = "🌐 <b>Tarjima yo'nalishini kiriting (masalan: O'zbekcha-Inglizcha):</b>"; }
+  else if (normText === "📄 CV yaratish") { promptText = "📄 <b>Foydalanuvchi F.I.Sh. kiriting:</b>"; }
+  else if (normText === "📄 AI Antiplagiat") { promptText = "📄 <b>Matn yuboring yoki fayl (PDF, DOCX, TXT) yuklang:</b>"; }
+  else if (normText === "📄 Obektivka yaratish") { promptText = "FISH ni kiriting: (Ortiqov Elyorbek Jasurbek o'g'li )"; }
+
+  userWizardStates.set(userId, { service: normText, step: 1, data: {} });
+  
+  await ctx.reply(promptText, {
+    parse_mode: "HTML",
+    reply_markup: {
+      keyboard: [[{ text: "⬅️ Asosiy menyu" }]],
+      resize_keyboard: true
+    }
+  });
 });
 
 bot.action("logout", async (ctx) => {
@@ -4588,46 +4649,17 @@ bot.on("message", async (ctx) => {
     const dynamicCosts = await getBotConfigCosts();
     const cost = dynamicCosts[normText] !== undefined ? dynamicCosts[normText] : AI_COSTS[normText];
     
-    const isAdmin = getAdminIds().includes(userId);
-    const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
-    
-    if (!hasBalance) {
-      return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost.toLocaleString()} so'm.\nSizning balansingizda mablag' yetarli emas.`, {
+    return ctx.reply(
+      `🤖 <b>${normText}</b>\n\n💳 Xizmat narxi: <b>${cost.toLocaleString()} so'm</b>`,
+      {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "💳 Balansni to'ldirish", callback_data: `add_balance` }]
+            [{ text: "✅ Yaratish", callback_data: `start_ai_srv_${normText}` }]
           ]
         }
-      });
-    }
-
-    // For services, disable open AI chat mode to prevent it from interfering with the wizard
-    aiAssistantActiveUsers.delete(userId);
-    aiServiceStates.delete(userId);
-
-    // Start Wizard state for document / slideshow!
-    let promptText = "Mavzuni kiriting:";
-    if (normText === "📊 Slayd yaratish") { promptText = "📊 <b>Taqdimot mavzusini kiriting:</b>"; }
-    else if (normText === "📄 Kurs ishi yaratish") { promptText = "📄 <b>Kurs ishi mavzusini kiriting:</b>"; }
-    else if (normText === "🎓 Tezis yaratish") { promptText = "🎓 <b>Tezis mavzusini kiriting:</b>"; }
-    else if (normText === "📑 Maqola yaratish") { promptText = "📑 <b>Maqola mavzusini kiriting:</b>"; }
-    else if (normText === "📝 Dars ishlanma yaratish") { promptText = "📝 <b>Fan nomini kiriting:</b>"; }
-    else if (normText === "📋 Test yaratish") { promptText = "📋 <b>Fan nomini kiriting:</b>"; }
-    else if (normText === "🌐 Tarjimon") { promptText = "🌐 <b>Tarjima yo'nalishini kiriting (masalan: O'zbekcha-Inglizcha):</b>"; }
-    else if (normText === "📄 CV yaratish") { promptText = "📄 <b>Foydalanuvchi F.I.Sh. kiriting:</b>"; }
-    else if (normText === "📄 AI Antiplagiat") { promptText = "📄 <b>Matn yuboring yoki fayl (PDF, DOCX, TXT) yuklang:</b>"; }
-    else if (normText === "📄 Obektivka yaratish") { promptText = "FISH ni kiriting: (Ortiqov Elyorbek Jasurbek o'g'li )"; }
-
-    userWizardStates.set(userId, { service: normText, step: 1, data: {} });
-    
-    return ctx.reply(promptText, {
-      parse_mode: "HTML",
-      reply_markup: {
-        keyboard: [[{ text: "⬅️ Asosiy menyu" }]],
-        resize_keyboard: true
       }
-    });
+    );
   } else {
     // console.log(`[Telegram] Wizard check: user ${userId} has wizard state: ${!!wizard}, pending: ${!!pending}`);
   }
