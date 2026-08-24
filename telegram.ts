@@ -764,6 +764,17 @@ const AI_COSTS: Record<string, number> = {
   "📄 Obektivka yaratish": 15000
 };
 
+export async function getBotConfigCosts() {
+  try {
+    const snap = await getDoc(doc(db, "botConfig", "aiCosts"));
+    const dbCosts = snap.exists() ? snap.data() : {};
+    return { ...AI_COSTS, "Referal bonus": 5000, ...dbCosts };
+  } catch (e) {
+    console.error(e);
+  }
+  return { ...AI_COSTS, "Referal bonus": 5000 };
+}
+
 const requestHistory = new Map<number, number[]>();
 
 export async function trackTelegramUserActivity(userId: number, from: any, role: string) {
@@ -1016,7 +1027,7 @@ async function getKeyboard(
       [{ text: "💵 Balans to'ldirish (Admin)" }],
       [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
       isPrimary 
-        ? [{ text: "📥 Javob berilmaganlar" }, { text: "⚙️ Bot sozlamalari" }]
+        ? [{ text: "📥 Javob berilmaganlar" }, { text: "💰 Narxlar sozlamalari" }]
         : [{ text: "📥 Javob berilmaganlar" }],
       [{ text: "🌐 Rasmiy sayt" }]
     ];
@@ -1404,9 +1415,12 @@ bot.on("contact", async (ctx) => {
               const oldBall = Number(rData.ball || 0);
               const oldRefCount = Number(rData.referralCount || rData.referrals || 0);
 
+              const dynamicCosts = await getBotConfigCosts();
+              const refBonus = dynamicCosts["Referal bonus"] || 5000;
+
               await updateDoc(doc(db, "users", rDoc.id), {
-                balance: oldBal + 5000,
-                ball: oldBall + 5000,
+                balance: oldBal + refBonus,
+                ball: oldBall + refBonus,
                 referralCount: oldRefCount + 1,
                 referrals: oldRefCount + 1,
                 updatedAt: serverTimestamp()
@@ -1418,7 +1432,7 @@ bot.on("contact", async (ctx) => {
                   Number(notifyTgId),
                   `🎉 <b>YANGI DO'ST TAKLIF QILINDI!</b>\n\n` +
                   `Siz taklif qilgan do'stingiz (<b>${displayName}</b>) botga a'zo bo'ldi.\n` +
-                  `💰 Balansingizga <b>+5 000 UZS</b> bonus qo'shildi!`,
+                  `💰 Balansingizga <b>+${refBonus.toLocaleString()} UZS</b> bonus qo'shildi!`,
                   { parse_mode: "HTML" }
                 );
               } catch (e) {}
@@ -2265,7 +2279,37 @@ bot.action(/admin_reject_pay_(\d+)/, async (ctx) => {
 bot.action("add_balance", async (ctx) => {
   try {
     await ctx.answerCbQuery();
-    await ctx.reply(paymentInstructionsText, { 
+    
+    let cardNumber = "9860 0000 0000 0010";
+    let cardOwner = "Ortiqov E";
+    
+    try {
+      if (db) {
+        const snap = await getDoc(doc(db, "settings", "payment_card"));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.number) cardNumber = data.number;
+          if (data.owner) cardOwner = data.owner;
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching payment settings in telegram:", e);
+    }
+
+    const userId = ctx.from.id;
+    const authed = await getAuthedUser(userId);
+    const sysId = authed?.systemId || userId;
+
+    const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>\n\n` +
+                 `1️⃣ <b>-USUL:</b> Koʻrsatilgan kartaga toʻlov qiling va chekni shu yerga yuboring.\n` +
+                 `💳 <b>Karta raqami:</b> <code>${cardNumber}</code>\n` +
+                 `👤 <b>Egasi:</b> ${cardOwner}\n\n` +
+                 `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                 `2️⃣ <b>-USUL:</b> Adminga murojaat qiling\n` +
+                 `🆔 <b>Sizning ID raqamingiz:</b> <code>${sysId}</code>\n` +
+                 `"Adminga ID raqamingizni va balansingizga qancha summa oʻtkazmoqchi ekanligingizni yozib yuboring"`;
+
+    await ctx.reply(text, { 
       parse_mode: "HTML"
     });
   } catch (e) {}
@@ -4539,17 +4583,20 @@ bot.on("message", async (ctx) => {
     });
   }
 
-  if (AI_COSTS[normText] && !pending) {
-    const cost = AI_COSTS[normText];
+  const isService = Object.keys(AI_COSTS).includes(normText);
+  if (isService && !pending) {
+    const dynamicCosts = await getBotConfigCosts();
+    const cost = dynamicCosts[normText] !== undefined ? dynamicCosts[normText] : AI_COSTS[normText];
+    
     const isAdmin = getAdminIds().includes(userId);
     const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
     
     if (!hasBalance) {
-      return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost} so'm.\nSizning balansingizda mablag' yetarli emas.`, {
+      return ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost.toLocaleString()} so'm.\nSizning balansingizda mablag' yetarli emas.`, {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "💰 Balansni to'ldirish", callback_data: `add_balance` }]
+            [{ text: "💳 Balansni to'ldirish", callback_data: `add_balance` }]
           ]
         }
       });
@@ -5553,25 +5600,32 @@ Foydalanuvchi xabari: ${prompt}`;
     }
   }
 
-  if (normText === "⚙️ Bot sozlamalari") {
+  if (normText === "💰 Narxlar sozlamalari") {
     const adminIds = getAdminIds();
     const isHardAdmin = adminIds.includes(userId);
     if (!isHardAdmin && (!authed || (authed.role !== "admin" && authed.role !== "subadmin"))) {
       return ctx.reply("Sizda bu huquq yo'q.");
     }
-    return ctx.reply(
-      "⚙️ <b>Bot sozlamalari</b>\n\nQuyidagi amallardan birini tanlang:",
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "💰 Narxlar sozlamalari", callback_data: "admin_price_settings" }],
-            [{ text: "📄 Xabar matnini tahrirlash", callback_data: "admin_edit_msg_text" }],
-            [{ text: "ℹ️ 'Tizim haqida' matnini tahrirlash", callback_data: "admin_edit_system_about" }]
-          ]
-        }
+    
+    try {
+      const costs = await getBotConfigCosts();
+      
+      let text = "💰 <b>Narxlar sozlamalari (so'mda):</b>\n\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n\n";
+      const buttons = [];
+      
+      for (const [service, price] of Object.entries(costs)) {
+        text += `🔹 <b>${service}</b>: ${price} so'm\n`;
+        buttons.push([{ text: `✏️ ${service}`, callback_data: `edit_price_${service.replace(/\s+/g, '_')}` }]);
       }
-    );
+      
+      return ctx.reply(text, {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: buttons }
+      });
+    } catch (e) {
+      console.error(e);
+      return ctx.reply("Xatolik yuz berdi.");
+    }
   }
 
 
@@ -5706,12 +5760,14 @@ Foydalanuvchi xabari: ${prompt}`;
 
   if (normText === "🎁 Bepul ball" || normText === "🎁 Bepul ball olish") {
     aiModeDeactivate();
+    const dynamicCosts = await getBotConfigCosts();
+    const refBonus = dynamicCosts["Referal bonus"] || 5000;
     return ctx.reply(
       `🎁 <b>Bepul bonus olish imkoniyatlari:</b>\n\n` +
-      `1️⃣ <b>Do'stlarni taklif qilish:</b> Har bir taklif qilingan do'stingiz uchun <b>5000 so'm</b> beriladi. Do'stingiz botga kirib /start bosishi kifoya.\n` +
+      `1️⃣ <b>Do'stlarni taklif qilish:</b> Har bir taklif qilingan do'stingiz uchun <b>${refBonus.toLocaleString()} so'm</b> beriladi. Do'stingiz botga kirib /start bosishi kifoya.\n` +
       `2️⃣ <b>Kunlik bonus:</b> Tizimga har kuni kirganingizda profilingizda bonuslar yangilanadi.\n` +
       `3️⃣ <b>Xatoliklar bo'yicha xabar:</b> Tizimdagi xatoliklar haqida @adminga xabar bersangiz va tasdiqlansa, sizga sovg'a tariqasida bonuslar taqdim etiladi.\n\n` +
-      `💡 <i>Hozircha har bir do'stingiz uchun 5000 so'm olish uchun quyidagi "👥 Do'stlarni taklif qilish" tugmasidan foydalaning!</i>`,
+      `💡 <i>Hozircha har bir do'stingiz uchun ${refBonus.toLocaleString()} so'm olish uchun quyidagi "👥 Do'stlarni taklif qilish" tugmasidan foydalaning!</i>`,
       { parse_mode: "HTML" }
     );
   }
@@ -5751,13 +5807,15 @@ Foydalanuvchi xabari: ${prompt}`;
       } catch (e) {}
     }
 
-    const earnedBonus = invitedCount * 5000;
+    const dynamicCosts = await getBotConfigCosts();
+    const refBonus = dynamicCosts["Referal bonus"] || 5000;
+    const earnedBonus = invitedCount * refBonus;
     const botUsername = ctx.botInfo?.username || "aiedutizim_bot";
     const botRefLink = `https://t.me/${botUsername}?start=ref_${userId}`;
     const webRefLink = `${APP_URL}/?r=${userId}`;
 
     const refMsg = `👥 <b>DO'STLARNI TAKLIF QILISH (REFERAL TIZIMI)</b>\n\n` +
-                   `🎁 Har bir taklif qilingan do'stingiz botga kirib kontaktini tasdiqlaganida balansingizga <b>5 000 UZS</b> avtomatik qo'shiladi!\n\n` +
+                   `🎁 Har bir taklif qilingan do'stingiz botga kirib kontaktini tasdiqlaganida balansingizga <b>${refBonus.toLocaleString()} UZS</b> avtomatik qo'shiladi!\n\n` +
                    `📊 <b>Sizning statistikangiz:</b>\n` +
                    `• Taklif qilingan do'stlar: <b>${invitedCount} ta</b>\n` +
                    `• Ishlangan umumiy summa: <b>${earnedBonus.toLocaleString()} UZS</b>\n\n` +
@@ -5782,31 +5840,32 @@ Foydalanuvchi xabari: ${prompt}`;
     aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
 
-    let cardNumber = "5614 6812 9015 3646";
-    let cardOwner = "IBODULLAYEVA SH";
-    if (db) {
-      try {
-        const cardSnap = await getDoc(doc(db, "settings", "payment_card"));
-        if (cardSnap.exists()) {
-          const cData = cardSnap.data();
-          if (cData.number) cardNumber = cData.number;
-          if (cData.owner) cardOwner = cData.owner;
+    let cardNumber = "9860 0000 0000 0010";
+    let cardOwner = "Ortiqov E";
+    
+    try {
+      if (db) {
+        const snap = await getDoc(doc(db, "settings", "payment_card"));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.number) cardNumber = data.number;
+          if (data.owner) cardOwner = data.owner;
         }
-      } catch (e) {}
+      }
+    } catch (e) {
+      console.error("Error fetching payment settings in telegram:", e);
     }
 
     const sysId = authed?.systemId || userId;
 
     const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>\n\n` +
-                 `1️⃣ <b>1-USUL: Karta raqamiga o'tkazma qilish</b>\n` +
-                 `💳 Karta raqami: <code>${cardNumber}</code>\n` +
-                 `👤 Egasi: <b>${cardOwner}</b>\n\n` +
-                 `👉 Ushbu kartaga to'lov qilib, <b>to'lov cheki (skrinshot) rasmini</b> ushbu botga yuboring. Adminlarimiz tekshirib balansingizni to'ldiradi.\n\n` +
+                 `1️⃣ <b>-USUL:</b> Koʻrsatilgan kartaga toʻlov qiling va chekni shu yerga yuboring.\n` +
+                 `💳 <b>Karta raqami:</b> <code>${cardNumber}</code>\n` +
+                 `👤 <b>Egasi:</b> ${cardOwner}\n\n` +
                  `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-                 `2️⃣ <b>2-USUL: Click / Payme orqali avtomatik to'lov</b>\n` +
-                 `📱 Click yoki Payme ilovasiga kiring va firmamiz / MCHJ nomini tanlang.\n` +
-                 `🆔 Sizning ID raqamingiz: <code>${sysId}</code>\n\n` +
-                 `👉 ID raqamingiz va summani kiritishingiz bilan ismingiz tasdiqlanadi hamda to'lov bajarilishi bilanoq balansingiz <b>avtomatik tarzda to'ldiriladi</b>!`;
+                 `2️⃣ <b>-USUL:</b> Adminga murojaat qiling\n` +
+                 `🆔 <b>Sizning ID raqamingiz:</b> <code>${sysId}</code>\n` +
+                 `"Adminga ID raqamingizni va balansingizga qancha summa oʻtkazmoqchi ekanligingizni yozib yuboring"`;
 
     return ctx.reply(text, { 
       parse_mode: "HTML"
@@ -5816,7 +5875,7 @@ Foydalanuvchi xabari: ${prompt}`;
   if (normText === "🌐 Rasmiy sayt") {
     aiAssistantActiveUsers.delete(userId);
     return ctx.reply(
-      `🔗 <a href="${APP_URL}">Rasmiy saytga o'tish</a>`, { parse_mode: "HTML" }
+      `🌐 <b>AIEDUTIZIM - Raqamli ta'lim platformasi</b>\n\n🔗 Veb-saytimiz: <a href="https://www.aide.uz">www.aide.uz</a>`, { parse_mode: "HTML" }
     );
   }
 
