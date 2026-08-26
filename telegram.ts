@@ -33,6 +33,9 @@ const Type = SDKType || {
 };
 import { generateContentWithRotation } from "./src/lib/gemini";
 import { generateCourseWorkDataWithGemini, buildCourseWorkDocxBuffer } from "./src/lib/courseworkGenerator.js";
+import { runProCourseWorkGeneration, runProPresentationGeneration } from "./src/pro/runners.js";
+import { proIsConfigured } from "./src/pro/config.js";
+import { proQueue } from "./src/pro/limiter.js";
 import { findUserBySystemId } from "./src/lib/serverPayment.js";
 import { getNextSequentialId } from "./src/lib/idUtils";
 import dotenv from "dotenv";
@@ -758,6 +761,8 @@ const customMenuTexts = new PersistentMap<string, string>(
 const AI_COSTS: Record<string, number> = {
   "📊 Slayd yaratish": 4000,
   "📄 Kurs ishi yaratish": 35000,
+  "💎 Pro slayd": 15000,
+  "💎 Pro kurs ishi": 89000,
   "🌐 Tarjimon": 3000,
   "📋 Test yaratish": 3000,
   "💬 Savol-javob": 1000,
@@ -1049,6 +1054,7 @@ async function getAiAssistantKeyboard(userId?: number) {
   const rows: any[][] = [
     [{ text: "🤖 Xizmatlar" }],
     [{ text: "📊 Slayd yaratish" }, { text: "📄 Kurs ishi yaratish" }],
+    [{ text: "💎 Pro slayd" }, { text: "💎 Pro kurs ishi" }],
     [{ text: "📋 Test yaratish" }, { text: "🌐 Tarjimon" }],
     [{ text: "📄 Obektivka yaratish" }],
     [{ text: "⬅️ Asosiy menyu" }]
@@ -1110,6 +1116,50 @@ async function checkAndDeductBalance(userId: number, cost: number): Promise<bool
   } catch (e) {
     console.error("Balance check error:", e);
     return false;
+  }
+}
+
+/**
+ * Gives back what checkAndDeductBalance took. The charge happens before the
+ * wizard starts, so a generation failure afterwards would otherwise leave the
+ * user paying for a document they never received.
+ *
+ * Mirrors the deduct path exactly, including the admin/subadmin skip: those
+ * roles are never charged, so they must never be credited either.
+ */
+async function refundBalance(userId: number, cost: number): Promise<void> {
+  if (!cost || cost <= 0) return;
+  try {
+    const usersRef = collection(db, "users");
+    let snap = await getDocs(query(usersRef, where("telegramId", "==", userId)));
+    if (snap.empty) {
+      snap = await getDocs(query(usersRef, where("telegramId", "==", String(userId))));
+    }
+    if (snap.empty) {
+      console.warn(`[BalanceRefund] No user document found for telegramId: ${userId}`);
+      return;
+    }
+
+    let userDoc = snap.docs[0];
+    for (const d of snap.docs) {
+      const dt = d.data();
+      if (dt.role === "admin" || dt.role === "subadmin" || (dt.uid && !dt.uid.startsWith("tg_"))) {
+        userDoc = d;
+        break;
+      }
+    }
+
+    const userData = userDoc.data();
+    if (userData.role === "admin" || userData.role === "subadmin") return;
+
+    const spentBalls = userData.spentBalls || 0;
+    await updateDoc(doc(db, "users", userDoc.id), {
+      spentBalls: Math.max(0, spentBalls - cost),
+      updatedAt: serverTimestamp()
+    });
+    console.log(`[BalanceRefund] Refunded ${cost} to user ${userId}`);
+  } catch (e) {
+    console.error("Balance refund error:", e);
   }
 }
 
@@ -2333,6 +2383,20 @@ bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
   const dynamicCosts = await getBotConfigCosts();
   const cost = dynamicCosts[normText] !== undefined ? dynamicCosts[normText] : (AI_COSTS[normText] || 0);
   
+  const isProService = normText === "💎 Pro kurs ishi" || normText === "💎 Pro slayd";
+
+  // Pro needs the Anthropic key. Check before charging, never after.
+  if (isProService && !proIsConfigured()) {
+    await ctx.reply("⚠️ <b>Pro xizmati hozircha mavjud emas.</b>\n\nIltimos keyinroq urinib ko'ring.", { parse_mode: "HTML" });
+    return;
+  }
+
+  // One Pro job per user: a second tap would charge again for the same work.
+  if (isProService && proQueue.hasJob(userId)) {
+    await ctx.reply("⏳ <b>Oldingi Pro buyurtmangiz hali tayyorlanmoqda.</b>\n\nU tugagach yangisini boshlashingiz mumkin.", { parse_mode: "HTML" });
+    return;
+  }
+
   const isAdmin = getAdminIds().includes(userId);
   const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
   
@@ -2356,6 +2420,8 @@ bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
   let promptText = "Mavzuni kiriting:";
   if (normText === "📊 Slayd yaratish") { promptText = "📊 <b>Taqdimot mavzusini kiriting:</b>"; }
   else if (normText === "📄 Kurs ishi yaratish") { promptText = "📄 <b>Kurs ishi mavzusini kiriting:</b>"; }
+  else if (normText === "💎 Pro kurs ishi") { promptText = "💎 <b>Pro kurs ishi mavzusini kiriting:</b>"; }
+  else if (normText === "💎 Pro slayd") { promptText = "💎 <b>Pro taqdimot mavzusini kiriting:</b>"; }
   else if (normText === "🎓 Tezis yaratish") { promptText = "🎓 <b>Tezis mavzusini kiriting:</b>"; }
   else if (normText === "📑 Maqola yaratish") { promptText = "📑 <b>Maqola mavzusini kiriting:</b>"; }
   else if (normText === "📝 Dars ishlanma yaratish") { promptText = "📝 <b>Fan nomini kiriting:</b>"; }
@@ -2365,7 +2431,9 @@ bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
   else if (normText === "📄 AI Antiplagiat") { promptText = "📄 <b>Matn yuboring yoki fayl (PDF, DOCX, TXT) yuklang:</b>"; }
   else if (normText === "📄 Obektivka yaratish") { promptText = "FISH ni kiriting: (Ortiqov Elyorbek Jasurbek o'g'li )"; }
 
-  userWizardStates.set(userId, { service: normText, step: 1, data: {} });
+  // Carried through the wizard so a failed generation refunds the exact amount
+  // that was taken, even if an admin edits the price mid-flight.
+  userWizardStates.set(userId, { service: normText, step: 1, data: { __chargedCost: isAdmin ? 0 : cost } });
   
   await ctx.reply(promptText, {
     parse_mode: "HTML",
@@ -3910,7 +3978,128 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
   const step = wizard.step;
   const data = wizard.data;
 
-  if (service === "📊 Slayd yaratish") {
+  // Pro services reuse the same question flow as their ordinary counterparts,
+  // so the answers users already know carry over. What differs is the engine:
+  // these run on Claude via src/pro, not Gemini.
+  const proHooks = {
+    keyboard: () => getAiAssistantKeyboard(userId),
+    refund: () => refundBalance(userId, data.__chargedCost || 0)
+  };
+
+  if (service === "💎 Pro kurs ishi") {
+    if (step === 1) {
+      data.topic = input;
+      userWizardStates.set(userId, { service, step: 2, data });
+      return ctx.reply("💎 <b>Fan nomini kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 2) {
+      data.subject = input;
+      userWizardStates.set(userId, { service, step: 3, data });
+      return ctx.reply("💎 <b>OTM (Universitet) nomini kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 3) {
+      data.university = input;
+      userWizardStates.set(userId, { service, step: 4, data });
+      return ctx.reply("💎 <b>Fakultet nomini kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 4) {
+      data.faculty = input;
+      userWizardStates.set(userId, { service, step: 5, data });
+      return ctx.reply("💎 <b>Kafedra nomini kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 5) {
+      data.department = input;
+      userWizardStates.set(userId, { service, step: 6, data });
+      return ctx.reply("💎 <b>Ta'lim yo'nalishini kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 6) {
+      data.direction = input;
+      userWizardStates.set(userId, { service, step: 7, data });
+      return ctx.reply("💎 <b>Talaba F.I.Sh. kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 7) {
+      data.studentName = input;
+      userWizardStates.set(userId, { service, step: 8, data });
+      return ctx.reply("💎 <b>Ilmiy rahbar F.I.Sh. kiriting:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 8) {
+      data.advisor = input;
+      userWizardStates.set(userId, { service, step: 9, data });
+      return ctx.reply("💎 <b>Shahar va o'quv yilini kiriting (Masalan: Toshkent - 2026):</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [
+          [{ text: "Toshkent - 2026" }, { text: "Chirchiq - 2026" }],
+          [{ text: "O'tkazib yuborish (Toshkent - 2026) ➡️" }],
+          [{ text: "⬅️ Asosiy menyu" }]
+        ], resize_keyboard: true }
+      });
+    } else if (step === 9) {
+      if (input.includes("O'tkazib") || !input.trim()) {
+        data.city = "Toshkent";
+        data.year = "2026";
+      } else {
+        const parts = input.split("-");
+        data.city = parts[0]?.trim() || "Toshkent";
+        data.year = parts[1]?.trim() || "2026";
+      }
+      userWizardStates.set(userId, { service, step: 10, data });
+      return ctx.reply("💎 <b>Kurs ishi hajmini (sahifalar soni) tanlang:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [
+          [{ text: "30" }, { text: "35" }],
+          [{ text: "40" }, { text: "50" }],
+          [{ text: "⬅️ Asosiy menyu" }]
+        ], resize_keyboard: true }
+      });
+    } else if (step === 10) {
+      data.pageCount = input.replace(/D/g, '') || "30";
+      userWizardStates.delete(userId);
+      await runProCourseWorkGeneration(ctx, data, proHooks);
+    }
+  }
+
+  else if (service === "💎 Pro slayd") {
+    // Only three questions: the ported renderer has one fixed design system, so
+    // the ordinary flow's design/images/charts/notes questions have no effect here.
+    if (step === 1) {
+      data.topic = input;
+      userWizardStates.set(userId, { service, step: 2, data });
+      return ctx.reply("💎 <b>Slaydlar sonini kiriting:</b>\n<i>Masalan: 10, 15, 20</i>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "10" }, { text: "15" }, { text: "20" }], [{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (step === 2) {
+      data.slideCount = input.replace(/[^0-9]/g, "") || "15";
+      userWizardStates.set(userId, { service, step: 3, data });
+      return ctx.reply("💎 <b>Taqdimot tilini tanlang:</b>", {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [
+          [{ text: "O'zbekcha" }, { text: "Ruscha" }, { text: "Inglizcha" }],
+          [{ text: "⬅️ Asosiy menyu" }]
+        ], resize_keyboard: true }
+      });
+    } else if (step === 3) {
+      data.language = input;
+      userWizardStates.delete(userId);
+      await runProPresentationGeneration(ctx, data, proHooks);
+    }
+  }
+
+  else if (service === "📊 Slayd yaratish") {
     if (step === 1) {
       data.topic = input;
       userWizardStates.set(userId, { service, step: 2, data });
