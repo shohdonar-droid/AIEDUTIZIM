@@ -275,8 +275,7 @@ export default function AdminBillingMonitoring() {
       "Platforma": u.platform === "both" ? "Sayt va Bot" : u.platform === "site" ? "Sayt (🌐)" : "Telegram Bot (🤖)",
       "Rol": getRoleLabel(u.role),
       "Sarflagan tokeni": u.usedTokens,
-      "Token qiymati (so'm)": u.usedTokens * tokenRate,
-      "To'lov qilgan summasi (so'm)": u.totalPaid,
+      "To'lov qilingan summasi (so'm)": u.totalPaid,
       "Joriy balansi (so'm)": u.balance,
     }));
 
@@ -325,7 +324,7 @@ export default function AdminBillingMonitoring() {
       </div>
 
       {/* Summary Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase tracking-wider text-slate-400">Jami Foydalanuvchilar</span>
@@ -349,7 +348,7 @@ export default function AdminBillingMonitoring() {
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Sarflangan Tokenlar</span>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Sarflangan Tokenlar (Jami Yig'indi)</span>
             <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
               <Coins className="w-5 h-5" />
             </div>
@@ -357,24 +356,7 @@ export default function AdminBillingMonitoring() {
           <div className="mt-4">
             <div className="text-2xl font-black text-slate-900">{stats.totalTokensCount.toLocaleString("uz-UZ")} token</div>
             <p className="text-[11px] text-slate-500 font-medium mt-1">
-              Barcha generatsiyalar va AI so'rovlari bo'yicha
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Token Qiymati (So'm)</span>
-            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="text-2xl font-black text-purple-700">
-              {stats.totalTokensCostSum.toLocaleString("uz-UZ")} UZS
-            </div>
-            <p className="text-[11px] text-slate-500 font-medium mt-1 flex items-center gap-1">
-              <span>Stavka: 1 token = {tokenRate} so'm</span>
+              Barcha generatsiyalar va AI so'rovlari bo'yicha ishlatilgan tokenlar yig'indisi
             </p>
           </div>
         </div>
@@ -391,7 +373,7 @@ export default function AdminBillingMonitoring() {
               {stats.totalPaidSum.toLocaleString("uz-UZ")} UZS
             </div>
             <p className="text-[11px] text-slate-500 font-medium mt-1">
-              Click, Payme va tizim to'lovlari
+              Click, Payme va tizim to'lovlari yig'indisi
             </p>
           </div>
         </div>
@@ -491,16 +473,15 @@ export default function AdminBillingMonitoring() {
                 <th className="py-4 px-4">Foydalanuvchi nomi</th>
                 <th className="py-4 px-4">Platforma / Rol</th>
                 <th className="py-4 px-4 text-right">Sarflagan tokeni</th>
-                <th className="py-4 px-4 text-right">Sarflagan tokeni (so'mda)</th>
-                <th className="py-4 px-4 text-right">To'lov qilgan summasi</th>
-                <th className="py-4 px-4 text-right">Joriy balans</th>
+                <th className="py-4 px-4 text-right">To'lov qilingan summasi</th>
+                <th className="py-4 px-4 text-right">Joriy balansi</th>
                 <th className="py-4 px-4 text-center w-20">Tafsilot</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
                       <span className="font-semibold text-xs">Monitoring ma'lumotlari yuklanmoqda...</span>
@@ -509,7 +490,7 @@ export default function AdminBillingMonitoring() {
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <ShieldAlert className="w-8 h-8 text-slate-300" />
                       <span className="font-bold text-slate-600">Foydalanuvchi topilmadi</span>
@@ -584,14 +565,6 @@ export default function AdminBillingMonitoring() {
                         <span className="text-[10px] font-bold text-slate-400 ml-1">token</span>
                       </td>
 
-                      {/* Sarflagan tokeni (so'mda) */}
-                      <td className="py-3.5 px-4 text-right">
-                        <span className="font-black text-purple-700">
-                          {tokenCost.toLocaleString("uz-UZ")}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400 ml-1">UZS</span>
-                      </td>
-
                       {/* To'lov qilgan summasi */}
                       <td className="py-3.5 px-4 text-right">
                         <span className={`font-black ${u.totalPaid > 0 ? "text-emerald-600" : "text-slate-400"}`}>
@@ -651,9 +624,6 @@ export default function AdminBillingMonitoring() {
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sarflangan Token</span>
                 <div className="text-lg font-black text-amber-600 mt-1">
                   {selectedUser.usedTokens.toLocaleString("uz-UZ")} token
-                </div>
-                <div className="text-xs text-purple-700 font-bold mt-1">
-                  ≈ {(selectedUser.usedTokens * 1).toLocaleString("uz-UZ")} UZS
                 </div>
               </div>
 
