@@ -327,7 +327,7 @@ export default function TeacherChat() {
       receiverId: selectedContact.uid,
       text: text,
       timestamp: serverTimestamp(),
-      isRead: false,
+      isRead: false, processedByBot: false,
     });
   };
 

@@ -1025,7 +1025,7 @@ async function getKeyboard(
 
   const userHeader = [
     [{ text: "👤 Profil" }, { text: "💬 Adminga murojaat" }],
-    [{ text: "🤖 Xizmatlar" }, { text: "👥 Do'stlarni taklif qilish" }],
+    [{ text: "🤖 Xizmatlar" }, { text: "💰 Bonus olish" }],
     [{ text: "💰 Balans" }, { text: "🌐 Rasmiy sayt" }]
   ];
 
@@ -5988,12 +5988,12 @@ Foydalanuvchi xabari: ${prompt}`;
       `1️⃣ <b>Do'stlarni taklif qilish:</b> Har bir taklif qilingan do'stingiz uchun <b>${refBonus.toLocaleString()} so'm</b> beriladi. Do'stingiz botga kirib /start bosishi kifoya.\n` +
       `2️⃣ <b>Kunlik bonus:</b> Tizimga har kuni kirganingizda profilingizda bonuslar yangilanadi.\n` +
       `3️⃣ <b>Xatoliklar bo'yicha xabar:</b> Tizimdagi xatoliklar haqida @adminga xabar bersangiz va tasdiqlansa, sizga sovg'a tariqasida bonuslar taqdim etiladi.\n\n` +
-      `💡 <i>Hozircha har bir do'stingiz uchun ${refBonus.toLocaleString()} so'm olish uchun quyidagi "👥 Do'stlarni taklif qilish" tugmasidan foydalaning!</i>`,
+      `💡 <i>Hozircha har bir do'stingiz uchun ${refBonus.toLocaleString()} so'm olish uchun quyidagi "💰 Bonus olish" tugmasidan foydalaning!</i>`,
       { parse_mode: "HTML" }
     );
   }
 
-  if (normText === "👥 Do'stlarni taklif qilish" || normText === "👥 Do'stni taklif qilish") {
+  if (normText === "💰 Bonus olish" || normText === "bonus olish") {
     aiModeDeactivate();
     let invitedCount = 0;
     if (db) {
@@ -6042,8 +6042,6 @@ Foydalanuvchi xabari: ${prompt}`;
                    `• Ishlangan umumiy summa: <b>${earnedBonus.toLocaleString()} UZS</b>\n\n` +
                    `🔗 <b>Telegram bot referal havolangiz:</b>\n` +
                    `${botRefLink}\n\n` +
-                   `🔗 <b>Veb-sayt havolangiz:</b>\n` +
-                   `${webRefLink}\n\n` +
                    `👉 Havolani do'stlaringizga ulashing va balansingizni to'ldiring!`;
 
     return ctx.reply(refMsg, {

@@ -371,7 +371,7 @@ export default function ChatSection() {
           receiverRole: receiverRole,
           text: text.trim(),
           timestamp: Timestamp.now(),
-          isRead: false,
+          isRead: false, processedByBot: false,
           replyTo: replyMsg ? {
             id: replyMsg.id,
             text: replyMsg.text,

@@ -247,7 +247,7 @@ export function ChatbotWidget() {
           receiverRole: user.role || "student",
           text: `🎉 Tug'ilgan kuningiz bilan, ${user.displayName}! Sizga uzoq umr, sihat-salomatlik va o'qishlaringizda ulkan muvaffaqiyatlar tilaymiz! 🎂`,
           timestamp: Timestamp.now(),
-          isRead: false,
+          isRead: false, processedByBot: false,
         });
 
         localStorage.setItem(bdKey, "1");
@@ -286,7 +286,7 @@ export function ChatbotWidget() {
                 receiverRole: user.role || "student",
                 text: `🎓 Tabriklaymiz, ${user.displayName}! Siz "${cert.coursePrefix || "yangi"}" sertifikatni qo'lga kiritdingiz. Keyingi ishlaringizda ham muvaffaqiyatlar tilaymiz! 🌟`,
                 timestamp: Timestamp.now(),
-                isRead: false,
+                isRead: false, processedByBot: false,
               });
             }
             localStorage.setItem(certKey, "1");
@@ -340,7 +340,7 @@ export function ChatbotWidget() {
             receiverRole: user.role || "student",
             text,
             timestamp: Timestamp.now(),
-            isRead: false,
+            isRead: false, processedByBot: false,
           });
         }
       }
@@ -393,7 +393,7 @@ export function ChatbotWidget() {
     // We listen to messages where receiver is admin to find all people who texted the admin/bot
     const q1 = query(
       collection(db, "messages"),
-      where("receiverId", "==", adminId),
+      where("receiverRole", "==", "admin"),
     );
     const unsub = safeOnSnapshot(
       q1,
@@ -631,7 +631,7 @@ export function ChatbotWidget() {
           receiverRole: selectedUser.role || "inquiry",
           text: textToSend,
           timestamp: Timestamp.now(),
-          isRead: false,
+          isRead: false, processedByBot: false,
         });
       } else {
         // Normal user sending to Admin/Bot
@@ -643,7 +643,7 @@ export function ChatbotWidget() {
           receiverRole: "admin",
           text: textToSend,
           timestamp: Timestamp.now(),
-          isRead: false,
+          isRead: false, processedByBot: false,
         });
       }
     } catch (error) {
