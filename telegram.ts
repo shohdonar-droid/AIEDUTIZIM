@@ -1683,7 +1683,7 @@ bot.command("addbalance", async (ctx) => {
     }
   } catch (e) {
     console.error("Add balance error:", e);
-    return ctx.reply("❌ Xatolik yuz berdi.");
+    return ctx.reply("❌ Xatolik: " + (e as any).message);
   }
 });
 
@@ -5300,7 +5300,7 @@ if (shops.length === 0) {
       });
     } catch (e) {
       console.error("Error fetching computer services:", e);
-      return ctx.reply("❌ Xatolik yuz berdi.");
+      return ctx.reply("❌ Xatolik: " + (e as any).message);
     }
   }
 

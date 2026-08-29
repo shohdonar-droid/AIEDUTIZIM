@@ -43,6 +43,8 @@ service cloud.firestore {
     match /academic_years/{id} { allow read, write: if true; }
     match /trash_bin/{id} { allow read, write: if true; }
     match /system_logs/{id} { allow read, write: if true; }
+    match /computer_services/{id} { allow read, write: if true; }
+    match /ai_services_costs/{id} { allow read, write: if true; }
 
     // Dynamic data
     match /enrollments/{id} { allow read, write: if true; }
