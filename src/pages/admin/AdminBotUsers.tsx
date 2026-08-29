@@ -32,6 +32,7 @@ export default function AdminBotUsers() {
             <th className="p-4">Ism</th>
             <th className="p-4">Username</th>
             <th className="p-4">Telegram ID</th>
+            <th className="p-4">Kontakt</th>
             <th className="p-4">Amallar</th>
           </tr>
         </thead>
@@ -39,9 +40,10 @@ export default function AdminBotUsers() {
           {botUsers.map((u, i) => (
             <tr key={`${u.id}_${i}`} className="border-b">
               <td className="p-4">{i + 1}</td>
-              <td className="p-4">{u.name || "Noma'lum"}</td>
+              <td className="p-4">{u.firstName || u.name || "Noma'lum"} {u.lastName || ""}</td>
               <td className="p-4">@{u.username || "yo'q"}</td>
               <td className="p-4">{u.telegramId || u.id}</td>
+              <td className="p-4">{u.phone || "yo'q"}</td>
               <td className="p-4">
                 <button onClick={() => handleDelete(u.id)} className="text-red-500"><Trash2 /></button>
               </td>

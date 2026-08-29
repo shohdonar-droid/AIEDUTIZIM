@@ -2442,10 +2442,20 @@ bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
   // that was taken, even if an admin edits the price mid-flight.
   userWizardStates.set(userId, { service: normText, step: 1, data: { __chargedCost: isAdmin ? 0 : chargeCost, __textCost: cost, __fileCost: dynamicCosts['📄 Fayl tarjima qilish'] !== undefined ? dynamicCosts['📄 Fayl tarjima qilish'] : 10000 } });
   
+  let keyboardButtons = [[{ text: "⬅️ Asosiy menyu" }]];
+  
+  if (normText === "🌐 Tarjimon") {
+    keyboardButtons = [
+      [{ text: "O'zbek - Rus" }, { text: "Rus - O'zbek" }],
+      [{ text: "O'zbek - Ingliz" }, { text: "Ingliz - O'zbek" }],
+      [{ text: "⬅️ Asosiy menyu" }]
+    ];
+  }
+
   await ctx.reply(promptText, {
     parse_mode: "HTML",
     reply_markup: {
-      keyboard: [[{ text: "⬅️ Asosiy menyu" }]],
+      keyboard: keyboardButtons,
       resize_keyboard: true
     }
   });
@@ -6374,7 +6384,13 @@ Foydalanuvchi xabari: ${prompt}`;
     return ctx.reply(
       "🆔 <b>Foydalanuvchi ID raqamini kiriting:</b>\n\n" +
       "<i>Foydalanuvchining 7 xonali ID raqami, Telegram ID yoki Firestore UID raqamini yozing.</i>",
-      { parse_mode: "HTML" }
+      { 
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [[{ text: "⬅️ Asosiy menyu" }]],
+          resize_keyboard: true
+        }
+      }
     );
   }
 

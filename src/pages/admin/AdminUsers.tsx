@@ -2798,6 +2798,9 @@ export default function AdminUsers() {
                         <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
                           Telegram ID
                         </th>
+                        <th className="px-6 py-5 text-left text-xs font-black text-gray-400 uppercase tracking-widest">
+                          Kontakt
+                        </th>
                         <th className="px-6 py-5 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
                           Mavjud Balans (Ball)
                         </th>
@@ -2839,6 +2842,9 @@ export default function AdminUsers() {
                               </td>
                               <td className="px-6 py-4 text-sm font-mono text-gray-500">
                                 {tgId}
+                              </td>
+                              <td className="px-6 py-4 text-sm font-mono font-semibold text-gray-700">
+                                {tu.phone || tu.phoneNumber || "Kiritilmagan"}
                               </td>
                               <td className="px-6 py-4 text-center">
                                 <span className="bg-emerald-50 text-emerald-700 font-extrabold px-3 py-1.5 rounded-xl border border-emerald-100 text-sm inline-flex items-center gap-1">
