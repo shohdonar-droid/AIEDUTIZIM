@@ -764,6 +764,7 @@ const AI_COSTS: Record<string, number> = {
   "💎 Pro slayd": 15000,
   "💎 Pro kurs ishi": 89000,
   "🌐 Tarjimon": 3000,
+  "📄 Fayl tarjima qilish": 10000,
   "📋 Test yaratish": 3000,
   "💬 Savol-javob": 1000,
   "📄 Obektivka yaratish": 15000
@@ -2398,7 +2399,13 @@ bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
   }
 
   const isAdmin = getAdminIds().includes(userId);
-  const hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
+  let hasBalance = true;
+  let chargeCost = cost;
+  if (normText !== "🌐 Tarjimon") {
+    hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
+  } else {
+    chargeCost = 0;
+  }
   
   if (!hasBalance) {
     await ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost.toLocaleString()} so'm.\nSizning balansingizda mablag' yetarli emas.`, {
@@ -2433,7 +2440,7 @@ bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
 
   // Carried through the wizard so a failed generation refunds the exact amount
   // that was taken, even if an admin edits the price mid-flight.
-  userWizardStates.set(userId, { service: normText, step: 1, data: { __chargedCost: isAdmin ? 0 : cost } });
+  userWizardStates.set(userId, { service: normText, step: 1, data: { __chargedCost: isAdmin ? 0 : chargeCost, __textCost: cost, __fileCost: dynamicCosts['📄 Fayl tarjima qilish'] !== undefined ? dynamicCosts['📄 Fayl tarjima qilish'] : 10000 } });
   
   await ctx.reply(promptText, {
     parse_mode: "HTML",
@@ -3887,39 +3894,100 @@ async function runTestGeneration(ctx: any, data: any) {
   }
 }
 
-async function runTranslationGeneration(ctx: any, data: any) {
+async function runTranslationGeneration(ctx: any, data: any, isFile: boolean = false) {
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
-  const loadingMsg = await ctx.reply(`⏳ <b>Tarjima qilinmoqda...</b>`, { parse_mode: "HTML" });
+  const loadingMsg = await ctx.reply("⏳ <b>Tarjima qilinmoqda...</b>", { parse_mode: "HTML" });
 
   try {
-    const res = await fetch(getApiUrl("/api/gemini"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "generateDocument",
-        topic: `[Direction: ${data.direction || "O'zbek-Ingliz"}]. Text to translate: ${data.text}`,
-        docType: "tarjimon"
-      })
-    });
+    let textToTranslate = data.text || "";
+
+    if (isFile && data.file_id) {
+      const fileLink = await ctx.telegram.getFileLink(data.file_id);
+      const res = await fetch(fileLink.href);
+      const buffer = await res.arrayBuffer();
+      
+      if (data.file_name?.toLowerCase().endsWith('.docx')) {
+         const mammoth = await import("mammoth");
+         const result = await mammoth.default.extractRawText({ buffer: Buffer.from(buffer) });
+         textToTranslate = result.value;
+      } else {
+         textToTranslate = Buffer.from(buffer).toString('utf-8');
+      }
+    }
+
+    if (!textToTranslate || textToTranslate.trim().length === 0) {
+      await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+      return ctx.reply("❌ Matn topilmadi. Iltimos tekshirib qaytadan urinib ko'ring.");
+    }
+
+    // Split text into chunks to avoid API limits
+    const chunkSize = 4000;
+    const chunks: string[] = [];
+    for (let i = 0; i < textToTranslate.length; i += chunkSize) {
+      chunks.push(textToTranslate.substring(i, i + chunkSize));
+    }
+
+    let fullTranslatedText = "";
+    let stepCount = 1;
+    for (const chunk of chunks) {
+      if (chunks.length > 1) {
+        await ctx.telegram.editMessageText(chatId, loadingMsg.message_id, undefined, `⏳ <b>Tarjima qilinmoqda... (${stepCount}/${chunks.length} qism)</b>`, { parse_mode: "HTML" }).catch(() => {});
+      }
+      
+      const res = await fetch(getApiUrl("/api/gemini"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "generateDocument",
+          topic: `[Direction: ${data.direction || "O'zbek-Ingliz"}]. Text to translate: ${chunk}`,
+          docType: "tarjimon"
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error("API xatosi yuz berdi.");
+      }
+      
+      const respData = await res.json();
+      fullTranslatedText += (respData.content || "") + "\n\n";
+      stepCount++;
+    }
 
     await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
 
-    if (res.ok) {
-      const respData = await res.json();
-      await ctx.reply(`🌐 <b>Tarjima xulosasi:</b>\n\n${respData.content || 'Tarjima bo\'sh qaytdi.'}`, { parse_mode: "HTML" });
-      return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
-        parse_mode: "HTML",
-        reply_markup: {
-          keyboard: await getAiAssistantKeyboard(userId),
-          resize_keyboard: true
-        }
+    if (isFile) {
+      const { Document, Packer, Paragraph, TextRun } = await import("docx");
+      const paragraphs = fullTranslatedText.split("\n").map(line => new Paragraph({ children: [new TextRun(line)] }));
+      const doc = new Document({
+        sections: [{ properties: {}, children: paragraphs }]
       });
+      const docBuffer = await Packer.toBuffer(doc);
+      
+      await ctx.replyWithDocument({
+        source: Buffer.from(docBuffer),
+        filename: `Tarjima_${data.file_name || "document.docx"}`
+      }, { caption: "✅ <b>Tarjima tayyor!</b>", parse_mode: "HTML" });
+      
     } else {
-      return ctx.reply("❌ Tarjima qilishda xatolik yuz berdi.");
+      if (fullTranslatedText.length > 4000) {
+        fullTranslatedText = fullTranslatedText.substring(0, 3990) + "...";
+      }
+      await ctx.reply(`🌐 <b>Tarjima xulosasi:</b>
+
+${fullTranslatedText}`, { parse_mode: "HTML" });
     }
+
+    return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: await getAiAssistantKeyboard(userId),
+        resize_keyboard: true
+      }
+    });
   } catch (err: any) {
     console.error("Translation err:", err);
+    await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
     return ctx.reply("❌ Tarjima qilishda xato yuz berdi: " + err.message);
   }
 }
@@ -4399,14 +4467,43 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
     if (step === 1) {
       data.direction = input;
       userWizardStates.set(userId, { service, step: 2, data });
-      return ctx.reply("🌐 <b>Tarjima qilinadigan matnni yuboring:</b>", {
+      return ctx.reply("🌐 <b>Tarjima qilmoqchi boʻlgan Matnni yuboring yoki .DOCX (Word) / .TXT faylini yuklang:</b>", {
         parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
     } else if (step === 2) {
-      data.text = input;
-      userWizardStates.delete(userId);
-      await runTranslationGeneration(ctx, data);
+      const isAdmin = getAdminIds().includes(userId);
+      
+      if (ctx.message && 'document' in ctx.message) {
+        const doc = ctx.message.document;
+        const fileName = (doc.file_name || "").toLowerCase();
+        if (!fileName.endsWith('.docx') && !fileName.endsWith('.txt')) {
+          return ctx.reply("❌ <b>Iltimos, faqat .DOCX (Word) yoki .TXT formatidagi fayllarni yuklang.</b>", { parse_mode: "HTML" });
+        }
+        
+        const fileCost = data.__fileCost || 10000;
+        const hasBalance = isAdmin || (await checkAndDeductBalance(userId, fileCost));
+        if (!hasBalance) {
+          userWizardStates.delete(userId);
+          return ctx.reply("❌ <b>Balansingiz yetarli emas!</b> Fayl tarjimasi narxi: " + fileCost.toLocaleString() + " so'm.", { parse_mode: "HTML" });
+        }
+        
+        userWizardStates.delete(userId);
+        data.file_id = doc.file_id;
+        data.file_name = doc.file_name;
+        await runTranslationGeneration(ctx, data, true);
+      } else {
+        const textCost = data.__textCost || 3000;
+        const hasBalance = isAdmin || (await checkAndDeductBalance(userId, textCost));
+        if (!hasBalance) {
+          userWizardStates.delete(userId);
+          return ctx.reply("❌ <b>Balansingiz yetarli emas!</b> Matn tarjimasi narxi: " + textCost.toLocaleString() + " so'm.", { parse_mode: "HTML" });
+        }
+        
+        data.text = input;
+        userWizardStates.delete(userId);
+        await runTranslationGeneration(ctx, data, false);
+      }
     }
   }
 
@@ -4833,11 +4930,29 @@ bot.on("message", async (ctx) => {
     });
   }
 
-  const isService = Object.keys(AI_COSTS).includes(normText);
+  // Specific AI Services Handler (Runs OUTSIDE of pure AI Chat mode)
+  // Fayl tarjima qilish shouldn't show as a separate startable service
+  const isService = Object.keys(AI_COSTS).includes(normText) && normText !== "📄 Fayl tarjima qilish";
+  
   if (isService && !pending) {
     const dynamicCosts = await getBotConfigCosts();
     const cost = dynamicCosts[normText] !== undefined ? dynamicCosts[normText] : AI_COSTS[normText];
     
+    if (normText === "🌐 Tarjimon") {
+      const fileCost = dynamicCosts["📄 Fayl tarjima qilish"] !== undefined ? dynamicCosts["📄 Fayl tarjima qilish"] : (AI_COSTS["📄 Fayl tarjima qilish"] || 10000);
+      return ctx.reply(
+        `🤖 <b>${normText}</b>\n\n💳 Matn tarjima qilish - <b>${cost.toLocaleString()} so'm</b>\n💳 Fayl (Word/Txt) tarjima qilish - <b>${fileCost.toLocaleString()} so'm</b>`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "✅ Yaratish", callback_data: `start_ai_srv_${normText}` }]
+            ]
+          }
+        }
+      );
+    }
+
     return ctx.reply(
       `🤖 <b>${normText}</b>\n\n💳 Xizmat narxi: <b>${cost.toLocaleString()} so'm</b>`,
       {
@@ -4849,7 +4964,7 @@ bot.on("message", async (ctx) => {
         }
       }
     );
-  } else {
+  }else {
     // console.log(`[Telegram] Wizard check: user ${userId} has wizard state: ${!!wizard}, pending: ${!!pending}`);
   }
 
