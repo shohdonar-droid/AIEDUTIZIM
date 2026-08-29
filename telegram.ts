@@ -1,3 +1,5 @@
+import { deleteDoc } from "firebase/firestore";
+
 import { Telegraf } from "telegraf";
 import { initializeApp, getApps, getApp, setLogLevel } from "firebase/app";
 import firebaseConfigRaw from "./firebase-applet-config.json";
@@ -105,11 +107,19 @@ export async function broadcastBotResumed() {
     console.log(`[Broadcast Resumed] Broadcasting bot active state to ${snap.size} users...`);
     const userDocs = snap.docs;
     const broadcastText = 
-      `⚡️ <b>TIZIM QAYTA ISHGA TUSHIRILDI!</b>\n\n` +
-      `Assalomu alaykum! Hurmatli foydalanuvchi, <b>AIEDUTIZIM</b> Telegram boti tizimdagi yangilanish ishlaridan so'ng qayta ishga tushirildi.\n\n` +
-      `🤖 <b>Barcha xizmatlar va buyruqlar to'liq faol:</b>\n` +
-      `• Sun'iy intellekt (AI) yordamchisidan bemalol foydalanishingiz mumkin.\n` +
-      `• Profilni tekshirish, savol-javob, tarjimon, tezis hamda maqola tayyorlash xizmatlari ishlamoqda.\n\n` +
+      `⚡️ <b>TIZIM QAYTA ISHGA TUSHIRILDI!</b>
+
+` +
+      `Assalomu alaykum! Hurmatli foydalanuvchi, <b>AIEDUTIZIM</b> Telegram boti tizimdagi yangilanish ishlaridan so'ng qayta ishga tushirildi.
+
+` +
+      `🤖 <b>Barcha xizmatlar va buyruqlar to'liq faol:</b>
+` +
+      `• Sun'iy intellekt (AI) yordamchisidan bemalol foydalanishingiz mumkin.
+` +
+      `• Profilni tekshirish, savol-javob, tarjimon, tezis hamda maqola tayyorlash xizmatlari ishlamoqda.
+
+` +
       `💡 <i>Botdan bemalol foydalanishingiz mumkin! Yangi menyuni ko'rish uchun /start buyrug'ini yuboring.</i>`;
 
     const getKeyboard = (role: string, uid: number, authVal: boolean) => {
@@ -356,18 +366,27 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
   if (req.isUpgradeRequest) typeLabel = "TARIFNI O'ZGARTIRISH SO'ROVI";
   if (req.isLimitsRequest) typeLabel = "LIMIT SOTIB OLISH SO'ROVI";
 
-  let text = `📸 <b>${typeLabel}</b>\n`;
-  text += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `👤 <b>Foydalanuvchi:</b> <code>${req.userName || "Foydalanuvchi"}</code>\n`;
-  text += `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>\n`;
-  text += `🆔 <b>ID raqami:</b> <code>${req.systemId || req.userId || "Kiritilmagan"}</code>\n`;
-  text += `📞 <b>Tel:</b> <code>${req.phone || "Kiritilmagan"}</code>\n`;
+  let text = `📸 <b>${typeLabel}</b>
+`;
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+  text += `👤 <b>Foydalanuvchi:</b> <code>${req.userName || "Foydalanuvchi"}</code>
+`;
+  text += `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>
+`;
+  text += `🆔 <b>ID raqami:</b> <code>${req.systemId || req.userId || "Kiritilmagan"}</code>
+`;
+  text += `📞 <b>Tel:</b> <code>${req.phone || "Kiritilmagan"}</code>
+`;
   
   if (req.isBalanceTopUp) {
-    text += `💰 <b>To'ldirish summasi:</b> <code>Qo'lda kiritiladi</code>\n`;
+    text += `💰 <b>To'ldirish summasi:</b> <code>Qo'lda kiritiladi</code>
+`;
   } else if (req.isLimitsRequest) {
-    text += `💰 <b>Jami summa:</b> <code>${(req.totalPrice || req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
-    text += `⚙️ <b>So'ralgan limitlar:</b>\n`;
+    text += `💰 <b>Jami summa:</b> <code>${(req.totalPrice || req.tariffPrice || 0).toLocaleString()} UZS</code>
+`;
+    text += `⚙️ <b>So'ralgan limitlar:</b>
+`;
     const ITEM_LABELS: Record<string, string> = {
       limit_departments: "Yo'nalishlar",
       limit_groups: "Guruhlar",
@@ -379,29 +398,38 @@ export async function notifyNewConnectionRequest(requestId: string, req: any) {
       limit_certificates: "Sertifikatlar"
     };
     Object.entries(req.requestedLimits || req.requestedItems || {}).forEach(([key, qty]) => {
-      text += `  - ${ITEM_LABELS[key] || key}: +${qty} ta\n`;
+      text += `  - ${ITEM_LABELS[key] || key}: +${qty} ta
+`;
     });
   } else {
-    text += `💎 <b>Tarif:</b> <code>${req.tariffName || "Standart"}</code>\n`;
-    text += `💰 <b>Narxi:</b> <code>${(req.tariffPrice || 0).toLocaleString()} UZS</code>\n`;
+    text += `💎 <b>Tarif:</b> <code>${req.tariffName || "Standart"}</code>
+`;
+    text += `💰 <b>Narxi:</b> <code>${(req.tariffPrice || 0).toLocaleString()} UZS</code>
+`;
   }
   
-  text += `💳 <b>To'lov turi:</b> <code>${req.paymentType || "Karta orqali o'tkazma"}</code>\n`;
+  text += `💳 <b>To'lov turi:</b> <code>${req.paymentType || "Karta orqali o'tkazma"}</code>
+`;
   
   if (req.isNewOrgRequest) {
-    text += `🆕 <b>Yangi tashkilot:</b> HA\n`;
-    text += `🔑 <b>Login:</b> <code>${req.login || "Avtomatik (ID raqam)"}</code>\n`;
+    text += `🆕 <b>Yangi tashkilot:</b> HA
+`;
+    text += `🔑 <b>Login:</b> <code>${req.login || "Avtomatik (ID raqam)"}</code>
+`;
   }
   
   if (req.isUpgradeRequest) {
-    text += `🔄 <b>Hozirgi tarif:</b> <code>${req.currentTariff || "Boshlang'ich"}</code>\n`;
+    text += `🔄 <b>Hozirgi tarif:</b> <code>${req.currentTariff || "Boshlang'ich"}</code>
+`;
   }
   
   if (req.limits && !req.isLimitsRequest) {
-    text += `⚙️ <b>Limitlar:</b> ${req.limits.students} talaba, ${req.limits.staff} xodim...\n`;
+    text += `⚙️ <b>Limitlar:</b> ${req.limits.students} talaba, ${req.limits.staff} xodim...
+`;
   }
   
-  text += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
   text += `📅 <code>${new Date().toLocaleString('uz-UZ')}</code>`;
 
   const inline_keyboard = [
@@ -458,14 +486,22 @@ export async function notifyPaymentCompleted(info: {
   newBalance: number;
 }) {
   const ids = getAdminIds();
-  const text = `⚡ <b>ONLAYN TO'LOV QABUL QILINDI (${info.provider.toUpperCase()})</b>\n` +
-               `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-               `👤 <b>Foydalanuvchi:</b> <code>${info.userName}</code>\n` +
-               `🆔 <b>ID raqami:</b> <code>${info.systemId}</code>\n` +
-               `💰 <b>To'lov summasi:</b> <code>+${info.amount.toLocaleString()} UZS</code>\n` +
-               `💳 <b>Yangi balans:</b> <code>${info.newBalance.toLocaleString()} UZS</code>\n` +
-               `🧾 <b>Tranzaksiya ID:</b> <code>${info.transactionId}</code>\n` +
-               `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+  const text = `⚡ <b>ONLAYN TO'LOV QABUL QILINDI (${info.provider.toUpperCase()})</b>
+` +
+               `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
+               `👤 <b>Foydalanuvchi:</b> <code>${info.userName}</code>
+` +
+               `🆔 <b>ID raqami:</b> <code>${info.systemId}</code>
+` +
+               `💰 <b>To'lov summasi:</b> <code>+${info.amount.toLocaleString()} UZS</code>
+` +
+               `💳 <b>Yangi balans:</b> <code>${info.newBalance.toLocaleString()} UZS</code>
+` +
+               `🧾 <b>Tranzaksiya ID:</b> <code>${info.transactionId}</code>
+` +
+               `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
                `📅 <code>${new Date().toLocaleString('uz-UZ')}</code>`;
 
   for (const adminId of ids) {
@@ -510,39 +546,66 @@ export function formatProfileInfo(uData: any, role: string, displayName: string,
   let profileMsg = "";
   const normRole = (role || "").toLowerCase();
 
-  profileMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  profileMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
   if (normRole === "student") {
-    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `🛡️ <b>Roli:</b> <code>Talaba</code>\n`;
-    profileMsg += `🏢 <b>Yo'nalishi:</b> <code>${uData?.departmentName || uData?.direction || "Kiritilmagan"}</code>\n`;
-    profileMsg += `👥 <b>Guruhi:</b> <code>${uData?.groupName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>\n`;
-    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>
+`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Talaba</code>
+`;
+    profileMsg += `🏢 <b>Yo'nalishi:</b> <code>${uData?.departmentName || uData?.direction || "Kiritilmagan"}</code>
+`;
+    profileMsg += `👥 <b>Guruhi:</b> <code>${uData?.groupName || "Kiritilmagan"}</code>
+`;
+    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>
+`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>
+`;
   } else if (normRole === "admin") {
-    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `🛡️ <b>Roli:</b> <code>Administrator</code>\n`;
-    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>
+`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Administrator</code>
+`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>
+`;
   } else if (normRole === "subadmin") {
-    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `🛡️ <b>Roli:</b> <code>Kichik Administrator</code>\n`;
-    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
-    if (uData?.phone) profileMsg += `📞 <b>Tel raqami:</b> <code>${uData.phone}</code>\n`;
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>
+`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Kichik Administrator</code>
+`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>
+`;
+    if (uData?.phone) profileMsg += `📞 <b>Tel raqami:</b> <code>${uData.phone}</code>
+`;
   } else if (normRole === "teacher") {
-    profileMsg += `🏫 <b>Tashkilot nomi:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `🛡️ <b>Roli:</b> <code>Tashkilot</code>\n`;
-    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>\n`;
-    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+    profileMsg += `🏫 <b>Tashkilot nomi:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>
+`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Tashkilot</code>
+`;
+    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>
+`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>
+`;
   } else if (normRole === "staff") {
-    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `🏫 <b>Qaysi tashkilotga tegishli:</b> <code>${uData?.teacherName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `🛡️ <b>Roli:</b> <code>Xodim</code>\n`;
-    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>\n`;
-    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>
+`;
+    profileMsg += `🏫 <b>Qaysi tashkilotga tegishli:</b> <code>${uData?.teacherName || "Kiritilmagan"}</code>
+`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>Xodim</code>
+`;
+    profileMsg += `📞 <b>Tel raqami:</b> <code>${uData?.phone || "Kiritilmagan"}</code>
+`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>
+`;
   } else {
-    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>\n`;
-    profileMsg += `🛡️ <b>Roli:</b> <code>${normRole.toUpperCase()}</code>\n`;
-    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>\n`;
-    if (uData?.phone) profileMsg += `📞 <b>Tel raqami:</b> <code>${uData.phone}</code>\n`;
+    profileMsg += `✍️ <b>F.I.SH:</b> <code>${uData?.displayName || displayName || "Kiritilmagan"}</code>
+`;
+    profileMsg += `🛡️ <b>Roli:</b> <code>${normRole.toUpperCase()}</code>
+`;
+    profileMsg += `📧 <b>Emaili:</b> <code>${uData?.email || email || "Kiritilmagan"}</code>
+`;
+    if (uData?.phone) profileMsg += `📞 <b>Tel raqami:</b> <code>${uData.phone}</code>
+`;
   }
   profileMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
@@ -959,9 +1022,15 @@ bot.use(async (ctx, next) => {
     try {
       if (ctx.message || ctx.callbackQuery) {
         const text = 
-          `🔧 <b>Botda vaqtinchalik tuzatish ishlari olib borilmoqda!</b>\n\n` +
-          `Assalomu alaykum! Hurmatli foydalanuvchi, ayni vaqtda botda vaqtinchalik tuzatish va yangilash ishlari olib borilayotganligi sababli bot faoliyati vaqtinchalik to'xtatildi.\n\n` +
-          `🔔 <b>Bot qayta ishga tushganda yoki yangilanganda sizga darhol bildirishnoma yuboriladi.</b>\n\n` +
+          `🔧 <b>Botda vaqtinchalik tuzatish ishlari olib borilmoqda!</b>
+
+` +
+          `Assalomu alaykum! Hurmatli foydalanuvchi, ayni vaqtda botda vaqtinchalik tuzatish va yangilash ishlari olib borilayotganligi sababli bot faoliyati vaqtinchalik to'xtatildi.
+
+` +
+          `🔔 <b>Bot qayta ishga tushganda yoki yangilanganda sizga darhol bildirishnoma yuboriladi.</b>
+
+` +
           `<i>Keltirilgan noqulayliklar uchun uzr so'raymiz hamda tushunishingiz uchun katta rahmat!</i>`;
         
         await ctx.reply(text, { parse_mode: "HTML" }).catch(() => {});
@@ -1025,6 +1094,7 @@ async function getKeyboard(
   }
 
   const userHeader = [
+    [{ text: "💻 CHIRCHIQ KOMPYUTER XIZMATLARI" }],
     [{ text: "👤 Profil" }, { text: "💬 Adminga murojaat" }],
     [{ text: "🤖 Xizmatlar" }, { text: "💰 Bonus olish" }],
     [{ text: "💰 Balans" }, { text: "🌐 Rasmiy sayt" }]
@@ -1035,6 +1105,7 @@ async function getKeyboard(
     const isPrimary = adminIds.length === 0 || adminIds[0] === userId;
 
     return [
+      [{ text: "💻 CHIRCHIQ KOMPYUTER XIZMATLARI" }],
       [{ text: "👤 Profil" }],
       [{ text: "🤖 Xizmatlar" }, { text: "💬 Savol-javob" }],
       [{ text: "💵 Balans to'ldirish (Admin)" }],
@@ -1264,10 +1335,16 @@ async function getAuthedUser(userId: number) {
   return authed;
 }
 
-const paymentInstructionsText = `💳 <b>Balansni to'ldirish yo'riqnomasi:</b>\n\n` +
-                     `1. Click, Payme yoki uzum orqali to'lovni amalga oshiring.\n\n` +
-                     `Yoki quyidagi karta raqamiga o'tkazma qiling va botga skrinshotini yuboring:\n` +
-                     `💳 <code>5614 6812 9015 3646</code>\n` +
+const paymentInstructionsText = `💳 <b>Balansni to'ldirish yo'riqnomasi:</b>
+
+` +
+                     `1. Click, Payme yoki uzum orqali to'lovni amalga oshiring.
+
+` +
+                     `Yoki quyidagi karta raqamiga o'tkazma qiling va botga skrinshotini yuboring:
+` +
+                     `💳 <code>5614 6812 9015 3646</code>
+` +
                      `Ibodullayeva SH`;
 
 bot.start(async (ctx) => {
@@ -1301,10 +1378,14 @@ bot.start(async (ctx) => {
   telegramUsersCount = userList.length;
 
   if (isNewUser) {
-    const textDesc = `🎉 <b>Yangi a'zo qo'shildi!</b>\n` +
-                     `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                     `👤 Ism: <b>${ctx.from.first_name || ""} ${ctx.from.last_name || ""}</b>\n` +
-                     `🔗 Username: @${ctx.from.username || "yo'q"}\n` +
+    const textDesc = `🎉 <b>Yangi a'zo qo'shildi!</b>
+` +
+                     `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
+                     `👤 Ism: <b>${ctx.from.first_name || ""} ${ctx.from.last_name || ""}</b>
+` +
+                     `🔗 Username: @${ctx.from.username || "yo'q"}
+` +
                      `🆔 Telegram ID: <code>${userId}</code>`;
     await notifyAdminsDirectly(textDesc);
   }
@@ -1314,7 +1395,9 @@ bot.start(async (ctx) => {
 
   if (isAdmin) {
     const greeting =
-      `🤖 <b>Assalomu alaykum Administrator!</b>\n\n` +
+      `🤖 <b>Assalomu alaykum Administrator!</b>
+
+` +
       `AIEDUTIZIM boshqaruv paneliga xush kelibsiz. Kerakli menyuni tanlang:`;
 
     return ctx.reply(greeting, {
@@ -1348,8 +1431,12 @@ bot.start(async (ctx) => {
 
   if (hasPhone) {
     const greeting =
-      `🤖 <b>Assalomu alaykum! AIEDUTIZIM Telegram botiga xush kelibsiz.</b>\n\n` +
-      `🎓 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Ta'lim Tizimi.\n\n` +
+      `🤖 <b>Assalomu alaykum! AIEDUTIZIM Telegram botiga xush kelibsiz.</b>
+
+` +
+      `🎓 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Ta'lim Tizimi.
+
+` +
       `Kerakli bo'limni tanlang:`;
 
     return ctx.reply(greeting, {
@@ -1370,7 +1457,9 @@ bot.start(async (ctx) => {
   pendingLogins.set(userId, { step: "await_contact", referrerId });
 
   return ctx.reply(
-    `👋 <b>Assalomu alaykum! AIEDUTIZIM botiga xush kelibsiz.</b>\n\n` +
+    `👋 <b>Assalomu alaykum! AIEDUTIZIM botiga xush kelibsiz.</b>
+
+` +
     `Botdan foydalanish va ro'yxatdan o'tish uchun iltimos, pastdagi <b>"📱 Kontaktni yuborish"</b> tugmasini bosing:`,
     {
       parse_mode: "HTML",
@@ -1488,8 +1577,11 @@ bot.on("contact", async (ctx) => {
               try {
                 await bot.telegram.sendMessage(
                   Number(notifyTgId),
-                  `🎉 <b>YANGI DO'ST TAKLIF QILINDI!</b>\n\n` +
-                  `Siz taklif qilgan do'stingiz (<b>${displayName}</b>) botga a'zo bo'ldi.\n` +
+                  `🎉 <b>YANGI DO'ST TAKLIF QILINDI!</b>
+
+` +
+                  `Siz taklif qilgan do'stingiz (<b>${displayName}</b>) botga a'zo bo'ldi.
+` +
                   `💰 Balansingizga <b>+${refBonus.toLocaleString()} UZS</b> bonus qo'shildi!`,
                   { parse_mode: "HTML" }
                 );
@@ -1523,10 +1615,16 @@ bot.on("contact", async (ctx) => {
 
   const keyboard = await getKeyboard("bot_user", userId, true);
   await ctx.reply(
-    `✅ <b>Telefon raqamingiz muvaffaqiyatli qabul qilindi!</b>\n\n` +
-    `👤 <b>Ism:</b> ${displayName}\n` +
-    `📞 <b>Telefon:</b> ${phone}\n` +
-    `🆔 <b>ID raqamingiz:</b> <code>${userSystemId}</code>\n\n` +
+    `✅ <b>Telefon raqamingiz muvaffaqiyatli qabul qilindi!</b>
+
+` +
+    `👤 <b>Ism:</b> ${displayName}
+` +
+    `📞 <b>Telefon:</b> ${phone}
+` +
+    `🆔 <b>ID raqamingiz:</b> <code>${userSystemId}</code>
+
+` +
     `🤖 Bot ishchi holatga o'tdi. Kerakli menyuni tanlang:`,
     {
       parse_mode: "HTML",
@@ -1662,18 +1760,25 @@ async function handleUnansweredRequest(ctx: any) {
     await ctx.telegram.deleteMessage(ctx.chat!.id, loadingMsg.message_id).catch(() => {});
 
     if (unansweredList.length === 0) {
-      return ctx.reply("🎉 <b>Ajoyib! Barcha murojaatlarga javob berilgan!</b>\n\nHech qanday javob berilmagan xabarlar topilmadi.", { parse_mode: "HTML" });
-    }
+      return ctx.reply("🎉 <b>Ajoyib! Barcha murojaatlarga javob berilgan!</b>\nHech qanday javob berilmagan xabarlar topilmadi.", { parse_mode: "HTML" });
+}
 
-    let text = `📥 <b>Javob berilmagan murojaatlar ro'yxati (${unansweredList.length} ta):</b>\n\n`;
+    let text = `📥 <b>Javob berilmagan murojaatlar ro'yxati (${unansweredList.length} ta):</b>
+
+`;
     for (let i = 0; i < unansweredList.length; i++) {
       const item = unansweredList[i];
-      text += `${i + 1}. 👤 <b>${item.partnerName}</b> (ID: <code>${item.partnerId}</code>)\n`;
-      text += `🕒 <code>${item.timeStr}</code>\n`;
-      text += `💬 <i>"${item.text.substring(0, 100)}${item.text.length > 100 ? '...' : ''}"</i>\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `${i + 1}. 👤 <b>${item.partnerName}</b> (ID: <code>${item.partnerId}</code>)
+`;
+      text += `🕒 <code>${item.timeStr}</code>
+`;
+      text += `💬 <i>"${item.text.substring(0, 100)}${item.text.length > 100 ? '...' : ''}"</i>
+`;
+      text += `━━━━━━━━━━━━━━━━━━━━━
+`;
     }
-    text += `\n✍️ Javob yozish uchun quyidagi ro'yxatdan foydalanuvchini tanlang:`;
+    text += `
+✍️ Javob yozish uchun quyidagi ro'yxatdan foydalanuvchini tanlang:`;
 
     const inline_keyboard: any[][] = [];
     for (const item of unansweredList.slice(0, 10)) {
@@ -1686,7 +1791,9 @@ async function handleUnansweredRequest(ctx: any) {
     }
 
     if (unansweredList.length > 10) {
-      text += `\n\n📌 <i>Yana ${unansweredList.length - 10} ta javobsiz xabar bor, birinchi 10 tasi yuqorida ko'rsatilgan. To'liq ro'yxatni ko'rish yoki boshqa foydalanuvchi bilan yozishmalarni ko'rish uchun <code>/viewmsg_ID</code> ko'rinishida yuboring.</i>`;
+      text += `
+
+📌 <i>Yana ${unansweredList.length - 10} ta javobsiz xabar bor, birinchi 10 tasi yuqorida ko'rsatilgan. To'liq ro'yxatni ko'rish yoki boshqa foydalanuvchi bilan yozishmalarni ko'rish uchun <code>/viewmsg_ID</code> ko'rinishida yuboring.</i>`;
     }
 
     return ctx.reply(text, {
@@ -1718,9 +1825,9 @@ bot.command("tizimhaqida", async (ctx) => {
   }
 
   const text = ctx.message.text.replace("/tizimhaqida", "").trim();
-  if (!text) {
-    return ctx.reply("✍️ Tizim haqida matnni yangilash uchun: \n`/tizimhaqida MATN` ko'rinishida yuboring.", { parse_mode: "Markdown" });
-  }
+if (!text) {
+return ctx.reply("✍️ Tizim haqida matnni yangilash uchun: \n`/tizimhaqida MATN` ko'rinishida yuboring.", { parse_mode: "Markdown" });
+}
 
   try {
     await setDoc(doc(db, "siteContent", "system_about"), { 
@@ -1759,11 +1866,12 @@ bot.action("admin_edit_menu_main", async (ctx) => {
   let kb = [];
   if (menuDoc.exists()) kb = menuDoc.data().keyboard || [];
   
-  let msg = "📝 <b>Joriy asosiy menyu:</b>\n\n";
-  if (kb.length === 0) msg += "<i>Standart menyu ishlatilmoqda.</i>";
+  let msg = "📝 <b>Joriy asosiy menyu:</b>\n";
+if (kb.length === 0) msg += "<i>Standart menyu ishlatilmoqda.</i>";
   else {
     kb.forEach((row: any[], i: number) => {
-      msg += `${i+1}-qator: ${row.map(b => `[${b.text}]`).join(" ")}\n`;
+      msg += `${i+1}-qator: ${row.map(b => `[${b.text}]`).join(" ")}
+`;
     });
   }
   
@@ -1836,11 +1944,11 @@ bot.action("admin_price_settings", async (ctx) => {
   try {
     const costs = await getBotConfigCosts();
     
-    let text = "💰 <b>Narxlar sozlamalari (so'mda):</b>\n\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n\n";
-    const buttons = [];
-    
-    for (const [service, price] of Object.entries(costs)) {
-      text += `🔹 <b>${service}</b>: ${price} so'm\n`;
+    let text = "💰 <b>Narxlar sozlamalari (so'mda):</b>\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n";
+const buttons = [];
+for (const [service, price] of Object.entries(costs)) {
+      text += `🔹 <b>${service}</b>: ${price} so'm
+`;
       buttons.push([{ text: `✏️ ${service}`, callback_data: `edit_price_${service.replace(/\s+/g, '_')}` }]);
     }
     
@@ -1920,7 +2028,8 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
         originalChatId: ctx.callbackQuery?.message?.chat?.id,
         originalMessageId: ctx.callbackQuery?.message?.message_id
       });
-      await ctx.reply(`👤 <b>Foydalanuvchi:</b> <code>${req.userName || "Foydalanuvchi"}</code>\n💰 Ushbu foydalanuvchi balansiga qancha kiritmoqchisiz? Faqat raqam kiriting (masalan: 50000):`, { parse_mode: "HTML" });
+      await ctx.reply(`👤 <b>Foydalanuvchi:</b> <code>${req.userName || "Foydalanuvchi"}</code>
+💰 Ushbu foydalanuvchi balansiga qancha kiritmoqchisiz? Faqat raqam kiriting (masalan: 50000):`, { parse_mode: "HTML" });
       try { ctx.answerCbQuery(); } catch(e){}
       return;
     }
@@ -2120,14 +2229,20 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
         console.log(`[Telegram] Balance updated for ${userRef.id}: ${currentBalance} -> ${newBalance}`);
       }
 
-      await ctx.reply(`✅ Balans muvaffaqiyatli to'ldirildi!\n👤 ${req.userName} (ID: ${req.systemId || targetUserId})\n💰 Qo'shildi: +${topUpAmount.toLocaleString()} UZS\n💳 Yangi balans: ${newBalance.toLocaleString()} UZS`);
+      await ctx.reply(`✅ Balans muvaffaqiyatli to'ldirildi!
+👤 ${req.userName} (ID: ${req.systemId || targetUserId})
+💰 Qo'shildi: +${topUpAmount.toLocaleString()} UZS
+💳 Yangi balans: ${newBalance.toLocaleString()} UZS`);
 
       const notifyTgId = userSnap.exists() ? (userSnap.data().telegramId || targetUserId) : targetUserId;
       if (notifyTgId) {
         try {
           await bot.telegram.sendMessage(
             Number(notifyTgId),
-            `✅ <b>To'lovingiz tasdiqlandi!</b>\n\n💰 Balansingizga <b>+${topUpAmount.toLocaleString()} UZS</b> qo'shildi.\n💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
+            `✅ <b>To'lovingiz tasdiqlandi!</b>
+
+💰 Balansingizga <b>+${topUpAmount.toLocaleString()} UZS</b> qo'shildi.
+💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
             { parse_mode: "HTML" }
           );
         } catch (e) {}
@@ -2220,11 +2335,18 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
 
     if (req.isNewOrgRequest) {
       await ctx.reply(
-        `✅ Yangi profil muvaffaqiyatli yaratildi!\n\n` +
-        `👤 <b>Foydalanuvchi:</b> ${req.userName}\n` +
-        `📞 <b>Telefon:</b> ${req.phone || "Kiritilmagan"}\n` +
-        `🔑 <b>Tizimli ID:</b> <code>${approvedLogin}</code>\n` +
-        `🔒 <b>Maxfiy Parol:</b> <code>${approvedPassword}</code>\n\n` +
+        `✅ Yangi profil muvaffaqiyatli yaratildi!
+
+` +
+        `👤 <b>Foydalanuvchi:</b> ${req.userName}
+` +
+        `📞 <b>Telefon:</b> ${req.phone || "Kiritilmagan"}
+` +
+        `🔑 <b>Tizimli ID:</b> <code>${approvedLogin}</code>
+` +
+        `🔒 <b>Maxfiy Parol:</b> <code>${approvedPassword}</code>
+
+` +
         `<i>Siz tomoningizdan ko'rsatib o'tilgan telefon raqamga SMS xabarnomada tizimga kirish login va paroli yuborildi.</i>`,
         { parse_mode: "HTML" }
       );
@@ -2297,7 +2419,9 @@ bot.action(/admin_reject_pay_(\d+)/, async (ctx) => {
   const targetId = parseInt(ctx.match[1]);
   const userId = ctx.from.id;
   
-  await bot.telegram.sendMessage(targetId, `❌ To\x27lov chekingiz rad etildi.\n\nIltimos administrator bilan bog\x27laning.`, { parse_mode: "HTML" }).catch(() => {});
+  await bot.telegram.sendMessage(targetId, `❌ To\x27lov chekingiz rad etildi.
+
+Iltimos administrator bilan bog\x27laning.`, { parse_mode: "HTML" }).catch(() => {});
   
   // Update payment status in Firestore and delete all admin messages
   try {
@@ -2357,13 +2481,23 @@ bot.action("add_balance", async (ctx) => {
     const authed = await getAuthedUser(userId);
     const sysId = authed?.systemId || userId;
 
-    const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>\n\n` +
-                 `1️⃣ <b>-USUL:</b> Koʻrsatilgan kartaga toʻlov qiling va chekni shu yerga yuboring.\n` +
-                 `💳 <b>Karta raqami:</b> <code>${cardNumber}</code>\n` +
-                 `👤 <b>Egasi:</b> ${cardOwner}\n\n` +
-                 `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-                 `2️⃣ <b>-USUL:</b> Adminga murojaat qiling\n` +
-                 `🆔 <b>Sizning ID raqamingiz:</b> <code>${sysId}</code>\n` +
+    const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>
+
+` +
+                 `1️⃣ <b>-USUL:</b> Koʻrsatilgan kartaga toʻlov qiling va chekni shu yerga yuboring.
+` +
+                 `💳 <b>Karta raqami:</b> <code>${cardNumber}</code>
+` +
+                 `👤 <b>Egasi:</b> ${cardOwner}
+
+` +
+                 `━━━━━━━━━━━━━━━━━━━━━━━━━
+
+` +
+                 `2️⃣ <b>-USUL:</b> Adminga murojaat qiling
+` +
+                 `🆔 <b>Sizning ID raqamingiz:</b> <code>${sysId}</code>
+` +
                  `"Adminga ID raqamingizni va balansingizga qancha summa oʻtkazmoqchi ekanligingizni yozib yuboring"`;
 
     await ctx.reply(text, { 
@@ -2388,14 +2522,14 @@ bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
 
   // Pro needs the Anthropic key. Check before charging, never after.
   if (isProService && !proIsConfigured()) {
-    await ctx.reply("⚠️ <b>Pro xizmati hozircha mavjud emas.</b>\n\nIltimos keyinroq urinib ko'ring.", { parse_mode: "HTML" });
-    return;
+    await ctx.reply("⚠️ <b>Pro xizmati hozircha mavjud emas.</b>\nIltimos keyinroq urinib ko'ring.", { parse_mode: "HTML" });
+return;
   }
 
   // One Pro job per user: a second tap would charge again for the same work.
   if (isProService && proQueue.hasJob(userId)) {
-    await ctx.reply("⏳ <b>Oldingi Pro buyurtmangiz hali tayyorlanmoqda.</b>\n\nU tugagach yangisini boshlashingiz mumkin.", { parse_mode: "HTML" });
-    return;
+    await ctx.reply("⏳ <b>Oldingi Pro buyurtmangiz hali tayyorlanmoqda.</b>\nU tugagach yangisini boshlashingiz mumkin.", { parse_mode: "HTML" });
+return;
   }
 
   const isAdmin = getAdminIds().includes(userId);
@@ -2408,7 +2542,10 @@ bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
   }
   
   if (!hasBalance) {
-    await ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>\n\nUshbu xizmat narxi: ${cost.toLocaleString()} so'm.\nSizning balansingizda mablag' yetarli emas.`, {
+    await ctx.reply(`❌ <b>Balansingiz yetarli emas!</b>
+
+Ushbu xizmat narxi: ${cost.toLocaleString()} so'm.
+Sizning balansingizda mablag' yetarli emas.`, {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
@@ -2550,13 +2687,16 @@ bot.action(/viewmsg_(.+)/, async (ctx) => {
 
     msgs = msgs.slice(-20); // last 20
 
-    let text = `<b>${msgs[msgs.length - 1].senderName || "Foydalanuvchi"} bilan yozishmalar:</b>\n\n`;
+    let text = `<b>${msgs[msgs.length - 1].senderName || "Foydalanuvchi"} bilan yozishmalar:</b>
+
+`;
     for (const m of msgs) {
       const roleName =
         m.senderId === adminUid || m.senderRole === "admin"
           ? "Siz"
           : m.senderName || "U";
-      text += `👤 <b>${roleName}:</b> ${m.text || ""}\n`;
+      text += `👤 <b>${roleName}:</b> ${m.text || ""}
+`;
     }
 
     ctx.reply(text, {
@@ -2619,7 +2759,7 @@ async function getSystemContextInfo(): Promise<string> {
           const c: any = d.data();
           return `- ${c.title} (${c.category || "Dasturlash"})`;
         }).join("\n");
-      }
+}
     } catch (e: any) {
       console.log("[ContextStats] Error or quota limit in context fetch:", e.message);
       // fallback from file cache
@@ -2751,7 +2891,9 @@ function safeParseJSON(text: string | null | undefined, defaultValue: any): any 
 async function runPresentationGeneration(ctx: any, data: any) {
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
-  const loadingMsg = await ctx.reply(`⏳ <b>Taqdimot tayyorlanmoqda...</b>\n\nIltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
+  const loadingMsg = await ctx.reply(`⏳ <b>Taqdimot tayyorlanmoqda...</b>
+
+Iltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
 
   try {
     const res = await fetch(getApiUrl("/api/gemini"), {
@@ -2944,7 +3086,7 @@ async function runPresentationGeneration(ctx: any, data: any) {
             }
             if (s.bulletPoints && s.bulletPoints.length > 0) {
                const bulletTxt = s.bulletPoints.map((bp: string) => `✦  ${bp}`).join("\n");
-               slide.addText(bulletTxt, { x: 5.1, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
+slide.addText(bulletTxt, { x: 5.1, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
             }
             
         } else if (layout === "image-right") {
@@ -2967,7 +3109,7 @@ async function runPresentationGeneration(ctx: any, data: any) {
             }
             if (s.bulletPoints && s.bulletPoints.length > 0) {
                const bulletTxt = s.bulletPoints.map((bp: string) => `✦  ${bp}`).join("\n");
-               slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
+slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
             }
             
         } else if (layout === "cards" && s.bulletPoints && s.bulletPoints.length > 0) {
@@ -3012,7 +3154,7 @@ async function runPresentationGeneration(ctx: any, data: any) {
             }
             if (s.bulletPoints && s.bulletPoints.length > 0) {
                const bulletTxt = s.bulletPoints.map((bp: string) => `✦  ${bp}`).join("\n");
-               slide.addText(bulletTxt, { x: 6.0, y: 3.0, w: 3.4, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
+slide.addText(bulletTxt, { x: 6.0, y: 3.0, w: 3.4, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
             }
             
         } else {
@@ -3047,7 +3189,7 @@ async function runPresentationGeneration(ctx: any, data: any) {
                 }
                 if (s.bulletPoints && s.bulletPoints.length > 0) {
                    const bulletTxt = s.bulletPoints.map((bp: string) => `✦  ${bp}`).join("\n");
-                   slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
+slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
                 }
             }
         }
@@ -3058,7 +3200,8 @@ async function runPresentationGeneration(ctx: any, data: any) {
       userWizardStates.delete(userId);
       await ctx.replyWithDocument(
         { source: pptxBuffer as any, filename },
-        { caption: `📊 "${data.topic}" mavzusida premium ${templateName} taqdimoti tayyor!\n🎨 Dizayn uslubi: ${designPlanText}` }
+        { caption: `📊 "${data.topic}" mavzusida premium ${templateName} taqdimoti tayyor!
+🎨 Dizayn uslubi: ${designPlanText}` }
       );
       return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
         parse_mode: "HTML",
@@ -3079,7 +3222,11 @@ async function runPresentationGeneration(ctx: any, data: any) {
       }
       console.error("Presentation API Error:", res.status, errMsg);
       userWizardStates.delete(userId);
-      return ctx.reply(`❌ Taqdimot ma'lumotlarini yuklashda xato yuz berdi:\n\n💬 Sabab: ${errMsg}\n\nIltimos, keyinroq qayta urinib ko'ring yoki Slaydlar sonini biroz kamaytirib tekshiring.`);
+      return ctx.reply(`❌ Taqdimot ma'lumotlarini yuklashda xato yuz berdi:
+
+💬 Sabab: ${errMsg}
+
+Iltimos, keyinroq qayta urinib ko'ring yoki Slaydlar sonini biroz kamaytirib tekshiring.`);
     }
   } catch (err: any) {
     console.error("Presentation generation err:", err);
@@ -3093,10 +3240,16 @@ async function runCourseWorkDocxGeneration(ctx: any, data: any) {
   const chatId = ctx.chat?.id;
 
   const loadingMsg = await ctx.reply(
-    `⏳ <b>Akademik Kurs Ishi generatsiya qilinmoqda...</b>\n\n` +
-    `<i>1. OAK va akademik standartlar bo'yicha 3 bob va 6 paragrafli reja shakllantirilmoqda...\n` +
-    `2. Nazariy va amaliy bo'limlar, manbalar hamda oraliq xulosalar tahlil qilinmoqda...\n` +
-    `3. Word (.docx) standarti bo'yicha shakllantirilmoqda...</i>\n\n` +
+    `⏳ <b>Akademik Kurs Ishi generatsiya qilinmoqda...</b>
+
+` +
+    `<i>1. OAK va akademik standartlar bo'yicha 3 bob va 6 paragrafli reja shakllantirilmoqda...
+` +
+    `2. Nazariy va amaliy bo'limlar, manbalar hamda oraliq xulosalar tahlil qilinmoqda...
+` +
+    `3. Word (.docx) standarti bo'yicha shakllantirilmoqda...</i>
+
+` +
     `Iltimos kuting, bu biroz vaqt olishi mumkin.`,
     { parse_mode: "HTML" }
   );
@@ -3129,11 +3282,18 @@ async function runCourseWorkDocxGeneration(ctx: any, data: any) {
     await ctx.replyWithDocument(
       { source: docxBuffer, filename },
       {
-        caption: `✅ <b>AKADEMIK KURS ISHI TAYYOR BO'LDI!</b>\n\n` +
-          `📌 <b>Mavzu:</b> ${data.topic}\n` +
-          `🎓 <b>Talaba:</b> ${data.studentName || "Ko'rsatilmadi"}\n` +
-          `🏛 <b>OTM:</b> ${data.university || "Ko'rsatilmadi"}\n` +
-          `📑 <b>Struktura:</b> Titul varaqasi, Mundarija, Kirish, 3 ta bob (6 paragraf), Xulosa, Ilmiy-amaliy tavsiyalar, Adabiyotlar ro'yxati.\n\n` +
+        caption: `✅ <b>AKADEMIK KURS ISHI TAYYOR BO'LDI!</b>
+
+` +
+          `📌 <b>Mavzu:</b> ${data.topic}
+` +
+          `🎓 <b>Talaba:</b> ${data.studentName || "Ko'rsatilmadi"}
+` +
+          `🏛 <b>OTM:</b> ${data.university || "Ko'rsatilmadi"}
+` +
+          `📑 <b>Struktura:</b> Titul varaqasi, Mundarija, Kirish, 3 ta bob (6 paragraf), Xulosa, Ilmiy-amaliy tavsiyalar, Adabiyotlar ro'yxati.
+
+` +
           `✨ <i>Fayl OAK va oliy ta'lim standartlariga mos Word (.docx) formatida tayyorlandi.</i>`,
         parse_mode: "HTML"
       }
@@ -3160,7 +3320,9 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
 
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
-  const loadingMsg = await ctx.reply(`⏳ <b>Hujjat tayyorlanmoqda...</b>\n\nIltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
+  const loadingMsg = await ctx.reply(`⏳ <b>Hujjat tayyorlanmoqda...</b>
+
+Iltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
   
   try {
     let topicStr = data.topic;
@@ -3223,7 +3385,8 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
           spacing: { after: 120, line: 360 }
         }));
         children.push(new Paragraph({
-          children: [new TextRun({ text: `${data.faculty.toUpperCase()} \n ${data.department.toUpperCase()}`, bold: true, size: 28, font: "Times New Roman" })],
+          children: [new TextRun({ text: `${data.faculty.toUpperCase()} 
+ ${data.department.toUpperCase()}`, bold: true, size: 28, font: "Times New Roman" })],
           alignment: AlignmentType.CENTER,
           spacing: { after: 1200, line: 360 }
         }));
@@ -3245,8 +3408,10 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
         
         children.push(new Paragraph({
           children: [
-            new TextRun({ text: `Bajardi: ${data.studentName}\n`, bold: true, size: 28, font: "Times New Roman" }),
-            new TextRun({ text: `Yo'nalish: ${data.direction}\n`, size: 28, font: "Times New Roman" }),
+            new TextRun({ text: `Bajardi: ${data.studentName}
+`, bold: true, size: 28, font: "Times New Roman" }),
+            new TextRun({ text: `Yo'nalish: ${data.direction}
+`, size: 28, font: "Times New Roman" }),
             new TextRun({ text: `Ilmiy rahbar: ${data.advisor}`, bold: true, size: 28, font: "Times New Roman" })
           ],
           alignment: AlignmentType.RIGHT,
@@ -3281,7 +3446,7 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
 
       // Parse and format body text cleanly
       const lines = content.split("\n");
-      lines.forEach((line: string) => {
+lines.forEach((line: string) => {
         const trimmed = line.trim();
         if (!trimmed) {
           children.push(new Paragraph({ spacing: { after: 200 } }));
@@ -3396,7 +3561,9 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
       const cleanFileName = `${(data.topic || data.name || "hujjat").substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_hujjat.docx`;
       await ctx.replyWithDocument(
         { source: docxBuffer as any, filename: cleanFileName },
-        { caption: `✅ Sarlavha: ${title}\n\nHaqiqiy Microsoft Word formatidagi fayl muvaffaqiyatli tayyorlandi!` }
+        { caption: `✅ Sarlavha: ${title}
+
+Haqiqiy Microsoft Word formatidagi fayl muvaffaqiyatli tayyorlandi!` }
       );
       return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
         parse_mode: "HTML",
@@ -3413,7 +3580,9 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
       } catch (e) {
         errMsg = res.statusText || errMsg;
       }
-      return ctx.reply(`❌ Xatolik: Serverdan ma'lumot olish muvaffaqiyatsiz bo'ldi.\n\n💬 Sabab: ${errMsg}`);
+      return ctx.reply(`❌ Xatolik: Serverdan ma'lumot olish muvaffaqiyatsiz bo'ldi.
+
+💬 Sabab: ${errMsg}`);
     }
   } catch (err: any) {
     console.error("Document generation error:", err);
@@ -3424,7 +3593,9 @@ async function runDocumentGeneration(ctx: any, docType: string, data: any) {
 async function runObektivkaDocxGeneration(ctx: any, data: any) {
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
-  const loadingMsg = await ctx.reply(`⏳ <b>Obektivka hujjati tayyorlanmoqda...</b>\n\nIltimos kuting, hozir faylingiz shakllantiriladi.`, { parse_mode: "HTML" });
+  const loadingMsg = await ctx.reply(`⏳ <b>Obektivka hujjati tayyorlanmoqda...</b>
+
+Iltimos kuting, hozir faylingiz shakllantiriladi.`, { parse_mode: "HTML" });
 
   try {
     const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, PageBreak } = await import("docx");
@@ -3465,7 +3636,7 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
                 new Paragraph({
                   children: [
                     new TextRun({ text: "3x4\nRasm", bold: true, font: "Times New Roman", size: 20, color: "555555" })
-                  ],
+],
                   alignment: AlignmentType.CENTER,
                   spacing: { before: 300, after: 300 }
                 })
@@ -3763,7 +3934,9 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
     const cleanFileName = `Obektivka_${(data.name || "hujjat").substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.docx`;
     await ctx.replyWithDocument(
       { source: docxBuffer as any, filename: cleanFileName },
-      { caption: `✅ <b>Sizning obektivkangiz tayyor bo'ldi!</b>\n\nMicrosoft Word formatidagi fayl muvaffaqiyatli shakllantirildi.` }
+      { caption: `✅ <b>Sizning obektivkangiz tayyor bo'ldi!</b>
+
+Microsoft Word formatidagi fayl muvaffaqiyatli shakllantirildi.` }
     );
 
     return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
@@ -3784,7 +3957,9 @@ async function runObektivkaDocxGeneration(ctx: any, data: any) {
 async function runTestGeneration(ctx: any, data: any) {
   const userId = ctx.from.id;
   const chatId = ctx.chat?.id;
-  const loadingMsg = await ctx.reply(`⏳ <b>Testlar shakllantirilmoqda...</b>\n\nIltimos kuting.`, { parse_mode: "HTML" });
+  const loadingMsg = await ctx.reply(`⏳ <b>Testlar shakllantirilmoqda...</b>
+
+Iltimos kuting.`, { parse_mode: "HTML" });
 
   try {
     const topicStr = `Fan: ${data.subject}. Mavzu: ${data.topic}. Soni: ${data.questionCount}`;
@@ -3960,8 +4135,8 @@ async function runTranslationGeneration(ctx: any, data: any, isFile: boolean = f
       }
       
       const respData = await res.json();
-      fullTranslatedText += (respData.content || "") + "\n\n";
-      stepCount++;
+      fullTranslatedText += (respData.content || "") + "\n";
+stepCount++;
     }
 
     await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
@@ -3969,7 +4144,7 @@ async function runTranslationGeneration(ctx: any, data: any, isFile: boolean = f
     if (isFile) {
       const { Document, Packer, Paragraph, TextRun } = await import("docx");
       const paragraphs = fullTranslatedText.split("\n").map(line => new Paragraph({ children: [new TextRun(line)] }));
-      const doc = new Document({
+const doc = new Document({
         sections: [{ properties: {}, children: paragraphs }]
       });
       const docBuffer = await Packer.toBuffer(doc);
@@ -4248,7 +4423,7 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       data.createDiagrams = input;
       userWizardStates.set(userId, { service, step: 7, data });
       return ctx.reply("📊 <b>Ma'ruzachi nutqi (Speaker Notes / Himoya matni) kerakmi?</b>\n<i>Har bir slayd uchun taqdimotni himoya qilishda aytiladigan maxsus ma'ruza matni yoziladi.</i>", {
-        parse_mode: "HTML",
+parse_mode: "HTML",
         reply_markup: {
           keyboard: [
             [{ text: "Ha, ma'ruzachi nutqi yozilsin" }],
@@ -4687,8 +4862,8 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
       data.deputy = input;
       data.relatives = [];
       userWizardStates.set(userId, { service, step: 14, data });
-      return ctx.reply("<b>2-bo'lim: FISH ning yaqin qarindoshlari haqida ma'lumot</b>\n\nOtasi:(Fish ni kiriting )", {
-        parse_mode: "HTML",
+      return ctx.reply("<b>2-bo'lim: FISH ning yaqin qarindoshlari haqida ma'lumot</b>\nOtasi:(Fish ni kiriting )", {
+parse_mode: "HTML",
         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
       });
     }
@@ -4850,6 +5025,169 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
   }
 }
 
+
+// --- CHIRCHIQ KOMPYUTER XIZMATLARI ACTIONS ---
+
+bot.action(/comp_srv_view_(.+)/, async (ctx) => {
+  const shopId = ctx.match[1];
+  try {
+    const snap = await getDoc(doc(db, "computer_services", shopId));
+    if (!snap.exists()) {
+      return ctx.answerCbQuery("Bu xizmat topilmadi.", { show_alert: true });
+    }
+    const shop = snap.data();
+    
+    let text = `💻 <b>${shop.name}</b>
+
+`;
+    text += `📋 <b>Xizmatlar:</b>
+${shop.services || "Ma'lumot yo'q"}
+
+`;
+    text += `📍 <b>Manzil:</b> ${shop.address || "Ma'lumot yo'q"}
+`;
+    text += `📞 <b>Bog'lanish:</b> ${shop.contact || "Ma'lumot yo'q"}`;
+
+    const buttons = [
+      [{ text: "🔙 Orqaga", callback_data: "comp_srv_back" }]
+    ];
+
+    const adminIds = getAdminIds();
+    const userId = ctx.from.id;
+    const authed = await getAuthedUser(userId);
+    const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin"));
+
+    if (isAdminUser) {
+      buttons.push([
+        { text: "✏️ Tahrirlash (Admin)", callback_data: `comp_srv_edit_${shopId}` },
+        { text: "🗑 O'chirish (Admin)", callback_data: `comp_srv_del_${shopId}` }
+      ]);
+    }
+
+    if (shop.photoId) {
+      await ctx.deleteMessage().catch(() => {});
+      await ctx.replyWithPhoto(shop.photoId, {
+        caption: text,
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: buttons }
+      });
+    } else {
+      await ctx.deleteMessage().catch(() => {});
+      await ctx.reply(text, {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: buttons }
+      });
+    }
+  } catch (e) {
+    console.error(e);
+    ctx.answerCbQuery("Xatolik").catch(() => {});
+  }
+});
+
+bot.action("comp_srv_back", async (ctx) => {
+  const userId = ctx.from.id;
+  const adminIds = getAdminIds();
+  const authed = await getAuthedUser(userId);
+  const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin"));
+
+  try {
+    const snap = await getDocs(collection(db, "computer_services"));
+    const shops = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
+    let text = "💻 <b>CHIRCHIQ KOMPYUTER XIZMATLARI</b>\nQuyidagi kompyuter xizmatlaridan birini tanlang:";
+if (shops.length === 0) {
+      text = "💻 <b>CHIRCHIQ KOMPYUTER XIZMATLARI</b>\nHozircha ro'yxat bo'sh.";
+}
+
+    const buttons = shops.map(shop => ([{ text: shop.name || "Nomsiz xizmat", callback_data: `comp_srv_view_${shop.id}` }]));
+    
+    if (isAdminUser) {
+      buttons.push([{ text: "➕ Yangi qo'shish (Admin)", callback_data: "comp_srv_add" }]);
+    }
+
+    await ctx.deleteMessage().catch(() => {});
+    await ctx.reply(text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: buttons }
+    });
+  } catch (e) {
+    console.error(e);
+  }
+});
+
+bot.action("comp_srv_add", async (ctx) => {
+  pendingLogins.set(ctx.from.id, { step: "admin_comp_add_name" });
+  await ctx.deleteMessage().catch(() => {});
+  await ctx.reply("✍️ Yangi kompyuterxona nomini kiriting:\n<i>Bekor qilish uchun <b>⬅️ Asosiy menyu</b> tugmasini bosing.</i>", {
+parse_mode: "HTML",
+    reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+  });
+});
+
+bot.action(/comp_srv_del_(.+)/, async (ctx) => {
+  const shopId = ctx.match[1];
+  try {
+    await deleteDoc(doc(db, "computer_services", shopId));
+    await ctx.answerCbQuery("O'chirildi", { show_alert: true });
+    
+    const snap = await getDocs(collection(db, "computer_services"));
+    const shops = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
+    let text = "💻 <b>CHIRCHIQ KOMPYUTER XIZMATLARI</b>\nQuyidagi kompyuter xizmatlaridan birini tanlang:";
+if (shops.length === 0) {
+      text = "💻 <b>CHIRCHIQ KOMPYUTER XIZMATLARI</b>\nHozircha ro'yxat bo'sh.";
+}
+
+    const buttons = shops.map(shop => ([{ text: shop.name || "Nomsiz xizmat", callback_data: `comp_srv_view_${shop.id}` }]));
+    buttons.push([{ text: "➕ Yangi qo'shish (Admin)", callback_data: "comp_srv_add" }]);
+
+    await ctx.deleteMessage().catch(() => {});
+    await ctx.reply(text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: buttons }
+    });
+  } catch (e) {
+    console.error(e);
+  }
+});
+
+bot.action(/comp_srv_edit_(.+)/, async (ctx) => {
+  const shopId = ctx.match[1];
+  pendingLogins.set(ctx.from.id, { step: "admin_comp_edit_select", shopId } as any);
+  await ctx.deleteMessage().catch(() => {});
+  await ctx.reply("Qaysi qismini tahrirlamoqchisiz?\n<i>Bekor qilish uchun <b>⬅️ Asosiy menyu</b> tugmasini bosing.</i>", {
+parse_mode: "HTML",
+    reply_markup: {
+       inline_keyboard: [
+           [{text: "Nomi", callback_data: "comp_srv_edit_field_name"}],
+           [{text: "Xizmatlar", callback_data: "comp_srv_edit_field_services"}],
+           [{text: "Manzil", callback_data: "comp_srv_edit_field_address"}],
+           [{text: "Bog'lanish", callback_data: "comp_srv_edit_field_contact"}],
+           [{text: "Rasm", callback_data: "comp_srv_edit_field_photo"}],
+       ]
+    }
+  });
+});
+
+bot.action(/comp_srv_edit_field_(.+)/, async (ctx) => {
+    const field = ctx.match[1];
+    const pending = pendingLogins.get(ctx.from.id);
+    if (!pending || pending.step !== "admin_comp_edit_select") {
+        return ctx.answerCbQuery("Xatolik", { show_alert: true });
+    }
+    pending.step = "admin_comp_edit_do";
+    (pending as any).editField = field;
+    await ctx.deleteMessage().catch(() => {});
+    await ctx.reply(`✍️ Yangi ${field} ma'lumotini yuboring (rasm bo'lsa rasm yuboring):
+
+<i>Bekor qilish uchun <b>⬅️ Asosiy menyu</b> tugmasini bosing.</i>`, {
+        parse_mode: "HTML",
+        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+    });
+});
+
+// --- END CHIRCHIQ KOMPYUTER XIZMATLARI ACTIONS ---
+
 bot.on("message", async (ctx) => {
   const userId = ctx.from.id;
   await ensureUserStateSynced(userId);
@@ -4891,7 +5229,8 @@ bot.on("message", async (ctx) => {
     "ℹ️ Tizim haqida", "💰 Balans", "💳 Balansni to'ldirish",
     "💬 Adminga murojaat", "🌐 Rasmiy sayt",
     "🔙 Asosiy Menyu", "⬅️ Asosiy menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish",
-    "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob"
+    "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob",
+    "💻 CHIRCHIQ KOMPYUTER XIZMATLARI"
   ];
   
   if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu" || normText === "⬅️ Asosiy menyu") {
@@ -4899,6 +5238,7 @@ bot.on("message", async (ctx) => {
       aiAssistantActiveUsers.delete(userId);
       aiServiceStates.delete(userId);
     }
+    pendingLogins.delete(userId); // Abort any pending state if user taps a menu button
   }
 
   // Check if user is in an active Wizard state (only check if there is no pending transaction/admin state)
@@ -4917,9 +5257,9 @@ bot.on("message", async (ctx) => {
     aiAssistantActiveUsers.set(userId, true);
     aiServiceStates.set(userId, "chat");
     return ctx.reply(
-      "💬 <b>Savol-javob bo'limiga xush kelibsiz!</b>\n\n" +
-      "Ushbu bo'limda o'quv jarayoniga oid istalgan fan, dars, matematika, tarix, fizika, geografiya, ingliz tili, dasturlash yoki boshqa har qanday o'quv mavzularidagi o'zingizni qiziqtirgan savolingizni yoza olasiz. Sun'iy intellekt savollaringizga batafsil javob beradi.\n\n" +
-      "Chiqish va asosiy menyuga qaytish uchun <b>⬅️ Asosiy menyu</b> tugmasini bosing.",
+      "💬 <b>Savol-javob bo'limiga xush kelibsiz!</b>\n" +
+"Ushbu bo'limda o'quv jarayoniga oid istalgan fan, dars, matematika, tarix, fizika, geografiya, ingliz tili, dasturlash yoki boshqa har qanday o'quv mavzularidagi o'zingizni qiziqtirgan savolingizni yoza olasiz. Sun'iy intellekt savollaringizga batafsil javob beradi.\n" +
+"Chiqish va asosiy menyuga qaytish uchun <b>⬅️ Asosiy menyu</b> tugmasini bosing.",
       {
         parse_mode: "HTML",
         reply_markup: {
@@ -4930,9 +5270,43 @@ bot.on("message", async (ctx) => {
     );
   }
 
+  if (normText === "💻 CHIRCHIQ KOMPYUTER XIZMATLARI") {
+    aiModeDeactivate();
+    aiAssistantActiveUsers.delete(userId);
+    
+    const adminIds = getAdminIds();
+    const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin"));
+
+    try {
+      const snap = await getDocs(collection(db, "computer_services"));
+      const shops = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+
+      let text = "💻 <b>CHIRCHIQ KOMPYUTER XIZMATLARI</b>\nQuyidagi kompyuter xizmatlaridan birini tanlang:";
+if (shops.length === 0) {
+        text = "💻 <b>CHIRCHIQ KOMPYUTER XIZMATLARI</b>\nHozircha ro'yxat bo'sh.";
+}
+
+      const buttons = shops.map(shop => ([{ text: shop.name || "Nomsiz xizmat", callback_data: `comp_srv_view_${shop.id}` }]));
+      
+      if (isAdminUser) {
+        buttons.push([{ text: "➕ Yangi qo'shish (Admin)", callback_data: "comp_srv_add" }]);
+      }
+
+      return ctx.reply(text, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: buttons
+        }
+      });
+    } catch (e) {
+      console.error("Error fetching computer services:", e);
+      return ctx.reply("❌ Xatolik yuz berdi.");
+    }
+  }
+
   if (normText === "🤖 AI Yordamchi" || normText === "🤖 Xizmatlar" || normText === "Xizmatlar" || normText === "🤖 XIZMATLAR" || normText === "XIZMATLAR") {
-    return ctx.reply("🤖 <b>Xizmatlar menyusiga xush kelibsiz!</b>\n\nKerakli xizmatni tanlang:", {
-      parse_mode: "HTML",
+    return ctx.reply("🤖 <b>Xizmatlar menyusiga xush kelibsiz!</b>\nKerakli xizmatni tanlang:", {
+parse_mode: "HTML",
       reply_markup: {
         keyboard: await getAiAssistantKeyboard(userId),
         resize_keyboard: true
@@ -4951,7 +5325,10 @@ bot.on("message", async (ctx) => {
     if (normText === "🌐 Tarjimon") {
       const fileCost = dynamicCosts["📄 Fayl tarjima qilish"] !== undefined ? dynamicCosts["📄 Fayl tarjima qilish"] : (AI_COSTS["📄 Fayl tarjima qilish"] || 10000);
       return ctx.reply(
-        `🤖 <b>${normText}</b>\n\n💳 Matn tarjima qilish - <b>${cost.toLocaleString()} so'm</b>\n💳 Fayl (Word/Txt) tarjima qilish - <b>${fileCost.toLocaleString()} so'm</b>`,
+        `🤖 <b>${normText}</b>
+
+💳 Matn tarjima qilish - <b>${cost.toLocaleString()} so'm</b>
+💳 Fayl (Word/Txt) tarjima qilish - <b>${fileCost.toLocaleString()} so'm</b>`,
         {
           parse_mode: "HTML",
           reply_markup: {
@@ -4964,7 +5341,9 @@ bot.on("message", async (ctx) => {
     }
 
     return ctx.reply(
-      `🤖 <b>${normText}</b>\n\n💳 Xizmat narxi: <b>${cost.toLocaleString()} so'm</b>`,
+      `🤖 <b>${normText}</b>
+
+💳 Xizmat narxi: <b>${cost.toLocaleString()} so'm</b>`,
       {
         parse_mode: "HTML",
         reply_markup: {
@@ -5019,13 +5398,20 @@ bot.on("message", async (ctx) => {
       const userDisplayName = authed?.displayName || `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim() || "Foydalanuvchi";
       const userSystemId = authed?.systemId || userId;
 
-      const caption = `🧾 <b>YANGI TO'LOV CHEKI (TELEGRAM BOT)</b>\n` +
-                      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                      `👤 <b>Foydalanuvchi:</b> <code>${userDisplayName}</code>\n` +
-                      `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>\n` +
-                      `🆔 <b>ID raqami:</b> <code>${userSystemId}</code>\n` +
-                      `🔗 <b>Username:</b> @${ctx.from.username || "yo'q"}\n` +
-                      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      const caption = `🧾 <b>YANGI TO'LOV CHEKI (TELEGRAM BOT)</b>
+` +
+                      `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
+                      `👤 <b>Foydalanuvchi:</b> <code>${userDisplayName}</code>
+` +
+                      `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>
+` +
+                      `🆔 <b>ID raqami:</b> <code>${userSystemId}</code>
+` +
+                      `🔗 <b>Username:</b> @${ctx.from.username || "yo'q"}
+` +
+                      `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
                       `💰 <b>Status:</b> ⏳ Tekshiruvda`;
       
       const keyboard = {
@@ -5054,7 +5440,10 @@ bot.on("message", async (ctx) => {
           } catch (err) {}
         } else {
           try {
-            const sentMsg = await bot.telegram.sendMessage(aId, caption + `\n\n📝 <b>Chek matni:</b>\n${userText}`, {
+            const sentMsg = await bot.telegram.sendMessage(aId, caption + `
+
+📝 <b>Chek matni:</b>
+${userText}`, {
               parse_mode: "HTML",
               reply_markup: keyboard
             });
@@ -5151,7 +5540,9 @@ bot.on("message", async (ctx) => {
         bot.telegram
           .sendMessage(
               userId,
-              `📢 E'lon muvaffaqiyatli tarqatildi:\n\nJami ${count} ta foydalanuvchi/guruhga yuborildi.`,
+              `📢 E'lon muvaffaqiyatli tarqatildi:
+
+Jami ${count} ta foydalanuvchi/guruhga yuborildi.`,
             )
           .catch((e) => console.error(e));
       })();
@@ -5168,7 +5559,9 @@ bot.on("message", async (ctx) => {
     
     // Check if message is a known AI service button, switch to that service
     if (false && currentState && currentState !== "chat") {
-      const loadingMsg = await ctx.reply(`⏳ <b>${currentState} tayyorlanmoqda...</b>\n\nIltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
+      const loadingMsg = await ctx.reply(`⏳ <b>${currentState} tayyorlanmoqda...</b>
+
+Iltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
       try {
         let action = "generateDocument";
         let docType = "";
@@ -5359,7 +5752,7 @@ bot.on("message", async (ctx) => {
                     }
                     if (s.bulletPoints && s.bulletPoints.length > 0) {
                        const bulletTxt = s.bulletPoints.map((bp: string) => `✦  ${bp}`).join("\n");
-                       slide.addText(bulletTxt, { x: 5.1, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
+slide.addText(bulletTxt, { x: 5.1, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
                     }
                     
                 } else if (layout === "image-right") {
@@ -5385,7 +5778,7 @@ bot.on("message", async (ctx) => {
                     }
                     if (s.bulletPoints && s.bulletPoints.length > 0) {
                        const bulletTxt = s.bulletPoints.map((bp: string) => `✦  ${bp}`).join("\n");
-                       slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
+slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
                     }
                     
                 } else if (layout === "cards" && s.bulletPoints && s.bulletPoints.length > 0) {
@@ -5445,7 +5838,7 @@ bot.on("message", async (ctx) => {
                         }
                         if (s.bulletPoints && s.bulletPoints.length > 0) {
                            const bulletTxt = s.bulletPoints.map((bp: string) => `✦  ${bp}`).join("\n");
-                           slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
+slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color: selectedStyle.contentBody, lineSpacing: 18 });
                         }
                     }
                 }
@@ -5453,15 +5846,21 @@ bot.on("message", async (ctx) => {
               const pptxBuffer = await pptx.write({ outputType: "nodebuffer" });
               return ctx.replyWithDocument(
                 { source: pptxBuffer as any, filename: `${apiTopic.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_taqdimot.pptx` },
-                { caption: `📊 ${apiTopic} mavzusida premium ${templateName} taqdimoti tayyor!\n🎨 Dizayn uslubi: ${designPlanText}` }
+                { caption: `📊 ${apiTopic} mavzusida premium ${templateName} taqdimoti tayyor!
+🎨 Dizayn uslubi: ${designPlanText}` }
               );
             } catch (err) {
               console.error("PPTX gen error:", err);
               // Fallback
-              let text = `📊 **${apiTopic} mavzusida taqdimot rejasi:**\n\n`;
+              let text = `📊 **${apiTopic} mavzusida taqdimot rejasi:**
+
+`;
               const fallbackSlides = Array.isArray(data.slides) ? data.slides : (Array.isArray(data) ? data : []);
               fallbackSlides.forEach((s: any, i: number) => {
-                text += `**${i + 1}-slayd: ${s.title}**\n${s.content}\n\n`;
+                text += `**${i + 1}-slayd: ${s.title}**
+${s.content}
+
+`;
               });
               const htmlContent = `<html><head><meta charset="utf-8"></head><body>${mdToHtml(text)}</body></html>`;
               return ctx.replyWithDocument(
@@ -5589,8 +5988,7 @@ bot.on("message", async (ctx) => {
 
               const contentText = data.content || "";
               const lines = contentText.split("\n");
-
-              lines.forEach((line: string) => {
+lines.forEach((line: string) => {
                 const trimmed = line.trim();
                 if (!trimmed) {
                   children.push(new Paragraph({ spacing: { after: 200 } }));
@@ -5734,14 +6132,14 @@ bot.on("message", async (ctx) => {
 
           if (!systemAboutText) {
             systemAboutText = 
-              "🚀 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Zamonaviy Ta'lim Tizimi.\n\n" +
-              "Platformamiz talabalar, o'qituvchilar va tashkilotlar uchun quyidagi imkoniyatlarni taqdim etadi:\n\n" +
-              "✅ <b>AI-Test Tizimi:</b> Sun'iy intellekt yordamida mavzuga oid savollarni avtomatik shakllantirish.\n" +
-              "✅ <b>Modulli Ta'lim:</b> Interaktiv darslar va o'quv jarayonini bosqichma-bosqich kuzatish.\n" +
-              "✅ <b>Avtomatik Sertifikatlar:</b> QR-kodli rasmiy sertifikatlarni darhol yuklab olish.\n" +
-              "✅ <b>Quizizz va Musobaqalar:</b> Real-vaqt rejimida bilimlar musobaqasini o'tkazish.\n" +
-              "✅ <b>Smart Jurnal:</b> Barcha natijalar va statistikani xavfsiz kataloglash.\n\n" +
-              "🌐 Batafsil: https://aiedutizim.vercel.app";
+              "🚀 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Zamonaviy Ta'lim Tizimi.\n" +
+"Platformamiz talabalar, o'qituvchilar va tashkilotlar uchun quyidagi imkoniyatlarni taqdim etadi:\n" +
+"✅ <b>AI-Test Tizimi:</b> Sun'iy intellekt yordamida mavzuga oid savollarni avtomatik shakllantirish.\n" +
+"✅ <b>Modulli Ta'lim:</b> Interaktiv darslar va o'quv jarayonini bosqichma-bosqich kuzatish.\n" +
+"✅ <b>Avtomatik Sertifikatlar:</b> QR-kodli rasmiy sertifikatlarni darhol yuklab olish.\n" +
+"✅ <b>Quizizz va Musobaqalar:</b> Real-vaqt rejimida bilimlar musobaqasini o'tkazish.\n" +
+"✅ <b>Smart Jurnal:</b> Barcha natijalar va statistikani xavfsiz kataloglash.\n" +
+"🌐 Batafsil: https://aiedutizim.vercel.app";
           }
 
           const systemCtx = await getSystemContextInfo();
@@ -5833,7 +6231,7 @@ Foydalanuvchi xabari: ${prompt}`;
             )
           ) {
             replyText = "❌ Ushbu savol bo'yicha ma'lumot topilmadi.\n📞 Administrator bilan bog'lanishingizni tavsiya qilaman.";
-          }
+}
 
           try {
             await ctx.reply(replyText, { parse_mode: "Markdown" });
@@ -5851,7 +6249,9 @@ Foydalanuvchi xabari: ${prompt}`;
           if (errMsg.includes("Quota") || errMsg.includes("limit")) {
             await ctx.reply("⚠️ <b>AI limiti tugadi.</b> Iltimos birozdan so'ng urinib ko'ring yoki boshqa xizmatdan foydalaning.", { parse_mode: "HTML" });
           } else {
-            await ctx.reply(`❌ AI bilan bog'lanishda xatolik yuz berdi: ${errMsg.substring(0, 100)}\n\nIltimos keyinroq urinib ko'ring.`);
+            await ctx.reply(`❌ AI bilan bog'lanishda xatolik yuz berdi: ${errMsg.substring(0, 100)}
+
+Iltimos keyinroq urinib ko'ring.`);
           }
         }
       } finally {
@@ -5921,26 +6321,42 @@ Foydalanuvchi xabari: ${prompt}`;
 
       await ctx.telegram.deleteMessage(ctx.chat!.id, loadingMsg.message_id);
 
-      let statsMsg = `📊 <b>Joriy vaqt uchun Bot va Tizim Statistika:</b>\n\n`;
-      statsMsg += `👥 <b>Tizimdagi jami foydalanuvchilar soni:</b> ${totalDBUsers}\n`;
-      statsMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      statsMsg += `👑 <b>Bosh Adminlar (Super Admin):</b> ${rolesCount.admin}\n`;
-      statsMsg += `🛡️ <b>Kichik Adminlar (Sub Admin):</b> ${rolesCount.subadmin}\n`;
-      statsMsg += `🏫 <b>Tashkilotlar (O'qituvchi):</b> ${rolesCount.teacher}\n`;
-      statsMsg += `🎓 <b>Talabalar:</b> ${rolesCount.student}\n`;
-      statsMsg += `💼 <b>Xodimlar:</b> ${rolesCount.staff}\n`;
+      let statsMsg = `📊 <b>Joriy vaqt uchun Bot va Tizim Statistika:</b>
+
+`;
+      statsMsg += `👥 <b>Tizimdagi jami foydalanuvchilar soni:</b> ${totalDBUsers}
+`;
+      statsMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+      statsMsg += `👑 <b>Bosh Adminlar (Super Admin):</b> ${rolesCount.admin}
+`;
+      statsMsg += `🛡️ <b>Kichik Adminlar (Sub Admin):</b> ${rolesCount.subadmin}
+`;
+      statsMsg += `🏫 <b>Tashkilotlar (O'qituvchi):</b> ${rolesCount.teacher}
+`;
+      statsMsg += `🎓 <b>Talabalar:</b> ${rolesCount.student}
+`;
+      statsMsg += `💼 <b>Xodimlar:</b> ${rolesCount.staff}
+`;
       if (rolesCount.guest > 0) {
-        statsMsg += `👤 <b>Mehmonlar:</b> ${rolesCount.guest}\n`;
+        statsMsg += `👤 <b>Mehmonlar:</b> ${rolesCount.guest}
+`;
       }
-      statsMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-      statsMsg += `🤖 <b>Telegram bot a'zolari:</b> ${telegramUsersCount}\n`;
+      statsMsg += `━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+      statsMsg += `🤖 <b>Telegram bot a'zolari:</b> ${telegramUsersCount}
+`;
       statsMsg += `✨ <i>Barcha ma'lumotlar real vaqt rejimida ma'lumotlar bazasidan hisoblab chiqildi!</i>`;
 
       return ctx.reply(statsMsg, { parse_mode: "HTML" });
     } catch (err) {
       console.error("Statistics error:", err);
       return ctx.reply(
-        `📊 <b>Statistika (Kesh rejimida):</b>\n\nBot foydalanuvchilari soni: ${telegramUsersCount}\n\nUlanishda xatolik yuz bergani sababli rollar keshdan o'qildi.`,
+        `📊 <b>Statistika (Kesh rejimida):</b>
+
+Bot foydalanuvchilari soni: ${telegramUsersCount}
+
+Ulanishda xatolik yuz bergani sababli rollar keshdan o'qildi.`,
         { parse_mode: "HTML" }
       );
     }
@@ -5956,11 +6372,11 @@ Foydalanuvchi xabari: ${prompt}`;
     try {
       const costs = await getBotConfigCosts();
       
-      let text = "💰 <b>Narxlar sozlamalari (so'mda):</b>\n\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n\n";
-      const buttons = [];
-      
-      for (const [service, price] of Object.entries(costs)) {
-        text += `🔹 <b>${service}</b>: ${price} so'm\n`;
+      let text = "💰 <b>Narxlar sozlamalari (so'mda):</b>\nQuyidagi xizmatlar narxini tahrirlashingiz mumkin:\n";
+const buttons = [];
+for (const [service, price] of Object.entries(costs)) {
+        text += `🔹 <b>${service}</b>: ${price} so'm
+`;
         buttons.push([{ text: `✏️ ${service}`, callback_data: `edit_price_${service.replace(/\s+/g, '_')}` }]);
       }
       
@@ -5978,6 +6394,7 @@ Foydalanuvchi xabari: ${prompt}`;
 
   if (normText === "🔙 Asosiy Menyu" || normText === "⬅️ Asosiy menyu") {
     aiModeDeactivate();
+    pendingLogins.delete(userId); // <-- Important fix: clear any pending wizard/admin state
     const authed = await getAuthedUser(userId);
     return ctx.reply("Asosiy menyuga qaytildi:", {
       reply_markup: {
@@ -6010,14 +6427,14 @@ Foydalanuvchi xabari: ${prompt}`;
       }
     } catch (e) {}
     return ctx.reply(
-      "🚀 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Zamonaviy Ta'lim Tizimi.\n\n" +
-      "Platformamiz talabalar, o'qituvchilar va tashkilotlar uchun quyidagi imkoniyatlarni taqdim etadi:\n\n" +
-      "✅ <b>AI-Test Tizimi:</b> Sun'iy intellekt yordamida mavzuga oid savollarni avtomatik shakllantirish.\n" +
-      "✅ <b>Modulli Ta'lim:</b> Interaktiv darslar va o'quv jarayonini bosqichma-bosqich kuzatish.\n" +
-      "✅ <b>Avtomatik Sertifikatlar:</b> QR-kodli rasmiy sertifikatlarni darhol yuklab olish.\n" +
-      "✅ <b>Quizizz va Musobaqalar:</b> Real-vaqt rejimida bilimlar musobaqasini o'tkazish.\n" +
-      "✅ <b>Smart Jurnal:</b> Barcha natijalar va statistikani xavfsiz kataloglash.\n\n" +
-      "🌐 Batafsil: " + APP_URL,
+      "🚀 <b>AIEDUTIZIM</b> — Sun'iy Intellekt Asosidagi Zamonaviy Ta'lim Tizimi.\n" +
+"Platformamiz talabalar, o'qituvchilar va tashkilotlar uchun quyidagi imkoniyatlarni taqdim etadi:\n" +
+"✅ <b>AI-Test Tizimi:</b> Sun'iy intellekt yordamida mavzuga oid savollarni avtomatik shakllantirish.\n" +
+"✅ <b>Modulli Ta'lim:</b> Interaktiv darslar va o'quv jarayonini bosqichma-bosqich kuzatish.\n" +
+"✅ <b>Avtomatik Sertifikatlar:</b> QR-kodli rasmiy sertifikatlarni darhol yuklab olish.\n" +
+"✅ <b>Quizizz va Musobaqalar:</b> Real-vaqt rejimida bilimlar musobaqasini o'tkazish.\n" +
+"✅ <b>Smart Jurnal:</b> Barcha natijalar va statistikani xavfsiz kataloglash.\n" +
+"🌐 Batafsil: " + APP_URL,
       { parse_mode: "HTML" }
     );
   }
@@ -6074,10 +6491,15 @@ Foydalanuvchi xabari: ${prompt}`;
       const spent = userData.spentBalls || 0;
       const displayBalance = bal - spent;
       
-      return ctx.reply(`💰 <b>Sizning balansingiz:</b>\n\n` +
-                       `💎 Umumiy mablag': <b>${bal} so'm</b>\n` +
-                       `📉 Ishlatilgan: <b>${spent} so'm</b>\n` +
-                       `━━━━━━\n` +
+      return ctx.reply(`💰 <b>Sizning balansingiz:</b>
+
+` +
+                       `💎 Umumiy mablag': <b>${bal} so'm</b>
+` +
+                       `📉 Ishlatilgan: <b>${spent} so'm</b>
+` +
+                       `━━━━━━
+` +
                        `✅ Mavjud balans: <b>${displayBalance} so'm</b>`, {
         parse_mode: "HTML",
         reply_markup: {
@@ -6089,10 +6511,16 @@ Foydalanuvchi xabari: ${prompt}`;
     } catch (e: any) {
       console.error("[Balance] CRITICAL ERROR:", e);
       // Absolute fallback - don't show error message, show 0 balance and log
-      return ctx.reply(`💰 <b>Sizning balansingiz</b>\n\n` +
-                       `👤 Ism: <b>${ctx.from.first_name || "Foydalanuvchi"}</b>\n` +
-                       `🆔 Telegram ID: <code>${userId}</code>\n` +
-                       `💎 Mablag': <b>0 so'm</b>\n\n` +
+      return ctx.reply(`💰 <b>Sizning balansingiz</b>
+
+` +
+                       `👤 Ism: <b>${ctx.from.first_name || "Foydalanuvchi"}</b>
+` +
+                       `🆔 Telegram ID: <code>${userId}</code>
+` +
+                       `💎 Mablag': <b>0 so'm</b>
+
+` +
                        `<i>⚠️ Ma'lumotlarni yangilashda texnik uzilish. Tez orada tuzatiladi.</i>`, {
         parse_mode: "HTML",
         reply_markup: {
@@ -6109,10 +6537,16 @@ Foydalanuvchi xabari: ${prompt}`;
     const dynamicCosts = await getBotConfigCosts();
     const refBonus = dynamicCosts["Referal bonus"] || 5000;
     return ctx.reply(
-      `🎁 <b>Bepul bonus olish imkoniyatlari:</b>\n\n` +
-      `1️⃣ <b>Do'stlarni taklif qilish:</b> Har bir taklif qilingan do'stingiz uchun <b>${refBonus.toLocaleString()} so'm</b> beriladi. Do'stingiz botga kirib /start bosishi kifoya.\n` +
-      `2️⃣ <b>Kunlik bonus:</b> Tizimga har kuni kirganingizda profilingizda bonuslar yangilanadi.\n` +
-      `3️⃣ <b>Xatoliklar bo'yicha xabar:</b> Tizimdagi xatoliklar haqida @adminga xabar bersangiz va tasdiqlansa, sizga sovg'a tariqasida bonuslar taqdim etiladi.\n\n` +
+      `🎁 <b>Bepul bonus olish imkoniyatlari:</b>
+
+` +
+      `1️⃣ <b>Do'stlarni taklif qilish:</b> Har bir taklif qilingan do'stingiz uchun <b>${refBonus.toLocaleString()} so'm</b> beriladi. Do'stingiz botga kirib /start bosishi kifoya.
+` +
+      `2️⃣ <b>Kunlik bonus:</b> Tizimga har kuni kirganingizda profilingizda bonuslar yangilanadi.
+` +
+      `3️⃣ <b>Xatoliklar bo'yicha xabar:</b> Tizimdagi xatoliklar haqida @adminga xabar bersangiz va tasdiqlansa, sizga sovg'a tariqasida bonuslar taqdim etiladi.
+
+` +
       `💡 <i>Hozircha har bir do'stingiz uchun ${refBonus.toLocaleString()} so'm olish uchun quyidagi "💰 Bonus olish" tugmasidan foydalaning!</i>`,
       { parse_mode: "HTML" }
     );
@@ -6160,13 +6594,24 @@ Foydalanuvchi xabari: ${prompt}`;
     const botRefLink = `https://t.me/${botUsername}?start=ref_${userId}`;
     const webRefLink = `${APP_URL}/?r=${userId}`;
 
-    const refMsg = `👥 <b>DO'STLARNI TAKLIF QILISH (REFERAL TIZIMI)</b>\n\n` +
-                   `🎁 Har bir taklif qilingan do'stingiz botga kirib kontaktini tasdiqlaganida balansingizga <b>${refBonus.toLocaleString()} UZS</b> avtomatik qo'shiladi!\n\n` +
-                   `📊 <b>Sizning statistikangiz:</b>\n` +
-                   `• Taklif qilingan do'stlar: <b>${invitedCount} ta</b>\n` +
-                   `• Ishlangan umumiy summa: <b>${earnedBonus.toLocaleString()} UZS</b>\n\n` +
-                   `🔗 <b>Telegram bot referal havolangiz:</b>\n` +
-                   `${botRefLink}\n\n` +
+    const refMsg = `👥 <b>DO'STLARNI TAKLIF QILISH (REFERAL TIZIMI)</b>
+
+` +
+                   `🎁 Har bir taklif qilingan do'stingiz botga kirib kontaktini tasdiqlaganida balansingizga <b>${refBonus.toLocaleString()} UZS</b> avtomatik qo'shiladi!
+
+` +
+                   `📊 <b>Sizning statistikangiz:</b>
+` +
+                   `• Taklif qilingan do'stlar: <b>${invitedCount} ta</b>
+` +
+                   `• Ishlangan umumiy summa: <b>${earnedBonus.toLocaleString()} UZS</b>
+
+` +
+                   `🔗 <b>Telegram bot referal havolangiz:</b>
+` +
+                   `${botRefLink}
+
+` +
                    `👉 Havolani do'stlaringizga ulashing va balansingizni to'ldiring!`;
 
     return ctx.reply(refMsg, {
@@ -6202,13 +6647,23 @@ Foydalanuvchi xabari: ${prompt}`;
 
     const sysId = authed?.systemId || userId;
 
-    const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>\n\n` +
-                 `1️⃣ <b>-USUL:</b> Koʻrsatilgan kartaga toʻlov qiling va chekni shu yerga yuboring.\n` +
-                 `💳 <b>Karta raqami:</b> <code>${cardNumber}</code>\n` +
-                 `👤 <b>Egasi:</b> ${cardOwner}\n\n` +
-                 `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-                 `2️⃣ <b>-USUL:</b> Adminga murojaat qiling\n` +
-                 `🆔 <b>Sizning ID raqamingiz:</b> <code>${sysId}</code>\n` +
+    const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>
+
+` +
+                 `1️⃣ <b>-USUL:</b> Koʻrsatilgan kartaga toʻlov qiling va chekni shu yerga yuboring.
+` +
+                 `💳 <b>Karta raqami:</b> <code>${cardNumber}</code>
+` +
+                 `👤 <b>Egasi:</b> ${cardOwner}
+
+` +
+                 `━━━━━━━━━━━━━━━━━━━━━━━━━
+
+` +
+                 `2️⃣ <b>-USUL:</b> Adminga murojaat qiling
+` +
+                 `🆔 <b>Sizning ID raqamingiz:</b> <code>${sysId}</code>
+` +
                  `"Adminga ID raqamingizni va balansingizga qancha summa oʻtkazmoqchi ekanligingizni yozib yuboring"`;
 
     return ctx.reply(text, { 
@@ -6219,7 +6674,9 @@ Foydalanuvchi xabari: ${prompt}`;
   if (normText === "🌐 Rasmiy sayt") {
     aiAssistantActiveUsers.delete(userId);
     return ctx.reply(
-      `🌐 <b>AIEDUTIZIM - Raqamli ta'lim platformasi</b>\n\n🔗 Veb-saytimiz: <a href="https://www.aide.uz">www.aide.uz</a>`, { parse_mode: "HTML" }
+      `🌐 <b>AIEDUTIZIM - Raqamli ta'lim platformasi</b>
+
+🔗 Veb-saytimiz: <a href="https://www.aide.uz">www.aide.uz</a>`, { parse_mode: "HTML" }
     );
   }
 
@@ -6237,8 +6694,8 @@ Foydalanuvchi xabari: ${prompt}`;
     if (!db) return ctx.reply("Ma'lumotlar bazasi ulanmagan.");
     pendingLogins.set(userId, { step: "email" });
     return ctx.reply(
-      "Profilga kirish uchun loginingizni yoki emailingizni kiriting:\n\n(Misol uchun: login nomi yoki to'liq email manzilni yuborishingiz mumkin)",
-    );
+      "Profilga kirish uchun loginingizni yoki emailingizni kiriting:\n(Misol uchun: login nomi yoki to'liq email manzilni yuborishingiz mumkin)",
+);
   }
 
   if (normText === "👤 Profil") {
@@ -6295,17 +6752,26 @@ Foydalanuvchi xabari: ${prompt}`;
     else if (roleText === "staff") roleDisplay = "Xodim";
     else if (roleText === "student") roleDisplay = "Talaba / O'quvchi";
 
-    let profileMsg = `👤 <b>PROFIL MA'LUMOTLARI</b>\n` +
-                     `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                     `👤 <b>Telegram nomi:</b> <code>${tgName}</code>\n` +
-                     `🔗 <b>Nick (Username):</b> ${nick}\n` +
-                     `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n` +
-                     `📞 <b>Tel nomeri:</b> <code>${phone}</code>\n` +
-                     `🛡️ <b>Roli:</b> <code>${roleDisplay}</code>\n`;
+    let profileMsg = `👤 <b>PROFIL MA'LUMOTLARI</b>
+` +
+                     `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
+                     `👤 <b>Telegram nomi:</b> <code>${tgName}</code>
+` +
+                     `🔗 <b>Nick (Username):</b> ${nick}
+` +
+                     `🆔 <b>Telegram ID:</b> <code>${userId}</code>
+` +
+                     `📞 <b>Tel nomeri:</b> <code>${phone}</code>
+` +
+                     `🛡️ <b>Roli:</b> <code>${roleDisplay}</code>
+`;
     if (roleText !== "bot_user") {
-      profileMsg += `🏷️ <b>ID raqami:</b> <code>${systemId}</code>\n`;
+      profileMsg += `🏷️ <b>ID raqami:</b> <code>${systemId}</code>
+`;
     }
-    profileMsg += `💰 <b>Balansi:</b> <code>${balance.toLocaleString()} UZS</code>\n` +
+    profileMsg += `💰 <b>Balansi:</b> <code>${balance.toLocaleString()} UZS</code>
+` +
                   `━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
     return ctx.reply(profileMsg, {
@@ -6350,19 +6816,34 @@ Foydalanuvchi xabari: ${prompt}`;
     const seconds = uptimeSec % 60;
 
     let botStatus =
-      `⚙️ <b>BOTNİNG ISHLASH HOLATI</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `🖥 <b>Tizim ma'lumotlari:</b>\n` +
-      `   ⚡️ Server: <code>Google Cloud Run (Node.js)</code>\n` +
-      `   ⏳ Ishlash vaqti (Uptime): <code>${hours}h ${minutes}m ${seconds}s</code>\n` +
-      `   📦 Kutubxona: <code>Telegraf v4.16.3</code>\n\n` +
-      `🧠 <b>AI Xizmati:</b>\n` +
-      `   🤖 Model: <code>Gemini 3.6 Flash / 3.1 Pro</code>\n` +
-      `   🛡 Rate-Limit: <code>Admin/O'qituvchilar cheksiz, Talabalar daqiqasiga 20 ta so'rov</code>\n\n` +
-      `🗄 <b>Baza holati (Firestore):</b>\n` +
-      `   🔹 ProjectID: <code>${firebaseProjectId || "aiedutizim-default"}</code>\n` +
-      `   📶 Aloqa: <code>Muvaffaqiyatli (Ulandi)</code>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `⚙️ <b>BOTNİNG ISHLASH HOLATI</b>
+` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
+      `🖥 <b>Tizim ma'lumotlari:</b>
+` +
+      `   ⚡️ Server: <code>Google Cloud Run (Node.js)</code>
+` +
+      `   ⏳ Ishlash vaqti (Uptime): <code>${hours}h ${minutes}m ${seconds}s</code>
+` +
+      `   📦 Kutubxona: <code>Telegraf v4.16.3</code>
+
+` +
+      `🧠 <b>AI Xizmati:</b>
+` +
+      `   🤖 Model: <code>Gemini 3.6 Flash / 3.1 Pro</code>
+` +
+      `   🛡 Rate-Limit: <code>Admin/O'qituvchilar cheksiz, Talabalar daqiqasiga 20 ta so'rov</code>
+
+` +
+      `🗄 <b>Baza holati (Firestore):</b>
+` +
+      `   🔹 ProjectID: <code>${firebaseProjectId || "aiedutizim-default"}</code>
+` +
+      `   📶 Aloqa: <code>Muvaffaqiyatli (Ulandi)</code>
+` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
       `💡 <i>Bot holati mukammal ishlamoqda. Yangi so'rovlarni qabul qilishga tayyor!</i>`;
     return ctx.reply(botStatus, { parse_mode: "HTML" });
   }
@@ -6382,8 +6863,8 @@ Foydalanuvchi xabari: ${prompt}`;
     }
     pendingLogins.set(userId, { step: "admin_manual_topup_id" });
     return ctx.reply(
-      "🆔 <b>Foydalanuvchi ID raqamini kiriting:</b>\n\n" +
-      "<i>Foydalanuvchining 7 xonali ID raqami, Telegram ID yoki Firestore UID raqamini yozing.</i>",
+      "🆔 <b>Foydalanuvchi ID raqamini kiriting:</b>\n" +
+"<i>Foydalanuvchining 7 xonali ID raqami, Telegram ID yoki Firestore UID raqamini yozing.</i>",
       { 
         parse_mode: "HTML",
         reply_markup: {
@@ -6420,8 +6901,8 @@ Foydalanuvchi xabari: ${prompt}`;
       const amount = parseInt(cleanNum);
 
       if (isNaN(amount) || amount <= 0) {
-        return ctx.reply("❌ <b>Noto'g'ri summa!</b>\n\nIltimos, faqat raqamlarda kiriting (masalan: 50000):", { parse_mode: "HTML" });
-      }
+        return ctx.reply("❌ <b>Noto'g'ri summa!</b>\nIltimos, faqat raqamlarda kiriting (masalan: 50000):", { parse_mode: "HTML" });
+}
 
       const requestId = pending.requestId;
       const req = pending.req;
@@ -6503,7 +6984,10 @@ Foydalanuvchi xabari: ${prompt}`;
         });
 
         // Notify admin
-        await ctx.reply(`✅ Balans muvaffaqiyatli to'ldirildi!\n👤 ${req.userName} (ID: ${req.systemId || userRef.id})\n💰 Qo'shildi: +${amount.toLocaleString()} UZS\n💳 Yangi balans: ${newBalance.toLocaleString()} UZS`);
+        await ctx.reply(`✅ Balans muvaffaqiyatli to'ldirildi!
+👤 ${req.userName} (ID: ${req.systemId || userRef.id})
+💰 Qo'shildi: +${amount.toLocaleString()} UZS
+💳 Yangi balans: ${newBalance.toLocaleString()} UZS`);
 
         // Notify user
         const notifyTgId = userSnap.exists() ? (userSnap.data().telegramId || targetUserId) : targetUserId;
@@ -6511,7 +6995,10 @@ Foydalanuvchi xabari: ${prompt}`;
           try {
             await bot.telegram.sendMessage(
               Number(notifyTgId),
-              `✅ <b>To'lovingiz tasdiqlandi!</b>\n\n💰 Balansingizga <b>+${amount.toLocaleString()} UZS</b> qo'shildi.\n💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
+              `✅ <b>To'lovingiz tasdiqlandi!</b>
+
+💰 Balansingizga <b>+${amount.toLocaleString()} UZS</b> qo'shildi.
+💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
               { parse_mode: "HTML" }
             );
           } catch (e) {
@@ -6541,8 +7028,12 @@ Foydalanuvchi xabari: ${prompt}`;
       const foundUser = await findUserBySystemId(cleanId);
       if (!foundUser) {
         return ctx.reply(
-          `❌ <b>Foydalanuvchi topilmadi!</b>\n\n` +
-          `Kiritilgan ID: <code>${cleanId}</code>\n\n` +
+          `❌ <b>Foydalanuvchi topilmadi!</b>
+
+` +
+          `Kiritilgan ID: <code>${cleanId}</code>
+
+` +
           `Iltimos, ID raqamni to'g'ri kiriting yoki bekor qilish uchun /cancel deb yozing:`,
           { parse_mode: "HTML" }
         );
@@ -6564,15 +7055,25 @@ Foydalanuvchi xabari: ${prompt}`;
       else if (foundUser.role === "admin" || foundUser.role === "subadmin") userRoleLabel = "Administrator";
 
       return ctx.reply(
-        `👤 <b>FOYDALANUVCHI TOPILDI:</b>\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `👤 <b>Ismi:</b> <code>${foundUser.displayName}</code>\n` +
-        `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>\n` +
-        `📞 <b>Tel raqami:</b> <code>${userPhone}</code>\n` +
-        `🆔 <b>ID raqami:</b> <code>${sysId}</code>\n` +
-        `💳 <b>Joriy balansi:</b> <code>${currBal.toLocaleString()} UZS</code>\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `💰 <b>Shu foydalanuvchining balansiga qancha to'lov qilmoqchisiz? To'lov summasini kiriting:</b>\n` +
+        `👤 <b>FOYDALANUVCHI TOPILDI:</b>
+` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
+        `👤 <b>Ismi:</b> <code>${foundUser.displayName}</code>
+` +
+        `🛡️ <b>Roli:</b> <code>${userRoleLabel}</code>
+` +
+        `📞 <b>Tel raqami:</b> <code>${userPhone}</code>
+` +
+        `🆔 <b>ID raqami:</b> <code>${sysId}</code>
+` +
+        `💳 <b>Joriy balansi:</b> <code>${currBal.toLocaleString()} UZS</code>
+` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━
+
+` +
+        `💰 <b>Shu foydalanuvchining balansiga qancha to'lov qilmoqchisiz? To'lov summasini kiriting:</b>
+` +
         `<i>(Masalan: 50000)</i>`,
         { parse_mode: "HTML" }
       );
@@ -6587,8 +7088,8 @@ Foydalanuvchi xabari: ${prompt}`;
       const amount = parseInt(cleanNum);
 
       if (isNaN(amount) || amount <= 0) {
-        return ctx.reply("❌ <b>Noto'g'ri summa!</b>\n\nTo'lov summasini faqat raqamlarda kiriting (masalan: 50000):", { parse_mode: "HTML" });
-      }
+        return ctx.reply("❌ <b>Noto'g'ri summa!</b>\nTo'lov summasini faqat raqamlarda kiriting (masalan: 50000):", { parse_mode: "HTML" });
+}
 
       pendingLogins.delete(userId);
 
@@ -6631,11 +7132,17 @@ Foydalanuvchi xabari: ${prompt}`;
         }
 
         await ctx.reply(
-          `✅ <b>BALANS MUVAFFAQIYATLI TO'LDIRILDI!</b>\n\n` +
-          `👤 <b>Foydalanuvchi:</b> <code>${foundUser.displayName}</code>\n` +
-          `📞 <b>Tel raqami:</b> <code>${foundUser.phone || "Kiritilmagan"}</code>\n` +
-          `🆔 <b>ID raqami:</b> <code>${foundUser.systemId || foundUser.docId}</code>\n` +
-          `💰 <b>Qo'shilgan summa:</b> <code>+${amount.toLocaleString()} UZS</code>\n` +
+          `✅ <b>BALANS MUVAFFAQIYATLI TO'LDIRILDI!</b>
+
+` +
+          `👤 <b>Foydalanuvchi:</b> <code>${foundUser.displayName}</code>
+` +
+          `📞 <b>Tel raqami:</b> <code>${foundUser.phone || "Kiritilmagan"}</code>
+` +
+          `🆔 <b>ID raqami:</b> <code>${foundUser.systemId || foundUser.docId}</code>
+` +
+          `💰 <b>Qo'shilgan summa:</b> <code>+${amount.toLocaleString()} UZS</code>
+` +
           `💳 <b>Yangi balans:</b> <code>${newBalance.toLocaleString()} UZS</code>`,
           { parse_mode: "HTML" }
         );
@@ -6644,8 +7151,11 @@ Foydalanuvchi xabari: ${prompt}`;
           try {
             await bot.telegram.sendMessage(
               userTgId,
-              `💰 <b>Balansingiz to'ldirildi!</b>\n\n` +
-              `Administrator tomonidan balansingizga <b>+${amount.toLocaleString()} UZS</b> qo'shildi.\n` +
+              `💰 <b>Balansingiz to'ldirildi!</b>
+
+` +
+              `Administrator tomonidan balansingizga <b>+${amount.toLocaleString()} UZS</b> qo'shildi.
+` +
               `💳 Joriy balansingiz: <b>${newBalance.toLocaleString()} UZS</b>`,
               { parse_mode: "HTML" }
             );
@@ -6734,7 +7244,8 @@ Foydalanuvchi xabari: ${prompt}`;
         await addDoc(collection(db, "messages"), {
           senderId: 'admin',
           receiverId: req.userId,
-          text: `Sizning ${req.tariffName} tarifiga ulanish so'rovingiz rad etildi.\nSababi: ${reason}`,
+          text: `Sizning ${req.tariffName} tarifiga ulanish so'rovingiz rad etildi.
+Sababi: ${reason}`,
           timestamp: serverTimestamp(),
           isRead: false
         });
@@ -6743,7 +7254,9 @@ Foydalanuvchi xabari: ${prompt}`;
           try {
             const uSnap = await getDoc(doc(db, "users", req.userId));
             if (uSnap.exists() && uSnap.data().telegramId) {
-              await bot.telegram.sendMessage(uSnap.data().telegramId, `❌ Sizning <b>${req.tariffName}</b> tarifiga ulanish so'rovingiz rad etildi.\n\n⚠️ Sababi: ${reason}`, { parse_mode: "HTML" });
+              await bot.telegram.sendMessage(uSnap.data().telegramId, `❌ Sizning <b>${req.tariffName}</b> tarifiga ulanish so'rovingiz rad etildi.
+
+⚠️ Sababi: ${reason}`, { parse_mode: "HTML" });
             }
           } catch(e) {}
         }
@@ -6801,7 +7314,11 @@ Foydalanuvchi xabari: ${prompt}`;
           
           // Notify user
           await bot.telegram.sendMessage(Number(targetId), 
-            `✅ To\x27lov tasdiqlandi\n\n💰 Sizga ${amount} so\x27m qo\x27shildi\n\n📊 Yangi balans: ${newBalance}`, 
+            `✅ To\x27lov tasdiqlandi
+
+💰 Sizga ${amount} so\x27m qo\x27shildi
+
+📊 Yangi balans: ${newBalance}`, 
             { parse_mode: "HTML" }
           ).catch((e) => {
              console.error(`Notify user ${targetId} failed:`, e);
@@ -6852,7 +7369,10 @@ Foydalanuvchi xabari: ${prompt}`;
             await ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
           }
 
-          return ctx.reply(`✅ <b>Muvaffaqiyatli!</b>\n\n👤 ${uName} (ID: ${targetId}) balansiga ${amount} so'm qo'shildi.\n📊 Yangi balans: ${newBalance}`);
+          return ctx.reply(`✅ <b>Muvaffaqiyatli!</b>
+
+👤 ${uName} (ID: ${targetId}) balansiga ${amount} so'm qo'shildi.
+📊 Yangi balans: ${newBalance}`);
         } else {
           pendingLogins.delete(userId);
           return ctx.reply(`❌ Foydalanuvchi (ID: ${targetId}) bazadan topilmadi.`);
@@ -6907,14 +7427,18 @@ Foydalanuvchi xabari: ${prompt}`;
         let originalPromptClean = (pending as any).originalText || "";
         if (originalPromptClean.startsWith("📨 Yangi xabar")) {
           const lines = originalPromptClean.split("\n");
-          lines.shift(); // remove "📨 Yangi xabar"
+lines.shift(); // remove "📨 Yangi xabar"
           originalPromptClean = lines.join("\n").trim();
-        }
+}
 
         const combinedTextToUser = 
-          `📬 <b>Siz yuborgan murojaat:</b>\n` +
-          `<i>${originalPromptClean}</i>\n\n` +
-          `✍️ <b>Admindan javob:</b>\n` +
+          `📬 <b>Siz yuborgan murojaat:</b>
+` +
+          `<i>${originalPromptClean}</i>
+
+` +
+          `✍️ <b>Admindan javob:</b>
+` +
           `<b>${userText}</b>`;
 
         await addDoc(collection(db, "messages"), {
@@ -7052,7 +7576,9 @@ Foydalanuvchi xabari: ${prompt}`;
       pendingLogins.delete(userId);
       customMenuTexts.set(targetMenu, userText);
       return ctx.reply(
-        `✅ <b>"${targetMenu}"</b> menyusi matni muvaffaqiyatli va tezroq yangilandi!\n\nEndi foydalanuvchilar ushbu menyuni bosganda shu ma'lumotni olishadi.`,
+        `✅ <b>"${targetMenu}"</b> menyusi matni muvaffaqiyatli va tezroq yangilandi!
+
+Endi foydalanuvchilar ushbu menyuni bosganda shu ma'lumotni olishadi.`,
         {
           parse_mode: "HTML",
           reply_markup: {
@@ -7061,6 +7587,76 @@ Foydalanuvchi xabari: ${prompt}`;
           }
         }
       );
+        } else if (pending.step === "admin_comp_add_name") {
+      (pending as any).shopName = userText;
+      pending.step = "admin_comp_add_services";
+      return ctx.reply("📋 Endi ushbu kompyuterxonaning xizmatlari ro'yxatini yuboring (masalan: Kserokopiya, format qilish):");
+    } else if (pending.step === "admin_comp_add_services") {
+      (pending as any).shopServices = userText;
+      pending.step = "admin_comp_add_address";
+      return ctx.reply("📍 Endi manzilni yuboring:");
+    } else if (pending.step === "admin_comp_add_address") {
+      (pending as any).shopAddress = userText;
+      pending.step = "admin_comp_add_contact";
+      return ctx.reply("📞 Endi bog'lanish ma'lumotlarini yuboring (telefon raqam va h.k):");
+    } else if (pending.step === "admin_comp_add_contact") {
+      (pending as any).shopContact = userText;
+      pending.step = "admin_comp_add_photo";
+      return ctx.reply("🖼 Endi kompyuterxonaning rasmini yuboring (yoki rasmsiz saqlash uchun 'skip' deb yozing):");
+    } else if (pending.step === "admin_comp_add_photo") {
+        let photoId = "";
+        const msg = ctx.message as any;
+        if (msg.photo && msg.photo.length > 0) {
+            photoId = msg.photo[msg.photo.length - 1].file_id;
+        }
+        
+        try {
+            await addDoc(collection(db, "computer_services"), {
+                name: (pending as any).shopName || "Nomsiz",
+                services: (pending as any).shopServices || "",
+                address: (pending as any).shopAddress || "",
+                contact: (pending as any).shopContact || "",
+                photoId: photoId
+            });
+            pendingLogins.delete(userId);
+            
+            const authed = await getAuthedUser(userId);
+            ctx.reply("✅ Yangi kompyuter xizmatlari ro'yxatga qo'shildi!", {
+                reply_markup: { keyboard: await getKeyboard(authed?.role, userId, !!authed), resize_keyboard: true }
+            });
+        } catch (e) {
+            console.error(e);
+            return ctx.reply("❌ Xatolik yuz berdi");
+        }
+        return;
+    } else if (pending.step === "admin_comp_edit_do") {
+        const shopId = (pending as any).shopId;
+        const field = (pending as any).editField;
+        let updateData: any = {};
+        
+        if (field === "photo") {
+            const msg = ctx.message as any;
+            if (msg.photo && msg.photo.length > 0) {
+                updateData.photoId = msg.photo[msg.photo.length - 1].file_id;
+            } else {
+                updateData.photoId = "";
+            }
+        } else {
+            updateData[field] = userText;
+        }
+        
+        try {
+            await updateDoc(doc(db, "computer_services", shopId), updateData);
+            pendingLogins.delete(userId);
+            const authed = await getAuthedUser(userId);
+            ctx.reply("✅ Ma'lumot muvaffaqiyatli yangilandi!", {
+                 reply_markup: { keyboard: await getKeyboard(authed?.role, userId, !!authed), resize_keyboard: true }
+            });
+        } catch (e) {
+            console.error(e);
+            return ctx.reply("❌ Xatolik yuz berdi");
+        }
+        return;
     } else if (pending.step === "password") {
       let email = pending.email!;
       const password = userText;
@@ -7266,28 +7862,43 @@ Foydalanuvchi xabari: ${prompt}`;
           );
           const autoLoginUrl = `${APP_URL}/login?auto=${encodedCreds}`;
 
-          let replyMsg = `✅ <b>Akkauntingiz muvaffaqiyatli ulandi!</b>\n\n`;
+          let replyMsg = `✅ <b>Akkauntingiz muvaffaqiyatli ulandi!</b>
+
+`;
           replyMsg += formatProfileInfo(uData, role, displayName, email);
 
-          replyMsg += `\n\nEndi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tishingiz mumkin!`;
+          replyMsg += `
+
+Endi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tishingiz mumkin!`;
 
           authedUsers.set(userId, { uid, displayName, role, email, docId });
 
           const userBirthDate = uData ? uData.birthDate : null;
           if (isTodayBirthday(userBirthDate)) {
             const bdayGreetings = 
-              `🎉✨ <b>TUG'ILGAN KUNINGIZ BILAN TABRIKLAYMIZ!</b> ✨🎉\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `Hurmatli <b>${displayName}</b>! 🎂\n\n` +
-              `Sizni bugungi tavallud ayomingiz bilan chin qalbimizdan muborakbod etamiz! 🌸\n` +
-              `Sizga sihat-salomatlik, baxt-saodat, uzoq umr va o'qish hamda ish faoliyatingizda ulkan muvaffaqiyatlar tilaymiz! 🌟\n\n` +
-              `Tizimimiz siz bilan birga ekanligidan mamnun va faxrlanadi! 😊🎈\n` +
+              `🎉✨ <b>TUG'ILGAN KUNINGIZ BILAN TABRIKLAYMIZ!</b> ✨🎉
+` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
+              `Hurmatli <b>${displayName}</b>! 🎂
+
+` +
+              `Sizni bugungi tavallud ayomingiz bilan chin qalbimizdan muborakbod etamiz! 🌸
+` +
+              `Sizga sihat-salomatlik, baxt-saodat, uzoq umr va o'qish hamda ish faoliyatingizda ulkan muvaffaqiyatlar tilaymiz! 🌟
+
+` +
+              `Tizimimiz siz bilan birga ekanligidan mamnun va faxrlanadi! 😊🎈
+` +
               `━━━━━━━━━━━━━━━━━━━━━━━━━`;
             ctx.reply(bdayGreetings, { parse_mode: "HTML" }).catch(() => {});
           }
 
           await addDoc(collection(db, "admin_notifications"), {
-            text: `Yangi tizimga ulanish (Telegram orqali):\n👤 F.I.SH: ${displayName}\n🛡 Profil: ${role.toUpperCase()}\n📧 Email: ${email}`,
+            text: `Yangi tizimga ulanish (Telegram orqali):
+👤 F.I.SH: ${displayName}
+🛡 Profil: ${role.toUpperCase()}
+📧 Email: ${email}`,
             timestamp: serverTimestamp(),
           });
 
@@ -7329,7 +7940,12 @@ Foydalanuvchi xabari: ${prompt}`;
           });
 
           ctx.reply(
-            `✅ Akkauntingiz muvaffaqiyatli ulandi!\n\n👤 Email: ${email}\n🛡 Profil: ${derivedRole.toUpperCase()}\n\nEndi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tishingiz mumkin!`,
+            `✅ Akkauntingiz muvaffaqiyatli ulandi!
+
+👤 Email: ${email}
+🛡 Profil: ${derivedRole.toUpperCase()}
+
+Endi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tishingiz mumkin!`,
             {
               parse_mode: "HTML",
               reply_markup: {
@@ -7469,12 +8085,19 @@ Foydalanuvchi xabari: ${prompt}`;
                   }
                 }
                 const totalUsers = adminsCount + teachersCount + staffCount + studentsCount;
-                executionResult = `Tizim foydalanuvchilari statistikasi (Bazada):\n` +
-                  `- Adminlar: ${adminsCount} ta\n` +
-                  `- Tashkilotlar: ${teachersCount} ta\n` +
-                  `- Xodimlar: ${staffCount} ta\n` +
-                  `- Talabalar: ${studentsCount} ta\n` +
-                  `- Jami foydalanuvchilar: ${totalUsers} ta\n\n` +
+                executionResult = `Tizim foydalanuvchilari statistikasi (Bazada):
+` +
+                  `- Adminlar: ${adminsCount} ta
+` +
+                  `- Tashkilotlar: ${teachersCount} ta
+` +
+                  `- Xodimlar: ${staffCount} ta
+` +
+                  `- Talabalar: ${studentsCount} ta
+` +
+                  `- Jami foydalanuvchilar: ${totalUsers} ta
+
+` +
                   `- Telegram bot faol foydalanuvchilari (start bosganlar): ${tgUsersCount} ta.`;
               } else if (fnName === "getUsersList") {
                 let q: any = collection(db, "users");
@@ -7585,7 +8208,11 @@ Foydalanuvchi xabari: ${prompt}`;
                   role: fnArgs.role || "student",
                   createdAt: serverTimestamp(),
                 });
-                executionResult = `Yangi foydalanuvchi muvaffaqiyatli qo'shildi!\n👤 Ismi: ${fnArgs.displayName}\n📧 Emaili: ${fnArgs.email}\n🔑 Paroli: ${fnArgs.password}\n🛡 Roli: ${(fnArgs.role || "student").toUpperCase()}`;
+                executionResult = `Yangi foydalanuvchi muvaffaqiyatli qo'shildi!
+👤 Ismi: ${fnArgs.displayName}
+📧 Emaili: ${fnArgs.email}
+🔑 Paroli: ${fnArgs.password}
+🛡 Roli: ${(fnArgs.role || "student").toUpperCase()}`;
               } else if (fnName === "createSystemNotification") {
                 const uSnap = await getDocs(collection(db, "users"));
                 let sentCount = 0;
@@ -7611,7 +8238,8 @@ Foydalanuvchi xabari: ${prompt}`;
                   const c: any = d.data();
                   return `- **${c.title}** (${c.category || "Boshqa"}): ${c.description || "Tavsif yo'q"}`;
                 }).join("\n");
-                executionResult = `Platformadagi darslar/kurslar ro'yxati:\n${list || "Hozircha fanlar kiritilmagan."}`;
+executionResult = `Platformadagi darslar/kurslar ro'yxati:
+${list || "Hozircha fanlar kiritilmagan."}`;
               } else {
                 executionResult = "Noma'lum funksiya chaqirildi.";
               }
@@ -7642,10 +8270,14 @@ Foydalanuvchi xabari: ${prompt}`;
       if (finalReply) {
         if (isAdmin) {
           const borderReply =
-            `👑 <b>USTOZ - ADMIN TIZIMI AI YORDAMCHISI</b>\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `${mdToHtml(finalReply)}\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `👑 <b>USTOZ - ADMIN TIZIMI AI YORDAMCHISI</b>
+` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
+            `${mdToHtml(finalReply)}
+` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━
+` +
             `💡 <i>Tizim administratorlari uchun cheksiz AI xizmati faollashtirilgan.</i>`;
           await ctx.reply(borderReply, { parse_mode: "HTML" });
         } else {
@@ -7749,8 +8381,8 @@ export async function launchBot() {
   fetchTelegramUsersCount();
   
   bot.telegram.setMyDescription(
-    "**Assalomu alaykum! AIEDUTIZIM platformasining telegram botiga xush kelibsiz!**\n\n🎓 AIEDUTIZIM — zamonaviy ta'lim jarayonlarini samarali boshqarish imkonini beradi."
-  ).catch(() => {});
+    "**Assalomu alaykum! AIEDUTIZIM platformasining telegram botiga xush kelibsiz!**\n🎓 AIEDUTIZIM — zamonaviy ta'lim jarayonlarini samarali boshqarish imkonini beradi."
+).catch(() => {});
 
   startSelfPing();
 
@@ -7767,7 +8399,9 @@ export async function launchBot() {
           const adminSnap = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
           adminSnap.forEach((d) => {
             const uData = d.data();
-            if (uData.telegramId) bot.telegram.sendMessage(Number(uData.telegramId), `🚨 Tizim xabari:\n\n${data.text}`).catch(() => {});
+            if (uData.telegramId) bot.telegram.sendMessage(Number(uData.telegramId), `🚨 Tizim xabari:
+
+${data.text}`).catch(() => {});
           });
         }
 
@@ -7806,7 +8440,11 @@ export async function launchBot() {
               if (uData.telegramId && (!senderTgId || Number(uData.telegramId) !== senderTgId)) {
                 const tgId = Number(uData.telegramId);
                 const isRecipientAdmin = uData.role === "admin" || uData.role === "teacher";
-                const messageText = isRecipientAdmin ? `📨 Yangi xabar${mData.senderName ? ` (${mData.senderName})` : ""}:\n\n${mData.text}` : `📨 Sizga Admindan xabar keldi:\n\n${mData.text}`;
+                const messageText = isRecipientAdmin ? `📨 Yangi xabar${mData.senderName ? ` (${mData.senderName})` : ""}:
+
+${mData.text}` : `📨 Sizga Admindan xabar keldi:
+
+${mData.text}`;
                 const opts: any = isRecipientAdmin ? { reply_markup: { inline_keyboard: [[{ text: "✍️ Javob yozish", callback_data: `reply_${mData.senderId}` }]] } } : {};
                 
                 try {
