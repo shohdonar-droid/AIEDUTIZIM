@@ -1097,6 +1097,7 @@ async function getKeyboard(
 
   const userHeader = [
     [{ text: "💻 CHIRCHIQ KOMPYUTER XIZMATLARI" }],
+    [{ text: "🎓 Mening topshiriqlarim" }],
     [{ text: "👤 Profil" }, { text: "💬 Adminga murojaat" }],
     [{ text: "🤖 Xizmatlar" }, { text: "💰 Bonus olish" }],
     [{ text: "💰 Balans" }, { text: "🌐 Rasmiy sayt" }]
@@ -1108,7 +1109,7 @@ async function getKeyboard(
 
     return [
       [{ text: "💻 CHIRCHIQ KOMPYUTER XIZMATLARI" }],
-      [{ text: "👤 Profil" }],
+      [{ text: "🎓 Mening topshiriqlarim" }, { text: "👤 Profil" }],
       [{ text: "🤖 Xizmatlar" }, { text: "💬 Savol-javob" }],
       [{ text: "💵 Balans to'ldirish (Admin)" }],
       [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
