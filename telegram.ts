@@ -5160,18 +5160,18 @@ bot.action(/comp_srv_edit_(.+)/, async (ctx) => {
 parse_mode: "HTML",
     reply_markup: {
        inline_keyboard: [
-           [{text: "Nomi", callback_data: "comp_srv_edit_field_name"}],
-           [{text: "Xizmatlar", callback_data: "comp_srv_edit_field_services"}],
-           [{text: "Lokatsiya", callback_data: "comp_srv_edit_field_location"}],
-           [{text: "Ish vaqti", callback_data: "comp_srv_edit_field_hours"}],
-           [{text: "Bog'lanish", callback_data: "comp_srv_edit_field_contact"}],
-           [{text: "Rasm", callback_data: "comp_srv_edit_field_photo"}],
+           [{text: "Nomi", callback_data: "comp_srv_fedit_name"}],
+           [{text: "Xizmatlar", callback_data: "comp_srv_fedit_services"}],
+           [{text: "Lokatsiya", callback_data: "comp_srv_fedit_location"}],
+           [{text: "Ish vaqti", callback_data: "comp_srv_fedit_hours"}],
+           [{text: "Bog'lanish", callback_data: "comp_srv_fedit_contact"}],
+           [{text: "Rasm", callback_data: "comp_srv_fedit_photo"}],
        ]
     }
   });
 });
 
-bot.action(/comp_srv_edit_field_(.+)/, async (ctx) => {
+bot.action(/comp_srv_fedit_(.+)/, async (ctx) => {
     const field = ctx.match[1];
     const pending = pendingLogins.get(ctx.from.id);
     if (!pending || pending.step !== "admin_comp_edit_select") {
