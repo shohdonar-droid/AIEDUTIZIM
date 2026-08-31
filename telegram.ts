@@ -2480,6 +2480,7 @@ bot.action("add_balance", async (ctx) => {
     const userId = ctx.from.id;
     const authed = await getAuthedUser(userId);
     const sysId = authed?.systemId || userId;
+    pendingLogins.set(userId, { step: "awaiting_payment_receipt" });
 
     const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>
 
@@ -5037,15 +5038,11 @@ bot.action(/comp_srv_view_(.+)/, async (ctx) => {
     }
     const shop = snap.data();
     
-    let text = `💻 <b>${shop.name}</b>
-
-`;
-    text += `📋 <b>Xizmatlar:</b>
-${shop.services || "Ma'lumot yo'q"}
-
-`;
-    text += `📍 <b>Manzil:</b> ${shop.address || "Ma'lumot yo'q"}
-`;
+    let text = `🖥 <b>${shop.name}</b>\n\n`;
+    text += `📋 <b>Xizmatlar:</b>\n${shop.services || "Ma'lumot yo'q"}\n\n`;
+    if (shop.workingHours) {
+        text += `🕐 <b>Ish vaqti:</b> ${shop.workingHours}\n\n`;
+    }
     text += `📞 <b>Bog'lanish:</b> ${shop.contact || "Ma'lumot yo'q"}`;
 
     const buttons = [
@@ -5077,6 +5074,10 @@ ${shop.services || "Ma'lumot yo'q"}
         parse_mode: "HTML",
         reply_markup: { inline_keyboard: buttons }
       });
+    }
+    
+    if (shop.latitude && shop.longitude) {
+      await ctx.replyWithLocation(shop.latitude, shop.longitude);
     }
   } catch (e) {
     console.error(e);
@@ -5161,7 +5162,8 @@ parse_mode: "HTML",
        inline_keyboard: [
            [{text: "Nomi", callback_data: "comp_srv_edit_field_name"}],
            [{text: "Xizmatlar", callback_data: "comp_srv_edit_field_services"}],
-           [{text: "Manzil", callback_data: "comp_srv_edit_field_address"}],
+           [{text: "Lokatsiya", callback_data: "comp_srv_edit_field_location"}],
+           [{text: "Ish vaqti", callback_data: "comp_srv_edit_field_hours"}],
            [{text: "Bog'lanish", callback_data: "comp_srv_edit_field_contact"}],
            [{text: "Rasm", callback_data: "comp_srv_edit_field_photo"}],
        ]
@@ -5178,12 +5180,33 @@ bot.action(/comp_srv_edit_field_(.+)/, async (ctx) => {
     pending.step = "admin_comp_edit_do";
     (pending as any).editField = field;
     await ctx.deleteMessage().catch(() => {});
-    await ctx.reply(`✍️ Yangi ${field} ma'lumotini yuboring (rasm bo'lsa rasm yuboring):
-
-<i>Bekor qilish uchun <b>⬅️ Asosiy menyu</b> tugmasini bosing.</i>`, {
-        parse_mode: "HTML",
-        reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
-    });
+    
+    if (field === "location") {
+        await ctx.reply(`📍 Yangi lokatsiyani yuboring:`, {
+            parse_mode: "HTML",
+            reply_markup: { 
+              keyboard: [[{ text: "📍 Lokatsiya yuborish", request_location: true }], [{ text: "⬅️ Asosiy menyu" }]], 
+              resize_keyboard: true 
+            }
+        });
+    } else if (field === "hours") {
+        await ctx.reply(`🕐 Yangi ish vaqtini kiriting (masalan: 08:00–22:00):`, {
+            parse_mode: "HTML",
+            reply_markup: { 
+              keyboard: [
+                [{ text: "🕐 08:00–18:00" }, { text: "🕐 08:00–20:00" }],
+                [{ text: "🕐 08:00–22:00" }, { text: "✏️ Boshqa vaqt" }],
+                [{ text: "⬅️ Asosiy menyu" }]
+              ], 
+              resize_keyboard: true 
+            }
+        });
+    } else {
+        await ctx.reply(`✍️ Yangi ${field} ma'lumotini yuboring (rasm bo'lsa rasm yuboring):\n\n<i>Bekor qilish uchun <b>⬅️ Asosiy menyu</b> tugmasini bosing.</i>`, {
+            parse_mode: "HTML",
+            reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+        });
+    }
 });
 
 // --- END CHIRCHIQ KOMPYUTER XIZMATLARI ACTIONS ---
@@ -5358,10 +5381,12 @@ parse_mode: "HTML",
   }
 
   // Photo or Text (cheque) forwarding to admin
-  const isCheque = (ctx.message && "photo" in ctx.message) || 
+  const isChequeState = pending && pending.step === "awaiting_payment_receipt";
+  const isChequeContent = (ctx.message && "photo" in ctx.message) || 
     (userText.length > 15 && (userText.includes("8600") || userText.includes("9860") || userText.includes("4444") || userText.toLowerCase().includes("payme") || userText.toLowerCase().includes("click") || userText.toLowerCase().includes("uzcard") || userText.toLowerCase().includes("humo"))); // Heuristic for text cheque with common prefixes
   
-  if (isCheque) {
+  if (isChequeState && isChequeContent) {
+    pendingLogins.delete(userId);
     let adminIds = getAdminIds();
     
     // Self-healing: if adminIds is empty, look up in Firestore dynamically
@@ -6628,6 +6653,7 @@ for (const [service, price] of Object.entries(costs)) {
   if (normText === "💳 Balansni to'ldirish") {
     aiModeDeactivate();
     aiAssistantActiveUsers.delete(userId);
+    pendingLogins.set(userId, { step: "awaiting_payment_receipt" });
 
     let cardNumber = "9860 0000 0000 0010";
     let cardOwner = "Ortiqov E";
@@ -6646,6 +6672,7 @@ for (const [service, price] of Object.entries(costs)) {
     }
 
     const sysId = authed?.systemId || userId;
+    pendingLogins.set(userId, { step: "awaiting_payment_receipt" });
 
     const text = `💳 <b>BALANSNI TO'LDIRISH (2 XIL USUL)</b>
 
@@ -7593,16 +7620,60 @@ Endi foydalanuvchilar ushbu menyuni bosganda shu ma'lumotni olishadi.`,
       return ctx.reply("📋 Endi ushbu kompyuterxonaning xizmatlari ro'yxatini yuboring (masalan: Kserokopiya, format qilish):");
     } else if (pending.step === "admin_comp_add_services") {
       (pending as any).shopServices = userText;
-      pending.step = "admin_comp_add_address";
-      return ctx.reply("📍 Endi manzilni yuboring:");
-    } else if (pending.step === "admin_comp_add_address") {
-      (pending as any).shopAddress = userText;
+      pending.step = "admin_comp_add_location";
+      return ctx.reply("📍 Endi kompyuterxonaning manzilini yuboring:", {
+        reply_markup: {
+          keyboard: [
+            [{ text: "📍 Lokatsiya yuborish", request_location: true }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
+          resize_keyboard: true
+        }
+      });
+    } else if (pending.step === "admin_comp_add_location") {
+      const msg = ctx.message as any;
+      if (msg.location) {
+        (pending as any).shopLat = msg.location.latitude;
+        (pending as any).shopLon = msg.location.longitude;
+        await ctx.reply("✅ Manzil saqlandi!");
+      } else {
+        return ctx.reply("Iltimos, pastdagi tugma orqali lokatsiya yuboring.");
+      }
+      pending.step = "admin_comp_add_hours";
+      return ctx.reply("🕐 Kompyuterxonaning ish vaqtini kiriting:\nMasalan: 08:00–22:00", {
+        reply_markup: {
+          keyboard: [
+            [{ text: "🕐 08:00–18:00" }, { text: "🕐 08:00–20:00" }],
+            [{ text: "🕐 08:00–22:00" }, { text: "✏️ Boshqa vaqt" }],
+            [{ text: "⬅️ Asosiy menyu" }]
+          ],
+          resize_keyboard: true
+        }
+      });
+    } else if (pending.step === "admin_comp_add_hours") {
+      if (userText === "✏️ Boshqa vaqt") {
+         pending.step = "admin_comp_add_hours_custom";
+         return ctx.reply("✍️ Ish vaqtini qo'lda kiriting (masalan: 09:00 - 18:00):", {
+           reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+         });
+      }
+      (pending as any).shopHours = userText.replace("🕐 ", "");
       pending.step = "admin_comp_add_contact";
-      return ctx.reply("📞 Endi bog'lanish ma'lumotlarini yuboring (telefon raqam va h.k):");
+      return ctx.reply("📞 Endi bog'lanish ma'lumotlarini yuboring (telefon raqam va h.k):", {
+         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
+    } else if (pending.step === "admin_comp_add_hours_custom") {
+      (pending as any).shopHours = userText;
+      pending.step = "admin_comp_add_contact";
+      return ctx.reply("📞 Endi bog'lanish ma'lumotlarini yuboring (telefon raqam va h.k):", {
+         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
     } else if (pending.step === "admin_comp_add_contact") {
       (pending as any).shopContact = userText;
       pending.step = "admin_comp_add_photo";
-      return ctx.reply("🖼 Endi kompyuterxonaning rasmini yuboring (yoki rasmsiz saqlash uchun 'skip' deb yozing):");
+      return ctx.reply("🖼 Endi kompyuterxonaning rasmini yuboring (yoki rasmsiz saqlash uchun 'skip' deb yozing):", {
+         reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+      });
     } else if (pending.step === "admin_comp_add_photo") {
         let photoId = "";
         const msg = ctx.message as any;
@@ -7614,7 +7685,9 @@ Endi foydalanuvchilar ushbu menyuni bosganda shu ma'lumotni olishadi.`,
             await addDoc(collection(db, "computer_services"), {
                 name: (pending as any).shopName || "Nomsiz",
                 services: (pending as any).shopServices || "",
-                address: (pending as any).shopAddress || "",
+                workingHours: (pending as any).shopHours || "",
+                latitude: (pending as any).shopLat || null,
+                longitude: (pending as any).shopLon || null,
                 contact: (pending as any).shopContact || "",
                 photoId: photoId
             });
@@ -7641,15 +7714,47 @@ Endi foydalanuvchilar ushbu menyuni bosganda shu ma'lumotni olishadi.`,
             } else {
                 updateData.photoId = "";
             }
+        } else if (field === "location") {
+            const msg = ctx.message as any;
+            if (msg.location) {
+                updateData.latitude = msg.location.latitude;
+                updateData.longitude = msg.location.longitude;
+            } else {
+                return ctx.reply("Iltimos, pastdagi tugma orqali lokatsiya yuboring.");
+            }
+        } else if (field === "hours") {
+            if (userText === "✏️ Boshqa vaqt") {
+                pending.step = "admin_comp_edit_do_hours_custom";
+                return ctx.reply("✍️ Ish vaqtini qo'lda kiriting (masalan: 09:00 - 18:00):", {
+                  reply_markup: { keyboard: [[{ text: "⬅️ Asosiy menyu" }]], resize_keyboard: true }
+                });
+            }
+            updateData.workingHours = userText.replace("🕐 ", "");
         } else {
-            updateData[field] = userText;
+            updateData[field === 'name' ? 'name' : field === 'services' ? 'services' : field === 'contact' ? 'contact' : field] = userText;
         }
         
+        if (field !== "hours" || (field === "hours" && userText !== "✏️ Boshqa vaqt")) {
+            try {
+                await updateDoc(doc(db, "computer_services", shopId), updateData);
+                pendingLogins.delete(userId);
+                const authed = await getAuthedUser(userId);
+                ctx.reply("✅ Ma'lumot muvaffaqiyatli yangilandi!", { 
+                     reply_markup: { keyboard: await getKeyboard(authed?.role, userId, !!authed), resize_keyboard: true }
+                });
+            } catch (e) {
+                console.error(e);
+                return ctx.reply("❌ Xatolik yuz berdi");
+            }
+        }
+        return;
+    } else if (pending.step === "admin_comp_edit_do_hours_custom") {
+        const shopId = (pending as any).shopId;
         try {
-            await updateDoc(doc(db, "computer_services", shopId), updateData);
+            await updateDoc(doc(db, "computer_services", shopId), { workingHours: userText });
             pendingLogins.delete(userId);
             const authed = await getAuthedUser(userId);
-            ctx.reply("✅ Ma'lumot muvaffaqiyatli yangilandi!", {
+            ctx.reply("✅ Ma'lumot muvaffaqiyatli yangilandi!", { 
                  reply_markup: { keyboard: await getKeyboard(authed?.role, userId, !!authed), resize_keyboard: true }
             });
         } catch (e) {
