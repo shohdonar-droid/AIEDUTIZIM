@@ -9,6 +9,45 @@ import { Department, Group } from '../../types';
 export default function StudentProfile() {
   const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  const [linkingTg, setLinkingTg] = useState(false);
+
+  const handleLinkTelegram = async () => {
+    if (!user?.uid) return;
+    setLinkingTg(true);
+    try {
+      const token = Math.random().toString(36).substring(2, 10);
+      await setDoc(doc(db, 'users', user.uid), {
+        telegramToken: token,
+      }, { merge: true });
+      window.open(`https://t.me/aiedutizim_bot?start=link_${token}`, '_blank');
+    } catch (e) {
+      console.error(e);
+      alert("Xatolik yuz berdi");
+    } finally {
+      setLinkingTg(false);
+    }
+  };
+
+  const handleUnlinkTelegram = async () => {
+    if (!user?.uid) return;
+    if (!confirm("Telegram akkauntini uzishni xohlaysizmi?")) return;
+    setLinkingTg(true);
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        telegramId: null,
+        telegramLinked: false,
+        telegramToken: null
+      }, { merge: true });
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      alert("Xatolik yuz berdi");
+    } finally {
+      setLinkingTg(false);
+    }
+  };
+
   const [passLoading, setPassLoading] = useState(false);
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
@@ -252,6 +291,46 @@ export default function StudentProfile() {
               <p className="text-[11px] text-gray-400 mt-2 font-bold">
                 💡 Payme, Click yoki Uzum Bank ilovasida ushbu ID raqamingiz orqali to'g'ridan-to'g'ri balansni to'ldirishingiz mumkin.
               </p>
+            </div>
+
+            
+            {/* Telegram qatori */}
+            <div className="pt-6 border-t border-gray-50 mt-6">
+              <label className="flex items-center gap-2 text-xs font-black text-blue-500 mb-2 uppercase tracking-widest">
+                Telegram
+              </label>
+              <div className="flex items-center gap-4 max-w-xl">
+                {(user as any)?.telegramLinked ? (
+                  <>
+                    <div className="flex-1 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-2xl font-black text-emerald-800 text-sm flex items-center gap-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                      🟢 Telegram ulangan
+                    </div>
+                    <button
+                      type="button"
+                      disabled={linkingTg}
+                      onClick={handleUnlinkTelegram}
+                      className="px-6 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      {linkingTg ? "Kuting..." : "🔓 Telegramni uzish"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-gray-500 text-sm">
+                      🔐 Telegram akkauntingiz talaba profiliga ulanmagan
+                    </div>
+                    <button
+                      type="button"
+                      disabled={linkingTg}
+                      onClick={handleLinkTelegram}
+                      className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-md shrink-0 cursor-pointer"
+                    >
+                      {linkingTg ? "Kuting..." : "🤖 Telegram botni ulash"}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-50">

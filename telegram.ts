@@ -127,10 +127,12 @@ export async function broadcastBotResumed() {
       if (authVal) {
         buttons.push([{ text: "👤 Profil" }, { text: "🚪 Chiqish" }]);
         buttons.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
+        buttons.push([{ text: "🎓 Mening topshiriqlarim" }]);
         // buttons.push([{ text: "👥 Do'stlarni taklif qilish" }]);
       } else {
         buttons.push([{ text: "🔑 Kirish" }]);
         buttons.push([{ text: "💰 Balans" }, { text: "💳 Balansni to'ldirish" }]);
+        buttons.push([{ text: "🎓 Mening topshiriqlarim" }]);
         // buttons.push([{ text: "👥 Do'stlarni taklif qilish" }]);
       }
       return buttons;
@@ -1351,6 +1353,34 @@ bot.start(async (ctx) => {
   const userId = ctx.from.id;
   const startPayload = ctx.startPayload; // Deep link payload (e.g. ref_12345)
 
+
+  if (startPayload && startPayload.startsWith("link_")) {
+    const token = startPayload.replace("link_", "");
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("telegramToken", "==", token));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const userDoc = snapshot.docs[0];
+        await updateDoc(doc(db, "users", userDoc.id), {
+          telegramLinked: true,
+          telegramId: userId,
+          telegramToken: null
+        });
+        await ctx.reply("✅ Telegram akkauntingiz muvaffaqiyatli talaba profiliga ulandi!", {
+          reply_markup: { keyboard: await getKeyboard(userDoc.data().role, userId, true), resize_keyboard: true }
+        });
+        return;
+      } else {
+        await ctx.reply("❌ Noto'g'ri yoki eskirgan link. Sayt orqali qaytadan urinib ko'ring.");
+        return;
+      }
+    } catch (e) {
+      console.error("Link error", e);
+      await ctx.reply("❌ Xatolik yuz berdi. Iltimos keyinroq urinib ko'ring.");
+      return;
+    }
+  }
   // Clear any pending actions to "reload" bot state cleanly
   pendingLogins.delete(userId);
   aiAssistantActiveUsers.delete(userId);
@@ -5209,6 +5239,213 @@ bot.action(/comp_srv_fedit_(.+)/, async (ctx) => {
     }
 });
 
+
+const tgTestSessions = new Map<number, any>();
+
+bot.action(/tgtst_(auto_test|test)_(.+)_(.+)/, async (ctx) => {
+  const type = ctx.match[1];
+  const testId = ctx.match[2];
+  const studentDocId = ctx.match[3];
+  
+  await ctx.answerCbQuery();
+  
+  try {
+     const docSnap = await getDoc(doc(db, type === "auto_test" ? "auto_tests" : "tests", testId));
+     if (!docSnap.exists()) {
+       return ctx.reply("❌ Topshiriq topilmadi.");
+     }
+     const testData = docSnap.data();
+     let questions = testData.questions || [];
+     if (type === "test" && questions.length === 0 && testData.id && testData.id.startsWith("subject_")) {
+        // Fallback for subject test.
+        const subjSnap = await getDoc(doc(db, "subjects", testData.id.replace("subject_", "")));
+        if (subjSnap.exists()) {
+           questions = subjSnap.data().questions || [];
+        }
+     }
+     
+     if (questions.length === 0) {
+        return ctx.reply("❌ Ushbu topshiriqda savollar yo'q.");
+     }
+
+     const session = {
+        studentDocId,
+        testId,
+        type,
+        testTitle: testData.title,
+        questions: questions,
+        currentQIdx: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        studentName: "", // We can fetch if needed
+        studentTeacherId: "", // We can fetch
+     };
+     
+     const uSnap = await getDoc(doc(db, "users", studentDocId));
+     if (uSnap.exists()) {
+        session.studentName = uSnap.data().displayName || "Noma'lum";
+        session.studentTeacherId = uSnap.data().teacherId || "admin";
+     }
+     
+     tgTestSessions.set(ctx.from.id, session);
+     
+     await sendNextQuestion(ctx);
+  } catch(e) {
+    console.error(e);
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+bot.action(/tgtst_ans_(.+)/, async (ctx) => {
+   const selectedIdx = parseInt(ctx.match[1], 10);
+   const session = tgTestSessions.get(ctx.from.id);
+   
+   if (!session) {
+      return ctx.answerCbQuery("❌ Test sessiyasi topilmadi. Qaytadan boshlang.", {show_alert: true});
+   }
+   
+   const q = session.questions[session.currentQIdx];
+   const isCorrect = selectedIdx === q.correctIdx;
+   
+   if (isCorrect) session.correctCount++;
+   else session.wrongCount++;
+   
+   let text = `📝 ${session.currentQIdx + 1} / ${session.questions.length}\n\nSavol: ${q.text}\n\n`;
+   if (isCorrect) {
+      text += `✅ <b>TO'G'RI JAVOB!</b>\n\n`;
+   } else {
+      text += `❌ <b>XATO JAVOB!</b>\nTo'g'ri javob: ✅ ${q.options[q.correctIdx]}\n\n`;
+   }
+   
+   const buttons = [];
+   q.options.forEach((opt, idx) => {
+      let mark = "";
+      if (idx === q.correctIdx) mark = "✅ ";
+      else if (idx === selectedIdx && !isCorrect) mark = "❌ ";
+      buttons.push([{ text: mark + opt, callback_data: "tgtst_ignore" }]);
+   });
+   
+   buttons.push([{ text: "➡️ Keyingisi", callback_data: "tgtst_next" }]);
+   
+   await ctx.editMessageText(text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: buttons }
+   });
+});
+
+bot.action("tgtst_ignore", (ctx) => { ctx.answerCbQuery(); });
+
+bot.action("tgtst_next", async (ctx) => {
+   const session = tgTestSessions.get(ctx.from.id);
+   if (!session) return ctx.answerCbQuery("❌ Xatolik", {show_alert:true});
+   
+   session.currentQIdx++;
+   if (session.currentQIdx >= session.questions.length) {
+       // Finish
+       const total = session.questions.length;
+       const score = Math.round((session.correctCount / total) * 100);
+       
+       let text = `🏁 <b>TOPSHIRIQ YAKUNLANDI!</b>\n\n`;
+       text += `📝 Jami: ${total}\n`;
+       text += `✅ To'g'ri: ${session.correctCount}\n`;
+       text += `❌ Noto'g'ri: ${session.wrongCount}\n`;
+       text += `📊 Natija: ${score}%\n`;
+       
+       // Save to DB
+       try {
+           const payload = {
+             testId: session.testId,
+             testTitle: session.testTitle,
+             testType: session.type === "auto_test" ? "auto" : "subject", // simplified
+             userId: session.studentDocId,
+             userName: session.studentName,
+             teacherId: session.studentTeacherId,
+             creatorId: session.studentTeacherId,
+             score: score,
+             correctAnswers: session.correctCount,
+             totalQuestions: total,
+             completedAt: serverTimestamp(),
+             passed: score >= 60,
+             timeSpent: 0
+           };
+           await addDoc(collection(db, "testResults"), payload);
+           text += "\n✅ Natija saytga saqlandi!";
+       } catch(e) {
+           console.error(e);
+           text += "\n❌ Natijani saqlashda xatolik bo'ldi.";
+       }
+       
+       tgTestSessions.delete(ctx.from.id);
+       
+       await ctx.editMessageText(text, {
+          parse_mode: "HTML",
+          reply_markup: {
+             inline_keyboard: [[{ text: "🎓 Topshiriqlarim", callback_data: "tgtst_menu" }]]
+          }
+       });
+   } else {
+       await sendNextQuestion(ctx);
+   }
+});
+
+
+bot.action(/tgtst_logout_(.+)/, async (ctx) => {
+   const studentDocId = ctx.match[1];
+   await ctx.answerCbQuery();
+   try {
+      await updateDoc(doc(db, "users", studentDocId), {
+         telegramLinked: false,
+         telegramId: null,
+         telegramToken: null
+      });
+      await ctx.deleteMessage().catch(() => {});
+      await ctx.reply("🚪 Telegram akkauntingiz talaba profilidan uzildi.", {
+         reply_markup: { keyboard: await getKeyboard("user", ctx.from.id, false), resize_keyboard: true }
+      });
+   } catch (e) {
+      console.error(e);
+      await ctx.reply("❌ Xatolik yuz berdi");
+   }
+});
+
+bot.action("tgtst_menu", async (ctx) => {
+   await ctx.answerCbQuery();
+   await ctx.deleteMessage().catch(() => {});
+   // simulate texting
+   Object.defineProperty(ctx, "message", { value: { text: "🎓 Mening topshiriqlarim", chat: ctx.chat, from: ctx.from } });
+   bot.handleUpdate({ message: ctx.message } as any);
+});
+
+bot.action(/tgtst_res_(.+)/, async (ctx) => {
+   ctx.answerCbQuery("✅ Bu topshiriq bajarilgan", {show_alert: true});
+});
+
+async function sendNextQuestion(ctx: any) {
+   const session = tgTestSessions.get(ctx.from.id);
+   if (!session) return;
+   const q = session.questions[session.currentQIdx];
+   let text = `📝 ${session.currentQIdx + 1} / ${session.questions.length}\n\n`;
+   text += `<b>Savol:</b>\n${q.text}\n`;
+   
+   const buttons = [];
+   q.options.forEach((opt: string, idx: number) => {
+       const letter = String.fromCharCode(65 + idx);
+       buttons.push([{ text: letter + ") " + opt, callback_data: "tgtst_ans_" + idx }]);
+   });
+   
+   if (ctx.callbackQuery && ctx.callbackQuery.message) {
+      await ctx.editMessageText(text, {
+         parse_mode: "HTML",
+         reply_markup: { inline_keyboard: buttons }
+      });
+   } else {
+      await ctx.reply(text, {
+         parse_mode: "HTML",
+         reply_markup: { inline_keyboard: buttons }
+      });
+   }
+}
+
 // --- END CHIRCHIQ KOMPYUTER XIZMATLARI ACTIONS ---
 
 bot.on("message", async (ctx) => {
@@ -5252,7 +5489,7 @@ bot.on("message", async (ctx) => {
     "ℹ️ Tizim haqida", "💰 Balans", "💳 Balansni to'ldirish",
     "💬 Adminga murojaat", "🌐 Rasmiy sayt",
     "🔙 Asosiy Menyu", "⬅️ Asosiy menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish",
-    "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob",
+    "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob", "🎓 Mening topshiriqlarim",
     "💻 CHIRCHIQ KOMPYUTER XIZMATLARI"
   ];
   
@@ -6723,6 +6960,120 @@ for (const [service, price] of Object.entries(costs)) {
     return ctx.reply(
       "Profilga kirish uchun loginingizni yoki emailingizni kiriting:\n(Misol uchun: login nomi yoki to'liq email manzilni yuborishingiz mumkin)",
 );
+  }
+
+
+  if (normText === "🎓 Mening topshiriqlarim" || normText === "🎓 mening topshiriqlarim" || normText === "mening topshiriqlarim") {
+    aiModeDeactivate();
+    pendingLogins.delete(userId);
+    
+    // Check if user is linked
+    let student = null;
+    let studentDocId = "";
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("telegramId", "==", userId));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        student = snapshot.docs[0].data();
+        studentDocId = snapshot.docs[0].id;
+      }
+    } catch(e) {
+       return ctx.reply("❌ Xatolik yuz berdi");
+    }
+
+    if (!student) {
+      return ctx.reply("🔐 Telegram akkauntingiz talaba profiliga ulanmagan.\nIltimos saytga kiring va Profilingizdan <b>🤖 Telegram botni ulash</b> tugmasini bosing.", {
+        parse_mode: "HTML"
+      });
+    }
+
+    // Load assignments
+    await ctx.reply("⏳ Topshiriqlar tekshirilmoqda...");
+    try {
+      let myTests = [];
+      
+      // Auto tests
+      const autoTestsSnap = await getDocs(collection(db, "auto_tests"));
+      autoTestsSnap.forEach(doc => {
+        const test: any = { id: doc.id, ...doc.data() };
+        let match = false;
+        if (test.groupIds && test.groupIds.includes(student.groupId)) match = true;
+        if (test.groupId && test.groupId === student.groupId) match = true;
+        if (test.departmentIds && test.departmentIds.includes(student.departmentId)) match = true;
+        if (test.departmentId && test.departmentId === student.departmentId) match = true;
+        if (test.teacherId && test.teacherId === student.teacherId) match = true;
+        
+        if (match) myTests.push({...test, realType: 'auto_test'});
+      });
+
+      // Regular tests
+      const testsSnap = await getDocs(collection(db, "tests"));
+      testsSnap.forEach(doc => {
+        const test: any = { id: doc.id, ...doc.data() };
+        if (test.isPublished) {
+          let match = false;
+          if (test.groupIds && test.groupIds.includes(student.groupId)) match = true;
+          if (test.departmentIds && test.departmentIds.includes(student.departmentId)) match = true;
+          if (test.organizationIds && test.organizationIds.includes(student.teacherId)) match = true;
+          if (test.creatorId === student.teacherId || test.teacherId === student.teacherId) match = true;
+          
+          if (match) myTests.push({...test, realType: 'test'});
+        }
+      });
+      
+      if (myTests.length === 0) {
+        return ctx.reply("🎓 <b>MENING TOPSHIRIQLARIM</b>\n\n👤 Talaba: " + (student.displayName || "Noma'lum") + "\n👥 Guruh: " + (student.groupName || "Noma'lum") + "\n\nSizga biriktirilgan topshiriqlar topilmadi.", { parse_mode: "HTML" });
+      }
+
+      // Check results to show status
+      const resSnap = await getDocs(query(collection(db, 'testResults'), where('userId', '==', studentDocId)));
+      const completedTests = new Map();
+      resSnap.forEach(r => completedTests.set(r.data().testId, r.data()));
+
+      let text = "🎓 <b>MENING TOPSHIRIQLARIM</b>\n\n";
+      text += "👤 Talaba: <b>" + (student.displayName || "Noma'lum") + "</b>\n";
+      text += "👥 Guruh: <b>" + (student.groupName || "Noma'lum") + "</b>\n\n";
+
+      const buttons = [];
+      let i = 1;
+      for (const t of myTests) {
+         let typeEmoji = "📝";
+         if (t.realType === 'auto_test') typeEmoji = "🤖";
+         else if (t.type === 'exam') typeEmoji = "📝";
+         else typeEmoji = "📚";
+
+         let statusStr = "🟡 Boshlanmagan";
+         if (completedTests.has(t.id)) {
+            const res = completedTests.get(t.id);
+            statusStr = "🟢 Bajarilgan (" + res.score + "%)";
+         }
+         
+         text += i + ". " + typeEmoji + " <b>" + t.title + "</b>\n";
+         text += "Holat: " + statusStr + "\n\n";
+         
+         if (!completedTests.has(t.id)) {
+             buttons.push([{ text: "▶️ " + t.title, callback_data: "tgtst_" + t.realType + "_" + t.id + "_" + studentDocId }]);
+         } else {
+             buttons.push([{ text: "✅ " + t.title, callback_data: "tgtst_res_" + t.id }]);
+         }
+         i++;
+      }
+      
+      // text might be too long, but let's assume it's fine for now
+      
+      await ctx.reply(text, {
+        parse_mode: "HTML",
+        reply_markup: {
+           inline_keyboard: buttons
+        }
+      });
+
+    } catch(e) {
+      console.error(e);
+      await ctx.reply("❌ Xatolik yuz berdi");
+    }
+    return;
   }
 
   if (normText === "👤 Profil") {
