@@ -1,13 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { db, auth } from '../../lib/firebase';
+import safeOnSnapshot from '../../lib/safeSnapshot';
 import { doc, setDoc, getDocs, collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { Camera, Save, Loader2, Mail, Phone, Calendar, User as UserIcon, Building, Users, Key } from 'lucide-react';
 import { Department, Group } from '../../types';
 
 export default function StudentProfile() {
+  
   const { user, refreshUser } = useAuth();
+  const [localUser, setLocalUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (user) {
+      setLocalUser(user);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubscribe = safeOnSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) {
+        setLocalUser({ uid: snap.id, ...snap.data() });
+      }
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
+
   const [loading, setLoading] = useState(false);
 
   const [linkingTg, setLinkingTg] = useState(false);
@@ -300,7 +320,7 @@ export default function StudentProfile() {
                 Telegram
               </label>
               <div className="flex items-center gap-4 max-w-xl">
-                {(user as any)?.telegramLinked ? (
+                {localUser?.telegramLinked ? (
                   <>
                     <div className="flex-1 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-2xl font-black text-emerald-800 text-sm flex items-center gap-2">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
