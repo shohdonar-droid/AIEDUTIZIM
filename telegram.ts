@@ -8691,6 +8691,13 @@ bot.catch((err: any, ctx) => {
     return;
   }
   console.error(`[Telegraf Global Catch] Fault in processing update ${ctx?.update?.update_id || "unknown"}:`, err);
+  
+  // Write to a local log file so we can inspect the exact error!
+  try {
+    const fs = require("fs");
+    fs.appendFileSync("tg-errors.log", new Date().toISOString() + " - " + errMsg + "\n" + (err.stack || "") + "\n\n");
+  } catch(e){}
+
   if (ctx && typeof ctx.reply === "function") {
     ctx.reply("⚠️ Tizimda kichik uzilish kuzatildi. Iltimos, xabaringizni qaytadan yuboring.").catch(() => {});
   }
