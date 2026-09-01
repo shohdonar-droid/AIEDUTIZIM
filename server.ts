@@ -517,19 +517,23 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
   
   app.post("/api/telegram/unlink", async (req, res) => {
     try {
-      const { telegramId } = req.body;
+      const { telegramId, studentUid } = req.body;
       if (telegramId) {
-        const { bot, getKeyboard } = await import("./telegram.js");
+        const { bot, getKeyboard, handleUnlinkTransfer } = await import("./telegram.js");
+        if (handleUnlinkTransfer) {
+           await handleUnlinkTransfer(telegramId, studentUid);
+        }
+        
         if (bot && getKeyboard) {
-          const kb = await getKeyboard("student", telegramId, false);
+          const kb = await getKeyboard("bot_user", telegramId, true);
           await bot.telegram.sendMessage(
             telegramId,
-            "🔌 <b>Sizning Telegram akkauntingiz talaba profilidan uzildi!</b>\nBot faqat cheklangan rejimda ishlaydi.",
+            "🔌 <b>Sizning Telegram akkauntingiz talaba profilidan uzildi!</b>\nEndi siz oldingi bot foydalanuvchisi rejimiga qaytdingiz (balansingiz saqlab qolindi).",
             {
               parse_mode: "HTML",
               reply_markup: { keyboard: kb, resize_keyboard: true }
             }
-          );
+          ).catch(() => {});
         }
       }
       res.json({ success: true });

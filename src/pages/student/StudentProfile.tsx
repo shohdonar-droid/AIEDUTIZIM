@@ -66,7 +66,7 @@ export default function StudentProfile() {
           await fetch('/api/telegram/unlink', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegramId: currentTgId })
+            body: JSON.stringify({ telegramId: currentTgId, studentUid: user.uid })
           });
         } catch(err) {
           console.error("Botni ogohlantirishda xatolik", err);
