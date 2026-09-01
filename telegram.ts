@@ -1071,7 +1071,7 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
-async function getKeyboard(
+export async function getKeyboard(
   role: string = "student",
   userId?: number,
   isAuthenticated: boolean = false,
@@ -5270,11 +5270,22 @@ bot.action(/tgtst_cat_(auto|exam|topic)_(.+)/, async (ctx) => {
         autoTestsSnap.forEach(d => {
           const test = { id: d.id, ...d.data() };
           let match = false;
-          if (test.groupIds && test.groupIds.includes(student.groupId)) match = true;
-          if (test.groupId && test.groupId === student.groupId) match = true;
-          if (test.departmentIds && test.departmentIds.includes(student.departmentId)) match = true;
-          if (test.departmentId && test.departmentId === student.departmentId) match = true;
-          if (test.teacherId && test.teacherId === student.teacherId) match = true;
+          const hasGroupArray = Array.isArray(test.groupIds) && test.groupIds.length > 0;
+          if (hasGroupArray || test.groupId) {
+            match = (hasGroupArray && test.groupIds.includes(student.groupId)) || (test.groupId === student.groupId);
+          } else {
+            const hasDeptArray = Array.isArray(test.departmentIds) && test.departmentIds.length > 0;
+            if (hasDeptArray || test.departmentId) {
+              match = (hasDeptArray && test.departmentIds.includes(student.departmentId)) || (test.departmentId === student.departmentId);
+            } else {
+              const hasFacultyArray = Array.isArray(test.facultyIds) && test.facultyIds.length > 0;
+              if (hasFacultyArray || test.facultyId) {
+                match = (hasFacultyArray && test.facultyIds.includes(student.facultyId)) || (test.facultyId === student.facultyId);
+              } else if (test.teacherId) {
+                match = test.teacherId === student.teacherId;
+              }
+            }
+          }
           if (match) myTests.push({...test, realType: 'auto_test'});
         });
      } else {
@@ -5284,10 +5295,24 @@ bot.action(/tgtst_cat_(auto|exam|topic)_(.+)/, async (ctx) => {
           if (test.isPublished) {
              if ((cat === "exam" && test.type === "exam") || (cat === "topic" && test.type === "topic")) {
                 let match = false;
-                if (test.groupIds && test.groupIds.includes(student.groupId)) match = true;
-                if (test.departmentIds && test.departmentIds.includes(student.departmentId)) match = true;
-                if (test.organizationIds && test.organizationIds.includes(student.teacherId)) match = true;
-                if (test.creatorId === student.teacherId || test.teacherId === student.teacherId) match = true;
+                const isAdminTest = test.creatorRole === 'admin' || !test.creatorRole;
+                const isGlobalAdminTest = isAdminTest && (!test.organizationIds || test.organizationIds.length === 0) && (!test.departmentIds || test.departmentIds.length === 0) && (!test.groupIds || test.groupIds.length === 0);
+                if (isGlobalAdminTest) {
+                   match = true;
+                } else {
+                   const hasGroupFilter = (test.groupIds?.length || 0) > 0;
+                   const hasDeptFilter = (test.departmentIds?.length || 0) > 0;
+                   const hasOrgFilter = (test.organizationIds?.length || 0) > 0;
+                   if (hasGroupFilter) {
+                     match = test.groupIds?.includes(student.groupId || '') || false;
+                   } else if (hasDeptFilter) {
+                     match = test.departmentIds?.includes(student.departmentId || '') || false;
+                   } else if (hasOrgFilter) {
+                     match = test.organizationIds?.includes(student.teacherId || '') || false;
+                   } else if (test.creatorId === student.teacherId || test.teacherId === student.teacherId) {
+                     match = true;
+                   }
+                }
                 if (match) myTests.push({...test, realType: 'test'});
              }
           }
@@ -5515,8 +5540,13 @@ bot.action(/tgtst_logout_(.+)/, async (ctx) => {
          telegramId: null,
          telegramToken: null
       });
+      authedUsers.delete(ctx.from.id);
+      aiAssistantActiveUsers.delete(ctx.from.id);
+      userWizardStates.delete(ctx.from.id);
+      pendingLogins.delete(ctx.from.id);
+      
       await ctx.deleteMessage().catch(() => {});
-      await ctx.reply("🚪 Telegram akkauntingiz talaba profilidan uzildi.", {
+      await ctx.reply("🚪 Telegram akkauntingiz talaba profilidan muvaffaqiyatli uzildi! Endi bot sizni mehmon sifatida ko'radi.", {
          reply_markup: { keyboard: await getKeyboard("user", ctx.from.id, false), resize_keyboard: true }
       });
    } catch (e) {
