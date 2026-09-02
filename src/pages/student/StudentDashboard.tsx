@@ -18,7 +18,7 @@ import { BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function StudentDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -47,7 +47,7 @@ export default function StudentDashboard() {
     { name: 'Chat', path: '/student/chat', icon: MessageSquare, badge: unreadCount },
   ];
 
-  const handleLogout = () => auth.signOut();
+  const handleLogout = () => logout();
 
   return (
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px)] bg-gray-50 relative pb-16 md:pb-0">

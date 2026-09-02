@@ -32,7 +32,7 @@ import { makeDirectImageUrl } from '../lib/helpers';
 import BalanceTopUpModal from './BalanceTopUpModal';
 
 export default function Navbar() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isTuzilmaOpen, setIsTuzilmaOpen] = useState(false);
@@ -82,25 +82,7 @@ export default function Navbar() {
   ];
 
   const handleLogout = async () => {
-    const sessionId = localStorage.getItem('sessionId');
-    const sessionStart = localStorage.getItem('sessionStart');
-    
-    if (sessionId && sessionStart) {
-      const durationMinutes = Math.round((Date.now() - parseInt(sessionStart)) / 60000);
-      try {
-        await updateDoc(doc(db, 'activityLogs', sessionId), {
-          logoutTime: Date.now(),
-          durationMinutes: durationMinutes
-        });
-      } catch (e) {
-        handleFirestoreError(e, OperationType.WRITE, `activityLogs/${sessionId}`);
-      }
-    }
-    
-    localStorage.removeItem('sessionId');
-    localStorage.removeItem('sessionStart');
-    localStorage.removeItem('lastActivityTime');
-    auth.signOut();
+    await logout();
   };
 
   const isActive = (path: string) => location.pathname === path;

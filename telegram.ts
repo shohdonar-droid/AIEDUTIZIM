@@ -5125,18 +5125,29 @@ bot.action(/tgtst_cat_(auto|exam|topic)_(.+)/, async (ctx) => {
      for (const t of myTests) {
          let typeEmoji = cat === "auto" ? "🤖" : (cat === "exam" ? "📝" : "📚");
          let statusStr = "🟡 Boshlanmagan";
+         let currentAttempts = 0;
+         const maxAttempts = t.maxAttempts || 1;
+         
          if (completedTests.has(t.id)) {
             const res = completedTests.get(t.id);
-            statusStr = "🟢 Bajarilgan (" + res.score + "%)";
+            currentAttempts = res.attempts || 1;
+            statusStr = "🟢 Bajarilgan (" + res.score + "%) - " + currentAttempts + "/" + maxAttempts + " marta";
          }
-         
+                  
          text += i + ". " + typeEmoji + " <b>" + t.title + "</b>\n";
          text += "Holat: " + statusStr + "\n\n";
          
-         if (!completedTests.has(t.id)) {
-             buttons.push([{ text: "▶️ " + t.title, callback_data: "tgtst_" + t.realType + "_" + t.id + "_" + studentDocId }]);
+         const shortType = t.realType === 'auto_test' ? 'atst' : 'test';
+         
+         if (currentAttempts < maxAttempts) {
+             let btnText = currentAttempts > 0 ? "▶️ Qayta ishlash" : "▶️ " + t.title;
+             // Trim title if button text is too long (optional, but good practice)
+             if (btnText.length > 35) btnText = btnText.substring(0, 32) + "...";
+             buttons.push([{ text: btnText, callback_data: "tgtst_" + shortType + "_" + t.id + "_" + studentDocId }]);
          } else {
-             buttons.push([{ text: "✅ " + t.title, callback_data: "tgtst_res_" + t.id }]);
+             let btnText = "✅ " + t.title;
+             if (btnText.length > 35) btnText = btnText.substring(0, 32) + "...";
+             buttons.push([{ text: btnText, callback_data: "tgtst_res_" + t.id }]);
          }
          i++;
      }
@@ -5154,7 +5165,7 @@ bot.action(/tgtst_cat_(auto|exam|topic)_(.+)/, async (ctx) => {
   }
 });
 
-bot.action(/tgtst_(auto_test|test)_(.+)_(.+)/, async (ctx) => {
+bot.action(/tgtst_(auto_test|atst|test)_(.+)_(.+)/, async (ctx) => {
   const type = ctx.match[1];
   const testId = ctx.match[2];
   const studentDocId = ctx.match[3];
@@ -5162,7 +5173,7 @@ bot.action(/tgtst_(auto_test|test)_(.+)_(.+)/, async (ctx) => {
   await ctx.answerCbQuery();
   
   try {
-     const docSnap = await getDoc(doc(db, type === "auto_test" ? "auto_tests" : "tests", testId));
+     const docSnap = await getDoc(doc(db, (type === "auto_test" || type === "atst") ? "auto_tests" : "tests", testId));
      if (!docSnap.exists()) {
        return ctx.reply("❌ Topshiriq topilmadi.");
      }
@@ -5181,7 +5192,7 @@ bot.action(/tgtst_(auto_test|test)_(.+)_(.+)/, async (ctx) => {
         }
      }
      
-     if (type === "auto_test") {
+     if (type === "auto_test" || type === "atst") {
         let randomCount = questions.length;
         if (testData.randomCount !== undefined && testData.randomCount !== null && testData.randomCount !== '') {
           const parsed = Number(testData.randomCount);
@@ -5198,6 +5209,16 @@ bot.action(/tgtst_(auto_test|test)_(.+)_(.+)/, async (ctx) => {
         return ctx.reply("❌ Ushbu topshiriqda savollar yo'q.");
      }
 
+     const resDocId = studentDocId + "_" + testId;
+     const resSnap = await getDoc(doc(db, "testResults", resDocId));
+     const existingResult = resSnap.exists() ? resSnap.data() : null;
+     const currentAttempts = existingResult?.attempts || 0;
+     const maxAttempts = testData.maxAttempts || 1;
+     
+     if (currentAttempts >= maxAttempts) {
+         return ctx.reply("Siz ushbu testni maksimal marta ishlagan ekansiz.");
+     }
+
      const session = {
         studentDocId,
         testId,
@@ -5207,8 +5228,9 @@ bot.action(/tgtst_(auto_test|test)_(.+)_(.+)/, async (ctx) => {
         currentQIdx: 0,
         correctCount: 0,
         wrongCount: 0,
-        studentName: "", // We can fetch if needed
-        studentTeacherId: "", // We can fetch
+        studentName: "", 
+        studentTeacherId: "", 
+        currentAttempts: currentAttempts,
      };
      
      const uSnap = await getDoc(doc(db, "users", studentDocId));
@@ -5286,7 +5308,7 @@ bot.action("tgtst_next", async (ctx) => {
            const payload = {
              testId: session.testId,
              testTitle: session.testTitle,
-             testType: session.type === "auto_test" ? "auto" : "subject", // simplified
+             testType: (session.type === "auto_test" || session.type === "atst") ? "auto" : "subject", // simplified
              userId: session.studentDocId,
              userName: session.studentName,
              teacherId: session.studentTeacherId,
@@ -5298,7 +5320,8 @@ bot.action("tgtst_next", async (ctx) => {
              passed: score >= 60,
              timeSpent: 0
            };
-           await addDoc(collection(db, "testResults"), payload);
+           payload.attempts = (session.currentAttempts || 0) + 1;
+           await setDoc(doc(db, "testResults", session.studentDocId + "_" + session.testId), payload, { merge: true });
            text += "\n✅ Natija saytga saqlandi!";
        } catch(e) {
            console.error(e);
@@ -8294,7 +8317,7 @@ Endi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tish
             parse_mode: "HTML",
             reply_markup: {
               inline_keyboard: [
-                [{ text: "📱 Tizimga kirish", web_app: { url: "https://aiedutizim.vercel.app/login" } }],
+                [{ text: "📱 Tizimga kirish", web_app: { url: "${APP_URL}/login" } }],
               ],
             },
           });
@@ -8341,7 +8364,7 @@ Endi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tish
                   [
                     {
                       text: "📱 Tizimga kirish",
-                      web_app: { url: "https://aiedutizim.vercel.app/login" },
+                      web_app: { url: "${APP_URL}/login" },
                     },
                   ],
                 ],
