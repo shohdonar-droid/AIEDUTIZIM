@@ -251,7 +251,7 @@ export async function generateContentWithRotation(
             safetySettings: params.safetySettings || defaultSafety
           }
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("AI Request Timeout (45s)")), 45000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("AI Request Timeout (120s)")), 120000))
       ]);
       
       const result = response as any;

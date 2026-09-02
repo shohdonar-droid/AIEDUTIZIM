@@ -1,5 +1,3 @@
-import { deleteDoc } from "firebase/firestore";
-
 import { Telegraf } from "telegraf";
 import { initializeApp, getApps, getApp, setLogLevel } from "firebase/app";
 import firebaseConfigRaw from "./firebase-applet-config.json";
@@ -13,6 +11,7 @@ import {
   updateDoc,
   doc,
   addDoc,
+  deleteDoc,
   serverTimestamp,
   setDoc,
   deleteField,
