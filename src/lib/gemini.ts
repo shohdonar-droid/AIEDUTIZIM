@@ -271,9 +271,9 @@ export async function generateContentWithRotation(
       
       const isBlocked = statusCode === 403 || errorDetail.includes("PERMISSION_DENIED") || errorDetail.includes("API_KEY_SERVICE_BLOCKED") || errorDetail.includes("blocked");
       const isInvalid = statusCode === 401 || errorDetail.includes("authentication credentials") || errorDetail.includes("API key not valid");
-      const isNotFound = statusCode === 404 || errorDetail.includes("not found");
+      const isKeyNotFound = (statusCode === 404 || errorDetail.includes("not found")) && !errorDetail.includes("models/") && !errorDetail.includes("model");
 
-      if (isBlocked || isInvalid || isNotFound) {
+      if (isBlocked || isInvalid || isKeyNotFound) {
          console.warn(`[Gemini Rotator] Key at index ${activeIndex} is ${isBlocked ? 'BLOCKED' : isInvalid ? 'INVALID' : 'INCOMPATIBLE'} (${statusCode}). Blacklisting.`);
          badKeys.add(apiKey);
          // Don't clear cache fully, just invalidate the bad key's presence in future rotates

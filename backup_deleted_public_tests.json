@@ -1,0 +1,2686 @@
+{
+  "deletedAt": "2026-09-03T13:41:56.993Z",
+  "tests": [
+    {
+      "id": "78yO9J7TZAINrZATKMsF",
+      "type": "topic",
+      "isPublished": true,
+      "title": "sun'iy intellekt",
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1777373732,
+        "nanoseconds": 905000000
+      },
+      "questions": [
+        {
+          "id": "ai_001",
+          "text": "Turing testi nima maqsadida ishlatiladi?",
+          "options": [
+            "Mashinaning inson kabi fikrlash qobiliyatini aniqlash",
+            "Internet tezligini o'lchash",
+            "Ma'lumotlar bazasini himoyalash",
+            "Grafik kartaning quvvatini aniqlash"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "ai_002",
+          "text": "Sun'iy intellekt sohasida eng mashhur va keng qo'llaniladigan dasturlash tili qaysi?",
+          "options": [
+            "PHP",
+            "Python",
+            "C++",
+            "Swift"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "ai_003",
+          "text": "Neyron tarmoqlarining asosi qaysi biologik organga o'xshatib yaratilgan?",
+          "options": [
+            "Yurak",
+            "Jigar",
+            "Inson miyasi",
+            "Mushaklar"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "ai_004",
+          "text": "NLP (Natural Language Processing) nima bilan shug'ullanadi?",
+          "options": [
+            "Tabiiy tillarni qayta ishlash va tushunish",
+            "Yangi tillarni ixtiro qilish",
+            "Kompyuter xotirasini tozalash",
+            "Raqamli tasvirlarni bo'yash"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "ai_005",
+          "text": "Mashinali o'qitishning (Machine Learning) asosiy g'oyasi nima?",
+          "options": [
+            "Kodlarni qo'lda yozish",
+            "Ma'lumotlar asosida kompyuterni o'z-o'zidan o'rganishga majburlash",
+            "Faqat robotlarni harakatlantirish",
+            "Veb-saytlarni dizayn qilish"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "ai_006",
+          "text": "'Deep Learning' (Chuqur o'qitish) nima?",
+          "options": [
+            "Ma'lumotlarni chuqur arxivlash",
+            "Ko'p qatlamli neyron tarmoqlarga asoslangan o'qitish usuli",
+            "Internetning chuqur qatlamlarini o'rganish",
+            "Suv osti robotlarini boshqarish tizimi"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "ai_007",
+          "text": "Kompyuter ko'rishi (Computer Vision) texnologiyasi qaysi sohada qo'llaniladi?",
+          "options": [
+            "Audio fayllarni tahrirlashda",
+            "Tasvirlar va videolarni tahlil qilishda",
+            "Matnlarni tarjima qilishda",
+            "Elektron pochta xavfsizligida"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "ai_008",
+          "text": "OpenAI kompaniyasi tomonidan ishlab chiqilgan mashhur til modeli qaysi?",
+          "options": [
+            "GPT",
+            "Siri",
+            "Alexa",
+            "Cortana"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "ai_009",
+          "text": "'Supervised Learning' (Nazorat ostidagi o'qitish) nima?",
+          "options": [
+            "O'qituvchisiz mustaqil o'rganish",
+            "Belgilangan (etiketlangan) ma'lumotlar yordamida o'qitish",
+            "Ma'lumotlarsiz bashorat qilish",
+            "Faqat tasodifiy tanlash"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "ai_010",
+          "text": "Qaysi biri sun'iy intellekt turlaridan biri hisoblanadi?",
+          "options": [
+            "Narrow AI (Tor AI)",
+            "Static AI (Statik AI)",
+            "Manual AI (Qo'lda boshqariladigan AI)",
+            "Hardware AI (Apparatli AI)"
+          ],
+          "correctIdx": 0
+        }
+      ]
+    },
+    {
+      "id": "Dy5TQB5ZOEbfMyt1cCzz",
+      "groupId": "all",
+      "departmentId": "B9eTUGGdEqNskWdD5seF",
+      "title": "Matematika",
+      "questions": [
+        {
+          "id": "0.7422018475764345",
+          "text": "What is writing mainly used for?",
+          "options": [
+            "Listening and repeating words",
+            "Expressing ideas through written language",
+            "Drawing and coloring pictures",
+            "Reading stories aloud"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.11163165267973785",
+          "text": "Which of the following is an example of formal writing?",
+          "options": [
+            "A message to a friend",
+            "A job application letter",
+            "A diary entry",
+            "A text message"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.2811836197344455",
+          "text": "Which is an example of informal writing?",
+          "options": [
+            "A scientific report",
+            "A chat with a friend online",
+            "A business contract",
+            "A school essay"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.7755396910462644",
+          "text": "What do students practice in beginning writing?",
+          "options": [
+            "Reading stories",
+            "Forming letters and simple words",
+            "Translating texts",
+            "Writing long paragraphs"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.614524051902285",
+          "text": "Which of the following helps students write fluently?",
+          "options": [
+            "Doing short, daily writing tasks",
+            "Memorizing grammar rules",
+            "Reading silently",
+            "Listening to music"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.12153115511120227",
+          "text": "What is the main focus of process writing?",
+          "options": [
+            "Writing through stages: planning, drafting, revising, editing",
+            "Writing once and not checking",
+            "Memorizing model texts",
+            "Copying text from the board"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.6058757180874947",
+          "text": "What is the purpose of spelling practice?",
+          "options": [
+            "To write words correctly",
+            "To improve speaking",
+            "To learn new tenses",
+            "To translate faster"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.5121276113581796",
+          "text": "What does punctuation help with?",
+          "options": [
+            "Making sentences clear and easy to read",
+            "Reading faster",
+            "Spelling long words",
+            "Speaking fluently"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.47439008086886814",
+          "text": "Why is it useful to teach both formal and informal writing?",
+          "options": [
+            "Students can write for different purposes and audiences",
+            "Students can only use one style",
+            "It’s easier to mark",
+            "It saves time in class"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.0871825068739065",
+          "text": "In process writing, what should students do after drafting?",
+          "options": [
+            "Revise and edit their work",
+            "Submit immediately",
+            "Erase everything",
+            "Copy another student’s text"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.015178028958100942",
+          "text": "What is the main purpose of assessment?90",
+          "options": [
+            "To measure students’ progress and achievement",
+            "To confuse students",
+            "To punish weak learners",
+            "To give homework"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.9900561646116717",
+          "text": "Which of the following is a formative assessment?",
+          "options": [
+            "A teacher checking students’ understanding during lessons",
+            "A final exam",
+            "A university entrance test",
+            "A national exam"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.024587982491226956",
+          "text": "Which of these is a summative assessment?",
+          "options": [
+            "End-of-term examination",
+            "Class discussion",
+            "Weekly quiz",
+            "Homework correction"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.2906854942626318",
+          "text": "What does giving a grade usually help with?",
+          "options": [
+            "Showing how well students performed",
+            "Making lessons longer",
+            "Choosing classroom materials"
+          ],
+          "correctIdx": 0
+        }
+      ],
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1777524386,
+        "nanoseconds": 541000000
+      },
+      "type": "topic",
+      "isPublished": true
+    },
+    {
+      "id": "Fzd0HHbn6ZaxpUJUXzUR",
+      "isPublished": true,
+      "type": "topic",
+      "groupId": "all",
+      "title": "Kiberpedagogika",
+      "questions": [
+        {
+          "id": "0.010628802038914698",
+          "text": "Kiberpedagogika fanining asosiy o'rganish obyekti nima?",
+          "options": [
+            "Robot texnikasini yaratish",
+            "Kiber makonda ta'lim-tarbiya jarayoni",
+            "Faqat kompyuter apparat qismlari",
+            "An'anaviy sinf-dars tizimi"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.5855198819653462",
+          "text": "Kiberpedagogikada 'Netiket' tushunchasi nimani anglatadi?",
+          "options": [
+            "Internet tezligini o'lchash",
+            "Kompyuter tarmoqlari tuzilishi",
+            "Raqamli muhitdagi muloqot odobi",
+            "Elektron darsliklar ro'yxati"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "0.3059386336860326",
+          "text": "Asinxron masofaviy ta'lim nima?",
+          "options": [
+            "O'qituvchi va o'quvchining bir vaqtda muloqoti",
+            "Faqat yuzma-yuz o'tiladigan darslar",
+            "O'quvchi va o'qituvchining turli vaqtda muloqot qilishi",
+            "Internetdan foydalanmasdan o'qish"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "0.22637528249082317",
+          "text": "LMS (Learning Management System) tizimining asosiy vazifasi nima?",
+          "options": [
+            "Kompyuterlarni virusdan himoyalash",
+            "O'quv jarayonini boshqarish va nazorat qilish",
+            "Video fayllarni montaj qilish",
+            "Matnli hujjatlarni chop etish"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.16483405304967502",
+          "text": "'To'ntarilgan sinf' (Flipped classroom) modelida nazariya qachon o'rganiladi?",
+          "options": [
+            "Dars davomida o'qituvchi tomonidan",
+            "Darsdan oldin mustaqil ravishda (uyda)",
+            "Imtihon vaqtida",
+            "Hech qachon o'rganilmaydi"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.05892719390070478",
+          "text": "Kiberpedagogikada o'qituvchining 'fasilitator' sifatidagi roli nimadan iborat?",
+          "options": [
+            "Faqat yangi mavzuni ma'ruza qilish",
+            "Talabalarning mustaqil bilim olishiga ko'maklashish",
+            "Kompyuterlarni ta'mirlash",
+            "O'quvchilarga baho qo'yishni taqiqlash"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.5814511404195949",
+          "text": "Ta'limda gamifikatsiya deganda nima tushuniladi?",
+          "options": [
+            "Dars o'rniga faqat o'yin o'ynash",
+            "O'quv jarayoniga o'yin elementlarini kiritish",
+            "Kompyuter o'yinlarini taqiqlash",
+            "O'quvchilarni guruhlarga bo'lish"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.7243740988909658",
+          "text": "Sinxron ta'limga qaysi javob misol bo'la oladi?",
+          "options": [
+            "Elektron pochta orqali topshiriq yuborish",
+            "Onlayn video-konferensiya darslari",
+            "Bloglardagi maqolalarni o'qish",
+            "Kutubxonada kitob mutolaa qilish"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.7939472015015173",
+          "text": "Raqamli didaktika kiberpedagogikaning qaysi qismini tashkil etadi?",
+          "options": [
+            "O'qitishning nazariy va amaliy metodikasini",
+            "Faqat texnik qurilmalar sozlamasini",
+            "O'quvchilarning jismoniy holatini",
+            "Maktabning moliyaviy hisobotini"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.7971993369185416",
+          "text": "Vebinar tushunchasining to'g'ri ta'rifini toping.",
+          "options": [
+            "Kompyuter uchun antivirus",
+            "Internet tarmog'i orqali o'tkaziladigan seminar",
+            "Masofaviy boshqariladigan robot",
+            "Elektron pochta xizmati"
+          ],
+          "correctIdx": 1
+        }
+      ],
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1777524166,
+        "nanoseconds": 600000000
+      },
+      "departmentId": "2e8iA3atPjfnWbNwvxlN"
+    },
+    {
+      "id": "JbQcVMyKQIhUAebKNDSP",
+      "type": "topic",
+      "questions": [
+        {
+          "id": "0.3420137512149013",
+          "text": "Kelajakda inson aqliy faoliyatini modellashtiruvchi texnologiya nima deb ataladi?",
+          "options": [
+            "Sun'iy intellekt",
+            "Blokcheyn",
+            "Bulutli hisoblash",
+            "Internet buyumlari"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.9987797295161543",
+          "text": "Kvant kompyuterlarida ma'lumotning eng kichik birligi nima?",
+          "options": [
+            "Bit",
+            "Bayt",
+            "Kubit",
+            "Tranzistor"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "0.29583315342787775",
+          "text": "Qurilmalarning internet orqali bir-biri bilan ma'lumot almashish tizimi qanday nomlanadi?",
+          "options": [
+            "Big Data",
+            "IoT (Internet buyumlari)",
+            "Metaverse",
+            "Web 3.0"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.21367483762073924",
+          "text": "Markazlashmagan internetning yangi avlodi qanday nomlanadi?",
+          "options": [
+            "Web 1.0",
+            "Web 2.0",
+            "Web 3.0",
+            "HTTP 2"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "0.10972766631574793",
+          "text": "Virtual va real dunyoni birlashtiruvchi raqamli makon nima?",
+          "options": [
+            "Cyberpunk",
+            "Metaolam (Metaverse)",
+            "Deep learning",
+            "Server"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.5848911626228478",
+          "text": "Kelajakdagi yuqori tezlikdagi mobil aloqa standarti qaysi?",
+          "options": [
+            "3G",
+            "4G LTE",
+            "6G",
+            "Dial-up"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "0.6606159382683051",
+          "text": "Miya va kompyuter o'rtasida to'g'ridan-to'g'ri aloqa o'rnatuvchi interfeys nima?",
+          "options": [
+            "USB-C",
+            "BCI (Miya-kompyuter interfeysi)",
+            "Bluetooth",
+            "Ethernet"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.8849192776622946",
+          "text": "Ma'lumotlarni zanjir ko'rinishida xavfsiz saqlash texnologiyasi qaysi?",
+          "options": [
+            "SQL",
+            "Blokcheyn",
+            "NoSQL",
+            "Excel"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.9235928398034091",
+          "text": "Inson aralashuvisiz harakatlanuvchi transport vositalari qanday ataladi?",
+          "options": [
+            "Gibrid avtomobillar",
+            "Mexanik transport",
+            "Avtonom (haydovchisiz) vositalar",
+            "Elektroskuterlar"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "0.5898278332432673",
+          "text": "Haqiqiy ob'ektning raqamli nusxasini yaratish texnologiyasi nima?",
+          "options": [
+            "Raqamli egizak (Digital Twin)",
+            "Fotokopiya",
+            "3D printer",
+            "Cloud Storage",
+            "savol matni",
+            "nato'g'ri_variant",
+            "to'g'ri_variant",
+            "nato'g'ri_variant",
+            "nato'g'ri_variant"
+          ],
+          "correctIdx": 6
+        }
+      ],
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1777524049,
+        "nanoseconds": 537000000
+      },
+      "departmentId": "2e8iA3atPjfnWbNwvxlN",
+      "title": "Kelajakka intilish",
+      "isPublished": true,
+      "groupId": "all"
+    },
+    {
+      "id": "TE6GnL9mn5LYc7llRAye",
+      "title": "html",
+      "questions": [
+        {
+          "id": "1",
+          "text": "HTML nima degani?",
+          "options": [
+            "Hyper Text Markup Language",
+            "Hyper Tool Multi Language",
+            "High Text Markdown Language",
+            "Hyperlink and Text Management Language"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "2",
+          "text": "Eng katta sarlavha qaysi teg yordamida yoziladi?",
+          "options": [
+            "<h6>",
+            "<heading>",
+            "<h1>",
+            "<head>"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "3",
+          "text": "Yangi qatorga o'tish uchun qaysi teg ishlatiladi?",
+          "options": [
+            "<lb>",
+            "<br>",
+            "<break>",
+            "<hr>"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "4",
+          "text": "Havola (link) yaratish uchun qaysi teg ishlatiladi?",
+          "options": [
+            "<a>",
+            "<link>",
+            "<href>",
+            "<url>"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "5",
+          "text": "Yopiluvchi tegni ko'rsatish uchun qaysi belgi ishlatiladi?",
+          "options": [
+            "<",
+            "^",
+            "*",
+            " / "
+          ],
+          "correctIdx": 3
+        },
+        {
+          "id": "6",
+          "text": "Tartiblanmagan ro'yxat yaratish uchun qaysi teg ishlatiladi?",
+          "options": [
+            "<list>",
+            "<ul>",
+            "<ol>",
+            "<li>"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "7",
+          "text": "Rasm qo'shish uchun qaysi teg ishlatiladi?",
+          "options": [
+            "<image>",
+            "<img>",
+            "<pic>",
+            "<src>"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "8",
+          "text": "Checkbox yaratish uchun qaysi teg ishlatiladi?",
+          "options": [
+            "<check>",
+            "<input type=\"checkbox\">",
+            "<checkbox>",
+            "<input type=\"check\">"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "9",
+          "text": "Hujjat sarlavhasini (brauzer tabida ko'rinadigan) belgilash uchun qaysi teg ishlatiladi?",
+          "options": [
+            "<head>",
+            "<meta>",
+            "<title>",
+            "<header>"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "10",
+          "text": "Elementga qator ichidagi (inline) uslublarni berish uchun qaysi atribut ishlatiladi?",
+          "options": [
+            "style",
+            "class",
+            "font",
+            "styles"
+          ],
+          "correctIdx": 0
+        }
+      ],
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1776865763,
+        "nanoseconds": 41000000
+      },
+      "type": "topic",
+      "isPublished": true
+    },
+    {
+      "id": "gtkyZapZrIINok6r05BG",
+      "creatorId": "admin_offline_elyorbek",
+      "maxAttempts": 1,
+      "isPublished": true,
+      "title": "1",
+      "groupIds": [],
+      "randomQuestionCount": 128,
+      "type": "topic",
+      "creatorRole": "admin",
+      "departmentIds": [],
+      "organizationIds": [],
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1785157307,
+        "nanoseconds": 657000000
+      },
+      "questions": [
+        {
+          "correctIdx": 0,
+          "options": [
+            "Последовательность сходится",
+            "Последовательность расходится",
+            "Ни сходится, ни расходится",
+            "Нет правильного"
+          ],
+          "text": "Если для последовательности  выполняется следующее условие, то...",
+          "id": "0.5126892976095446"
+        },
+        {
+          "text": "Если функция  является начальной функцией функции , какая из следующих формул верна?",
+          "id": "0.9929947653009789",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "id": "0.8910614317375047",
+          "text": "Вычислите предел:",
+          "options": [
+            "0",
+            "3",
+            "a"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Найдите первообразную функцию из функций, которая проходит через",
+          "id": "0.7223867559735615",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "id": "0.2610569261758465",
+          "text": "Найдите область определения функции",
+          "options": [
+            "[-6; 4]",
+            "[-4; 6]",
+            "(-6; 4)"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "correctIdx": 4,
+          "options": [
+            "-16",
+            "-5",
+            "-34",
+            "0Найдите область значения функции",
+            ""
+          ],
+          "text": "найти точную нижнюю границу множества: {}",
+          "id": "0.09354636696329444"
+        },
+        {
+          "text": "Вычислите",
+          "id": "0.5502199960268196",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "options": [
+            "12",
+            "4",
+            "0,5",
+            "0,25Вычислите",
+            "8",
+            "4",
+            "0,5",
+            "0,25"
+          ],
+          "correctIdx": 4,
+          "id": "0.7726736406970804",
+          "text": "Вычислите"
+        },
+        {
+          "options": [
+            "0",
+            "5",
+            "2",
+            "8"
+          ],
+          "correctIdx": 0,
+          "id": "0.8953448315255617",
+          "text": "Вычислите"
+        },
+        {
+          "text": "Вычислите",
+          "id": "0.8380292487126882",
+          "correctIdx": 4,
+          "options": [
+            "- 1/3",
+            "1/3",
+            "2",
+            "-3Найдите производную функции:",
+            ""
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "1/3",
+            "0,5",
+            "0,25",
+            "рассходится"
+          ],
+          "text": "Вычислите",
+          "id": "0.9311761745750531"
+        },
+        {
+          "id": "0.9841381868910759",
+          "text": "найдите производную функции в точке",
+          "options": [
+            "27",
+            "0",
+            "3",
+            "9"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.9585232138189167",
+          "text": "Вычислите"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Вычислите",
+          "id": "0.5047868104978914"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Вычислите",
+          "id": "0.04765821285459959"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "1",
+            "3"
+          ],
+          "text": "Если  найдите .",
+          "id": "0.7411958946301438"
+        },
+        {
+          "id": "0.0810531999040004",
+          "text": "Вычислите",
+          "options": [
+            "47,5",
+            "47",
+            "48,5",
+            "45"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.4016590668158052",
+          "text": "Найдите производную функции:",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "-8",
+            "8",
+            "-4",
+            "5"
+          ],
+          "text": "Если  найдите",
+          "id": "0.8065800945429202"
+        },
+        {
+          "id": "0.9281332970295829",
+          "text": "Вычислите:",
+          "options": [
+            "9",
+            "8",
+            "10",
+            "0,5"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            "16",
+            "8",
+            "10",
+            "0,5"
+          ],
+          "correctIdx": 0,
+          "id": "0.8870353716988911",
+          "text": "Вычислите:"
+        },
+        {
+          "options": [
+            "0",
+            "3",
+            "4",
+            "5"
+          ],
+          "correctIdx": 0,
+          "id": "0.7843033188457553",
+          "text": "Если  Вычислите"
+        },
+        {
+          "id": "0.9444526989369172",
+          "text": "Какое из следующих утверждений является верным?",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Вычислите",
+          "id": "0.19221359110666958",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Вычислите",
+          "id": "0.1670463035039218"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Найдите производную этой функции:",
+          "id": "0.9424413807411117"
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.7023354854960543",
+          "text": "Вычислите"
+        },
+        {
+          "options": [
+            "6",
+            "5",
+            "4",
+            "7"
+          ],
+          "correctIdx": 0,
+          "id": "0.5668875802979514",
+          "text": "Точка  движется согласно закону. Найдите скорость этой точки в положении ."
+        },
+        {
+          "text": "Множество E, состоящее из всех элементов множеств A или B, называется ……. множеств A и B.",
+          "id": "0.9250436251550825",
+          "correctIdx": 0,
+          "options": [
+            "объединение",
+            "пересечение",
+            "разность",
+            "симметрическая разность"
+          ]
+        },
+        {
+          "text": "Если последовательность  имеет предел, то …",
+          "id": "0.05319777749679788",
+          "correctIdx": 0,
+          "options": [
+            "будет единственным",
+            "будет равен 1",
+            "будет равно -1",
+            "будет равен 0"
+          ]
+        },
+        {
+          "options": [
+            "y= f(x0)+f’(x0)(x-x0)",
+            "y= f(x0)-(x-x0)",
+            "y= f(x0)+f’(x0)(x+x0)",
+            "y= f(x0)+(x-x0)"
+          ],
+          "correctIdx": 0,
+          "id": "0.7162678509962069",
+          "text": "Какое уравнение касательной, проведенной к графику функции в точке  дано правильно?"
+        },
+        {
+          "options": [
+            "должна быть непрерывной.",
+            "должна иметь разрыв",
+            "должна быть возрастающей.",
+            "должна быть убывающей."
+          ],
+          "correctIdx": 0,
+          "id": "0.8748173742913776",
+          "text": "функция будет интегрируемой на  если она…"
+        },
+        {
+          "options": [
+            "стационарная точка",
+            "точка максимума",
+            "точка минимума",
+            "точка экстремума"
+          ],
+          "correctIdx": 0,
+          "id": "0.9334110277649887",
+          "text": "Как называется точка, в которой производная функции становится равной 0?"
+        },
+        {
+          "id": "0.03382841427528538",
+          "text": "Если для  при  выполняется неравенство  то  функция на множестве  называется ………..",
+          "options": [
+            "возрастающей",
+            "убывающей",
+            "строго возрастающей",
+            "строго убывающей"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.8775318938533134",
+          "text": "В каком ответе дан первый замечательный предел?",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Для сходимости последовательности необходимо и достаточно, чтобы она была фундаментальной. Чья это теорема?",
+          "id": "0.27536187475646434",
+          "correctIdx": 0,
+          "options": [
+            "Коши",
+            "Гейне",
+            "Больцано-Вейерштрассе",
+            "Ферма"
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "Для любого"
+          ],
+          "text": "при каких значениях  справедливо неравенство?",
+          "id": "0.8210209651587781"
+        },
+        {
+          "text": "найти область значений функции.",
+          "id": "0.6835082202033734",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "id": "0.9431733075150913",
+          "text": "Если  для  в  и  ( в ), то каковы функции и   в ?",
+          "options": [
+            "эквивалент",
+            "равны",
+            "сопоставимый",
+            "непрерывный"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.7202197924758408",
+          "text": "Если таких постоянных чисел  то для 1)  , 2)  если да, функция  ………",
+          "options": [
+            "называется периодической функцией",
+            "называется четной функцией",
+            "называется нечетной функцией",
+            "называется ограниченной функцией"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "имеет конечный предел",
+            "ограниченный",
+            "Сходяшихся",
+            "Расходящихся"
+          ],
+          "text": "Если  последовательности 1) убывающие, 2) ограниченные снизу, то это………",
+          "id": "0.1876618809993894"
+        },
+        {
+          "id": "0.953998253026861",
+          "text": "функция ограничена?",
+          "options": [
+            "ограниченный",
+            "неограниченный",
+            "ограниченный снизу",
+            "ограниченный сверху"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.6595884894985049",
+          "text": "функция ограничена?",
+          "options": [
+            "ограниченный",
+            "неограниченный",
+            "ограниченный снизу",
+            "ограниченный сверху"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            "3/2",
+            "5/3",
+            "4/3",
+            "3/4"
+          ],
+          "correctIdx": 0,
+          "id": "0.3289622193791728",
+          "text": "Вычислите"
+        },
+        {
+          "id": "0.8271596207061149",
+          "text": "найдите предел в",
+          "options": [
+            "2",
+            "3",
+            "4",
+            "5"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            "1/2",
+            "2/3",
+            "-1/2",
+            "-2/3"
+          ],
+          "correctIdx": 0,
+          "id": "0.6117464945379043",
+          "text": "Вычислите"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ],
+          "text": "Вычислите",
+          "id": "0.22295864652950315"
+        },
+        {
+          "id": "0.15128374103300968",
+          "text": "Найдите неправильный ответ.",
+          "options": [
+            "Если     и   - функции нечетные, то  тоже будет четным",
+            "Если     и   -  функции четные, то  тоже будет четным.",
+            "Если     и   - функции нечетные, то  тоже будет нечнетным",
+            "Если     и   - функции нечетные, то  тоже будет четным"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "0",
+            "3",
+            "2",
+            "7"
+          ],
+          "text": "Вычислите",
+          "id": "0.24031169738629654"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "2",
+            "4",
+            "3",
+            "-1"
+          ],
+          "text": "Вычислите",
+          "id": "0.08931125009973195"
+        },
+        {
+          "text": "Вычислите",
+          "id": "0.47959029490194793",
+          "correctIdx": 0,
+          "options": [
+            "47",
+            "37",
+            "25",
+            "72"
+          ]
+        },
+        {
+          "id": "0.33663248016500635",
+          "text": "Найдите сумму числового ряда .",
+          "options": [
+            "2",
+            "1",
+            "-1",
+            "4"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "найдите придел при",
+          "id": "0.8105395180066556",
+          "correctIdx": 0,
+          "options": [
+            "0",
+            "1",
+            "2"
+          ]
+        },
+        {
+          "text": "Если ,  то",
+          "id": "0.6866421708140299",
+          "correctIdx": 0,
+          "options": [
+            "",
+            "Нет правильного ответа",
+            "x"
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "",
+            "Нет правильного ответа",
+            "x"
+          ],
+          "text": "Если ,  то",
+          "id": "0.7079837332696691"
+        },
+        {
+          "text": "Найдите область определения функции.",
+          "id": "0.031741029053663605",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Найдите область определения функции.",
+          "id": "0.31693053573512997"
+        },
+        {
+          "options": [
+            "1",
+            "0",
+            "2",
+            "e"
+          ],
+          "correctIdx": 0,
+          "id": "0.35106178486407424",
+          "text": "Вычислите"
+        },
+        {
+          "options": [
+            "0",
+            "1",
+            "2",
+            "e"
+          ],
+          "correctIdx": 0,
+          "id": "0.006623163639078666",
+          "text": "Вычислите"
+        },
+        {
+          "options": [
+            "",
+            "(0,2)",
+            "(0,0)"
+          ],
+          "correctIdx": 0,
+          "id": "0.8516179677035952",
+          "text": "Найдите точки разрыва функции."
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ",",
+            ",",
+            ",",
+            ","
+          ],
+          "text": "Найдите частные производные первого порядка функции.",
+          "id": "0.9714094845886735"
+        },
+        {
+          "options": [
+            ", ,",
+            ", ,",
+            ", ,",
+            ", ,"
+          ],
+          "correctIdx": 0,
+          "id": "0.88548577878777",
+          "text": "Найдите частные производные второго порядка функции."
+        },
+        {
+          "id": "0.7801443195045509",
+          "text": "Если   то вычислите",
+          "options": [
+            "2",
+            "0",
+            "7",
+            "9"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "проверить функцию на экстремум.",
+          "id": "0.7482264108260288",
+          "correctIdx": 0,
+          "options": [
+            "Минимум в - и",
+            "Минимум в и",
+            "Минимум в  и",
+            "Минимум в  и"
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "1",
+            "2",
+            "3",
+            "-1"
+          ],
+          "text": "Вычислите",
+          "id": "0.5846406272312623"
+        },
+        {
+          "text": "Изменить порядок интегрирования",
+          "id": "0.7690352419793411",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "text": "Вычислите  , где",
+          "id": "0.23446533883857956",
+          "correctIdx": 0,
+          "options": [
+            "4",
+            "6",
+            "-4",
+            "1"
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "",
+            "2",
+            "3"
+          ],
+          "text": "Вычислите  , где .",
+          "id": "0.283313899285091"
+        },
+        {
+          "options": [
+            "",
+            "2",
+            "3",
+            "4"
+          ],
+          "correctIdx": 0,
+          "id": "0.7429708496506332",
+          "text": "Вычислите площадь фигуры, ограниченной эллипсом."
+        },
+        {
+          "id": "0.7014670469241328",
+          "text": "Вычислите криволинейный интеграл II типа   где линия OA соединяет точки  и  по прямой линии",
+          "options": [
+            "1",
+            "-3",
+            "7",
+            "5"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Вычислить,",
+          "id": "0.23408541004882788",
+          "correctIdx": 0,
+          "options": [
+            "81",
+            "27",
+            "24",
+            "36"
+          ]
+        },
+        {
+          "text": "Вычислить",
+          "id": "0.9511097498536661",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Вычислить",
+          "id": "0.4775154715369774"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Вычислить:",
+          "id": "0.3396942157635743"
+        },
+        {
+          "id": "0.9531956516064964",
+          "text": "Вычислить",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Вычислить:",
+          "id": "0.2474797378355541"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Вычислить",
+          "id": "0.08375279969690996"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "Если     и   - функции нечетные, то  тоже будет четным",
+            "Если     и   -  функции четные, то  тоже будет четным.",
+            "Если     и   - функции нечетные, то  тоже будет нечнетным",
+            "Если     и   - функции нечетные, то  тоже будет четным"
+          ],
+          "text": "Найдите неправильный ответ.",
+          "id": "0.3476483178666485"
+        },
+        {
+          "options": [
+            "Коши",
+            "Гейне",
+            "Больцано-Вейерштрассе",
+            "Ферма"
+          ],
+          "correctIdx": 0,
+          "id": "0.5458303325184495",
+          "text": "Для сходимости последовательности необходимо и достаточно, чтобы она была фундаментальной. Чья это теорема?"
+        },
+        {
+          "id": "0.6732737555696094",
+          "text": "функция будет интегрируемой на  если она…",
+          "options": [
+            "должна быть непрерывной.",
+            "должна иметь разрыв",
+            "должна быть возрастающей.",
+            "должна быть убывающей."
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Как называется точка, в которой производная функции становится равной 0?",
+          "id": "0.8133225338207906",
+          "correctIdx": 0,
+          "options": [
+            "стационарная точка",
+            "точка максимума",
+            "точка минимума",
+            "точка экстремума"
+          ]
+        },
+        {
+          "options": [
+            "возрастающей",
+            "убывающей",
+            "строго возрастающей",
+            "строго убывающей"
+          ],
+          "correctIdx": 0,
+          "id": "0.7818614989407501",
+          "text": "Если для  при  выполняется неравенство  то  функция на множестве  называется ……….."
+        },
+        {
+          "options": [
+            "1/3",
+            "0,5",
+            "0,25",
+            "Расходящийся"
+          ],
+          "correctIdx": 0,
+          "id": "0.5530419475920952",
+          "text": "Вычислите:"
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.1460329595260692",
+          "text": "Найдите площадь фигуры, ограниченной эллипсом:"
+        },
+        {
+          "id": "0.7672237287395645",
+          "text": "Найдите площадь фигуры, ограниченной параболой и осью Ox:",
+          "options": [
+            "",
+            "4",
+            "2"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "27",
+            "0",
+            "-1",
+            "9"
+          ],
+          "text": "Найдите производную функции в точке:",
+          "id": "0.8871711171585126"
+        },
+        {
+          "id": "0.29147447397142523",
+          "text": "Вычислите несобственный интеграл:",
+          "options": [
+            "1",
+            "5",
+            "3",
+            "-3"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.11585979232378318",
+          "text": "Вычислите интеграл:"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Вычислите интеграл:",
+          "id": "0.9829922178091602"
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.4860649415296695",
+          "text": "Вычислите:."
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "Нижняя сумма Дарбу не больше верхней суммы..",
+            "Нижняя сумма Дарбу является интегральной суммой.",
+            "Верхняя сумма Дарбу является интегральной суммой.",
+            "Интегрируемая функция будет непрерывной."
+          ],
+          "text": "Какое из следующих утверждений верно?",
+          "id": "0.11734662817008512"
+        },
+        {
+          "text": "Найдите промежуток возрастания данной функции:",
+          "id": "0.8899975490831501",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "text": "Вычислите:",
+          "id": "0.6285699912836807",
+          "correctIdx": 0,
+          "options": [
+            "47,5",
+            "47",
+            "48,5",
+            "45"
+          ]
+        },
+        {
+          "id": "0.42072261560795077",
+          "text": "Найдите предел:",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.56570317698269",
+          "text": "Найдите производную данной функции:",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "-8",
+            "8",
+            "-4",
+            "5"
+          ],
+          "text": "Если,  , то найдите:",
+          "id": "0.15033913902383156"
+        },
+        {
+          "id": "0.25184834526947075",
+          "text": "Вычислите следующий предел:",
+          "options": [
+            "9",
+            "8",
+            "10",
+            "0,5"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.4576103738587418",
+          "text": "Вычислите следующий предел:",
+          "options": [
+            "16",
+            "8",
+            "10",
+            "0,5"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            "0",
+            "3",
+            "4",
+            "5"
+          ],
+          "correctIdx": 0,
+          "id": "0.08988339679007995",
+          "text": "Если, то найдите:"
+        },
+        {
+          "id": "0.26905918851709953",
+          "text": "Найдите:",
+          "options": [
+            "0",
+            "2",
+            "3",
+            "9"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.01078785341591193",
+          "text": "Найдите промежуток возрастания функции:"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Какое из следующих соотношений верно?",
+          "id": "0.8034754213705821"
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.8583459277155392",
+          "text": "Вычислите неопределенный интеграл:"
+        },
+        {
+          "id": "0.6448083807983771",
+          "text": "Вычислите неопределенный интеграл:",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.30045052195437094",
+          "text": "Вычислите неопределенный интеграл:"
+        },
+        {
+          "text": "Вычислите неопределенный интеграл:",
+          "id": "0.3982503341945506",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Найдите производную функции:",
+          "id": "0.7426024763583049"
+        },
+        {
+          "id": "0.27986565187519397",
+          "text": "Вычислите предел:",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Вычислите неопределенный интеграл:",
+          "id": "0.025628887068201434",
+          "correctIdx": 0,
+          "options": [
+            ""
+          ]
+        },
+        {
+          "id": "0.4912185556057973",
+          "text": "Вычислите неопределенный интеграл:.",
+          "options": [
+            ""
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Материальная точка движется по закону.. Найдите скорость этой точки в момент времени:",
+          "id": "0.7785315591915075",
+          "correctIdx": 0,
+          "options": [
+            "6",
+            "5",
+            "4",
+            "7"
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "Под каким углом график данной функции  пересекает ось абсцисс в начале координат?",
+          "id": "0.6926154759711615"
+        },
+        {
+          "text": "Множество, состоящее из всех элементов множеств A и B, называется ... этих множеств..",
+          "id": "0.6980370734797672",
+          "correctIdx": 0,
+          "options": [
+            "Суммой (объединением)",
+            "Произведением (пересечением)",
+            "Разностью",
+            "Симметрической разностью"
+          ]
+        },
+        {
+          "options": [
+            "Единственный",
+            "Равен 1",
+            "Равен -1",
+            "Равен 0"
+          ],
+          "correctIdx": 0,
+          "id": "0.7437029994829423",
+          "text": "Если последовательность имеет предел, то он ... ."
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "y= f(x0)+f’(x0)(x-x0)",
+            "y= f(x0)-(x-x0)",
+            "y= f(x0)+f’(x0)(x+x0)",
+            "y= f(x0)+(x-x0)"
+          ],
+          "text": "В каком ответе правильно дано уравнение касательной, проведенной к графику функции в точке ?",
+          "id": "0.6589932519708401"
+        },
+        {
+          "id": "0.845413997944926",
+          "text": "В каком ответе правильно дано уравнение нормали, проведенной к графику функции в точке?",
+          "options": [
+            "y= f(x0)-(x-x0)",
+            "y= f(x0)-f(x0)(x-x0)",
+            "y= f(x0)+f’(x0)(x+x0)",
+            "y= f(x0)+(x-x0)"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Если,   то найдите f(x):",
+          "id": "0.3788097778989967",
+          "correctIdx": 0,
+          "options": [
+            "x2-2",
+            "x2-1",
+            "x2+1",
+            "x+2"
+          ]
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "Должна быть непрерывной.",
+            "Должна иметь разрыв.",
+            "Должна быть возрастающей.",
+            "Должна быть убывающей."
+          ],
+          "text": "Для того чтобы функция была интегрируема на , она ...",
+          "id": "0.15596395405507835"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "Равномерно непрерывна",
+            "Неограничена",
+            "Четная",
+            "Ограничена"
+          ],
+          "text": "Если,  То функция  на множестве ...…….",
+          "id": "0.043666378871930145"
+        },
+        {
+          "id": "0.4779892680032355",
+          "text": "Как называется точка, в которой производная функции равна нулю??",
+          "options": [
+            "Стационарная точка",
+            "Точка максимума",
+            "Точка минимума",
+            "Точка экстремума"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            ""
+          ],
+          "text": "каком ответе дан первый замечательный предел?",
+          "id": "0.5539941849941223"
+        },
+        {
+          "options": [
+            "Предел не существует",
+            "-1",
+            "1",
+            "0"
+          ],
+          "correctIdx": 0,
+          "id": "0.47793460957003275",
+          "text": "Найдите предел функции в точке :"
+        },
+        {
+          "id": "0.9043401624150572",
+          "text": "Для сходимости последовательности необходимо и достаточно, чтобы она была фундаментальной. Кому принадлежит эта теорема?",
+          "options": [
+            "Коши",
+            "Гейне",
+            "Больцано-Вейерштрассу",
+            "Ферма"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.5911507496737644",
+          "text": "При каких значениях выполняется неравенство? ?",
+          "options": [
+            "Для любых"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "text": "Найдите производную функции в точке : ?",
+          "id": "0.5579666134543011",
+          "correctIdx": 0,
+          "options": [
+            "Не имеет производной",
+            "-1",
+            "1",
+            "0"
+          ]
+        },
+        {
+          "id": "0.17672674926453547",
+          "text": "Для того чтобы функция f(x) имела предел в точке a, необходимо и достаточно, чтобы в этой точке существовали левый и правый пределы и выполнялось равенство:",
+          "options": [
+            "f(a-0)=f(a+0)",
+            "f(a-0)> f(a+0)",
+            "f(a-0)+ f(a+0)=0",
+            "f(a-0)< f(a+0)"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "options": [
+            ""
+          ],
+          "correctIdx": 0,
+          "id": "0.8200287324856752",
+          "text": "Найдите область значений функции:"
+        },
+        {
+          "text": "Является ли функция ограниченной?",
+          "id": "0.8477350345503456",
+          "correctIdx": 0,
+          "options": [
+            "Ограниченная",
+            "Неограниченная",
+            "Ограниченная снизу",
+            "Ограниченная сверху"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lkMYBk7OBeaMpv30PvRo",
+      "questions": [
+        {
+          "id": "0.10078317479446619",
+          "text": "15 ko'paytirilgan 4 dan 20 bo'lingan 2 ni ayirganda necha hosil bo'ladi?",
+          "options": [
+            "40",
+            "50",
+            "30",
+            "60"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.314656685110863",
+          "text": "Uchburchakning ichki burchaklari yig'indisi necha gradusga teng?",
+          "options": [
+            "90°",
+            "360°",
+            "180°",
+            "270°"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "0.404163174983423",
+          "text": "Eng kichik tub sonni ko'rsating.",
+          "options": [
+            "1",
+            "0",
+            "3",
+            "2"
+          ],
+          "correctIdx": 3
+        },
+        {
+          "id": "0.6983484720699145",
+          "text": "Kvadratning tomoni 8 sm bo'lsa, uning perimetri necha sm bo'ladi?",
+          "options": [
+            "64",
+            "32",
+            "16",
+            "24"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.16521762268500328",
+          "text": "200 sonining 15 foizi nechaga teng?",
+          "options": [
+            "30",
+            "25",
+            "15",
+            "40"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "0.4495041349040071",
+          "text": "Qaysi shaklning barcha tomonlari va burchaklari teng?",
+          "options": [
+            "Romb",
+            "Trapetsiya",
+            "To'g'ri to'rtburchak",
+            "Kvadrat"
+          ],
+          "correctIdx": 3
+        },
+        {
+          "id": "0.2021092320316522",
+          "text": "Aylana yuzasini hisoblash formulasi qaysi?",
+          "options": [
+            "S=2πr",
+            "S=πr²",
+            "S=ah",
+            "S=abc"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.47029824917152807",
+          "text": "5 ning kubi (5³) nechaga teng?",
+          "options": [
+            "15",
+            "25",
+            "125",
+            "75"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "0.016953497912590265",
+          "text": "To'g'ri burchak necha gradusga teng?",
+          "options": [
+            "45°",
+            "90°",
+            "180°",
+            "360°"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "0.12154680079383096",
+          "text": "Logarifm 2 asosga ko'ra 8 nimaga teng?",
+          "options": [
+            "2",
+            "4",
+            "16",
+            "3"
+          ],
+          "correctIdx": 3
+        }
+      ],
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1777524240,
+        "nanoseconds": 320000000
+      },
+      "departmentId": "q2Ilu5IWFdEdUOBZuR6g",
+      "isPublished": true,
+      "title": "Matematika",
+      "type": "topic",
+      "groupId": "all"
+    },
+    {
+      "id": "mCWze7ndxUNH6uqMaIiy",
+      "isPublished": true,
+      "questions": [
+        {
+          "id": "inf-001",
+          "text": "Kompyuterning markaziy qismi, barcha hisoblash amallarini bajaruvchi qurilma nima?",
+          "options": [
+            "Monitor",
+            "Protsessor",
+            "Sichqoncha",
+            "Printer"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "inf-002",
+          "text": "Axborotning eng kichik o'lchov birligi qaysi?",
+          "options": [
+            "Bayt",
+            "Kilobayt",
+            "Bit",
+            "Megabayt"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "inf-003",
+          "text": "Quyidagilardan qaysi biri tizimli dasturiy ta'minotga kiradi?",
+          "options": [
+            "Microsoft Word",
+            "Adobe Photoshop",
+            "Operatsion tizim",
+            "Google Chrome"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "inf-004",
+          "text": "Veb-sahifalarni ko'rish uchun ishlatiladigan dastur qanday ataladi?",
+          "options": [
+            "Brauzer",
+            "Antivirus",
+            "Arxivator",
+            "Matn muharriri"
+          ],
+          "correctIdx": 0
+        },
+        {
+          "id": "inf-005",
+          "text": "1 Kilobayt necha baytga teng?",
+          "options": [
+            "1000",
+            "1024",
+            "512",
+            "2048"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "inf-006",
+          "text": "Kompyuter o'chirilganda undagi ma'lumotlar o'chib ketadigan xotira turi qaysi?",
+          "options": [
+            "Doimiy xotira (ROM)",
+            "Qattiq disk (HDD)",
+            "Tezkor xotira (RAM)",
+            "Flesh-xotira"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "inf-007",
+          "text": "Fayllarni siqish va hajmini kamaytirish uchun qaysi dasturlardan foydalaniladi?",
+          "options": [
+            "Brauzerlar",
+            "Arxivatorlar",
+            "Tahrirlagichlar",
+            "Drayverlar"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "id": "inf-008",
+          "text": "Internet tarmog'idagi har bir kompyuterning o'ziga xos raqamli manzili nima deyiladi?",
+          "options": [
+            "URL",
+            "Domen",
+            "IP-manzil",
+            "E-mail"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "inf-009",
+          "text": "Matnli hujjatlarni yaratish va tahrirlash uchun mo'ljallangan dastur qaysi?",
+          "options": [
+            "Microsoft Excel",
+            "Microsoft PowerPoint",
+            "Microsoft Word",
+            "Microsoft Access"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "id": "inf-010",
+          "text": "Kompyuterning tashqi qurilmalarini operatsion tizim bilan bog'lovchi maxsus dastur nima?",
+          "options": [
+            "Drayver",
+            "Yadro",
+            "Fayl",
+            "Yorliq"
+          ],
+          "correctIdx": 0
+        }
+      ],
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1777374094,
+        "nanoseconds": 939000000
+      },
+      "title": "informatika",
+      "type": "topic"
+    }
+  ],
+  "testResults": [
+    {
+      "id": "FhyLqtmzvMcwEqMCgGKrpkHYp112_Dy5TQB5ZOEbfMyt1cCzz",
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1787035698,
+        "nanoseconds": 453000000
+      },
+      "testId": "Dy5TQB5ZOEbfMyt1cCzz",
+      "teacherId": "L3b2NjDOrIS4QnpjmnS7kQWOreE3",
+      "attempts": 1,
+      "testType": "topic",
+      "creatorId": "admin",
+      "totalQuestions": 14,
+      "score": 43,
+      "questions": [
+        {
+          "text": "What is writing mainly used for?",
+          "options": [
+            "Reading stories aloud",
+            "Drawing and coloring pictures",
+            "Listening and repeating words",
+            "Expressing ideas through written language"
+          ],
+          "correctIdx": 3,
+          "id": "0.7422018475764345"
+        },
+        {
+          "options": [
+            "A job application letter",
+            "A message to a friend",
+            "A diary entry",
+            "A text message"
+          ],
+          "correctIdx": 0,
+          "text": "Which of the following is an example of formal writing?",
+          "id": "0.11163165267973785"
+        },
+        {
+          "options": [
+            "A school essay",
+            "A business contract",
+            "A scientific report",
+            "A chat with a friend online"
+          ],
+          "id": "0.2811836197344455",
+          "correctIdx": 3,
+          "text": "Which is an example of informal writing?"
+        },
+        {
+          "options": [
+            "Writing long paragraphs",
+            "Translating texts",
+            "Forming letters and simple words",
+            "Reading stories"
+          ],
+          "text": "What do students practice in beginning writing?",
+          "id": "0.7755396910462644",
+          "correctIdx": 2
+        },
+        {
+          "correctIdx": 3,
+          "options": [
+            "Memorizing grammar rules",
+            "Listening to music",
+            "Reading silently",
+            "Doing short, daily writing tasks"
+          ],
+          "id": "0.614524051902285",
+          "text": "Which of the following helps students write fluently?"
+        },
+        {
+          "correctIdx": 3,
+          "id": "0.12153115511120227",
+          "text": "What is the main focus of process writing?",
+          "options": [
+            "Writing once and not checking",
+            "Copying text from the board",
+            "Memorizing model texts",
+            "Writing through stages: planning, drafting, revising, editing"
+          ]
+        },
+        {
+          "options": [
+            "To learn new tenses",
+            "To improve speaking",
+            "To write words correctly",
+            "To translate faster"
+          ],
+          "id": "0.6058757180874947",
+          "text": "What is the purpose of spelling practice?",
+          "correctIdx": 2
+        },
+        {
+          "text": "What does punctuation help with?",
+          "correctIdx": 2,
+          "id": "0.5121276113581796",
+          "options": [
+            "Reading faster",
+            "Speaking fluently",
+            "Making sentences clear and easy to read",
+            "Spelling long words"
+          ]
+        },
+        {
+          "options": [
+            "Students can only use one style",
+            "It saves time in class",
+            "It’s easier to mark",
+            "Students can write for different purposes and audiences"
+          ],
+          "id": "0.47439008086886814",
+          "correctIdx": 3,
+          "text": "Why is it useful to teach both formal and informal writing?"
+        },
+        {
+          "options": [
+            "Revise and edit their work",
+            "Submit immediately",
+            "Copy another student’s text",
+            "Erase everything"
+          ],
+          "text": "In process writing, what should students do after drafting?",
+          "id": "0.0871825068739065",
+          "correctIdx": 0
+        },
+        {
+          "id": "0.015178028958100942",
+          "text": "What is the main purpose of assessment?90",
+          "correctIdx": 1,
+          "options": [
+            "To punish weak learners",
+            "To measure students’ progress and achievement",
+            "To give homework",
+            "To confuse students"
+          ]
+        },
+        {
+          "correctIdx": 3,
+          "options": [
+            "A university entrance test",
+            "A national exam",
+            "A final exam",
+            "A teacher checking students’ understanding during lessons"
+          ],
+          "text": "Which of the following is a formative assessment?",
+          "id": "0.9900561646116717"
+        },
+        {
+          "text": "Which of these is a summative assessment?",
+          "id": "0.024587982491226956",
+          "correctIdx": 0,
+          "options": [
+            "End-of-term examination",
+            "Class discussion",
+            "Homework correction",
+            "Weekly quiz"
+          ]
+        },
+        {
+          "id": "0.2906854942626318",
+          "text": "What does giving a grade usually help with?",
+          "correctIdx": 2,
+          "options": [
+            "Making lessons longer",
+            "Choosing classroom materials",
+            "Showing how well students performed"
+          ]
+        }
+      ],
+      "correctAnswers": 6,
+      "answers": {
+        "0": 2,
+        "1": 2,
+        "2": 2,
+        "3": 2,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3,
+        "9": 3,
+        "10": 3,
+        "11": 3,
+        "12": 3,
+        "13": 2
+      },
+      "testTitle": "Matematika",
+      "userId": "FhyLqtmzvMcwEqMCgGKrpkHYp112",
+      "userName": "Muratov Shaxzodxon"
+    },
+    {
+      "id": "3YFKaa12V0T8IURopomU60LsESJ3_JbQcVMyKQIhUAebKNDSP",
+      "userName": "Ortiqov Elyorbek",
+      "score": 0,
+      "testTitle": "Kelajakka intilish",
+      "userId": "3YFKaa12V0T8IURopomU60LsESJ3",
+      "testType": "topic",
+      "attempts": 1,
+      "testId": "JbQcVMyKQIhUAebKNDSP",
+      "teacherId": "admin",
+      "answers": {
+        "0": 3,
+        "1": 3,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3,
+        "9": 3
+      },
+      "totalQuestions": 10,
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1777723962,
+        "nanoseconds": 487000000
+      },
+      "questions": [
+        {
+          "correctIdx": 0,
+          "text": "Kelajakda inson aqliy faoliyatini modellashtiruvchi texnologiya nima deb ataladi?",
+          "options": [
+            "Sun'iy intellekt",
+            "Blokcheyn",
+            "Bulutli hisoblash",
+            "Internet buyumlari"
+          ],
+          "id": "0.3420137512149013"
+        },
+        {
+          "options": [
+            "Bit",
+            "Bayt",
+            "Kubit",
+            "Tranzistor"
+          ],
+          "id": "0.9987797295161543",
+          "correctIdx": 2,
+          "text": "Kvant kompyuterlarida ma'lumotning eng kichik birligi nima?"
+        },
+        {
+          "options": [
+            "Big Data",
+            "IoT (Internet buyumlari)",
+            "Metaverse",
+            "Web 3.0"
+          ],
+          "id": "0.29583315342787775",
+          "text": "Qurilmalarning internet orqali bir-biri bilan ma'lumot almashish tizimi qanday nomlanadi?",
+          "correctIdx": 1
+        },
+        {
+          "id": "0.21367483762073924",
+          "options": [
+            "Web 1.0",
+            "Web 2.0",
+            "Web 3.0",
+            "HTTP 2"
+          ],
+          "correctIdx": 2,
+          "text": "Markazlashmagan internetning yangi avlodi qanday nomlanadi?"
+        },
+        {
+          "options": [
+            "Cyberpunk",
+            "Metaolam (Metaverse)",
+            "Deep learning",
+            "Server"
+          ],
+          "id": "0.10972766631574793",
+          "text": "Virtual va real dunyoni birlashtiruvchi raqamli makon nima?",
+          "correctIdx": 1
+        },
+        {
+          "id": "0.5848911626228478",
+          "options": [
+            "3G",
+            "4G LTE",
+            "6G",
+            "Dial-up"
+          ],
+          "correctIdx": 2,
+          "text": "Kelajakdagi yuqori tezlikdagi mobil aloqa standarti qaysi?"
+        },
+        {
+          "text": "Miya va kompyuter o'rtasida to'g'ridan-to'g'ri aloqa o'rnatuvchi interfeys nima?",
+          "correctIdx": 1,
+          "options": [
+            "USB-C",
+            "BCI (Miya-kompyuter interfeysi)",
+            "Bluetooth",
+            "Ethernet"
+          ],
+          "id": "0.6606159382683051"
+        },
+        {
+          "id": "0.8849192776622946",
+          "options": [
+            "SQL",
+            "Blokcheyn",
+            "NoSQL",
+            "Excel"
+          ],
+          "text": "Ma'lumotlarni zanjir ko'rinishida xavfsiz saqlash texnologiyasi qaysi?",
+          "correctIdx": 1
+        },
+        {
+          "id": "0.9235928398034091",
+          "options": [
+            "Gibrid avtomobillar",
+            "Mexanik transport",
+            "Avtonom (haydovchisiz) vositalar",
+            "Elektroskuterlar"
+          ],
+          "correctIdx": 2,
+          "text": "Inson aralashuvisiz harakatlanuvchi transport vositalari qanday ataladi?"
+        },
+        {
+          "id": "0.5898278332432673",
+          "options": [
+            "Raqamli egizak (Digital Twin)",
+            "Fotokopiya",
+            "3D printer",
+            "Cloud Storage",
+            "savol matni",
+            "nato'g'ri_variant",
+            "to'g'ri_variant",
+            "nato'g'ri_variant",
+            "nato'g'ri_variant"
+          ],
+          "text": "Haqiqiy ob'ektning raqamli nusxasini yaratish texnologiyasi nima?",
+          "correctIdx": 6
+        }
+      ]
+    },
+    {
+      "id": "rE8YfRPrc8CfhHoLjHQ2",
+      "answers": {
+        "0": 1,
+        "1": 2,
+        "2": 2,
+        "3": 0,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 2,
+        "8": 2,
+        "9": 0
+      },
+      "questions": [
+        {
+          "text": "Kompyuterning markaziy qismi, barcha hisoblash amallarini bajaruvchi qurilma nima?",
+          "options": [
+            "Monitor",
+            "Protsessor",
+            "Sichqoncha",
+            "Printer"
+          ],
+          "id": "inf-001",
+          "correctIdx": 1
+        },
+        {
+          "correctIdx": 2,
+          "text": "Axborotning eng kichik o'lchov birligi qaysi?",
+          "id": "inf-002",
+          "options": [
+            "Bayt",
+            "Kilobayt",
+            "Bit",
+            "Megabayt"
+          ]
+        },
+        {
+          "correctIdx": 2,
+          "id": "inf-003",
+          "options": [
+            "Microsoft Word",
+            "Adobe Photoshop",
+            "Operatsion tizim",
+            "Google Chrome"
+          ],
+          "text": "Quyidagilardan qaysi biri tizimli dasturiy ta'minotga kiradi?"
+        },
+        {
+          "text": "Veb-sahifalarni ko'rish uchun ishlatiladigan dastur qanday ataladi?",
+          "options": [
+            "Brauzer",
+            "Antivirus",
+            "Arxivator",
+            "Matn muharriri"
+          ],
+          "id": "inf-004",
+          "correctIdx": 0
+        },
+        {
+          "text": "1 Kilobayt necha baytga teng?",
+          "id": "inf-005",
+          "options": [
+            "1000",
+            "1024",
+            "512",
+            "2048"
+          ],
+          "correctIdx": 1
+        },
+        {
+          "correctIdx": 2,
+          "options": [
+            "Doimiy xotira (ROM)",
+            "Qattiq disk (HDD)",
+            "Tezkor xotira (RAM)",
+            "Flesh-xotira"
+          ],
+          "id": "inf-006",
+          "text": "Kompyuter o'chirilganda undagi ma'lumotlar o'chib ketadigan xotira turi qaysi?"
+        },
+        {
+          "id": "inf-007",
+          "options": [
+            "Brauzerlar",
+            "Arxivatorlar",
+            "Tahrirlagichlar",
+            "Drayverlar"
+          ],
+          "text": "Fayllarni siqish va hajmini kamaytirish uchun qaysi dasturlardan foydalaniladi?",
+          "correctIdx": 1
+        },
+        {
+          "text": "Internet tarmog'idagi har bir kompyuterning o'ziga xos raqamli manzili nima deyiladi?",
+          "id": "inf-008",
+          "options": [
+            "URL",
+            "Domen",
+            "IP-manzil",
+            "E-mail"
+          ],
+          "correctIdx": 2
+        },
+        {
+          "correctIdx": 2,
+          "text": "Matnli hujjatlarni yaratish va tahrirlash uchun mo'ljallangan dastur qaysi?",
+          "options": [
+            "Microsoft Excel",
+            "Microsoft PowerPoint",
+            "Microsoft Word",
+            "Microsoft Access"
+          ],
+          "id": "inf-009"
+        },
+        {
+          "correctIdx": 0,
+          "options": [
+            "Drayver",
+            "Yadro",
+            "Fayl",
+            "Yorliq"
+          ],
+          "id": "inf-010",
+          "text": "Kompyuterning tashqi qurilmalarini operatsion tizim bilan bog'lovchi maxsus dastur nima?"
+        }
+      ],
+      "createdAt": {
+        "type": "firestore/timestamp/1.0",
+        "seconds": 1777405502,
+        "nanoseconds": 132000000
+      },
+      "testId": "mCWze7ndxUNH6uqMaIiy",
+      "testTitle": "informatika",
+      "userId": "YVlMpP3VkETJ2AuBTQeGJ7lDJex2",
+      "score": 90,
+      "userName": "Elyorbek (Admin)"
+    }
+  ]
+}

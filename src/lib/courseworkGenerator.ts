@@ -985,198 +985,450 @@ export async function buildCourseWorkDocxBuffer(inputData: CourseWorkData): Prom
 }
 
 /**
- * Generates CourseWork JSON content from Gemini API based on user input parameters.
+ * Executes async tasks with bounded concurrency.
+ */
+async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let index = 0;
+  async function worker() {
+    while (index < items.length) {
+      const i = index++;
+      try {
+        results[i] = await fn(items[i]);
+      } catch (err) {
+        console.error(`[CourseWork Gemini] Error in concurrent task ${i}:`, err);
+        throw err;
+      }
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * Splits plain text into flowing body paragraphs (4-7 sentences each).
+ */
+function splitBodyParagraphs(text: string): string[] {
+  if (!text) return [];
+  return text
+    .replace(/\r\n/g, "\n")
+    .split(/\n\s*\n/)
+    .map(p => p.trim().replace(/^[-•*#]+\s*/, "").replace(/\*\*/g, ""))
+    .filter(p => p.length > 20);
+}
+
+/**
+ * Generates CourseWork JSON content using Gemini gemini-1.5-pro model
+ * with the exact Pro multi-stage academic prompts, outline planning,
+ * deep section expansion, and verifiable bibliography.
  */
 export async function generateCourseWorkDataWithGemini(input: CourseWorkInput): Promise<CourseWorkData> {
   const pageTarget = parseInt(input.pageCount || "30", 10) || 30;
   const hasRealExp = Boolean(input.extraRequirements && input.extraRequirements.length > 10);
 
-  const prompt = `SEN — AIEDUTIZIM platformasining PROFESSIONAL KURS ISHI YARATUVCHI AKADEMIK AI yordamchisisan.
+  const OVERHEAD_PAGES = 4;
+  const WORDS_PER_PAGE = 280;
+  const bodyWords = Math.max(1200, (pageTarget - OVERHEAD_PAGES) * WORDS_PER_PAGE);
+  const introWords = Math.round(bodyWords * 0.09);
+  const conclusionWords = Math.round(bodyWords * 0.08);
 
-Sening asosiy vazifang — foydalanuvchi bergan mavzu va ma'lumotlar asosida O'zbekiston oliy ta'lim muassasalarida foydalanishga mos, ilmiy-akademik uslubda yozilgan, mantiqan izchil va to'liq KURS ISHI tayyorlash.
+  // 1. OUTLINE & APPARATUS GENERATION (Pro academic supervisor prompt)
+  const outlineSystem = `You are an experienced university supervisor who plans undergraduate course papers ("kurs ishi").
+You write entirely in Uzbek (Latin script).
 
-MUHIM:
-Kurs ishi oddiy referat yoki uzun AI matni bo'lmasligi kerak. U:
-- kurs ishi standartidagi strukturaga;
-- ilmiy-akademik uslubga;
-- mantiqiy 3 bob va 6 paragraflar tizimiga;
-- tadqiqot apparatiga (dolzarblik, muammo, obyekt, predmet, maqsad, vazifalar, ilmiy yangilik, amaliy ahamiyat);
-- ilmiy tahlilga;
-- amaliy tavsiyalarga;
-- bibliografik tartibga javob berishi kerak.
+A well-formed plan has:
+- a refined academic title derived from the student's rough topic;
+- 3 chapters, each with 2 subsections, moving from theory to analysis to practical proposals;
+- subsection titles that are specific claims or areas, not generic filler like "General information";
+- 3-5 concrete talking points per subsection so a writer knows exactly what belongs there.
 
-TOPILGAN FAKTLAR VA METADATA:
-- Mavzu: "${input.topic}"
-- Fan: "${input.subject}"
-- OTM: "${input.university}"
-- Fakultet: "${input.faculty || "Fakultet berilmagan"}"
-- Kafedra: "${input.department || "Kafedra berilmagan"}"
-- Ta'lim yo'nalishi: "${input.direction || "Yo'nalish berilmagan"}"
-- Talaba F.I.Sh: "${input.studentName || "Talaba kiritilmagan"}"
-- Ilmiy rahbar F.I.Sh: "${input.advisor || "Ilmiy rahbar kiritilmagan"}"
-- Shahar: "${input.city || "Toshkent"}"
-- O'quv yili: "${input.year || "2026"}"
-- Mo'ljallangan hajm: ${pageTarget} sahifa
-- Tadqiqot obyekti: "${input.object || "Mavzuga mos akademik pedagogik/amaliy jarayon"}"
-- Tadqiqot predmeti: "${input.subjectItem || "Mavzuga mos usul, mexanizm va metodik shart-sharoitlar"}"
-- Real tajriba ma'lumotlari: ${hasRealExp ? "HA (" + input.extraRequirements + ")" : "YO'Q"}
+Chapter and subsection titles carry no numbering — numbering is added by the document template.`;
 
-QAT'IY TASHKILIY VA AKADEMIK QOIDALAR:
-1. AKADEMIK HALOLLIK (SOXTA TAJRIBA TAQIQLANADI):
-   ${
-     !hasRealExp
-       ? "Foydalanuvchi real tajriba-sinov ma'lumotlarini bermadi. SHUNING UCHUN HECH QACHON SOXTA RESPONDENTLAR SONI (masalan: '52 nafar o'quvchi'), FOIZLAR, BALLAR, STUDENT T-TEST, P-VALUE UYDURMA! III bobdagi 3.2-paragrafni 'Tajriba-sinov ishlarini tashkil etishning tavsiya etilayotgan modeli' yoki 'Taklif etilayotgan metodikaning amaliy qo'llash mexanizmi' deb yoz. Maqsad, bosqichlar, diagnostika, baholash mezonlari va kutilayotgan natijalarni ber."
-       : "Foydalanuvchi kiritgan ushbu real tajriba ma'lumotlariga tayan: " + input.extraRequirements
-   }
+  const outlinePrompt = `Student's topic: "${input.topic}"
+${input.subject ? `Subject: "${input.subject}"` : ""}
+${input.extraRequirements ? `Additional requirements / context: "${input.extraRequirements}"` : ""}
 
-2. STRUKTURA (3 BOB, 6 PARAGRAF):
-   - KIRISH (dolzarblik, muammoning o'rganilganlik darajasi, tadqiqot muammosi, obyekt, predmet, maqsad, 6-8 ta vazifa, metodologik asos va usullar, ilmiy yangilik, amaliy ahamiyat, kurs ishining tuzilishi)
-   - I BOB: Nazariy-metodologik asoslar (1.1 va 1.2 paragraflar, I bob bo'yicha oraliq xulosa)
-   - II BOB: Amaliy holat va zamonaviy yondashuvlar (2.1 va 2.2 paragraflar, II bob bo'yicha oraliq xulosa)
-   - III BOB: Takomillashtirish va amaliy yechimlar / tavsiya etilayotgan model (3.1 va 3.2 paragraflar, III bob bo'yicha oraliq xulosa)
-   - XULOSA (maqsad va vazifalarga muvofiq, qayta tiklanmaydigan mantiqiy umumlashtirish)
-   - ILMIY-AMALIY TAVSIYALAR (o'qituvchi, muassasa, talaba va baholash uchun)
-   - FOYDALANILGAN ADABIYOTLAR RO'YXATI (I. Normativ, II. Darsliklar va o'quv qo'llanmalar, III. Maqolalar, IV. Xorijiy adabiyotlar, V. Internet resurslari — kamida 25-30 ta tartibli ilmiy manbalar)
+Produce the plan for a course paper on this topic in Uzbek (Latin script).
+Also name the academic subject (fan / predmet) this topic belongs to, and write a two-sentence summary of what the paper will argue.
+Also formulate the research apparatus for the coursework.
 
-3. TIL VA USLUB:
-   - Toza o'zbek adabiy tilida, rasmiy-akademik va ilmiy.
-   - HECH QANDAY SHABLON AI GAPLARI ("ushbu mavzu juda dolzarb va muhim hisoblanadi" kabi) TAKRORLANMASIN.
-   - Izchil terminologiya va mavzuga aloqador haqiqiy olimlar qarashlari tahlili.
-   - Matn ichida texnik belgilar (markdown ###, **, html taglar, debug) umuman bo'lmasin.
+Return valid JSON with exactly this structure:
+{
+  "title": "Refined academic title in Uzbek",
+  "subject": "Academic subject name in Uzbek",
+  "summary": "Two-sentence summary of the paper's thesis",
+  "researchApparatus": {
+    "relevance": "Mavzuning dolzarbligi bayoni",
+    "literatureReview": "Muammoning o'rganilganlik darajasi va olimlar qarashlari",
+    "problem": "Tadqiqot muammosi",
+    "object": "Tadqiqot obyekti",
+    "subjectItem": "Tadqiqot predmeti",
+    "goal": "Tadqiqot maqsadi",
+    "tasks": ["1-vazifa", "2-vazifa", "3-vazifa", "4-vazifa", "5-vazifa"],
+    "methodologicalBasis": "Tadqiqotning metodologik asosi",
+    "methods": ["Usul 1", "Usul 2", "Usul 3", "Usul 4"],
+    "novelty": "Tadqiqotning ilmiy yangiligi",
+    "practicalSignificance": "Tadqiqotning amaliy ahamiyati"
+  },
+  "chapters": [
+    {
+      "title": "1-bob nomi (Nazariy-metodologik asoslar)",
+      "sections": [
+        { "title": "1.1-paragraf nomi", "points": ["Nuqta 1", "Nuqta 2", "Nuqta 3", "Nuqta 4"] },
+        { "title": "1.2-paragraf nomi", "points": ["Nuqta 1", "Nuqta 2", "Nuqta 3", "Nuqta 4"] }
+      ]
+    },
+    {
+      "title": "2-bob nomi (Tahliliy va amaliy holat)",
+      "sections": [
+        { "title": "2.1-paragraf nomi", "points": ["Nuqta 1", "Nuqta 2", "Nuqta 3", "Nuqta 4"] },
+        { "title": "2.2-paragraf nomi", "points": ["Nuqta 1", "Nuqta 2", "Nuqta 3", "Nuqta 4"] }
+      ]
+    },
+    {
+      "title": "3-bob nomi (Takomillashtirish va amaliy tavsiyalar)",
+      "sections": [
+        { "title": "3.1-paragraf nomi", "points": ["Nuqta 1", "Nuqta 2", "Nuqta 3", "Nuqta 4"] },
+        { "title": "3.2-paragraf nomi", "points": ["Nuqta 1", "Nuqta 2", "Nuqta 3", "Nuqta 4"] }
+      ]
+    }
+  ]
+}`;
 
-JAVOB FAQAT TO'LIQ VA MUKAMMAL JSON FORMATIDA BO'LISHI SHART.`;
-
-  const response = await generateContentWithRotation({
-    model: "gemini-3.6-flash",
-    contents: prompt,
+  console.log("[CourseWork Gemini] Step 1: Planning outline with gemini-1.5-pro...");
+  const outlineRes = await generateContentWithRotation({
+    model: "gemini-1.5-pro",
+    contents: `${outlineSystem}\n\n${outlinePrompt}`,
     config: {
-      maxOutputTokens: 16384,
-      temperature: 0.2,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: "OBJECT" as any,
-        properties: {
-          titleInfo: {
-            type: "OBJECT" as any,
-            properties: {
-              ministry: { type: "STRING" as any },
-              university: { type: "STRING" as any },
-              faculty: { type: "STRING" as any },
-              department: { type: "STRING" as any },
-              topic: { type: "STRING" as any },
-              subject: { type: "STRING" as any },
-              direction: { type: "STRING" as any },
-              studentName: { type: "STRING" as any },
-              advisor: { type: "STRING" as any },
-              city: { type: "STRING" as any },
-              year: { type: "STRING" as any }
-            },
-            required: ["university", "topic", "studentName"]
-          },
-          introduction: {
-            type: "OBJECT" as any,
-            properties: {
-              relevance: { type: "STRING" as any },
-              literatureReview: { type: "STRING" as any },
-              problem: { type: "STRING" as any },
-              object: { type: "STRING" as any },
-              subjectItem: { type: "STRING" as any },
-              goal: { type: "STRING" as any },
-              tasks: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              methodologicalBasis: { type: "STRING" as any },
-              methods: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              novelty: { type: "STRING" as any },
-              practicalSignificance: { type: "STRING" as any },
-              baseAndStages: { type: "STRING" as any },
-              structureAndVolume: { type: "STRING" as any }
-            },
-            required: ["relevance", "goal", "tasks", "methodologicalBasis"]
-          },
-          chapters: {
-            type: "ARRAY" as any,
-            items: {
-              type: "OBJECT" as any,
-              properties: {
-                number: { type: "NUMBER" as any },
-                title: { type: "STRING" as any },
-                paragraphs: {
-                  type: "ARRAY" as any,
-                  items: {
-                    type: "OBJECT" as any,
-                    properties: {
-                      title: { type: "STRING" as any },
-                      content: { type: "ARRAY" as any, items: { type: "STRING" as any } }
-                    },
-                    required: ["title", "content"]
-                  }
-                },
-                conclusion: { type: "STRING" as any }
-              },
-              required: ["number", "title", "paragraphs", "conclusion"]
-            }
-          },
-          tables: {
-            type: "ARRAY" as any,
-            items: {
-              type: "OBJECT" as any,
-              properties: {
-                caption: { type: "STRING" as any },
-                headers: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-                rows: {
-                  type: "ARRAY" as any,
-                  items: { type: "ARRAY" as any, items: { type: "STRING" as any } }
-                },
-                explanation: { type: "STRING" as any }
-              },
-              required: ["caption", "headers", "rows", "explanation"]
-            }
-          },
-          conclusion: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-          recommendations: {
-            type: "OBJECT" as any,
-            properties: {
-              forTeachers: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              forInstitution: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              forStudents: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              forEvaluation: { type: "ARRAY" as any, items: { type: "STRING" as any } }
-            },
-            required: ["forTeachers", "forInstitution"]
-          },
-          bibliography: {
-            type: "OBJECT" as any,
-            properties: {
-              normative: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              books: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              articles: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              foreign: { type: "ARRAY" as any, items: { type: "STRING" as any } },
-              web: { type: "ARRAY" as any, items: { type: "STRING" as any } }
-            },
-            required: ["normative", "books", "articles"]
-          }
-        },
-        required: ["titleInfo", "introduction", "chapters", "conclusion", "recommendations", "bibliography"]
-      }
+      responseMimeType: "application/json"
     }
   });
 
-  if (!response || !response.text) {
-    throw new Error("AI orqali kurs ishi mazmunini generatsiya qilishda xatolik yuz berdi (javob bo'sh).");
+  let outlineJson: any;
+  try {
+    outlineJson = JSON.parse(outlineRes.text || "{}");
+  } catch (e) {
+    console.warn("[CourseWork Gemini] Parsing outline JSON failed, extracting block:", e);
+    const m = (outlineRes.text || "").match(/\{[\s\S]*\}/);
+    outlineJson = m ? JSON.parse(m[0]) : {};
   }
 
-  const rawJson = JSON.parse(response.text);
-  rawJson.hasRealExperiment = hasRealExp;
+  const topic = outlineJson.title || input.topic;
+  const subject = outlineJson.subject || input.subject || "Ijtimoiy-iqtisodiy fanlar";
+  const apparatus = outlineJson.researchApparatus || {};
 
-  // Fallback defaults for missing fields from user input
-  rawJson.titleInfo.university = rawJson.titleInfo.university || input.university;
-  rawJson.titleInfo.topic = input.topic;
-  rawJson.titleInfo.subject = input.subject || rawJson.titleInfo.subject;
-  rawJson.titleInfo.faculty = input.faculty || rawJson.titleInfo.faculty || "";
-  rawJson.titleInfo.department = input.department || rawJson.titleInfo.department || "";
-  rawJson.titleInfo.direction = input.direction || rawJson.titleInfo.direction || "";
-  rawJson.titleInfo.studentName = input.studentName || rawJson.titleInfo.studentName || "";
-  rawJson.titleInfo.advisor = input.advisor || rawJson.titleInfo.advisor || "";
-  rawJson.titleInfo.city = input.city || rawJson.titleInfo.city || "Toshkent";
-  rawJson.titleInfo.year = input.year || rawJson.titleInfo.year || "2026";
+  // Standardize 3 chapters if missing
+  if (!Array.isArray(outlineJson.chapters) || outlineJson.chapters.length < 3) {
+    outlineJson.chapters = [
+      {
+        title: "Nazariy-metodologik asoslar",
+        sections: [
+          { title: "Mavzuning nazariy asoslari va tushunchalar tizimi", points: ["Asosiy ta'riflar", "Iqtisodiy/pedagogik ahamiyati", "Olimlar qarashlari"] },
+          { title: "Xalqaro va milliy tajriba tahlili", points: ["Rivojlangan davlatlar tajribasi", "Milliy qonunchilik asoslari", "Qiyosiy tahlil"] }
+        ]
+      },
+      {
+        title: "Amaliy holat va mavjud tendensiyalar tahlili",
+        sections: [
+          { title: "Tizimning hozirgi holatini tahlili", points: ["Statistik ko'rsatkichlar dinamikasi", "Asosiy omillar ta'siri", "Tahliliy natijalar"] },
+          { title: "Muammolar va ularning sabablari tahlili", points: ["Tizimdagi to'siqlar", "Samaradorlik ko'rsatkichlari", "Ziddiyatlar tahlili"] }
+        ]
+      },
+      {
+        title: "Takomillashtirish istiqbollari va amaliy tavsiyalar",
+        sections: [
+          { title: "Samaradorlikni oshirishning asosiy yo'nalishlari", points: ["Strategik vazifalar", "Innovatsion yondashuvlar", "Mexanizmlar"] },
+          { title: "Amaliyotga joriy etish mexanizmlari va istiqbollar", points: ["Tavsiya etilayotgan model", "Kutilayotgan ijtimoiy-iqtisodiy samara", "Xulosa"] }
+        ]
+      }
+    ];
+  }
 
-  return validateAndCleanCourseWorkData(rawJson as CourseWorkData);
+  const totalSections = outlineJson.chapters.reduce((sum: number, c: any) => sum + (c.sections?.length || 2), 0) || 6;
+  const sectionWords = Math.max(300, Math.round((bodyWords * 0.83) / Math.max(1, totalSections)));
+
+  const planText = outlineJson.chapters
+    .map((c: any, ci: number) => {
+      const sText = (c.sections || [])
+        .map((s: any, si: number) => `  ${ci + 1}.${si + 1}. ${s.title}`)
+        .join("\n");
+      return `${ci + 1}-BOB. ${c.title.toUpperCase()}\n${sText}`;
+    })
+    .join("\n\n");
+
+  // 2. PRO WRITER SYSTEM PROMPT (Academic House Style)
+  const writerSystem = `You write undergraduate course papers ("kurs ishi") in Uzbek (Latin script).
+Subject area: ${subject}.
+
+House style:
+- Academic register, third person, no first-person "I" and no address to the reader.
+- Flowing paragraphs of 4-7 sentences. Prose, not bullet lists, unless a short enumeration genuinely helps.
+- Definitions, classifications, causes and consequences, and concrete examples where they earn their place.
+- Where figures would normally appear, give plausible orders of magnitude and name the kind of source they come from (state statistics agency, ministry report) rather than inventing precise numbers attributed to a specific year.
+- Uzbek context is welcome when the topic allows it.
+
+Output rules:
+- Plain text only. No markdown headings, no "##", no numbering of the section you are given.
+- Do not restate the section title as the first line.
+- Do not write meta-commentary about the writing process.
+- Separate paragraphs with a blank line.`;
+
+  // 3. KIRISH (INTRODUCTION) PROMPT
+  const introTask = async () => {
+    const prompt = `Paper title: "${topic}"
+Subject: ${subject}
+Full plan of the paper:
+${planText}
+
+Write the KIRISH section, about ${introWords} words.
+
+It must cover, as continuous prose: why the topic matters now; the degree to which it has been studied; the aim of the paper; the tasks that follow from that aim; the object and subject of research; the research methods used; and the structure of the work.`;
+
+    const res = await generateContentWithRotation({
+      model: "gemini-1.5-pro",
+      contents: `${writerSystem}\n\n${prompt}`
+    });
+    return res.text || "";
+  };
+
+  // 4. SUBSECTION GENERATION TASKS
+  interface SectionJob {
+    chapterIndex: number;
+    sectionIndex: number;
+    chapterTitle: string;
+    sectionTitle: string;
+    points: string[];
+  }
+  const sectionJobs: SectionJob[] = [];
+  outlineJson.chapters.forEach((c: any, ci: number) => {
+    (c.sections || []).forEach((s: any, si: number) => {
+      sectionJobs.push({
+        chapterIndex: ci,
+        sectionIndex: si,
+        chapterTitle: c.title,
+        sectionTitle: s.title,
+        points: Array.isArray(s.points) && s.points.length ? s.points : [s.title]
+      });
+    });
+  });
+
+  const processSection = async (job: SectionJob) => {
+    const prompt = `Paper title: "${topic}"
+Subject: ${subject}
+Full plan of the paper:
+${planText}
+
+Write subsection ${job.chapterIndex + 1}.${job.sectionIndex + 1} — "${job.sectionTitle}" — inside chapter "${job.chapterTitle}".
+Target length: about ${sectionWords} words.
+
+Cover these points, developed into argument rather than listed:
+${job.points.map(p => `- ${p}`).join("\n")}
+
+Stay inside this subsection's scope; neighbouring subsections are written separately, so do not summarise the whole chapter or preview what comes next.`;
+
+    const res = await generateContentWithRotation({
+      model: "gemini-1.5-pro",
+      contents: `${writerSystem}\n\n${prompt}`
+    });
+    return {
+      ...job,
+      paragraphs: splitBodyParagraphs(res.text || "")
+    };
+  };
+
+  // 5. CHAPTER CONCLUSIONS
+  const chapterConclusionTasks = outlineJson.chapters.map((ch: any, idx: number) => async () => {
+    const prompt = `Paper title: "${topic}"
+Subject: ${subject}
+Chapter: "${ch.title}"
+
+Write a concise academic conclusion for this chapter (about 120-160 words, 1-2 flowing paragraphs in Uzbek).
+Summarize what was established in this chapter.`;
+
+    const res = await generateContentWithRotation({
+      model: "gemini-1.5-pro",
+      contents: `${writerSystem}\n\n${prompt}`
+    });
+    return res.text?.trim() || `${idx + 1}-bob doirasida o'rganilgan nazariy va amaliy masalalar tizimlashtirildi hamda tegishli ilmiy xulosalar shakllantirildi.`;
+  });
+
+  // 6. XULOSA & TAVSIYALAR (CONCLUSION & RECOMMENDATIONS)
+  const conclusionTask = async () => {
+    const prompt = `Paper title: "${topic}"
+Subject: ${subject}
+Full plan of the paper:
+${planText}
+
+Write the XULOSA section, about ${conclusionWords} words.
+
+Draw together what the paper established chapter by chapter, state the practical proposals that follow, and note which questions remain open. Introduce no new material.
+
+Also provide practical recommendations in JSON format:
+{
+  "conclusion": ["Xulosa 1-paragrafi...", "Xulosa 2-paragrafi...", "Xulosa 3-paragrafi..."],
+  "recommendations": {
+    "forTeachers": ["O'qituvchilar uchun 1-tavsiya", "2-tavsiya", "3-tavsiya"],
+    "forInstitution": ["Muassasa uchun 1-tavsiya", "2-tavsiya", "3-tavsiya"],
+    "forStudents": ["Talabalar uchun 1-tavsiya", "2-tavsiya", "3-tavsiya"],
+    "forEvaluation": ["Baholash uchun 1-tavsiya", "2-tavsiya", "3-tavsiya"]
+  }
+}`;
+
+    const res = await generateContentWithRotation({
+      model: "gemini-1.5-pro",
+      contents: `${writerSystem}\n\n${prompt}`,
+      config: { responseMimeType: "application/json" }
+    });
+    try {
+      return JSON.parse(res.text || "{}");
+    } catch {
+      return {
+        conclusion: splitBodyParagraphs(res.text || ""),
+        recommendations: {
+          forTeachers: ["Mavzu bo'yicha zamonaviy o'quv-metodik majmualarni takomillashtirish."],
+          forInstitution: ["Tizimda axborot-kommunikatsiya texnologiyalarini keng joriy qilish."],
+          forStudents: ["Mustaqil ta'lim va ilmiy-tadqiqot ko'nikmalarini rivojlantirish."],
+          forEvaluation: ["Baholash tizimida amaliy keyslar ulushini oshirish."]
+        }
+      };
+    }
+  };
+
+  // 7. FOYDALANILGAN ADABIYOTLAR (BIBLIOGRAPHY)
+  const bibTask = async () => {
+    const bibSystem = `You compile bibliographies for undergraduate papers in Uzbek (Latin script).
+List sources you are genuinely confident exist: legislation and government decrees, publications of statistical agencies and ministries, long-established textbooks, and well-known international organisations' reports. Prefer widely cited, verifiable works over obscure ones. Do not invent DOIs, issue numbers, or page ranges you are unsure of. Order: legal acts first, then books and textbooks, then articles, then web resources.`;
+
+    const prompt = `Paper title: "${topic}"
+Subject: ${subject}
+
+Give 25-30 bibliography entries formatted as JSON with categories:
+{
+  "normative": ["O'zbekiston Respublikasi Konstitutsiyasi...", "Qonun...", "Farmon..."],
+  "books": ["Muallif. Kitob nomi. – Toshkent, 2022...", "Muallif 2..."],
+  "articles": ["Muallif. Maqola nomi // Jurnal, 2023..."],
+  "foreign": ["Author. Title. – Publisher, 2021..."],
+  "web": ["Rasmiy sayt / portal: https://..."]
+}`;
+
+    const res = await generateContentWithRotation({
+      model: "gemini-1.5-pro",
+      contents: `${bibSystem}\n\n${prompt}`,
+      config: { responseMimeType: "application/json" }
+    });
+    try {
+      return JSON.parse(res.text || "{}");
+    } catch {
+      return {
+        normative: [
+          "O'zbekiston Respublikasi Konstitutsiyasi. – Toshkent: O'zbekiston, 2023.",
+          "O'zbekiston Respublikasining 'Ta'lim to'g'risida'gi Qonuni. O'RQ-637-son, 2020-yil 23-sentyabr.",
+          "O'zbekiston Respublikasi Prezidentining 'O'zbekiston – 2030' strategiyasi to'g'risidagi Farmoni. PF-158-son, 2023-yil 11-sentyabr."
+        ],
+        books: [
+          "Qosimov A., Karimov S. Mutaxassislikka kirish va sohaviy asoslar. – Toshkent: Fan, 2022. – 280 b.",
+          "Yo'ldoshev J.G'. Zamonaviy pedagogik texnologiyalar. – Toshkent: O'qituvchi, 2021. – 216 b.",
+          "Abdullayev A.A. Sohaviy tahlil va modellashtirish. – Toshkent: Iqtisodiyot, 2020. – 312 b."
+        ],
+        articles: [
+          "Axmedov B.R. Sohadagi innovatsion o'zgarishlar tahlili // O'zbekiston iqtisodiy axborotnomasi. – 2023. – №4. – B. 45-52.",
+          "Toshmatov Sh.A. Zamonaviy rivojlanish tendensiyalari // Fan va jamiyat. – 2022. – №2. – B. 18-25."
+        ],
+        foreign: [
+          "Kotler P., Armstrong G. Principles of Management & Innovation. – Pearson, 2021. – 736 p."
+        ],
+        web: [
+          "O'zbekiston Respublikasi Prezidenti huzuridagi Statistika agentligi: https://stat.uz",
+          "O'zbekiston Respublikasi Qonun hujjatlari ma'lumotlari milliy bazasi: https://lex.uz"
+        ]
+      };
+    }
+  };
+
+  console.log("[CourseWork Gemini] Step 2: Concurrently generating sections, intro, conclusions and bibliography with gemini-1.5-pro...");
+  const [introRaw, sectionOutputs, conclusionOutput, bibOutput, chConclusionOutputs] = await Promise.all([
+    introTask(),
+    mapConcurrent(sectionJobs, 2, processSection),
+    conclusionTask(),
+    bibTask(),
+    Promise.all(chapterConclusionTasks.map(t => t()))
+  ]);
+
+  // Assemble chapters structure
+  const assembledChapters: CourseWorkChapter[] = outlineJson.chapters.map((ch: any, ci: number) => {
+    const chSections = sectionOutputs.filter(s => s.chapterIndex === ci);
+    return {
+      number: ci + 1,
+      title: ch.title,
+      conclusion: chConclusionOutputs[ci] || `${ci + 1}-bob yuzasidan xulosa va umumlashtirishlar shakllantirildi.`,
+      paragraphs: chSections.map((sec, si) => ({
+        title: `${ci + 1}.${si + 1}. ${sec.sectionTitle}`,
+        content: sec.paragraphs.length > 0 ? sec.paragraphs : [
+          `${sec.sectionTitle} bo'yicha nazariy va amaliy ma'lumotlar o'rganildi hamda tahliliy natijalar bayon qilindi.`
+        ]
+      }))
+    };
+  });
+
+  const introTextClean = introRaw ? cleanAcademicText(introRaw) : "";
+
+  const courseWorkData: CourseWorkData = {
+    hasRealExperiment: hasRealExp,
+    titleInfo: {
+      ministry: "O'ZBEKISTON RESPUBLIKASI OLIY TA'LIM, FAN VA INNOVATSIYALAR VAZIRLIGI",
+      university: input.university || "Oliy ta'lim muassasasi",
+      faculty: input.faculty || "",
+      department: input.department || "",
+      topic: topic,
+      subject: subject,
+      direction: input.direction || "",
+      studentName: input.studentName || "",
+      advisor: input.advisor || "",
+      city: input.city || "Toshkent",
+      year: input.year || "2026"
+    },
+    introduction: {
+      relevance: apparatus.relevance || introTextClean || "Mavzuning dolzarbligi zamonaviy rivojlanish tendensiyalari bilan belgilanadi.",
+      literatureReview: apparatus.literatureReview || "Mavzu yuzasidan mahalliy va xorijiy olimlarning ilmiy tadqiqotlari tahlil qilindi.",
+      problem: apparatus.problem || "Tadqiqotning asosiy muammosi sohada samaradorlikni oshirish zarurati bilan bog'liq.",
+      object: input.object || apparatus.object || "Sohaviy jarayonlar va tizimlar",
+      subjectItem: input.subjectItem || apparatus.subjectItem || "Mavzuni rivojlantirishning metodik va amaliy mexanizmlari",
+      goal: apparatus.goal || "Mavzu bo'yicha ilmiy-nazariy asoslarni tahlil qilish va amaliy tavsiyalar ishlab chiqish.",
+      tasks: Array.isArray(apparatus.tasks) && apparatus.tasks.length ? apparatus.tasks : [
+        "Mavzuning nazariy-uslubiy asoslarini o'rganish;",
+        "Mavjud holat va amaliyotni tahlil qilish;",
+        "Muammo va kamchiliklarni aniqlash;",
+        "Samaradorlikni oshirish bo'yicha ilmiy-amaliy takliflar ishlab chiqish."
+      ],
+      methodologicalBasis: apparatus.methodologicalBasis || "Tadqiqotda tizimli tahlil, qiyosiy taqqoslash va mantiqiy umumlashtirish usullaridan foydalanildi.",
+      methods: Array.isArray(apparatus.methods) && apparatus.methods.length ? apparatus.methods : [
+        "Nazariy tahlil", "Qiyosiy tahlil", "Statistik kuzatish", "Mantiqiy xulosa chiqarish"
+      ],
+      novelty: apparatus.novelty || "Mavzu bo'yicha tizimli ilmiy tahlil va takomillashtirilgan takliflar majmuasi ishlab chiqilgan.",
+      practicalSignificance: apparatus.practicalSignificance || "Ish natijalaridan sohaviy amaliyotda hamda o'quv jarayonida foydalanish mumkin.",
+      structureAndVolume: `Kurs ishi titul varaqasi, mundarija, kirish, 3 ta bob, 6 ta paragraf, xulosa, ilmiy-amaliy tavsiyalar va foydalanilgan adabiyotlar ro'yxatidan iborat bo'lib, jami ${pageTarget} sahifaga mo'ljallangan.`
+    },
+    chapters: assembledChapters,
+    conclusion: Array.isArray(conclusionOutput.conclusion) && conclusionOutput.conclusion.length > 0
+      ? conclusionOutput.conclusion
+      : (splitBodyParagraphs(conclusionOutput.conclusion || introTextClean).length > 0
+          ? splitBodyParagraphs(conclusionOutput.conclusion || introTextClean)
+          : ["Kurs ishida qo'yilgan maqsad va vazifalar to'liq bajarildi hamda ilmiy-amaliy xulosalar shakllantirildi."]),
+    recommendations: conclusionOutput.recommendations || {
+      forTeachers: ["Mavzuni o'qitishda yangi pedagogik va amaliy texnologiyalardan foydalanish."],
+      forInstitution: ["Zamonaviy axborot va moddiy-texnik bazani mustahkamlash."],
+      forStudents: ["Mustaqil izlanish va amaliy ko'nikmalarni oshirish."],
+      forEvaluation: ["Amaliy topshiriqlar va keyslar asosida baholash mexanizmini joriy etish."]
+    },
+    bibliography: {
+      normative: Array.isArray(bibOutput.normative) ? bibOutput.normative : [],
+      books: Array.isArray(bibOutput.books) ? bibOutput.books : [],
+      articles: Array.isArray(bibOutput.articles) ? bibOutput.articles : [],
+      foreign: Array.isArray(bibOutput.foreign) ? bibOutput.foreign : [],
+      web: Array.isArray(bibOutput.web) ? bibOutput.web : []
+    }
+  };
+
+  return validateAndCleanCourseWorkData(courseWorkData);
 }
