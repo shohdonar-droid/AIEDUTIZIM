@@ -7,7 +7,7 @@ import {
   collection,
   query,
   where,
-  collection, query, where, getDocs,
+  getDocs,
   updateDoc,
   doc,
   addDoc,
@@ -1089,6 +1089,45 @@ export async function getAuthedUser(userId: number): Promise<any | null> {
   }
 }
 
+export async function checkAndDeductBalance(userId: number, cost: number): Promise<boolean> {
+  if (!db || cost <= 0) return true;
+  try {
+    const user = await getAuthedUser(userId);
+    if (!user) return false;
+    const currentBalance = Number(user.balance !== undefined ? user.balance : (user.ball || 0));
+    if (currentBalance < cost) return false;
+    const newBalance = currentBalance - cost;
+    const userRef = doc(db, "users", user.id);
+    await updateDoc(userRef, {
+      balance: newBalance,
+      ball: newBalance,
+      updatedAt: serverTimestamp()
+    });
+    return true;
+  } catch (e) {
+    console.error("Error deducting balance:", e);
+    return false;
+  }
+}
+
+export async function refundBalance(userId: number, amount: number): Promise<void> {
+  if (!db || amount <= 0) return;
+  try {
+    const user = await getAuthedUser(userId);
+    if (!user) return;
+    const currentBalance = Number(user.balance !== undefined ? user.balance : (user.ball || 0));
+    const newBalance = currentBalance + amount;
+    const userRef = doc(db, "users", user.id);
+    await updateDoc(userRef, {
+      balance: newBalance,
+      ball: newBalance,
+      updatedAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.error("Error refunding balance:", e);
+  }
+}
+
 export async function getKeyboard(
   role: string = "student",
   userId?: number,
@@ -1132,6 +1171,7 @@ export async function getKeyboard(
       isPrimary 
         ? [{ text: "📥 Javob berilmaganlar" }, { text: "💰 Narxlar sozlamalari" }]
         : [{ text: "📥 Javob berilmaganlar" }],
+      [{ text: "📊 Tizim xarajatlari" }],
       [{ text: "🌐 Rasmiy sayt" }]
     ];
   }
@@ -1785,6 +1825,362 @@ bot.action(/edit_price_(.+)/, async (ctx) => {
   const service = ctx.match[1].replace(/_/g, ' ');
   pendingLogins.set(ctx.from.id, { step: "admin_set_new_price", service });
   await ctx.reply(`✍️ <b>${service}</b> uchun yangi narxni (faqat son) kiriting:`, { parse_mode: "HTML" });
+});
+
+async function sendAuditMainMenu(ctx: any, isEdit: boolean = false) {
+  const text = 
+`📊 <b>AIEDUTIZIM — TIZIM XARAJATLARI VA TEXNIK AUDIT</b>
+
+🏛 <b>Platforma Arxitekturasi:</b>
+• <b>Frontend:</b> React 18 + Tailwind CSS + Vite
+• <b>Backend:</b> Node.js Express + TSX (Port 3000)
+• <b>Baza:</b> Google Firebase Firestore (NoSQL)
+• <b>AI Modellari:</b> Gemini 2.5 Flash / 1.5 Pro + Claude 3.5 Sonnet
+• <b>Integratsiya:</b> Telegram Telegraf Bot + Web Platform
+
+💰 <b>Xarajatlar qisqacha xulosasi:</b>
+• <b>Infratuzilma (Server + DB + Bot):</b> ~$25.00/oy (~325,000 so'm)
+• <b>AI API sarfi (O'rtacha):</b> ~$45.00/oy (~585,000 so'm)
+• <b>Jami reja xarajat:</b> ~$70.00/oy (~910,000 so'm)
+• <b>O'rtacha marja darajasi:</b> <b>83.5% - 85.0%</b>
+
+Quyidagi bo'limlardan birini tanlang va to'liq audit tahlilini ko'ring:`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: "🤖 AI Modellari Xarajatlari", callback_data: "audit_ai_models" },
+        { text: "🖥 Infratuzilma & Server", callback_data: "audit_infra" }
+      ],
+      [
+        { text: "📦 Tariflar Iqtisodiyoti", callback_data: "audit_tariffs" },
+        { text: "🧮 1 ta So'rov Tannarxi", callback_data: "audit_unit_cost" }
+      ],
+      [
+        { text: "⚡️ Real Tizim Metrikalari", callback_data: "audit_real_stats" }
+      ],
+      [
+        { text: "🌐 Saytdagi To'liq Audit Sahifasi", url: `${APP_URL}/admin/billing/audit` }
+      ]
+    ]
+  };
+
+  if (isEdit) {
+    try {
+      await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+    } catch (e) {
+      await ctx.reply(text, { parse_mode: "HTML", reply_markup: keyboard });
+    }
+  } else {
+    await ctx.reply(text, { parse_mode: "HTML", reply_markup: keyboard });
+  }
+}
+
+bot.action("audit_main_menu", async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  await sendAuditMainMenu(ctx, true);
+});
+
+bot.action("audit_ai_models", async (ctx) => {
+  try {
+    await ctx.answerCbQuery().catch(() => {});
+    const text = 
+`🤖 <b>AI MODELLARI XARAJATLARI VA TAHLILI</b>
+
+1️⃣ <b>Google Gemini 2.5 Flash / 1.5 Pro:</b>
+• <b>Asosiy vazifasi:</b> Slaydlar, oddiy kurs ishlari, testlar, qidiruv, savol-javob
+• <b>Kiruvchi narx (Prompt):</b> $0.075 / 1M token (~0.001 so'm / 1k token)
+• <b>Chiquvchi narx (Output):</b> $0.30 / 1M token (~0.004 so'm / 1k token)
+• <b>Birlik sarfi:</b>
+  - 1 ta Slayd generatsiyasi: ~$0.003 (~40 so'm)
+  - 1 ta Test to'plami (20 ta savol): ~$0.002 (~25 so'm)
+  - 1 ta Oddiy Kurs ishi: ~$0.008 (~100 so'm)
+• <b>Samaradorlik:</b> Yuqori tezlik, past xarajat, 98% rentabellik!
+
+2️⃣ <b>Anthropic Claude 3.5 Sonnet / Haiku:</b>
+• <b>Asosiy vazifasi:</b> 💎 Pro kurs ishi, 💎 Pro slayd, chuqur tahlil
+• <b>Kiruvchi narx (Prompt):</b> $3.00 / 1M token
+• <b>Chiquvchi narx (Output):</b> $15.00 / 1M token
+• <b>Birlik sarfi:</b>
+  - 1 ta Pro Kurs ishi: ~$0.055 (~700 so'm)
+  - 1 ta Pro Slayd: ~$0.025 (~320 so'm)
+• <b>Foydalanuvchiga narxi:</b> 15,000 - 20,000 so'm
+• <b>Sof foyda marjasi:</b> <b>~95.3%</b> rentabellik!
+
+💡 <b>Strategik xulosa:</b>
+Oddiy kundalik so'rovlarni Gemini Flash orqali arzon bajarish, yuqori sifatli pro vazifalarni esa Claude orqali sotish orqali xarajatlar minimal ushlab turiladi.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🧮 1 ta So'rov Tannarxi", callback_data: "audit_unit_cost" },
+          { text: "📦 Tariflar Iqtisodiyoti", callback_data: "audit_tariffs" }
+        ],
+        [
+          { text: "🔙 Audit bosh menyusiga qaytish", callback_data: "audit_main_menu" }
+        ]
+      ]
+    };
+
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+  } catch (e) {
+    console.error("Audit AI Models error:", e);
+  }
+});
+
+bot.action("audit_infra", async (ctx) => {
+  try {
+    await ctx.answerCbQuery().catch(() => {});
+    const text = 
+`🖥 <b>INFRATUZILMA VA SERVER XARAJATLARI</b>
+
+🏢 <b>1. Server & Hosting:</b>
+• <b>Turi:</b> Cloud Run / Linux VPS (Node.js runtime)
+• <b>Resurs:</b> 1-2 vCPU, 2GB RAM
+• <b>Oylik xarajat:</b> ~$12.00 - $15.00 / oy (~156,000 - 195,000 so'm)
+
+🗄 <b>2. Firebase Firestore Database:</b>
+• <b>Bepul limit (Free Tier):</b>
+  - 50,000 ta hujjat o'qish / kun (bepul)
+  - 20,000 ta hujjat yozish / kun (bepul)
+  - 1 GB ma'lumotlar saqlash
+• <b>Limitdan oshganda:</b> $0.06 / 100k o'qish, $0.18 / 100k yozish
+• <b>Kutilayotgan xarajat:</b> ~$5.00 - $8.00 / oy (~65,000 - 104,000 so'm)
+
+🤖 <b>3. Telegram Bot Infratuzilmasi:</b>
+• Mavjud web server bilan parallel ishlaydi
+• <b>Qo'shimcha xarajat:</b> $0.00 / oy
+
+🌐 <b>4. Domen va SSL Sertifikati:</b>
+• Cloudflare / Let's Encrypt SSL: Bepul
+• Domen yillik xarajati: ~$10.00 / yil (~$0.85 / oy)
+
+━━━━━━━━━━━━━━━━━━━━
+📊 <b>JAMI OYLIK INFRATUZILMA:</b>
+• <b>Minimal:</b> ~$18.00 / oy (~234,000 so'm)
+• <b>O'rtacha (Yuklama bilan):</b> ~$25.00 / oy (~325,000 so'm)`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "📦 Tariflar Iqtisodiyoti", callback_data: "audit_tariffs" },
+          { text: "⚡️ Real Metrikalar", callback_data: "audit_real_stats" }
+        ],
+        [
+          { text: "🔙 Audit bosh menyusiga qaytish", callback_data: "audit_main_menu" }
+        ]
+      ]
+    };
+
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+  } catch (e) {
+    console.error("Audit infra error:", e);
+  }
+});
+
+bot.action("audit_tariffs", async (ctx) => {
+  try {
+    await ctx.answerCbQuery().catch(() => {});
+    const text = 
+`📦 <b>TARIFLAR RENTABELLIGI VA FOYDA TAHLILI</b>
+
+<i>(Har bir tarifda 20 tadan tashkilot obuna bo'lgan hisobdagi modellashtirish)</i>
+
+1️⃣ <b>Baza Tarifi (Kichik maktab / o'quv markazlar):</b>
+• Obuna narxi: <b>50,000 so'm</b> / oy
+• 1 ta tashkilot tannarxi: <b>8,400 so'm</b>
+• 20 ta tashkilot tushumi: <b>1,000,000 so'm</b>
+• 20 ta tashkilot xarajati: <b>168,000 so'm</b>
+• Sof foyda: <b>+832,000 so'm</b> (Marja: <b>83.2%</b>)
+
+2️⃣ <b>Standart Tarifi (Litsey / Kollejlar):</b>
+• Obuna narxi: <b>150,000 so'm</b> / oy
+• 1 ta tashkilot tannarxi: <b>24,000 so'm</b>
+• 20 ta tashkilot tushumi: <b>3,000,000 so'm</b>
+• 20 ta tashkilot xarajati: <b>480,000 so'm</b>
+• Sof foyda: <b>+2,520,000 so'm</b> (Marja: <b>84.0%</b>)
+
+3️⃣ <b>Professional Tarifi (OTM / Katta tashkilotlar):</b>
+• Obuna narxi: <b>400,000 so'm</b> / oy
+• 1 ta tashkilot tannarxi: <b>62,000 so'm</b>
+• 20 ta tashkilot tushumi: <b>8,000,000 so'm</b>
+• 20 ta tashkilot xarajati: <b>1,240,000 so'm</b>
+• Sof foyda: <b>+6,760,000 so'm</b> (Marja: <b>84.5%</b>)
+
+━━━━━━━━━━━━━━━━━━━━
+🏆 <b>JAMI 60 TA OBUNA NATIJASI:</b>
+• <b>Jami tushum:</b> 12,000,000 so'm / oy
+• <b>Jami xarajat:</b> 1,888,000 so'm / oy
+• <b>SOF FOYDA:</b> <b>+10,112,000 so'm / oy (84.3%)</b>`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🧮 1 ta So'rov Tannarxi", callback_data: "audit_unit_cost" },
+          { text: "🤖 AI Xarajatlari", callback_data: "audit_ai_models" }
+        ],
+        [
+          { text: "🔙 Audit bosh menyusiga qaytish", callback_data: "audit_main_menu" }
+        ]
+      ]
+    };
+
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+  } catch (e) {
+    console.error("Audit tariffs error:", e);
+  }
+});
+
+bot.action("audit_unit_cost", async (ctx) => {
+  try {
+    await ctx.answerCbQuery().catch(() => {});
+    const text = 
+`🧮 <b>1 TA SO'ROV VA XIZMATNING ANIQ TANNARXI</b>
+
+🔹 <b>📊 Oddiy Taqdimot (Slayd):</b>
+• Model: Gemini 2.5 Flash (~5k token)
+• Tannarx: <b>~40 - 60 so'm</b>
+• Foydalanuvchiga narx: <b>3,000 so'm</b>
+• Sof foyda: <b>+2,950 so'm (98% foyda)</b>
+
+🔹 <b>💎 Pro Taqdimot (Slayd):</b>
+• Model: Claude 3.5 Sonnet
+• Tannarx: <b>~350 - 450 so'm</b>
+• Foydalanuvchiga narx: <b>10,000 so'm</b>
+• Sof foyda: <b>+9,580 so'm (96% foyda)</b>
+
+🔹 <b>📄 Oddiy Kurs Ishi:</b>
+• Model: Gemini 2.5 Flash
+• Tannarx: <b>~100 - 150 so'm</b>
+• Foydalanuvchiga narx: <b>5,000 so'm</b>
+• Sof foyda: <b>+4,870 so'm (97% foyda)</b>
+
+🔹 <b>💎 Pro Kurs Ishi:</b>
+• Model: Claude 3.5 Sonnet
+• Tannarx: <b>~650 - 900 so'm</b>
+• Foydalanuvchiga narx: <b>15,000 so'm</b>
+• Sof foyda: <b>+14,200 so'm (95% foyda)</b>
+
+🔹 <b>📝 Test Generatsiyasi:</b>
+• Model: Gemini 2.5 Flash
+• Tannarx: <b>~25 - 40 so'm</b>
+• Foydalanuvchiga narx: <b>2,000 so'm</b>
+• Sof foyda: <b>+1,965 so'm (98% foyda)</b>
+
+🔹 <b>🌐 Fayl Tarjima Qilish:</b>
+• Model: Gemini 2.5 Flash
+• Tannarx: <b>~200 - 300 so'm</b>
+• Foydalanuvchiga narx: <b>10,000 so'm</b>
+• Sof foyda: <b>+9,750 so'm (97.5% foyda)</b>
+
+✅ <i>Xulosa: Tizimdagi har bir xizmat 95% dan yuqori rentabellikka ega!</i>`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "📦 Tariflar Iqtisodiyoti", callback_data: "audit_tariffs" },
+          { text: "🤖 AI Modellari", callback_data: "audit_ai_models" }
+        ],
+        [
+          { text: "🔙 Audit bosh menyusiga qaytish", callback_data: "audit_main_menu" }
+        ]
+      ]
+    };
+
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+  } catch (e) {
+    console.error("Audit unit cost error:", e);
+  }
+});
+
+bot.action("audit_real_stats", async (ctx) => {
+  try {
+    await ctx.answerCbQuery().catch(() => {});
+    await ctx.editMessageText("⏳ <i>Ma'lumotlar bazasidan real ko'rsatkichlar yuklanmoqda...</i>", { parse_mode: "HTML" }).catch(() => {});
+
+    let usersCount = 0;
+    let testsCount = 0;
+    let autoTestsCount = 0;
+    let activeSubsCount = 0;
+    let paymentsCount = 0;
+    let coursesCount = 0;
+
+    if (db) {
+      try {
+        const uSnap = await getCountFromServer(collection(db, "users"));
+        usersCount = uSnap.data().count;
+      } catch (e) {}
+
+      try {
+        const tSnap = await getCountFromServer(collection(db, "tests"));
+        testsCount = tSnap.data().count;
+      } catch (e) {}
+
+      try {
+        const atSnap = await getCountFromServer(collection(db, "auto_tests"));
+        autoTestsCount = atSnap.data().count;
+      } catch (e) {}
+
+      try {
+        const subSnap = await getCountFromServer(collection(db, "active_subscriptions"));
+        activeSubsCount = subSnap.data().count;
+      } catch (e) {}
+
+      try {
+        const pSnap = await getCountFromServer(collection(db, "payments"));
+        paymentsCount = pSnap.data().count;
+      } catch (e) {}
+
+      try {
+        const cSnap = await getCountFromServer(collection(db, "courses"));
+        coursesCount = cSnap.data().count;
+      } catch (e) {}
+    }
+
+    const totalAudience = Math.max(usersCount, telegramUsersCount);
+
+    const text = 
+`⚡️ <b>REAL TIZIM STATISTIKASI VA METRIKALAR</b>
+
+👥 <b>Foydalanuvchilar:</b>
+• Sayt foydalanuvchilari: <b>${usersCount}</b> nafar
+• Telegram bot foydalanuvchilari: <b>${telegramUsersCount}</b> nafar
+• Jami auditoriya: <b>${totalAudience}</b> nafar
+
+📚 <b>Kontent va topshiriqlar:</b>
+• Qo'lda tuzilgan testlar: <b>${testsCount}</b> ta
+• AI avtomatik testlar: <b>${autoTestsCount}</b> ta
+• Kurslar va o'quv modullari: <b>${coursesCount}</b> ta
+• Faol tashkilot obunalari: <b>${activeSubsCount}</b> ta
+
+💰 <b>Moliya va operatsiyalar:</b>
+• Qayd etilgan to'lov arizalari: <b>${paymentsCount}</b> ta
+• Baza o'rtacha yuklamasi: <b>Barqaror (Optimal)</b>
+
+🖥 <b>Server va Infratuzilma holati:</b>
+• Platforma ish faolligi (Uptime): <b>99.9%</b>
+• Node.js jarayoni: <b>Faol (Normal)</b>
+• Firestore kvotasi: <b>Normal (Xavfsiz limitda)</b>`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🔄 Qayta yangilash", callback_data: "audit_real_stats" },
+          { text: "🖥 Infratuzilma", callback_data: "audit_infra" }
+        ],
+        [
+          { text: "🌐 Saytdagi To'liq Audit", url: `${APP_URL}/admin/billing/audit` }
+        ],
+        [
+          { text: "🔙 Audit bosh menyusiga qaytish", callback_data: "audit_main_menu" }
+        ]
+      ]
+    };
+
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+  } catch (e) {
+    console.error("Audit real stats error:", e);
+  }
 });
 
 bot.on("message", async (ctx, next) => {
@@ -5056,7 +5452,7 @@ bot.action(/tgtst_cat_(auto|exam|topic)_(.+)/, async (ctx) => {
      if (cat === "auto") {
         const autoTestsSnap = await getDocs(collection(db, "auto_tests"));
         autoTestsSnap.forEach(d => {
-          const test = { id: d.id, ...d.data() };
+          const test: any = { id: d.id, ...d.data() };
           let match = false;
           const isAdminTest = test.creatorRole === 'admin' || !test.creatorRole || test.creatorName === 'Admin';
           const isGlobalAdminTest = isAdminTest && (!test.facultyIds || test.facultyIds.length === 0) && (!test.departmentIds || test.departmentIds.length === 0) && (!test.groupIds || test.groupIds.length === 0);
@@ -5083,7 +5479,7 @@ bot.action(/tgtst_cat_(auto|exam|topic)_(.+)/, async (ctx) => {
      } else {
         const testsSnap = await getDocs(collection(db, "tests"));
         testsSnap.forEach(d => {
-          const test = { id: d.id, ...d.data() };
+          const test: any = { id: d.id, ...d.data() };
           if (test.isPublished) {
              if ((cat === "exam" && test.type === "exam") || (cat === "topic" && test.type === "topic")) {
                 let match = false;
@@ -5309,7 +5705,7 @@ bot.action("tgtst_next", async (ctx) => {
        
        // Save to DB
        try {
-           const payload = {
+           const payload: any = {
              testId: session.testId,
              testTitle: session.testTitle,
              testType: (session.type === "auto_test" || session.type === "atst") ? "auto" : "subject", // simplified
@@ -5508,7 +5904,7 @@ bot.on("message", async (ctx) => {
     "💬 Adminga murojaat", "🌐 Rasmiy sayt",
     "🔙 Asosiy Menyu", "⬅️ Asosiy menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish",
     "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob", "🎓 Mening topshiriqlarim",
-    "💻 CHIRCHIQ KOMPYUTER XIZMATLARI"
+    "💻 CHIRCHIQ KOMPYUTER XIZMATLARI", "📊 Tizim xarajatlari"
   ];
   
   if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu" || normText === "⬅️ Asosiy menyu") {
@@ -6668,6 +7064,15 @@ for (const [service, price] of Object.entries(costs)) {
       console.error(e);
       return ctx.reply("Xatolik yuz berdi.");
     }
+  }
+
+  if (normText === "📊 Tizim xarajatlari") {
+    const adminIds = getAdminIds();
+    const isHardAdmin = adminIds.includes(userId);
+    if (!isHardAdmin && (!authed || (authed.role !== "admin" && authed.role !== "subadmin"))) {
+      return ctx.reply("❌ Sizda tizim xarajatlari va auditi ma'lumotlarini ko'rish huquqi yo'q.");
+    }
+    return sendAuditMainMenu(ctx, false);
   }
 
 

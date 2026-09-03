@@ -47,8 +47,10 @@ import {
   Database,
   HardDrive,
   Bot,
-  Sparkles
+  Sparkles,
+  Cpu
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import * as XLSX from "xlsx";
 
@@ -368,14 +370,23 @@ export default function AdminBilling() {
 
     return (
       <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-100">
-            <TrendingDown className="w-6 h-6" />
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-red-600 text-white rounded-2xl shadow-lg shadow-red-100">
+              <TrendingDown className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tariflar Iqtisodiyoti (20 ta Obuna Uchun)</h2>
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Har bir tarifda 20 tadan tashkilot obuna bo'lgan holatdagi jami tahlil</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tariflar Iqtisodiyoti (20 ta Obuna Uchun)</h2>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Har bir tarifda 20 tadan tashkilot obuna bo'lgan holatdagi jami tahlil</p>
-          </div>
+          <Link
+            to="/admin/billing/audit"
+            className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-indigo-100 transition-all hover:scale-105 active:scale-95"
+          >
+            <Cpu className="w-4 h-4" />
+            Tizim Texnik & Xarajat Auditi
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
