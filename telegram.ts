@@ -2034,46 +2034,73 @@ bot.action("audit_tariffs", async (ctx) => {
 bot.action("audit_unit_cost", async (ctx) => {
   try {
     await ctx.answerCbQuery().catch(() => {});
+    const costs = await getBotConfigCosts();
+
+    const slaydPrice = costs["📊 Slayd yaratish"] || 4000;
+    const proSlaydPrice = costs["💎 Pro slayd"] || 15000;
+    const kursIshiPrice = costs["📄 Kurs ishi yaratish"] || 35000;
+    const proKursIshiPrice = costs["💎 Pro kurs ishi"] || 89000;
+    const testPrice = costs["📋 Test yaratish"] || 3000;
+    const faylTarjimaPrice = costs["📄 Fayl tarjima qilish"] || 10000;
+
+    const slaydProfit = slaydPrice - 50;
+    const slaydMargin = ((slaydProfit / slaydPrice) * 100).toFixed(1);
+
+    const proSlaydProfit = proSlaydPrice - 400;
+    const proSlaydMargin = ((proSlaydProfit / proSlaydPrice) * 100).toFixed(1);
+
+    const kursIshiProfit = kursIshiPrice - 120;
+    const kursIshiMargin = ((kursIshiProfit / kursIshiPrice) * 100).toFixed(1);
+
+    const proKursIshiProfit = proKursIshiPrice - 800;
+    const proKursIshiMargin = ((proKursIshiProfit / proKursIshiPrice) * 100).toFixed(1);
+
+    const testProfit = testPrice - 30;
+    const testMargin = ((testProfit / testPrice) * 100).toFixed(1);
+
+    const faylTarjimaProfit = faylTarjimaPrice - 250;
+    const faylTarjimaMargin = ((faylTarjimaProfit / faylTarjimaPrice) * 100).toFixed(1);
+
     const text = 
 `🧮 <b>1 TA SO'ROV VA XIZMATNING ANIQ TANNARXI</b>
 
 🔹 <b>📊 Oddiy Taqdimot (Slayd):</b>
 • Model: Gemini 2.5 Flash (~5k token)
 • Tannarx: <b>~40 - 60 so'm</b>
-• Foydalanuvchiga narx: <b>3,000 so'm</b>
-• Sof foyda: <b>+2,950 so'm (98% foyda)</b>
+• Foydalanuvchiga narx: <b>${slaydPrice.toLocaleString()} so'm</b>
+• Sof foyda: <b>+${slaydProfit.toLocaleString()} so'm (${slaydMargin}% foyda)</b>
 
 🔹 <b>💎 Pro Taqdimot (Slayd):</b>
 • Model: Claude 3.5 Sonnet
 • Tannarx: <b>~350 - 450 so'm</b>
-• Foydalanuvchiga narx: <b>10,000 so'm</b>
-• Sof foyda: <b>+9,580 so'm (96% foyda)</b>
+• Foydalanuvchiga narx: <b>${proSlaydPrice.toLocaleString()} so'm</b>
+• Sof foyda: <b>+${proSlaydProfit.toLocaleString()} so'm (${proSlaydMargin}% foyda)</b>
 
 🔹 <b>📄 Oddiy Kurs Ishi:</b>
 • Model: Gemini 2.5 Flash
 • Tannarx: <b>~100 - 150 so'm</b>
-• Foydalanuvchiga narx: <b>5,000 so'm</b>
-• Sof foyda: <b>+4,870 so'm (97% foyda)</b>
+• Foydalanuvchiga narx: <b>${kursIshiPrice.toLocaleString()} so'm</b>
+• Sof foyda: <b>+${kursIshiProfit.toLocaleString()} so'm (${kursIshiMargin}% foyda)</b>
 
 🔹 <b>💎 Pro Kurs Ishi:</b>
 • Model: Claude 3.5 Sonnet
 • Tannarx: <b>~650 - 900 so'm</b>
-• Foydalanuvchiga narx: <b>15,000 so'm</b>
-• Sof foyda: <b>+14,200 so'm (95% foyda)</b>
+• Foydalanuvchiga narx: <b>${proKursIshiPrice.toLocaleString()} so'm</b>
+• Sof foyda: <b>+${proKursIshiProfit.toLocaleString()} so'm (${proKursIshiMargin}% foyda)</b>
 
 🔹 <b>📝 Test Generatsiyasi:</b>
 • Model: Gemini 2.5 Flash
 • Tannarx: <b>~25 - 40 so'm</b>
-• Foydalanuvchiga narx: <b>2,000 so'm</b>
-• Sof foyda: <b>+1,965 so'm (98% foyda)</b>
+• Foydalanuvchiga narx: <b>${testPrice.toLocaleString()} so'm</b>
+• Sof foyda: <b>+${testProfit.toLocaleString()} so'm (${testMargin}% foyda)</b>
 
 🔹 <b>🌐 Fayl Tarjima Qilish:</b>
 • Model: Gemini 2.5 Flash
 • Tannarx: <b>~200 - 300 so'm</b>
-• Foydalanuvchiga narx: <b>10,000 so'm</b>
-• Sof foyda: <b>+9,750 so'm (97.5% foyda)</b>
+• Foydalanuvchiga narx: <b>${faylTarjimaPrice.toLocaleString()} so'm</b>
+• Sof foyda: <b>+${faylTarjimaProfit.toLocaleString()} so'm (${faylTarjimaMargin}% foyda)</b>
 
-✅ <i>Xulosa: Tizimdagi har bir xizmat 95% dan yuqori rentabellikka ega!</i>`;
+✅ <i>Xulosa: Tizimdagi har bir xizmat rentabelligi dinamik hisoblanmoqda!</i>`;
 
     const keyboard = {
       inline_keyboard: [

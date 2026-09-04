@@ -254,7 +254,7 @@ export default function AdminTechnicalAudit() {
         const [usersSnap, paymentsSnap, botConfigSnap] = await Promise.all([
           getDocs(collection(db, "users")),
           getDocs(collection(db, "payments")),
-          getDoc(doc(db, "siteContent", "bot_config"))
+          getDoc(doc(db, "botConfig", "aiCosts"))
         ]);
 
         const uCount = usersSnap.size;
@@ -268,14 +268,34 @@ export default function AdminTechnicalAudit() {
 
         let prices: Record<string, number> = {};
         if (botConfigSnap.exists()) {
-          prices = botConfigSnap.data().prices || {};
+          prices = botConfigSnap.data() || {};
+        }
+
+        // Mapping local IDs to Telegram Config Keys
+        const TG_KEYS: Record<string, string> = {
+          "kurs_ishi": "📄 Kurs ishi yaratish",
+          "pro_kurs_ishi": "💎 Pro kurs ishi",
+          "slayd": "📊 Slayd yaratish",
+          "pro_slayd": "💎 Pro slayd",
+          "test": "📋 Test yaratish",
+          "tarjimon_matn": "🌐 Tarjimon",
+          "tarjimon_fayl": "📄 Fayl tarjima qilish",
+          "chat": "💬 Savol-javob",
+          "obektivka": "📄 Obektivka yaratish"
+        };
+        
+        const mappedPrices: Record<string, number> = {};
+        for (const [localId, tgKey] of Object.entries(TG_KEYS)) {
+          if (prices[tgKey] !== undefined) {
+            mappedPrices[localId] = prices[tgKey];
+          }
         }
 
         setDbStats({
           usersCount: uCount,
           paymentsCount: pCount,
           totalVolumeUZS: totalVal,
-          dynamicPrices: prices,
+          dynamicPrices: mappedPrices,
           loading: false,
         });
       } catch (err) {
