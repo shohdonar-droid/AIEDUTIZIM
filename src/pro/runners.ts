@@ -18,6 +18,8 @@ export interface ProHooks {
   keyboard: () => Promise<any>;
   /** Give the balance back. Called on every failure path that already charged. */
   refund: () => Promise<void>;
+  /** Called after successful generation */
+  onSuccess?: () => Promise<void>;
 }
 
 /** Wizard answers are free text; anything unrecognised falls back to Uzbek. */
@@ -96,6 +98,7 @@ async function runProJob(
 
     await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
     await ctx.replyWithDocument({ source: buffer, filename }, { caption, parse_mode: "HTML" });
+    await hooks.onSuccess?.();
 
     return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
       parse_mode: "HTML",

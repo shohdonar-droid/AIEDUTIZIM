@@ -21,6 +21,7 @@ import {
   limit,
   orderBy,
   getCountFromServer,
+  increment,
 } from "firebase/firestore";
 import { GoogleGenAI, Type as SDKType } from "@google/genai";
 
@@ -52,6 +53,53 @@ if (!rawAppUrl.startsWith("http://") && !rawAppUrl.startsWith("https://")) {
   rawAppUrl = "https://" + rawAppUrl;
 }
 const APP_URL = rawAppUrl.replace(/\/$/, "");
+
+export const API_COSTS_USD = {
+  oddiySlayd: 0.003,
+  proSlayd: 0.035,
+  oddiyKursIshi: 0.01,
+  proKursIshi: 0.06,
+  test: 0.002,
+  tarjima: 0.02
+};
+
+export async function trackAiUsage(serviceType: keyof typeof API_COSTS_USD) {
+  if (!db) return;
+  try {
+    const cost = API_COSTS_USD[serviceType];
+    const statRef = doc(db, "bot_settings", "ai_stats");
+    const isClaude = serviceType.startsWith("pro");
+    
+    const decrementField = isClaude ? "claudeBalance" : "geminiBalance";
+    
+    await setDoc(statRef, {
+      [`count_${serviceType}`]: increment(1),
+      [decrementField]: increment(-cost),
+      lastUpdated: serverTimestamp()
+    }, { merge: true });
+    
+    const snap = await getDoc(statRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const bal = data[decrementField];
+      if (bal !== undefined && bal < 1.0) { 
+         const admins = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
+         const aiName = isClaude ? "Claude" : "Gemini";
+         for (const adm of admins.docs) {
+           const tgId = adm.data().telegramId;
+           if (tgId) {
+             try {
+               await globalT.bot.telegram.sendMessage(tgId, `⚠️ <b>DIQQAT! API Balans tugamoqda!</b>\n\n🤖 <b>${aiName}</b> tarmog'ida hisob $1 dan kamaydi.\nJoriy qoldiq: ~${bal.toFixed(2)}\n\nIltimos, tezroq API hisobini to'ldiring.`, { parse_mode: "HTML" });
+             } catch(e){}
+           }
+         }
+      }
+    }
+  } catch (e) {
+    console.error("Failed to track AI usage:", e);
+  }
+}
+
 
 function getApiUrl(subPath: string): string {
   // Use port 3000 as per environment constraints
@@ -1884,37 +1932,53 @@ bot.action("audit_main_menu", async (ctx) => {
   await sendAuditMainMenu(ctx, true);
 });
 
+
+bot.action("audit_add_gemini", async (ctx) => {
+  const userId = ctx.from.id;
+  userWizardStates.set(userId, { service: "admin_add_balance", target: "geminiBalance", step: 1, data: {} });
+  await ctx.reply("🟢 <b>Gemini API</b> uchun to'ldirilgan summani kiriting (USD da):\n\n<i>Masalan: 5.50</i>", { parse_mode: "HTML" });
+});
+
+bot.action("audit_add_claude", async (ctx) => {
+  const userId = ctx.from.id;
+  userWizardStates.set(userId, { service: "admin_add_balance", target: "claudeBalance", step: 1, data: {} });
+  await ctx.reply("🔵 <b>Claude API</b> uchun to'ldirilgan summani kiriting (USD da):\n\n<i>Masalan: 10.00</i>", { parse_mode: "HTML" });
+});
+
 bot.action("audit_tracker", async (ctx) => {
   try {
     await ctx.answerCbQuery().catch(() => {});
     await ctx.editMessageText("⏳ <i>Joriy oydagi sarflar hisoblanmoqda...</i>", { parse_mode: "HTML" }).catch(() => {});
 
-    let testsCount = 0;
-    let autoTestsCount = 0;
-    let coursesCount = 0;
+    let aiStats = {
+      geminiBalance: 0,
+      claudeBalance: 0,
+      count_oddiySlayd: 0,
+      count_proSlayd: 0,
+      count_oddiyKursIshi: 0,
+      count_proKursIshi: 0,
+      count_test: 0,
+      count_tarjima: 0
+    };
 
     if (db) {
       try {
-        const tSnap = await getCountFromServer(collection(db, "tests"));
-        testsCount = tSnap.data().count;
-      } catch (e) {}
-      try {
-        const atSnap = await getCountFromServer(collection(db, "auto_tests"));
-        autoTestsCount = atSnap.data().count;
-      } catch (e) {}
-      try {
-        const cSnap = await getCountFromServer(collection(db, "courses"));
-        coursesCount = cSnap.data().count;
+        const statRef = doc(db, "bot_settings", "ai_stats");
+        const statSnap = await getDoc(statRef);
+        if (statSnap.exists()) {
+          aiStats = { ...aiStats, ...statSnap.data() };
+        }
       } catch (e) {}
     }
 
-    const totalAI = testsCount + autoTestsCount + coursesCount;
+    const geminiSpent = (aiStats.count_oddiySlayd * API_COSTS_USD.oddiySlayd) + 
+                        (aiStats.count_oddiyKursIshi * API_COSTS_USD.oddiyKursIshi) + 
+                        (aiStats.count_test * API_COSTS_USD.test) + 
+                        (aiStats.count_tarjima * API_COSTS_USD.tarjima);
     
-    // O'rtacha hisoblangan API xarajatlari (Gemini $0.003 + Claude $0.05 / jami blended $0.012)
-    const estimatedAICostUSD = totalAI * 0.012; 
-    const estimatedAICostUZS = estimatedAICostUSD * 12900;
+    const claudeSpent = (aiStats.count_proSlayd * API_COSTS_USD.proSlayd) + 
+                        (aiStats.count_proKursIshi * API_COSTS_USD.proKursIshi);
 
-    // Oy oxirigacha qolgan kunlar
     const now = new Date();
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const daysLeft = lastDay.getDate() - now.getDate();
@@ -1922,22 +1986,34 @@ bot.action("audit_tracker", async (ctx) => {
     const text = 
 `📈 <b>AQLLI HISOBLAGICH (Joriy xarajatlar)</b>
 
-Bu bo'lim tizimdagi real generatsiyalar soniga asoslanib, shu kungacha sarflangan taxminiy byudjetni ko'rsatadi.
+🤖 <b>Google Gemini API</b> (Oddiy modellar)
+• <b>Balans qoldig'i:</b> ~$${(aiStats.geminiBalance || 0).toFixed(2)}
+• <b>Slaydlar:</b> ${aiStats.count_oddiySlayd} ta
+• <b>Kurs ishlari:</b> ${aiStats.count_oddiyKursIshi} ta
+• <b>Testlar:</b> ${aiStats.count_test} ta
+• <b>Tarjimalar:</b> ${aiStats.count_tarjima} ta
+• <b>Jami sarflandi:</b> ~$${geminiSpent.toFixed(2)}
 
-🤖 <b>AI API Xarajatlari (Gemini & Claude):</b>
-• <b>Bajarilgan jami AI so'rovlar:</b> ~${totalAI} ta
-• <b>Taxminiy API sarfi:</b> ~$${estimatedAICostUSD.toFixed(2)} (~${Math.round(estimatedAICostUZS).toLocaleString()} so'm)
-<i>*Aniq qoldiqni bilish uchun Google AI va Anthropic kabinetiga kiring.</i>
+🤖 <b>Anthropic Claude API</b> (Pro modellar)
+• <b>Balans qoldig'i:</b> ~$${(aiStats.claudeBalance || 0).toFixed(2)}
+• <b>Pro Slaydlar:</b> ${aiStats.count_proSlayd} ta
+• <b>Pro Kurs ishlari:</b> ${aiStats.count_proKursIshi} ta
+• <b>Jami sarflandi:</b> ~$${claudeSpent.toFixed(2)}
 
 🖥 <b>Davriy To'lovlar (Server & Domen):</b>
 • <b>Railway (Xosting):</b> Oyiga $5.00
 • <b>Domen (Aide.uz):</b> Oyiga ~$0.20
-⏳ <b>Keyingi davriy to'lovgacha:</b> Taxminan <b>${daysLeft} kun</b> qoldi (Oy oxirigacha).
+⏳ <b>Keyingi davriy to'lovgacha:</b> Taxminan <b>${daysLeft} kun</b> qoldi.
+(Har oyning 1-sanasida avtomatik eslatma yuboriladi)
 
-💡 <i>Bu hisoblagich tashqi saytlarga bog'lanmasdan tizimdagi real statistika orqali avtomatik ishlaydi.</i>`;
+<i>💡 To'lovlarni kiritish orqali hisobni yangilang.</i>`;
 
     const keyboard = {
       inline_keyboard: [
+        [
+          { text: "🟢 Gemini Balans To'ldirish", callback_data: "audit_add_gemini" },
+          { text: "🔵 Claude Balans To'ldirish", callback_data: "audit_add_claude" }
+        ],
         [
           { text: "🔄 Qayta hisoblash", callback_data: "audit_tracker" },
           { text: "🧮 1 ta So'rov Tannarxi", callback_data: "audit_unit_cost" }
@@ -3519,6 +3595,7 @@ slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color
         { caption: `📊 "${data.topic}" mavzusida premium ${templateName} taqdimoti tayyor!
 🎨 Dizayn uslubi: ${designPlanText}` }
       );
+      await trackAiUsage('oddiySlayd');
       return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
         parse_mode: "HTML",
         reply_markup: {
@@ -3614,7 +3691,7 @@ async function runCourseWorkDocxGeneration(ctx: any, data: any) {
         parse_mode: "HTML"
       }
     );
-
+    await trackAiUsage('oddiyKursIshi');
     return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
       parse_mode: "HTML",
       reply_markup: {
@@ -4379,6 +4456,7 @@ Iltimos kuting.`, { parse_mode: "HTML" });
         { source: docxBuffer as any, filename: cleanFileName },
         { caption: `📋 "${data.topic}" mavzusi bo'yicha testlar muvaffaqiyatli shakllantirildi!` }
       );
+      await trackAiUsage('test');
       return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
         parse_mode: "HTML",
         reply_markup: {
@@ -4469,6 +4547,7 @@ const doc = new Document({
         source: Buffer.from(docBuffer),
         filename: `Tarjima_${data.file_name || "document.docx"}`
       }, { caption: "✅ <b>Tarjima tayyor!</b>", parse_mode: "HTML" });
+      await trackAiUsage('tarjima');
       
     } else {
       if (fullTranslatedText.length > 4000) {
@@ -4552,8 +4631,34 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
   // these run on Claude via src/pro, not Gemini.
   const proHooks = {
     keyboard: () => getAiAssistantKeyboard(userId),
-    refund: () => refundBalance(userId, data.__chargedCost || 0)
+    refund: () => refundBalance(userId, data.__chargedCost || 0),
+    onSuccess: async () => {
+       if (service === "💎 Pro slayd") await trackAiUsage('proSlayd');
+       else if (service === "💎 Pro kurs ishi") await trackAiUsage('proKursIshi');
+    }
   };
+
+
+  if (service === "admin_add_balance") {
+     const amount = parseFloat(input);
+     if (isNaN(amount) || amount <= 0) {
+        return ctx.reply("Iltimos, to'g'ri summa kiriting (masalan: 5.50):");
+     }
+     
+     const statRef = doc(db, "bot_settings", "ai_stats");
+     const field = state.target;
+     await setDoc(statRef, {
+        [field]: increment(amount),
+        lastUpdated: serverTimestamp()
+     }, { merge: true });
+     
+     userWizardStates.delete(userId);
+     return ctx.reply(`✅ Balans muvaffaqiyatli ${amount} USD ga to'ldirildi!`, {
+        reply_markup: {
+           inline_keyboard: [[{ text: "🔙 Qaytish", callback_data: "audit_tracker" }]]
+        }
+     });
+  }
 
   if (service === "💎 Pro kurs ishi") {
     if (step === 1) {
@@ -9300,6 +9405,31 @@ function startSelfPing() {
         }
       });
   }, 120000); // 2 minutes
+}
+
+
+// Periodic Reminders
+let lastReminderMonth = -1;
+function startPeriodicReminders() {
+  setInterval(async () => {
+     const now = new Date();
+     if (now.getDate() === 1 && now.getHours() === 10) {
+        const currentMonth = now.getMonth();
+        if (lastReminderMonth !== currentMonth) {
+           lastReminderMonth = currentMonth;
+           if (!db) return;
+           try {
+             const admins = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
+             for (const adm of admins.docs) {
+               const tgId = adm.data().telegramId;
+               if (tgId) {
+                 await globalT.bot.telegram.sendMessage(tgId, `📢 <b>DAVRIY TO'LOVLAR ESLATMASI!</b>\n\nBugun oyning 1-sanasi. Server (Railway) va Domen (Aide.uz) uchun oylik to'lovlarni amalga oshirishni unutmang!\n\n<i>To'lovlarni vaqtida qilish loyihaning uzluksiz ishlashini ta'minlaydi.</i>`, { parse_mode: "HTML" }).catch(()=>{});
+               }
+             }
+           } catch(e){}
+        }
+     }
+  }, 3600000); // every hour
 }
 
 export async function launchBot() {
