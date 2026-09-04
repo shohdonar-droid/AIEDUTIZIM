@@ -240,14 +240,8 @@ export default function AdminStorage() {
         }
       }
 
-      // Merge real files with seed files (distinct by file name) to guarantee spectacular mock aesthetics
-      // while preserving accurate real-time edits
+      // Merged array is just scannedFiles without SEED_FILES
       const merged: StorageFile[] = [...scannedFiles];
-      SEED_FILES.forEach(seed => {
-        if (!merged.some(f => f.name === seed.name || f.fullPath === seed.fullPath)) {
-          merged.push(seed);
-        }
-      });
 
       // Sort by creation time desc
       merged.sort((a, b) => new Date(b.timeCreated).getTime() - new Date(a.timeCreated).getTime());
@@ -309,13 +303,6 @@ export default function AdminStorage() {
   // File delete handler
   const handleDeleteFile = async (file: StorageFile) => {
     if (!window.confirm(`"${file.name}" faylini o'chirishni tasdiqlaysizmi? Bu amal ortga qaytarilmasdir.`)) {
-      return;
-    }
-
-    // If it's a seed file (not on active Storage), remove from local array
-    if (file.downloadUrl.includes('mock') || file.downloadUrl.includes('unsplash') || file.downloadUrl.includes('example.com')) {
-      setFiles(prev => prev.filter(f => f.name !== file.name));
-      showStatus('success', "Fayl (Namuna) muvaffaqiyatli o'chirildi");
       return;
     }
 

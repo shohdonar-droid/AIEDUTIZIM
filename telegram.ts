@@ -1849,6 +1849,9 @@ Quyidagi bo'limlardan birini tanlang va to'liq audit tahlilini ko'ring:`;
   const keyboard = {
     inline_keyboard: [
       [
+        { text: "📈 Joriy Xarajatlar & Balans (Tracker)", callback_data: "audit_tracker" }
+      ],
+      [
         { text: "🤖 AI Modellari Xarajatlari", callback_data: "audit_ai_models" },
         { text: "🖥 Infratuzilma & Server", callback_data: "audit_infra" }
       ],
@@ -1879,6 +1882,76 @@ Quyidagi bo'limlardan birini tanlang va to'liq audit tahlilini ko'ring:`;
 bot.action("audit_main_menu", async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
   await sendAuditMainMenu(ctx, true);
+});
+
+bot.action("audit_tracker", async (ctx) => {
+  try {
+    await ctx.answerCbQuery().catch(() => {});
+    await ctx.editMessageText("⏳ <i>Joriy oydagi sarflar hisoblanmoqda...</i>", { parse_mode: "HTML" }).catch(() => {});
+
+    let testsCount = 0;
+    let autoTestsCount = 0;
+    let coursesCount = 0;
+
+    if (db) {
+      try {
+        const tSnap = await getCountFromServer(collection(db, "tests"));
+        testsCount = tSnap.data().count;
+      } catch (e) {}
+      try {
+        const atSnap = await getCountFromServer(collection(db, "auto_tests"));
+        autoTestsCount = atSnap.data().count;
+      } catch (e) {}
+      try {
+        const cSnap = await getCountFromServer(collection(db, "courses"));
+        coursesCount = cSnap.data().count;
+      } catch (e) {}
+    }
+
+    const totalAI = testsCount + autoTestsCount + coursesCount;
+    
+    // O'rtacha hisoblangan API xarajatlari (Gemini $0.003 + Claude $0.05 / jami blended $0.012)
+    const estimatedAICostUSD = totalAI * 0.012; 
+    const estimatedAICostUZS = estimatedAICostUSD * 12900;
+
+    // Oy oxirigacha qolgan kunlar
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const daysLeft = lastDay.getDate() - now.getDate();
+
+    const text = 
+`📈 <b>AQLLI HISOBLAGICH (Joriy xarajatlar)</b>
+
+Bu bo'lim tizimdagi real generatsiyalar soniga asoslanib, shu kungacha sarflangan taxminiy byudjetni ko'rsatadi.
+
+🤖 <b>AI API Xarajatlari (Gemini & Claude):</b>
+• <b>Bajarilgan jami AI so'rovlar:</b> ~${totalAI} ta
+• <b>Taxminiy API sarfi:</b> ~$${estimatedAICostUSD.toFixed(2)} (~${Math.round(estimatedAICostUZS).toLocaleString()} so'm)
+<i>*Aniq qoldiqni bilish uchun Google AI va Anthropic kabinetiga kiring.</i>
+
+🖥 <b>Davriy To'lovlar (Server & Domen):</b>
+• <b>Railway (Xosting):</b> Oyiga $5.00
+• <b>Domen (Aide.uz):</b> Oyiga ~$0.20
+⏳ <b>Keyingi davriy to'lovgacha:</b> Taxminan <b>${daysLeft} kun</b> qoldi (Oy oxirigacha).
+
+💡 <i>Bu hisoblagich tashqi saytlarga bog'lanmasdan tizimdagi real statistika orqali avtomatik ishlaydi.</i>`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🔄 Qayta hisoblash", callback_data: "audit_tracker" },
+          { text: "🧮 1 ta So'rov Tannarxi", callback_data: "audit_unit_cost" }
+        ],
+        [
+          { text: "🔙 Audit bosh menyusiga qaytish", callback_data: "audit_main_menu" }
+        ]
+      ]
+    };
+
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+  } catch (e) {
+    console.error("Audit tracker error:", e);
+  }
 });
 
 bot.action("audit_ai_models", async (ctx) => {

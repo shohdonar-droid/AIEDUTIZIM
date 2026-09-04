@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, CreditCard, Copy, Check, Upload, Sparkles } from 'lucide-react';
 import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
 
 interface BalanceTopUpModalProps {
@@ -23,11 +24,13 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
     type: "Humo / Uzcard"
   });
 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [receiptUrl, setReceiptUrl] = useState('');
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
   const [fileError, setFileError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     async function loadCard() {
@@ -71,21 +74,16 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 800 * 1024) {
-      setFileError("Fayl hajmi 800KB dan oshmasligi kerak. Iltimos, kichikroq rasm tanlang.");
+    if (file.size > 2 * 1024 * 1024) { // Increased to 2MB since it uses Firebase Storage
+      setFileError("Fayl hajmi 2MB dan oshmasligi kerak.");
       return;
     }
 
     setFileError('');
     setFileName(file.name);
     setFileSize(`${(file.size / 1024).toFixed(1)} KB`);
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const res = event.target?.result as string;
-      if (res) setReceiptUrl(res);
-    };
-    reader.readAsDataURL(file);
+    setSelectedFile(file);
+    setReceiptUrl(URL.createObjectURL(file));
   };
 
   const handleSubmit = async () => {
@@ -93,13 +91,42 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
       alert("Iltimos, avval tizimga kiring.");
       return;
     }
-    if (!receiptUrl) {
+    if (!selectedFile) {
       alert("Iltimos, to'lov chekini (kvitansiyasini) yuklang.");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // 1. Upload file to Firebase Storage
+      const ext = selectedFile.name.split('.').pop();
+      const storagePath = `receipts/${user.uid}_${Date.now()}.${ext}`;
+      const storageRef = ref(storage, storagePath);
+      
+      const metadata = {
+        contentType: selectedFile.type,
+      };
+
+      const uploadTask = uploadBytesResumable(storageRef, selectedFile, metadata);
+
+      const downloadURL = await new Promise<string>((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(Math.round(progress));
+          },
+          (error) => {
+            reject(error);
+          },
+          async () => {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(url);
+          }
+        );
+      });
+
+      // 2. Submit document
       const userSystemId = user.systemId || user.uid;
       const userRole = user.role || 'student';
       const userName = user.displayName || 'Foydalanuvchi';
@@ -114,7 +141,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
         tariffPrice: 0,
         amount: 0,
         paymentType: "Karta orqali o'tkazma",
-        receiptUrl: receiptUrl,
+        receiptUrl: downloadURL,
         isBalanceTopUp: true,
         status: 'pending',
         timestamp: serverTimestamp()
@@ -138,7 +165,7 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
               tariffPrice: 0,
               amount: 0,
               paymentType: "Karta orqali o'tkazma",
-              receiptUrl: receiptUrl,
+              receiptUrl: downloadURL,
               isBalanceTopUp: true
             }
           })
@@ -273,22 +300,40 @@ export default function BalanceTopUpModal({ isOpen, onClose }: BalanceTopUpModal
           </div>
         </div>
 
-        <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 mt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-3 rounded-xl border border-gray-200 font-bold text-xs text-slate-600 hover:bg-gray-50 transition-all cursor-pointer"
-          >
-            Bekor qilish
-          </button>
-          <button
-            type="button"
-            disabled={isSubmitting || !receiptUrl}
-            onClick={handleSubmit}
-            className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer"
-          >
-            {isSubmitting ? "Yuborilmoqda..." : "So'rovni yuborish"}
-          </button>
+        <div className="pt-6 border-t border-gray-100 flex flex-col gap-3 shrink-0 mt-4">
+          {isSubmitting && uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="w-full">
+              <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                <span>Yuklanmoqda...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-300" 
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center justify-end gap-3 w-full">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-5 py-3 rounded-xl border border-gray-200 font-bold text-xs text-slate-600 hover:bg-gray-50 transition-all cursor-pointer disabled:opacity-50"
+            >
+              Bekor qilish
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting || !selectedFile}
+              onClick={handleSubmit}
+              className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer"
+            >
+              {isSubmitting ? "Yuborilmoqda..." : "So'rovni yuborish"}
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>
