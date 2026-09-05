@@ -684,12 +684,12 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
           return res.status(status).json({ error: `Parsingda xatolik: ${err.message}` });
         }
       } else if (action === "generateDynamicTest") {
-        const countOptions = 4;
+        const countOptions = Number(req.body?.options?.optionsCount) || 4;
         const prompt = `Siz professional pedagog va testolog-ekspertisiz.
           Vazifa: "${topic}" mavzusi bo'yicha ${count || 10} ta professional va akademik test savollarini yaratish.
           
           QOIDALAR:
-          - Har bir savolda 4 ta variant bo'lsin.
+          - Har bir savolda ${countOptions} ta variant bo'lsin.
           - Faqat bitta to'g'ri javob bo'lsin.
           - Savollar takrorlanmasin.
           - Oson, o'rta va murakkab darajalar aralash bo'lsin.

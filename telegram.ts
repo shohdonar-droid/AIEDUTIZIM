@@ -884,6 +884,7 @@ const AI_COSTS: Record<string, number> = {
   "🌐 Tarjimon": 3000,
   "📄 Fayl tarjima qilish": 10000,
   "📋 Test yaratish": 3000,
+  "📝 Test yaratish": 3000,
   "💬 Savol-javob": 1000,
   "📄 Obektivka yaratish": 15000
 };
@@ -1261,7 +1262,7 @@ export async function getAiAssistantKeyboard(userId?: number) {
     [{ text: "🤖 Xizmatlar" }],
     [{ text: "📊 Slayd yaratish" }, { text: "📄 Kurs ishi yaratish" }],
     [{ text: "💎 Pro slayd" }, { text: "💎 Pro kurs ishi" }],
-    [{ text: "📝 Test yaratish" }, { text: "🌐 Tarjimon" }],
+    [{ text: "📋 Test yaratish" }, { text: "🌐 Tarjimon" }],
     [{ text: "📄 Obektivka yaratish" }],
     [{ text: "⬅️ Asosiy menyu" }]
   ];
@@ -3057,7 +3058,10 @@ bot.action("add_balance", async (ctx) => {
 });
 
 bot.action(/^start_ai_srv_(.+)$/, async (ctx) => {
-  const normText = ctx.match[1];
+  let normText = ctx.match[1];
+  if (normText === "📝 Test yaratish" || normText.toLowerCase() === "test yaratish") {
+    normText = "📋 Test yaratish";
+  }
   const userId = ctx.from.id;
 
   try {
@@ -3119,7 +3123,7 @@ Sizning balansingizda mablag' yetarli emas.`, {
   else if (normText === "🎓 Tezis yaratish") { promptText = "🎓 <b>Tezis mavzusini kiriting:</b>"; }
   else if (normText === "📑 Maqola yaratish") { promptText = "📑 <b>Maqola mavzusini kiriting:</b>"; }
   else if (normText === "📝 Dars ishlanma yaratish") { promptText = "📝 <b>Fan nomini kiriting:</b>"; }
-  else if (normText === "📋 Test yaratish") { promptText = "📋 <b>Fan nomini kiriting:</b>"; }
+  else if (normText === "📋 Test yaratish" || normText === "📝 Test yaratish") { promptText = "📋 <b>Fan nomini kiriting:</b>"; }
   else if (normText === "🌐 Tarjimon") { promptText = "🌐 <b>Tarjima yo'nalishini kiriting (masalan: O'zbekcha-Inglizcha):</b>"; }
   else if (normText === "📄 CV yaratish") { promptText = "📄 <b>Foydalanuvchi F.I.Sh. kiriting:</b>"; }
   else if (normText === "📄 AI Antiplagiat") { promptText = "📄 <b>Matn yuboring yoki fayl (PDF, DOCX, TXT) yuklang:</b>"; }
@@ -4574,13 +4578,24 @@ Iltimos kuting.`, { parse_mode: "HTML" });
 
     if (res.ok) {
       const respData = await res.json();
+      const questions: any[] = Array.isArray(respData)
+        ? respData
+        : (respData?.questions || respData?.tests || respData?.items || respData?.data || []);
+      
+      if (!questions || questions.length === 0) {
+        throw new Error("AI tomonidan test savollari shakllantirilmadi.");
+      }
+
       const { Document, Packer, Paragraph, TextRun, AlignmentType } = await import("docx");
       const children: any[] = [];
       
+      const subjectText = (data.subject || "FAN").trim().toUpperCase();
+      const topicText = (data.topic || "Testlar").trim();
+
       children.push(new Paragraph({
         children: [
           new TextRun({
-            text: `${data.subject.toUpperCase()} FANI BO'YICHA TESTLAR`,
+            text: `${subjectText} FANI BO'YICHA TESTLAR`,
             bold: true,
             size: 32,
             font: "Times New Roman"
@@ -4593,7 +4608,7 @@ Iltimos kuting.`, { parse_mode: "HTML" });
       children.push(new Paragraph({
         children: [
           new TextRun({
-            text: `Mavzu: "${data.topic}"`,
+            text: `Mavzu: "${topicText}"`,
             italics: true,
             size: 24,
             font: "Times New Roman"
@@ -4603,7 +4618,7 @@ Iltimos kuting.`, { parse_mode: "HTML" });
         spacing: { after: 400 }
       }));
 
-      respData.forEach((t: any, i: number) => {
+      questions.forEach((t: any, i: number) => {
         children.push(new Paragraph({
           children: [
             new TextRun({
@@ -4623,7 +4638,7 @@ Iltimos kuting.`, { parse_mode: "HTML" });
             children.push(new Paragraph({
               children: [
                 new TextRun({ text: prefix, bold: true, font: "Times New Roman", size: 26 }),
-                new TextRun({ text: o, font: "Times New Roman", size: 26 }),
+                new TextRun({ text: String(o), font: "Times New Roman", size: 26 }),
                 ...(isCorrect ? [
                   new TextRun({ text: "  [To'g'ri javob ✅]", bold: true, color: "15803D", font: "Times New Roman", size: 26 })
                 ] : [])
@@ -4648,14 +4663,14 @@ Iltimos kuting.`, { parse_mode: "HTML" });
 
       const docxBuffer = await Packer.toBuffer(doc);
       
-      if (!docxBuffer || docxBuffer.length < 2000 || docxBuffer[0] !== 0x50 || docxBuffer[1] !== 0x4B) {
-        throw new Error("Docx file validation failed: ZIP signature error");
+      if (!docxBuffer || docxBuffer.length < 500 || docxBuffer[0] !== 0x50 || docxBuffer[1] !== 0x4B) {
+        throw new Error("Docx fayli validatsiya xatoligi: noto'g'ri ZIP formati.");
       }
 
-      const cleanFileName = `${data.topic?.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_testlar.docx`;
+      const cleanFileName = `${topicText.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_testlar.docx`;
       await ctx.replyWithDocument(
         { source: docxBuffer as any, filename: cleanFileName },
-        { caption: `📋 "${data.topic}" mavzusi bo'yicha testlar muvaffaqiyatli shakllantirildi!` }
+        { caption: `📋 "${topicText}" mavzusi bo'yicha testlar muvaffaqiyatli shakllantirildi!` }
       );
       await trackAiUsage('test');
       return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
@@ -4666,11 +4681,22 @@ Iltimos kuting.`, { parse_mode: "HTML" });
         }
       });
     } else {
-      return ctx.reply("❌ Test savollarini shakllantirishda xato yuz berdi.");
+      let errMsg = "";
+      try {
+        const errJson = await res.json();
+        errMsg = errJson.error || errJson.message || "";
+      } catch (e) {}
+      if (data.__chargedCost) {
+        await refundBalance(userId, data.__chargedCost);
+      }
+      return ctx.reply(`❌ Test savollarini shakllantirishda xato yuz berdi.${errMsg ? ` Sabab: ${errMsg}` : ""}`);
     }
   } catch (err: any) {
     console.error("Test word generation err:", err);
-    return ctx.reply("❌ Test Word faylini yaratishda xato yuz berdi: " + err.message);
+    if (data.__chargedCost) {
+      await refundBalance(userId, data.__chargedCost);
+    }
+    return ctx.reply("❌ Test Word faylini yaratishda xato yuz berdi: " + (err.message || "Noma'lum xatolik"));
   }
 }
 
@@ -5254,7 +5280,7 @@ parse_mode: "HTML",
     }
   }
 
-  else if (service === "📋 Test yaratish") {
+  else if (service === "📋 Test yaratish" || service === "📝 Test yaratish") {
     if (step === 1) {
       data.subject = input;
       userWizardStates.set(userId, { service, step: 2, data });
@@ -6338,6 +6364,9 @@ bot.on("message", async (ctx) => {
   const wizard = userWizardStates.get(userId);
   if (wizard && !pending) {
     if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu" || normText === "⬅️ Asosiy menyu" || AI_COSTS[normText]) {
+      if (wizard.data?.__chargedCost) {
+        await refundBalance(userId, wizard.data.__chargedCost);
+      }
       userWizardStates.delete(userId);
     } else {
       await handleWizardStep(ctx, wizard, normText);
@@ -6409,16 +6438,17 @@ parse_mode: "HTML",
 
   // Specific AI Services Handler (Runs OUTSIDE of pure AI Chat mode)
   // Fayl tarjima qilish shouldn't show as a separate startable service
-  const isService = Object.keys(AI_COSTS).includes(normText) && normText !== "📄 Fayl tarjima qilish";
+  const matchedService = (normText === "📝 Test yaratish" || normText.toLowerCase() === "test yaratish") ? "📋 Test yaratish" : normText;
+  const isService = Object.keys(AI_COSTS).includes(matchedService) && matchedService !== "📄 Fayl tarjima qilish";
   
   if (isService && !pending) {
     const dynamicCosts = await getBotConfigCosts();
-    const cost = dynamicCosts[normText] !== undefined ? dynamicCosts[normText] : AI_COSTS[normText];
+    const cost = dynamicCosts[matchedService] !== undefined ? dynamicCosts[matchedService] : AI_COSTS[matchedService];
     
-    if (normText === "🌐 Tarjimon") {
+    if (matchedService === "🌐 Tarjimon") {
       const fileCost = dynamicCosts["📄 Fayl tarjima qilish"] !== undefined ? dynamicCosts["📄 Fayl tarjima qilish"] : (AI_COSTS["📄 Fayl tarjima qilish"] || 10000);
       return ctx.reply(
-        `🤖 <b>${normText}</b>
+        `🤖 <b>${matchedService}</b>
 
 💳 Matn tarjima qilish - <b>${cost.toLocaleString()} so'm</b>
 💳 Fayl (Word/Txt) tarjima qilish - <b>${fileCost.toLocaleString()} so'm</b>`,
@@ -6426,7 +6456,7 @@ parse_mode: "HTML",
           parse_mode: "HTML",
           reply_markup: {
             inline_keyboard: [
-              [{ text: "✅ Yaratish", callback_data: `start_ai_srv_${normText}` }]
+              [{ text: "✅ Yaratish", callback_data: `start_ai_srv_${matchedService}` }]
             ]
           }
         }
@@ -6434,14 +6464,14 @@ parse_mode: "HTML",
     }
 
     return ctx.reply(
-      `🤖 <b>${normText}</b>
+      `🤖 <b>${matchedService}</b>
 
 💳 Xizmat narxi: <b>${cost.toLocaleString()} so'm</b>`,
       {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "✅ Yaratish", callback_data: `start_ai_srv_${normText}` }]
+            [{ text: "✅ Yaratish", callback_data: `start_ai_srv_${matchedService}` }]
           ]
         }
       }
@@ -6674,7 +6704,7 @@ Iltimos kuting, bu biroz vaqt olishi mumkin.`, { parse_mode: "HTML" });
           docType = "dars_ishlanma";
         } else if (currentState === "🌐 Tarjimon") {
           docType = "tarjimon";
-        } else if (currentState === "📋 Test yaratish") {
+        } else if (currentState === "📋 Test yaratish" || currentState === "📝 Test yaratish") {
           action = "generateDynamicTest";
         }
 
