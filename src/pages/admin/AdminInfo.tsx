@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { db, storage } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { SiteContent, InfoSection } from '../../types';
-import { Save, Loader2, Image as ImageIcon, Type, FileText, Plus, Trash2, Globe, Layout, Lock, Unlock, FileUp, TextSelection, CheckCircle2, Link as LinkIcon, X } from 'lucide-react';
+import { 
+  Save, Loader2, Image as ImageIcon, Type, FileText, Plus, Trash2, 
+  Globe, Layout, Lock, Unlock, FileUp, TextSelection, CheckCircle2, 
+  Link as LinkIcon, X, Download, ExternalLink, AlertCircle 
+} from 'lucide-react';
 import { makeDirectImageUrl } from '../../lib/helpers';
+import { uploadFileToServer, isAllowedDocument, compressImage } from '../../lib/uploadHelper';
 
 export default function AdminInfo() {
   const [content, setContent] = useState<SiteContent | null>(null);
@@ -12,67 +16,29 @@ export default function AdminInfo() {
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadingFileName, setUploadingFileName] = useState<string>('');
+  const [uploadToast, setUploadToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      if (!file.type.startsWith('image/')) return resolve(file);
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (e) => {
-        const img = new Image();
-        img.src = e.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
-          let width = img.width;
-          let height = img.height;
-          if (width > height && width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-          else if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-          canvas.width = width; canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => {
-            if (blob) { resolve(new File([blob], file.name, { type: 'image/jpeg' })); }
-            else { resolve(file); }
-          }, 'image/jpeg', 0.6);
-        };
-        img.onerror = () => resolve(file);
-      };
-      reader.onerror = () => resolve(file);
-    });
-  };
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadFileToStorage = async (file: File, disableProgressCounter = false): Promise<string> => {
     if (!disableProgressCounter) {
       setIsUploading(true);
-      setUploadProgress(0);
+      setUploadProgress(15);
+      setUploadingFileName(file.name);
     }
     try {
-      const processedFile = file.type.startsWith('image/') ? await compressImage(file) : file;
-      const ext = processedFile.name.split('.').pop() || '';
-      const storageRef = ref(storage, `siteContent/${Date.now()}_${Math.random().toString(36).substring(2)}.${ext}`);
-      const uploadTask = uploadBytesResumable(storageRef, processedFile);
-      
-      return await new Promise<string>((resolve, reject) => {
-        uploadTask.on('state_changed', 
-          (snapshot) => {
-            if (!disableProgressCounter) {
-              const prog = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-              setUploadProgress(prog);
-            }
-          },
-          (error) => reject(error),
-          async () => {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(url);
-          }
-        );
+      return await uploadFileToServer(file, (p) => {
+        if (!disableProgressCounter) {
+          setUploadProgress(p);
+        }
       });
     } finally {
       if (!disableProgressCounter) {
         setIsUploading(false);
         setUploadProgress(0);
+        setUploadingFileName('');
       }
     }
   };
@@ -81,28 +47,28 @@ export default function AdminInfo() {
     if (!content) return;
     
     const fileName = file.name;
-    const fileExt = fileName.split('.').pop()?.toLowerCase() || '';
     
     if (itemType === 'file') {
-      const allowedExts = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'];
-      if (!allowedExts.includes(fileExt)) {
-        console.error(`Xatolik: Nojo'ya fayl formati yuklanmoqchi bo'lindi: .${fileExt}`);
-        alert("Faqat PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX formatidagi fayllarni yuklash mumkin!");
+      if (!isAllowedDocument(fileName)) {
+        console.warn(`Ogohlantirish: Nojo'ya fayl formati: ${fileName}`);
+        alert("Faqat PDF, Word, Excel, PowerPoint, Text, Arxiv yoki boshqa standart hujjat formatlarini yuklash mumkin!");
         return;
       }
     } else if (itemType === 'image') {
-      if (!file.type.startsWith('image/')) {
-        console.error("Xatolik: Nojo'ya rasm formati yuklanmoqchi bo'lindi:", file.type);
-        alert("Faqat rasm fayllarini yuklash mumkin!");
+      const isImg = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|svg|bmp)$/i.test(fileName);
+      if (!isImg) {
+        console.error("Xatolik: Nojo'ya rasm formati:", file.type);
+        alert("Faqat rasm fayllarini (JPG, PNG, WEBP, GIF, SVG) yuklash mumkin!");
         return;
       }
     }
 
     try {
       setIsUploading(true);
-      setUploadProgress(0);
+      setUploadProgress(15);
+      setUploadingFileName(file.name);
 
-      const downloadUrl = await uploadFileToStorage(file, false);
+      const downloadUrl = await uploadFileToServer(file, (p) => setUploadProgress(p));
       
       const updatedSections = (content.hero.infoSections || []).map(s => {
         if (s.id === sectionId) {
@@ -131,15 +97,20 @@ export default function AdminInfo() {
       // Write directly to Firestore and local cache
       await setDoc(doc(db, 'siteContent', 'main'), updatedContent, { merge: true });
       
-      console.log(`Muvaffaqiyatli saqlandi. Firestore va Storage yangilandi. Hujjat nomi: ${file.name}`);
+      console.log(`Muvaffaqiyatli saqlandi. Hujjat nomi: ${file.name}`);
       setContent(updatedContent);
       localStorage.setItem('site_content_main_cache', JSON.stringify(updatedContent));
+      setUploadToast({ type: 'success', message: `"${file.name}" muvaffaqiyatli yuklandi va saqlandi!` });
+      setTimeout(() => setUploadToast(null), 4000);
     } catch (err: any) {
       console.error("Fayl yuklashda xatolik yuz berdi:", err);
-      alert("Yuklashda xatolik yuz berdi: " + err.message);
+      setUploadToast({ type: 'error', message: "Yuklashda xatolik: " + (err.message || 'Nomaʼlum xato') });
+      setTimeout(() => setUploadToast(null), 5000);
+      alert("Yuklashda xatolik yuz berdi: " + (err.message || "Noma'lum xato"));
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+      setUploadingFileName('');
     }
   };
 
@@ -641,33 +612,9 @@ export default function AdminInfo() {
                  />
                  <div className="flex items-center gap-3">
                    <button 
-                     onClick={() => {
-                        const file = document.createElement('input');
-                        file.type = 'file';
-                        file.accept = 'image/*';
-                        file.onchange = (e: any) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          
-                          handleUploadSectionItem(currentSection.id, 'image', f);
-                          return;
-
-                          uploadFileToStorage(f, true).then(url => {
-                             setContent(prev => {
-                                if (!prev) return prev;
-                                const newSections = prev.hero.infoSections?.map(s => {
-                                   if (s.id === currentSection.id) {
-                                      return s;
-                                   }
-                                   return s;
-                                });
-                                return { ...prev, hero: { ...prev.hero, infoSections: newSections } };
-                             });
-                          }).catch(() => {});
-                        };
-                        file.click();
-                     }}
-                     className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-black hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                     type="button"
+                     onClick={() => imageInputRef.current?.click()}
+                     className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-black hover:bg-green-600 hover:text-white transition-all shadow-sm cursor-pointer"
                    >
                      <Plus className="w-3.5 h-3.5" /> RASM YUKLASH
                    </button>
@@ -701,18 +648,9 @@ export default function AdminInfo() {
                       </div>
                     ))}
                     <button 
-                      onClick={() => {
-                        const file = document.createElement('input');
-                        file.type = 'file';
-                        file.accept = 'image/*';
-                        file.onchange = (e: any) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          handleUploadSectionItem(currentSection.id, 'image', f);
-                        };
-                        file.click();
-                      }}
-                      className="aspect-square rounded-2xl border-4 border-dashed border-gray-100 flex flex-col items-center justify-center text-gray-300 hover:border-blue-200 hover:text-blue-400 transition-all gap-2"
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      className="aspect-square rounded-2xl border-4 border-dashed border-gray-100 flex flex-col items-center justify-center text-gray-300 hover:border-blue-200 hover:text-blue-500 hover:bg-blue-50/30 transition-all gap-2 cursor-pointer"
                     >
                       <Plus className="w-8 h-8" />
                       <span className="text-[10px] font-black uppercase tracking-widest">Qo'shish</span>
@@ -738,18 +676,9 @@ export default function AdminInfo() {
                          <LinkIcon className="w-4 h-4" />
                        </button>
                        <button 
-                         onClick={() => {
-                           const file = document.createElement('input');
-                           file.type = 'file';
-                           file.accept = '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-                           file.onchange = (e: any) => {
-                             const f = e.target.files?.[0];
-                             if (!f) return;
-                             handleUploadSectionItem(currentSection.id, 'file', f);
-                           };
-                           file.click();
-                         }}
-                         className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                         type="button"
+                         onClick={() => fileInputRef.current?.click()}
+                         className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
                          title="Fayl yuklash"
                        >
                          <Plus className="w-4 h-4" />
@@ -769,15 +698,29 @@ export default function AdminInfo() {
                              <p className="text-[10px] font-black text-gray-400 uppercase">{file.type === 'link' ? 'LINK' : (file.type.split('/')[1] || 'Fayl')}</p>
                            </div>
                         </div>
-                        <button 
-                          onClick={() => {
-                            const filtered = currentSection.files?.filter((_, i) => i !== idx);
-                            updateSection(currentSection.id, { files: filtered });
-                          }}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={file.type !== 'link' ? file.name : undefined}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="Ko'rish / Yuklab olish"
+                          >
+                            {file.type === 'link' ? <ExternalLink className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                          </a>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const filtered = currentSection.files?.filter((_, i) => i !== idx);
+                              updateSection(currentSection.id, { files: filtered });
+                            }}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg opacity-60 hover:opacity-100 transition cursor-pointer"
+                            title="O'chirish"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     {(currentSection.files || []).length === 0 && (
@@ -807,6 +750,67 @@ export default function AdminInfo() {
                   </button>
                </div>
             </div>
+          </div>
+        )}
+
+        {/* Hidden inputs for file/image picking */}
+        <input 
+          type="file" 
+          ref={imageInputRef} 
+          accept="image/*" 
+          className="hidden" 
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f && currentSection) {
+              handleUploadSectionItem(currentSection.id, 'image', f);
+            }
+            e.target.value = '';
+          }} 
+        />
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf,.odt,.ods,.odp,.csv,.zip,.rar,application/*" 
+          className="hidden" 
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f && currentSection) {
+              handleUploadSectionItem(currentSection.id, 'file', f);
+            }
+            e.target.value = '';
+          }} 
+        />
+
+        {/* Floating Upload Progress Notification */}
+        {isUploading && (
+          <div className="fixed bottom-8 right-8 z-50 bg-gray-900 text-white p-5 rounded-2xl shadow-2xl flex items-center gap-4 min-w-[320px] max-w-md border border-gray-700 animate-in fade-in slide-in-from-bottom-5">
+            <div className="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center flex-shrink-0">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-bold text-gray-300 truncate max-w-[200px]">{uploadingFileName || 'Fayl yuklanmoqda...'}</span>
+                <span className="text-xs font-black text-blue-400">{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.max(5, uploadProgress)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Toast */}
+        {uploadToast && (
+          <div className={`fixed bottom-8 right-8 z-50 p-4 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold border transition-all animate-in fade-in ${
+            uploadToast.type === 'success' 
+              ? 'bg-emerald-900 text-emerald-100 border-emerald-700' 
+              : 'bg-red-900 text-red-100 border-red-700'
+          }`}>
+            {uploadToast.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <AlertCircle className="w-5 h-5 text-red-400" />}
+            <span>{uploadToast.message}</span>
           </div>
         )}
       </div>

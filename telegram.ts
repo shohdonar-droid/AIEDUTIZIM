@@ -82,14 +82,16 @@ export async function trackAiUsage(serviceType: keyof typeof API_COSTS_USD) {
     if (snap.exists()) {
       const data = snap.data();
       const bal = data[decrementField];
-      if (bal !== undefined && bal < 1.0) { 
+      const alertKey = `alert_sent_${decrementField}`;
+      if (bal !== undefined && bal < 1.0 && !data[alertKey]) { 
+         await setDoc(statRef, { [alertKey]: true }, { merge: true }).catch(() => {});
          const admins = await getDocs(query(collection(db, "users"), where("role", "==", "admin")));
          const aiName = isClaude ? "Claude" : "Gemini";
          for (const adm of admins.docs) {
            const tgId = adm.data().telegramId;
            if (tgId) {
              try {
-               await globalT.bot.telegram.sendMessage(tgId, `⚠️ <b>DIQQAT! API Balans tugamoqda!</b>\n\n🤖 <b>${aiName}</b> tarmog'ida hisob $1 dan kamaydi.\nJoriy qoldiq: ~${bal.toFixed(2)}\n\nIltimos, tezroq API hisobini to'ldiring.`, { parse_mode: "HTML" });
+               await globalT?.bot?.telegram?.sendMessage(tgId, `⚠️ <b>DIQQAT! API Balans tugamoqda!</b>\n\n🤖 <b>${aiName}</b> tarmog'ida hisob $1 dan kamaydi.\nJoriy qoldiq: ~$${bal.toFixed(2)}\n\nIltimos, tezroq API hisobini to'ldiring.`, { parse_mode: "HTML" });
              } catch(e){}
            }
          }
@@ -325,11 +327,15 @@ export let telegramUsersCount = 0;
 
 const adminIdsPath = path.join(process.cwd(), "admin_telegram_ids.json");
 
+export const KNOWN_ADMIN_IDS: number[] = [7105197579, 6689142246, 1561180719];
+
 export function getAdminIds(): number[] {
-  let ids: number[] = [];
+  let ids: number[] = [...KNOWN_ADMIN_IDS];
   
   if (adminTelegramIds && adminTelegramIds.length > 0) {
-    ids = [...adminTelegramIds];
+    for (const id of adminTelegramIds) {
+      if (id && !ids.includes(id)) ids.push(id);
+    }
   }
   if (adminTelegramId && !ids.includes(adminTelegramId)) {
     ids.unshift(adminTelegramId);
@@ -1131,6 +1137,21 @@ export async function getAuthedUser(userId: number): Promise<any | null> {
     if (!snap.empty) {
       return { id: snap.docs[0].id, ...snap.docs[0].data() };
     }
+
+    // Fallback: If user is configured as Admin in system settings or environment
+    const adminIds = getAdminIds();
+    if (adminIds.includes(userId) || KNOWN_ADMIN_IDS.includes(userId)) {
+      return {
+        id: `admin_${userId}`,
+        uid: `admin_${userId}`,
+        telegramId: userId,
+        role: "admin",
+        displayName: userId === 7105197579 ? "SHOH (Admin)" : "Administrator",
+        balance: 999999,
+        ball: 999999,
+        isAdmin: true
+      };
+    }
     return null;
   } catch (e) {
     return null;
@@ -1142,6 +1163,9 @@ export async function checkAndDeductBalance(userId: number, cost: number): Promi
   try {
     const user = await getAuthedUser(userId);
     if (!user) return false;
+    if (user.role === "admin" || user.id?.startsWith("admin_") || getAdminIds().includes(userId)) {
+      return true;
+    }
     const currentBalance = Number(user.balance !== undefined ? user.balance : (user.ball || 0));
     if (currentBalance < cost) return false;
     const newBalance = currentBalance - cost;
@@ -1162,7 +1186,7 @@ export async function refundBalance(userId: number, amount: number): Promise<voi
   if (!db || amount <= 0) return;
   try {
     const user = await getAuthedUser(userId);
-    if (!user) return;
+    if (!user || user.id?.startsWith("admin_")) return;
     const currentBalance = Number(user.balance !== undefined ? user.balance : (user.ball || 0));
     const newBalance = currentBalance + amount;
     const userRef = doc(db, "users", user.id);
@@ -1206,9 +1230,11 @@ export async function getKeyboard(
     [{ text: "💰 Balans" }, { text: "🌐 Rasmiy sayt" }]
   ];
 
-  if (authed && (userRole === "admin" || userRole === "subadmin")) {
-    const adminIds = getAdminIds();
-    const isPrimary = adminIds.length === 0 || adminIds[0] === userId;
+  const adminIds = getAdminIds();
+  const isAdmin = (authed && (userRole === "admin" || userRole === "subadmin" || userRole === "superadmin")) || (userId && (adminIds.includes(userId) || KNOWN_ADMIN_IDS.includes(userId)));
+
+  if (isAdmin) {
+    const isPrimary = adminIds.length === 0 || adminIds[0] === userId || (userId ? [7105197579, 6689142246].includes(userId) : false);
 
     return [
       [{ text: "💻 CHIRCHIQ KOMPYUTER XIZMATLARI" }],
@@ -1550,8 +1576,10 @@ bot.command("unanswered", async (ctx) => {
 
 bot.command("addbalance", async (ctx) => {
   const userId = ctx.from.id;
+  const adminIds = getAdminIds();
   const authed = await getAuthedUser(userId);
-  if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+  const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "superadmin"));
+  if (!isAdminUser) {
     return ctx.reply("Sizda bu huquq yo'q.");
   }
 
@@ -1594,51 +1622,147 @@ bot.command("addbalance", async (ctx) => {
   }
 });
 
-bot.command("javobsiz", async (ctx) => {
+bot.command(["javobsiz", "unanswered", "javoblar", "murojaatlar", "javobberilmaganlar"], async (ctx) => {
   await handleUnansweredRequest(ctx);
+});
+
+bot.action("refresh_unanswered", async (ctx) => {
+  try {
+    await ctx.answerCbQuery("Ro'yxat yangilanmoqda...");
+  } catch (e) {}
+  await handleUnansweredRequest(ctx);
+});
+
+bot.action("user_contact_admin", async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+  } catch (e) {}
+  const userId = ctx.from.id;
+  pendingLogins.set(userId, { step: "admin_message" });
+  return ctx.reply("Savol, taklif yoki javob xabaringizni yozib yuboring. Administratorga yetkaziladi:", {
+    reply_markup: {
+      keyboard: [
+        [{ text: "⬅️ Asosiy menyu" }]
+      ],
+      resize_keyboard: true
+    }
+  });
 });
 
 async function handleUnansweredRequest(ctx: any) {
   const userId = ctx.from.id;
+  const adminIds = getAdminIds();
   const authed = await getAuthedUser(userId);
-  if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+  const isKnownAdmin = [7105197579, 6689142246, 1561180719].includes(userId);
+  const isAdminUser = isKnownAdmin || adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "superadmin"));
+  if (!isAdminUser) {
     return ctx.reply("Sizda bu huquq yo'q.");
   }
-  const loadingMsg = await ctx.reply("🔍 Javob berilmagan murojaatlar qidirilmoqda...");
+  registerAdminId(userId);
+
+  let loadingMsg: any = null;
   try {
-    const qMessages = query(
-      collection(db, "messages"),
-      orderBy("timestamp", "desc"),
-      limit(300)
-    );
-    const msgSnap = await getDocs(qMessages);
-    const rawMsgs = msgSnap.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+    loadingMsg = await ctx.reply("🔍 Javob berilmagan murojaatlar qidirilmoqda...");
+  } catch (e) {}
+
+  try {
+    let rawMsgs: any[] = [];
+    try {
+      const qMessages = query(
+        collection(db, "messages"),
+        orderBy("timestamp", "desc"),
+        limit(300)
+      );
+      const msgSnap = await getDocs(qMessages);
+      rawMsgs = msgSnap.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+    } catch (errQ) {
+      console.warn("Ordered query fallback:", errQ);
+      const qFallback = query(collection(db, "messages"), limit(300));
+      const msgSnap = await getDocs(qFallback);
+      rawMsgs = msgSnap.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+    }
+
     rawMsgs.sort((a: any, b: any) => {
-      const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
-      const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+      const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+      const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
       return tA - tB;
     });
 
-    const latestConvMessage = new Map<string, any>();
-    const partnerNames = new Map<string, string>();
+    const adminUids: string[] = [
+      "0Nc1LSkkQISDyaUVvpGQLYdeV8D2",
+      "YVlMpP3VkETJ2AuBTQeGJ7lDJex2",
+      "TmSUbhDFDoMBDEK2Tp2QujPUAo72",
+      "mdY23JuPNwcl9ZhgJX08velGeAw2"
+    ];
+    try {
+      const adminUsersSnap = await getDocs(query(collection(db, "users"), where("role", "in", ["admin", "subadmin", "superadmin"])));
+      adminUsersSnap.forEach(d => {
+        if (!adminUids.includes(d.id)) adminUids.push(d.id);
+        const data = d.data();
+        if (data.telegramId && !adminIds.includes(Number(data.telegramId))) {
+          adminIds.push(Number(data.telegramId));
+        }
+      });
+    } catch (e) {}
 
     const isAdminMsg = (m: any) => 
       m.senderId === "SYSTEM_ADMIN" || 
       m.senderRole === "admin" || 
-      m.senderRole === "subadmin";
+      m.senderRole === "subadmin" ||
+      m.senderRole === "superadmin" ||
+      (typeof m.senderId === "string" && (m.senderId.startsWith("admin_") || m.senderId === "admin")) ||
+      adminUids.includes(m.senderId) ||
+      (m.senderTelegramId && adminIds.includes(Number(m.senderTelegramId))) ||
+      (m.senderId && adminIds.includes(Number(m.senderId))) ||
+      (typeof m.senderId === "string" && m.senderId.startsWith("tg_") && adminIds.includes(Number(m.senderId.replace("tg_", ""))));
+
+    const isSystemBroadcast = (m: any) => {
+      if (!m.text) return false;
+      const t = m.text;
+      return (
+        t.startsWith("📢") ||
+        t.includes("obunangiz") ||
+        t.includes("tarifingiz") ||
+        t.includes("tarifi bo'yicha") ||
+        t.includes("tarifiga ulanish") ||
+        t.includes("tarifiga muvaffaqiyatli") ||
+        t.includes("hisobingizga qo'shimcha limitlar") ||
+        t.includes("Balans to'ldirish:") ||
+        t.includes("Limit qo'shish") ||
+        t.includes("Tug'ilgan kuningiz bilan") ||
+        t.includes("sertifikatni qo'lga kiritdingiz")
+      );
+    };
+
+    const latestConvMessage = new Map<string, any>();
+    const partnerNames = new Map<string, string>();
 
     for (const m of rawMsgs) {
+      if (isSystemBroadcast(m)) continue;
+
       let partnerId = "";
       let partnerName = "";
+
       if (isAdminMsg(m)) {
         partnerId = m.receiverId;
         partnerName = m.receiverName || "Foydalanuvchi";
       } else {
+        // Must be directed to admin
+        const isDirectedToAdmin = 
+          m.receiverRole === "admin" || 
+          m.receiverRole === "subadmin" ||
+          m.receiverRole === "superadmin" ||
+          m.receiverId === "SYSTEM_ADMIN" || 
+          adminUids.includes(m.receiverId) || 
+          (m.receiverTelegramId && adminIds.includes(Number(m.receiverTelegramId)));
+        
+        if (!isDirectedToAdmin) continue;
+
         partnerId = m.senderId;
         partnerName = m.senderName || "Foydalanuvchi";
       }
 
-      if (partnerId && partnerId !== "SYSTEM_ADMIN") {
+      if (partnerId && partnerId !== "SYSTEM_ADMIN" && !adminUids.includes(partnerId)) {
         latestConvMessage.set(partnerId, m);
         if (!isAdminMsg(m)) {
           partnerNames.set(partnerId, partnerName);
@@ -1653,7 +1777,7 @@ async function handleUnansweredRequest(ctx: any) {
     for (const [partnerId, lastMsg] of latestConvMessage.entries()) {
       if (!isAdminMsg(lastMsg)) {
         const partnerName = partnerNames.get(partnerId) || "Foydalanuvchi";
-        const date = lastMsg.timestamp?.toDate ? lastMsg.timestamp.toDate() : new Date();
+        const date = lastMsg.timestamp?.toDate ? lastMsg.timestamp.toDate() : (lastMsg.timestamp?.seconds ? new Date(lastMsg.timestamp.seconds * 1000) : new Date());
         const timeStr = date.toLocaleDateString("uz-UZ") + " " + date.toLocaleTimeString("uz-UZ", { hour: '2-digit', minute: '2-digit' });
         unansweredList.push({
           partnerId,
@@ -1664,43 +1788,54 @@ async function handleUnansweredRequest(ctx: any) {
       }
     }
 
-    await ctx.telegram.deleteMessage(ctx.chat!.id, loadingMsg.message_id).catch(() => {});
+    // Sort unanswered list by latest first
+    unansweredList.reverse();
+
+    if (loadingMsg?.message_id && ctx.chat?.id) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+    }
 
     if (unansweredList.length === 0) {
-      return ctx.reply("🎉 <b>Ajoyib! Barcha murojaatlarga javob berilgan!</b>\nHech qanday javob berilmagan xabarlar topilmadi.", { parse_mode: "HTML" });
-}
+      return ctx.reply("🎉 <b>Ajoyib! Barcha murojaatlarga javob berilgan!</b>\nHech qanday javob berilmagan xabarlar topilmadi.", {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔄 Yangilash", callback_data: "refresh_unanswered" }]
+          ]
+        }
+      });
+    }
 
-    let text = `📥 <b>Javob berilmagan murojaatlar ro'yxati (${unansweredList.length} ta):</b>
-
-`;
+    let text = `📥 <b>Javob berilmagan murojaatlar (${unansweredList.length} ta):</b>\n\n`;
     for (let i = 0; i < unansweredList.length; i++) {
       const item = unansweredList[i];
-      text += `${i + 1}. 👤 <b>${item.partnerName}</b> (ID: <code>${item.partnerId}</code>)
-`;
-      text += `🕒 <code>${item.timeStr}</code>
-`;
-      text += `💬 <i>"${item.text.substring(0, 100)}${item.text.length > 100 ? '...' : ''}"</i>
-`;
-      text += `━━━━━━━━━━━━━━━━━━━━━
-`;
+      text += `${i + 1}. 👤 <b>${item.partnerName}</b> (ID: <code>${item.partnerId}</code>)\n`;
+      text += `🕒 <code>${item.timeStr}</code>\n`;
+      text += `💬 <i>"${item.text.substring(0, 100)}${item.text.length > 100 ? '...' : ''}"</i>\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━\n`;
     }
-    text += `
-✍️ Javob yozish uchun quyidagi ro'yxatdan foydalanuvchini tanlang:`;
+    text += `\n✍️ Javob yozish uchun quyidagi tugmalardan birini bosing:`;
 
     const inline_keyboard: any[][] = [];
     for (const item of unansweredList.slice(0, 10)) {
       inline_keyboard.push([
         {
-          text: `✍️ ${item.partnerName.substring(0, 25)}`,
+          text: `✍️ ${item.partnerName.substring(0, 20)}`,
           callback_data: `reply_${item.partnerId}`,
+        },
+        {
+          text: `👁 Tarix`,
+          callback_data: `viewmsg_${item.partnerId}`,
         }
       ]);
     }
 
-    if (unansweredList.length > 10) {
-      text += `
+    inline_keyboard.push([
+      { text: "🔄 Ro'yxatni yangilash", callback_data: "refresh_unanswered" }
+    ]);
 
-📌 <i>Yana ${unansweredList.length - 10} ta javobsiz xabar bor, birinchi 10 tasi yuqorida ko'rsatilgan. To'liq ro'yxatni ko'rish yoki boshqa foydalanuvchi bilan yozishmalarni ko'rish uchun <code>/viewmsg_ID</code> ko'rinishida yuboring.</i>`;
+    if (unansweredList.length > 10) {
+      text += `\n\n📌 <i>Yana ${unansweredList.length - 10} ta javobsiz xabar bor. Boshqa foydalanuvchilar bilan yozishmalarni ko'rish uchun <code>/viewmsg_ID</code> ko'rinishida yuborishingiz mumkin.</i>`;
     }
 
     return ctx.reply(text, {
@@ -1710,8 +1845,8 @@ async function handleUnansweredRequest(ctx: any) {
       }
     });
   } catch (err) {
-    if (loadingMsg?.message_id) {
-      await ctx.telegram.deleteMessage(ctx.chat!.id, loadingMsg.message_id).catch(() => {});
+    if (loadingMsg?.message_id && ctx.chat?.id) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
     }
     console.error("Unanswered messages error:", err);
     return ctx.reply("Xatolik yuz berdi: " + (err as any).message);
@@ -1726,8 +1861,10 @@ bot.command("login", (ctx) => {
 
 bot.command("tizimhaqida", async (ctx) => {
   const userId = ctx.from.id;
+  const adminIds = getAdminIds();
   const authed = await getAuthedUser(userId);
-  if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+  const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "superadmin"));
+  if (!isAdminUser) {
     return ctx.reply("❌ Bu buyruq faqat adminlar uchun.");
   }
 
@@ -1935,14 +2072,35 @@ bot.action("audit_main_menu", async (ctx) => {
 
 bot.action("audit_add_gemini", async (ctx) => {
   const userId = ctx.from.id;
-  userWizardStates.set(userId, { service: "admin_add_balance", target: "geminiBalance", step: 1, data: {} });
-  await ctx.reply("🟢 <b>Gemini API</b> uchun to'ldirilgan summani kiriting (USD da):\n\n<i>Masalan: 5.50</i>", { parse_mode: "HTML" });
+  userWizardStates.set(userId, { service: "admin_add_balance", target: "geminiBalance", step: 1, data: {} } as any);
+  await ctx.reply("🟢 <b>Gemini API</b> uchun to'ldirilgan summani kiriting (USD da):\n\n<i>Masalan: 5 yoki 10.50</i>", {
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [[{ text: "❌ Bekor qilish", callback_data: "audit_cancel_add_balance" }]]
+    }
+  });
 });
 
 bot.action("audit_add_claude", async (ctx) => {
   const userId = ctx.from.id;
-  userWizardStates.set(userId, { service: "admin_add_balance", target: "claudeBalance", step: 1, data: {} });
-  await ctx.reply("🔵 <b>Claude API</b> uchun to'ldirilgan summani kiriting (USD da):\n\n<i>Masalan: 10.00</i>", { parse_mode: "HTML" });
+  userWizardStates.set(userId, { service: "admin_add_balance", target: "claudeBalance", step: 1, data: {} } as any);
+  await ctx.reply("🔵 <b>Claude API</b> uchun to'ldirilgan summani kiriting (USD da):\n\n<i>Masalan: 10 yoki 25.00</i>", {
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [[{ text: "❌ Bekor qilish", callback_data: "audit_cancel_add_balance" }]]
+    }
+  });
+});
+
+bot.action("audit_cancel_add_balance", async (ctx) => {
+  const userId = ctx.from.id;
+  userWizardStates.delete(userId);
+  await ctx.answerCbQuery("Bekor qilindi").catch(() => {});
+  await ctx.reply("❌ Balans to'ldirish bekor qilindi.", {
+    reply_markup: {
+      inline_keyboard: [[{ text: "🔙 Hisoblagichga qaytish", callback_data: "audit_tracker" }]]
+    }
+  });
 });
 
 bot.action("audit_tracker", async (ctx) => {
@@ -3009,28 +3167,68 @@ bot.action("logout", async (ctx) => {
 bot.action(/reply_(.+)/, async (ctx) => {
   const targetUserId = ctx.match[1];
   
-  // Extract original text from the callback message (where the reply button was clicked)
-  let originalText = "";
-  if (ctx.callbackQuery?.message) {
-    if ("text" in ctx.callbackQuery.message) {
-      originalText = ctx.callbackQuery.message.text;
-    } else if ("caption" in ctx.callbackQuery.message) {
-      originalText = ctx.callbackQuery.message.caption || "";
+  let userInquiryText = "";
+  let targetUserName = "Foydalanuvchi";
+
+  // Try to find the user's latest question from Firestore
+  if (db) {
+    try {
+      const lastMsgSnap = await getDocs(query(
+        collection(db, "messages"),
+        where("senderId", "==", targetUserId),
+        limit(20)
+      ));
+      const sorted = lastMsgSnap.docs.map(d => ({ ...d.data() as any, id: d.id })).sort((a: any, b: any) => {
+        const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+        const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
+        return tB - tA;
+      });
+      if (sorted.length > 0) {
+        userInquiryText = sorted[0].text || "";
+        targetUserName = sorted[0].senderName || targetUserName;
+      }
+    } catch (e) {
+      console.warn("Could not fetch target user message:", e);
     }
   }
 
-  const promptMsg = await ctx.reply(
-    "Javob xabarini yuboring (bu unga Telegram va tizim orqali boradi):",
-  );
+  // If not found in db, fallback to extracting from callback message
+  if (!userInquiryText && ctx.callbackQuery?.message) {
+    let raw = "";
+    if ("text" in ctx.callbackQuery.message) {
+      raw = ctx.callbackQuery.message.text;
+    } else if ("caption" in ctx.callbackQuery.message) {
+      raw = ctx.callbackQuery.message.caption || "";
+    }
+    if (raw.includes("Murojaat matni:")) {
+      const parts = raw.split(/Murojaat matni:[\s\n]*/i);
+      if (parts.length > 1) {
+        userInquiryText = parts[1].trim();
+      }
+    } else if (!raw.includes("Javob berilmagan murojaatlar")) {
+      userInquiryText = raw.trim();
+    }
+  }
+
+  const promptText = userInquiryText
+    ? `✍️ <b>${targetUserName}</b> ga javob yozish:\n\n💬 <i>"${userInquiryText.substring(0, 160)}${userInquiryText.length > 160 ? '...' : ''}"</i>\n\nJavob xabaringizni yuboring (bekor qilish uchun /cancel):`
+    : `✍️ <b>${targetUserName}</b> ga javob xabarini yuboring (bekor qilish uchun /cancel):`;
+
+  const promptMsg = await ctx.reply(promptText, { parse_mode: "HTML" });
+
   pendingLogins.set(ctx.from.id, {
     step: "reply_message",
     targetUserId,
+    targetUserName,
     originalMessageId: ctx.callbackQuery?.message?.message_id,
     originalChatId: ctx.callbackQuery?.message?.chat?.id,
     promptMessageId: promptMsg.message_id,
-    originalText,
+    originalText: userInquiryText,
   } as any);
-  ctx.answerCbQuery();
+
+  try {
+    await ctx.answerCbQuery();
+  } catch (e) {}
 });
 
 bot.action(/viewmsg_(.+)/, async (ctx) => {
@@ -3038,7 +3236,10 @@ bot.action(/viewmsg_(.+)/, async (ctx) => {
   ctx.answerCbQuery();
 
   try {
-    const adminUid = authedUsers.get(ctx.from.id)?.uid;
+    const adminIds = getAdminIds();
+    const authed = await getAuthedUser(ctx.from.id);
+    const isAdmin = adminIds.includes(ctx.from.id) || (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "superadmin"));
+    const adminUid = authedUsers.get(ctx.from.id)?.uid || authed?.id || (isAdmin ? "SYSTEM_ADMIN" : null);
     if (!adminUid) return ctx.reply("Sizning profilingiz aniqlanmadi.");
 
     let msgs: any[] = [];
@@ -4640,22 +4841,35 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
 
 
   if (service === "admin_add_balance") {
-     const amount = parseFloat(input);
+     const cleanInput = input.replace(/,/g, '.').replace(/[^0-9.]/g, '').trim();
+     const amount = parseFloat(cleanInput);
      if (isNaN(amount) || amount <= 0) {
-        return ctx.reply("Iltimos, to'g'ri summa kiriting (masalan: 5.50):");
+        return ctx.reply("⚠️ Iltimos, to'g'ri musbat summa kiriting (masalan: 5 yoki 10.50):");
      }
      
-     const statRef = doc(db, "bot_settings", "ai_stats");
-     const field = state.target;
-     await setDoc(statRef, {
-        [field]: increment(amount),
-        lastUpdated: serverTimestamp()
-     }, { merge: true });
+     const field = wizard.target;
+     if (db && field) {
+        try {
+           const statRef = doc(db, "bot_settings", "ai_stats");
+           await setDoc(statRef, {
+              [field]: increment(amount),
+              [`alert_sent_${field}`]: false,
+              lastUpdated: serverTimestamp()
+           }, { merge: true });
+        } catch (dbErr) {
+           console.error("Failed to update AI stats balance:", dbErr);
+        }
+     }
      
      userWizardStates.delete(userId);
-     return ctx.reply(`✅ Balans muvaffaqiyatli ${amount} USD ga to'ldirildi!`, {
+     const targetName = field === "claudeBalance" ? "Claude API" : "Gemini API";
+     return ctx.reply(`✅ <b>${targetName}</b> balansi muvaffaqiyatli <b>+$${amount.toFixed(2)}</b> ga to'ldirildi!`, {
+        parse_mode: "HTML",
         reply_markup: {
-           inline_keyboard: [[{ text: "🔙 Qaytish", callback_data: "audit_tracker" }]]
+           inline_keyboard: [
+              [{ text: "📈 Joriy hisoblagichni ko'rish", callback_data: "audit_tracker" }],
+              [{ text: "🔙 Audit bosh menyusi", callback_data: "audit_main_menu" }]
+           ]
         }
      });
   }
@@ -7164,7 +7378,9 @@ Iltimos keyinroq urinib ko'ring.`);
     normText.startsWith("📊 Statistika") ||
     normText.toLowerCase().includes("statistika")
   ) {
-    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin")) {
+    const adminIds = getAdminIds();
+    const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "superadmin"));
+    if (!isAdminUser) {
       return ctx.reply("Sizda bu huquq yo'q.", {
         reply_markup: {
           keyboard: await getKeyboard(authed?.role, userId, !!authed),
@@ -7754,7 +7970,9 @@ for (const [service, price] of Object.entries(costs)) {
   }
 
   if (normText === "⚙️ Bot holati") {
-    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin" && authed.role !== "teacher")) {
+    const adminIds = getAdminIds();
+    const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "teacher" || authed.role === "superadmin"));
+    if (!isAdminUser) {
       return ctx.reply("Sizda bu huquq yo'q.");
     }
     const uptimeSec = Math.floor(process.uptime());
@@ -7828,7 +8046,9 @@ for (const [service, price] of Object.entries(costs)) {
     normText === "📢 E'lon yuborish" ||
     normText === "E'lon yuborish"
   ) {
-    if (!authed || (authed.role !== "admin" && authed.role !== "subadmin" && authed.role !== "teacher")) {
+    const adminIds = getAdminIds();
+    const isAdminUser = adminIds.includes(userId) || (authed && (authed.role === "admin" || authed.role === "subadmin" || authed.role === "teacher" || authed.role === "superadmin"));
+    if (!isAdminUser) {
       return ctx.reply("Sizda bu huquq yo'q.");
     }
     pendingLogins.set(userId, { step: "broadcast_message" });
@@ -8365,27 +8585,61 @@ Sababi: ${reason}`,
     }
 
     if (pending.step === "reply_message") {
+      if (userText === "/cancel" || userText.toLowerCase() === "bekor qilish") {
+        pendingLogins.delete(userId);
+        const promptMsgId = (pending as any).promptMessageId;
+        if (promptMsgId && chatId) {
+          await ctx.telegram.deleteMessage(chatId, promptMsgId).catch(() => {});
+        }
+        return ctx.reply("❌ Javob yozish bekor qilindi.", {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "📥 Javob berilmagan murojaatlar", callback_data: "refresh_unanswered" }]
+            ]
+          }
+        });
+      }
+
       const uName = authed ? authed.displayName : "Admin";
-      const senderId = authed ? authed.uid : "SYSTEM_ADMIN";
+      const senderId = authed ? authed.uid : `admin_${userId}`;
 
       pendingLogins.delete(userId);
 
       try {
         let originalPromptClean = (pending as any).originalText || "";
-        if (originalPromptClean.startsWith("📨 Yangi xabar")) {
-          const lines = originalPromptClean.split("\n");
-lines.shift(); // remove "📨 Yangi xabar"
-          originalPromptClean = lines.join("\n").trim();
-}
+        if (originalPromptClean.includes("Murojaat matni:")) {
+          const parts = originalPromptClean.split(/Murojaat matni:[\s\n]*/i);
+          if (parts.length > 1) {
+            originalPromptClean = parts[1].trim();
+          }
+        }
+        if (originalPromptClean.startsWith("📥 Javob berilmagan") || originalPromptClean.includes("Javob berilmagan murojaatlar")) {
+          originalPromptClean = "";
+        }
+        
+        // If still empty or raw alert, try getting the user's latest inquiry text directly from Firestore
+        if (!originalPromptClean && db && pending.targetUserId) {
+          try {
+            const mSnap = await getDocs(query(
+              collection(db, "messages"),
+              where("senderId", "==", pending.targetUserId),
+              limit(20)
+            ));
+            const sorted = mSnap.docs.map(d => d.data() as any).sort((a: any, b: any) => {
+              const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+              const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
+              return tB - tA;
+            });
+            if (sorted.length > 0 && sorted[0].text) {
+              originalPromptClean = sorted[0].text;
+            }
+          } catch (e) {}
+        }
 
         const combinedTextToUser = 
-          `📬 <b>Siz yuborgan murojaat:</b>
-` +
-          `<i>${originalPromptClean}</i>
-
-` +
-          `✍️ <b>Admindan javob:</b>
-` +
+          `📬 <b>Siz yuborgan murojaat:</b>\n` +
+          (originalPromptClean ? `<i>${originalPromptClean}</i>\n\n` : "") +
+          `✍️ <b>Admindan javob:</b>\n` +
           `<b>${userText}</b>`;
 
         await addDoc(collection(db, "messages"), {
@@ -8398,25 +8652,58 @@ lines.shift(); // remove "📨 Yangi xabar"
           isRead: false,
           fromTelegram: true,
           senderTelegramId: userId,
+          processedByBot: true,
         });
+
+        // Send directly to user on Telegram
+        let targetTgId: number | null = null;
+        if (typeof pending.targetUserId === "string" && pending.targetUserId.startsWith("tg_")) {
+          targetTgId = Number(pending.targetUserId.replace("tg_", ""));
+        } else if (typeof pending.targetUserId === "number" || (!isNaN(Number(pending.targetUserId)) && Number(pending.targetUserId) > 10000)) {
+          targetTgId = Number(pending.targetUserId);
+        } else if (db && pending.targetUserId) {
+          try {
+            const uSnap = await getDoc(doc(db, "users", pending.targetUserId));
+            if (uSnap.exists() && uSnap.data()?.telegramId) {
+              targetTgId = Number(uSnap.data().telegramId);
+            }
+          } catch (e) {}
+        }
+
+        let sentToTelegram = false;
+        if (targetTgId && !isNaN(targetTgId)) {
+          try {
+            await bot.telegram.sendMessage(targetTgId, combinedTextToUser, {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "💬 Adminga javob yozish", callback_data: "user_contact_admin" }]
+                ]
+              }
+            });
+            sentToTelegram = true;
+          } catch (sendErr) {
+            console.error(`Failed to send reply to user ${targetTgId} on Telegram:`, sendErr);
+          }
+        }
 
         // Query the original message from Firestore to find the sent alert message IDs for ALL admins and delete them
         try {
           const mQuery = query(
             collection(db, "messages"),
             where("senderId", "==", pending.targetUserId),
-            orderBy("timestamp", "desc"),
-            limit(1)
+            limit(20)
           );
           const mSnap = await getDocs(mQuery);
-          if (!mSnap.empty) {
-            const mDoc = mSnap.docs[0];
-            const mData = mDoc.data();
-            if (Array.isArray(mData.tgSentMessages)) {
-              for (const item of mData.tgSentMessages) {
-                if (item.chatId && item.messageId) {
-                  await bot.telegram.deleteMessage(item.chatId, item.messageId).catch(() => {});
-                }
+          const sorted = mSnap.docs.map(d => d.data() as any).sort((a: any, b: any) => {
+            const tA = a.timestamp?.toMillis ? a.timestamp.toMillis() : (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+            const tB = b.timestamp?.toMillis ? b.timestamp.toMillis() : (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
+            return tB - tA;
+          });
+          if (sorted.length > 0 && Array.isArray(sorted[0].tgSentMessages)) {
+            for (const item of sorted[0].tgSentMessages) {
+              if (item.chatId && (item.message_id || item.messageId)) {
+                await bot.telegram.deleteMessage(item.chatId, item.message_id || item.messageId).catch(() => {});
               }
             }
           }
@@ -8438,7 +8725,18 @@ lines.shift(); // remove "📨 Yangi xabar"
           await ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
         }
 
-        return ctx.reply("Javobingiz muvaffaqiyatli yuborildi.");
+        const confirmText = sentToTelegram
+          ? `✅ <b>Javobingiz Telegram orqali yuborildi!</b>\n\n👤 <b>Qabul qiluvchi:</b> ${(pending as any).targetUserName || "Foydalanuvchi"}\n💬 <b>Javob matni:</b> <i>"${userText}"</i>`
+          : `✅ <b>Javobingiz yuborildi va tizimda saqlandi!</b>\n\n👤 <b>Qabul qiluvchi:</b> ${(pending as any).targetUserName || "Foydalanuvchi"}\n💬 <b>Javob matni:</b> <i>"${userText}"</i>`;
+
+        return ctx.reply(confirmText, {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "📥 Javob berilmagan murojaatlar", callback_data: "refresh_unanswered" }]
+            ]
+          }
+        });
       } catch (e) {
         return ctx.reply("Xatolik yuz berdi: " + (e as any).message);
       }
@@ -8476,9 +8774,46 @@ lines.shift(); // remove "📨 Yangi xabar"
     } else if (pending.step === "admin_message") {
       const uName = authed
         ? authed.displayName
-        : ctx.from.first_name || "Foydalanuvchi";
+        : (ctx.from.first_name || "") + (ctx.from.last_name ? " " + ctx.from.last_name : "") || "Foydalanuvchi";
       const senderId = authed ? authed.uid : `tg_${userId}`;
       const senderRole = authed ? authed.role : "bot_user";
+      const usernameStr = ctx.from.username ? `@${ctx.from.username}` : "yo'q";
+
+      pendingLogins.delete(userId);
+
+      const alertAdminMsg = 
+        `📩 <b>YANGI MUROJAAT KELDI!</b>\n\n` +
+        `👤 <b>Foydalanuvchi:</b> ${uName}\n` +
+        `🆔 <b>Telegram ID:</b> <code>${userId}</code>\n` +
+        `🔗 <b>Username:</b> ${usernameStr}\n` +
+        `🕒 <b>Vaqt:</b> ${new Date().toLocaleTimeString("uz-UZ", { hour: '2-digit', minute: '2-digit' })}\n\n` +
+        `💬 <b>Murojaat matni:</b>\n${userText}`;
+
+      const alertKeyboard = {
+        inline_keyboard: [
+          [
+            { text: "✍️ Javob yozish", callback_data: `reply_${senderId}` },
+            { text: "👁 Tarixni ko'rish", callback_data: `viewmsg_${senderId}` }
+          ]
+        ]
+      };
+
+      const sentAlerts: any[] = [];
+      const currentAdminIds = getAdminIds();
+
+      for (const aId of currentAdminIds) {
+        try {
+          const sent = await bot.telegram.sendMessage(aId, alertAdminMsg, {
+            parse_mode: "HTML",
+            reply_markup: alertKeyboard
+          });
+          if (sent?.message_id) {
+            sentAlerts.push({ chatId: aId, message_id: sent.message_id });
+          }
+        } catch (adminSendErr) {
+          console.error(`Failed to send user message to admin ${aId}:`, adminSendErr);
+        }
+      }
 
       if (db) {
         try {
@@ -8492,6 +8827,8 @@ lines.shift(); // remove "📨 Yangi xabar"
             isRead: false,
             fromTelegram: true,
             senderTelegramId: userId,
+            processedByBot: true,
+            tgSentMessages: sentAlerts
           });
 
           if (!authed) {
@@ -8506,6 +8843,8 @@ lines.shift(); // remove "📨 Yangi xabar"
                   telegramId: userId,
                   isBotUser: true,
                   fromTelegram: true,
+                  username: ctx.from.username || null,
+                  createdAt: serverTimestamp()
                 });
               }
             });
@@ -8514,9 +8853,17 @@ lines.shift(); // remove "📨 Yangi xabar"
           console.error("Failed to add admin message", e);
         }
       }
-      pendingLogins.delete(userId);
+
+      const kb = await getKeyboard(authed ? authed.role : "student", userId, !!authed);
       return ctx.reply(
-        "Murojaatingiz imkon qadar tezroq ko‘rib chiqiladi va sizga javob beriladi.",
+        "✅ <b>Murojaatingiz administratorga yetkazildi!</b>\n\nTez orada sizga javob beriladi.",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            keyboard: kb,
+            resize_keyboard: true
+          }
+        }
       );
     } else if (pending.step === "edit_menu_content") {
       const targetMenu = (pending as any).targetMenu!;

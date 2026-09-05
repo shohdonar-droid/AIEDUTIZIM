@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { GoogleGenAI, Type as SDKType } from "@google/genai";
 
 const Type = SDKType;
@@ -290,8 +291,56 @@ ${bibText}
 export const app = express();
 
 // Top-level middleware (mounted immediately for Vercel/serverless environments)
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Ensure public/uploads directory exists and serve static uploads
+const uploadsDirectory = path.join(process.cwd(), "public", "uploads");
+if (!fs.existsSync(uploadsDirectory)) {
+  fs.mkdirSync(uploadsDirectory, { recursive: true });
+}
+app.use("/uploads", express.static(uploadsDirectory));
+
+// File and Image Upload API Endpoint
+app.post("/api/upload", express.json({ limit: "50mb" }), async (req, res) => {
+  try {
+    const { filename, contentType, base64 } = req.body;
+    if (!base64 || !filename) {
+      return res.status(400).json({ success: false, error: "Fayl nomi yoki tarkibi yetishmayapti" });
+    }
+
+    // Clean data URL prefix if present
+    const cleanBase64 = base64.replace(/^data:[^;]+;base64,/, "");
+    const buffer = Buffer.from(cleanBase64, "base64");
+
+    if (!fs.existsSync(uploadsDirectory)) {
+      fs.mkdirSync(uploadsDirectory, { recursive: true });
+    }
+
+    const rawExt = path.extname(filename) || (contentType ? `.${contentType.split("/")[1]}` : "");
+    const ext = rawExt.toLowerCase();
+    const rawBase = path.basename(filename, rawExt).replace(/[^a-zA-Z0-9_\-\u0400-\u04FF]/g, "_").slice(0, 60);
+    const safeBase = rawBase.length > 0 ? rawBase : "file";
+    const uniqueFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${safeBase}${ext}`;
+    const filePath = path.join(uploadsDirectory, uniqueFileName);
+
+    await fs.promises.writeFile(filePath, buffer);
+
+    const publicUrl = `/uploads/${uniqueFileName}`;
+    console.log(`[Upload API] Successfully saved: ${filePath} (${buffer.length} bytes) -> ${publicUrl}`);
+
+    res.json({
+      success: true,
+      url: publicUrl,
+      filename: filename,
+      size: buffer.length,
+      contentType: contentType || "application/octet-stream"
+    });
+  } catch (err: any) {
+    console.error("[Upload API] Error saving file:", err);
+    res.status(500).json({ success: false, error: err.message || "Faylni saqlashda xatolik yuz berdi" });
+  }
+});
 
 // Canonical 301 Redirect Middleware from apex domain (aide.uz) to www (www.aide.uz)
 app.use((req, res, next) => {
