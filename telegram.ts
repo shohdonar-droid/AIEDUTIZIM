@@ -22,6 +22,7 @@ import {
   orderBy,
   getCountFromServer,
   increment,
+  arrayUnion,
 } from "firebase/firestore";
 import { GoogleGenAI, Type as SDKType } from "@google/genai";
 
@@ -1159,12 +1160,290 @@ export async function getAuthedUser(userId: number): Promise<any | null> {
   }
 }
 
-export async function checkAndDeductBalance(userId: number, cost: number): Promise<boolean> {
-  if (!db || cost <= 0) return true;
+function sanitizeServiceKey(name: string): string {
+  return (name || "unknown").replace(/\./g, '_').trim();
+}
+
+export async function recordServiceUsage(serviceName: string, cost: number, userId?: number): Promise<void> {
+  if (!db || !serviceName) return;
+  try {
+    const key = sanitizeServiceKey(serviceName);
+    const statRef = doc(db, "bot_settings", "service_usage_stats");
+    await setDoc(statRef, {
+      [`services.${key}.name`]: serviceName,
+      [`services.${key}.count`]: increment(1),
+      [`services.${key}.totalSpent`]: increment(cost || 0),
+      totalCount: increment(1),
+      totalSpentSum: increment(cost || 0),
+      lastUpdated: serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.error("Failed to record service usage:", e);
+  }
+}
+
+export async function unrecordServiceUsage(serviceName: string, cost: number): Promise<void> {
+  if (!db || !serviceName) return;
+  try {
+    const key = sanitizeServiceKey(serviceName);
+    const statRef = doc(db, "bot_settings", "service_usage_stats");
+    await setDoc(statRef, {
+      [`services.${key}.count`]: increment(-1),
+      [`services.${key}.totalSpent`]: increment(-(cost || 0)),
+      totalCount: increment(-1),
+      totalSpentSum: increment(-(cost || 0)),
+      lastUpdated: serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.error("Failed to unrecord service usage:", e);
+  }
+}
+
+export async function getBotIncomeAndServiceStats() {
+  const dynamicCosts = await getBotConfigCosts();
+
+  const standardServices: Array<{ key: string; name: string; defaultPrice: number }> = [
+    { key: "📄 Kurs ishi yaratish", name: "📄 Kurs ishi yaratish", defaultPrice: 35000 },
+    { key: "💎 Pro kurs ishi", name: "💎 Pro kurs ishi", defaultPrice: 89000 },
+    { key: "📄 Obektivka yaratish", name: "📄 Obektivka yaratish", defaultPrice: 15000 },
+    { key: "📊 Slayd yaratish", name: "📊 Slayd yaratish", defaultPrice: 4000 },
+    { key: "💎 Pro slayd", name: "💎 Pro slayd", defaultPrice: 15000 },
+    { key: "📋 Test yaratish", name: "📋 Test yaratish", defaultPrice: 3000 },
+    { key: "🌐 Tarjimon", name: "🌐 Tarjimon (matn)", defaultPrice: 3000 },
+    { key: "📄 Fayl tarjima qilish", name: "📄 Fayl tarjima qilish", defaultPrice: 10000 },
+    { key: "📄 AI Antiplagiat", name: "📄 AI Antiplagiat", defaultPrice: 5000 },
+    { key: "📄 CV yaratish", name: "📄 CV yaratish", defaultPrice: 10000 },
+    { key: "🎓 Tezis yaratish", name: "🎓 Tezis yaratish", defaultPrice: 15000 },
+    { key: "📑 Maqola yaratish", name: "📑 Maqola yaratish", defaultPrice: 20000 },
+    { key: "📝 Dars ishlanma yaratish", name: "📝 Dars ishlanma yaratish", defaultPrice: 10000 },
+    { key: "💬 Savol-javob", name: "💬 Savol-javob (AI Chat)", defaultPrice: 1000 }
+  ];
+
+  const servicesMap: Record<string, { key: string; name: string; count: number; totalSpent: number; price: number }> = {};
+  for (const item of standardServices) {
+    const price = dynamicCosts[item.key] !== undefined ? dynamicCosts[item.key] : item.defaultPrice;
+    servicesMap[item.key] = {
+      key: item.key,
+      name: item.name,
+      count: 0,
+      totalSpent: 0,
+      price
+    };
+  }
+
+  let totalBotIncome = 0;
+  let totalDepositTransactions = 0;
+  let totalCurrentBalance = 0;
+  let botUsersCount = 0;
+
+  if (!db) {
+    return {
+      totalBotIncome: 0,
+      totalDepositTransactions: 0,
+      totalCurrentBalance: 0,
+      botUsersCount: 0,
+      services: Object.values(servicesMap),
+      totalUsedServicesCount: 0,
+      totalUsedServicesSum: 0
+    };
+  }
+
+  // 1. Read persistent service stats from doc(db, "bot_settings", "service_usage_stats")
+  try {
+    const statsDoc = await getDoc(doc(db, "bot_settings", "service_usage_stats"));
+    if (statsDoc.exists()) {
+      const data = statsDoc.data();
+      if (data.services) {
+        for (const [sKey, sVal] of Object.entries(data.services as any)) {
+          const rawName = (sVal as any)?.name || sKey;
+          const foundKey = Object.keys(servicesMap).find(k => k === rawName || sanitizeServiceKey(k) === sKey) || rawName;
+          if (!servicesMap[foundKey]) {
+            servicesMap[foundKey] = {
+              key: foundKey,
+              name: rawName,
+              count: Math.max(0, Number((sVal as any)?.count) || 0),
+              totalSpent: Math.max(0, Number((sVal as any)?.totalSpent) || 0),
+              price: dynamicCosts[foundKey] || 0
+            };
+          } else {
+            servicesMap[foundKey].count = Math.max(servicesMap[foundKey].count, Number((sVal as any)?.count) || 0);
+            servicesMap[foundKey].totalSpent = Math.max(servicesMap[foundKey].totalSpent, Number((sVal as any)?.totalSpent) || 0);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error reading service_usage_stats:", e);
+  }
+
+  // 2. Read ai_stats to ensure historical AI service counts are preserved
+  try {
+    const aiSnap = await getDoc(doc(db, "bot_settings", "ai_stats"));
+    if (aiSnap.exists()) {
+      const aid = aiSnap.data();
+      if (aid.count_oddiyKursIshi) {
+        servicesMap["📄 Kurs ishi yaratish"].count = Math.max(servicesMap["📄 Kurs ishi yaratish"].count, Number(aid.count_oddiyKursIshi));
+      }
+      if (aid.count_proKursIshi) {
+        servicesMap["💎 Pro kurs ishi"].count = Math.max(servicesMap["💎 Pro kurs ishi"].count, Number(aid.count_proKursIshi));
+      }
+      if (aid.count_oddiySlayd) {
+        servicesMap["📊 Slayd yaratish"].count = Math.max(servicesMap["📊 Slayd yaratish"].count, Number(aid.count_oddiySlayd));
+      }
+      if (aid.count_proSlayd) {
+        servicesMap["💎 Pro slayd"].count = Math.max(servicesMap["💎 Pro slayd"].count, Number(aid.count_proSlayd));
+      }
+      if (aid.count_test) {
+        servicesMap["📋 Test yaratish"].count = Math.max(servicesMap["📋 Test yaratish"].count, Number(aid.count_test));
+      }
+      if (aid.count_tarjima) {
+        servicesMap["🌐 Tarjimon"].count = Math.max(servicesMap["🌐 Tarjimon"].count, Number(aid.count_tarjima));
+      }
+    }
+  } catch (e) {}
+
+  // 3. Read payment_history to calculate total deposits into bot users' balance
+  let paymentHistoryDeposits = 0;
+  let paymentHistoryCount = 0;
+  try {
+    const phSnap = await getDocs(collection(db, "payment_history"));
+    phSnap.forEach((docItem) => {
+      const p = docItem.data();
+      const status = p.status || "approved";
+      if (status === "approved" || status === "completed" || status === "success") {
+        const amt = Number(p.amount) || 0;
+        if (amt > 0) {
+          const isBotPayer =
+            p.payerType === "bot_user" ||
+            p.telegramId !== undefined ||
+            (typeof p.paymentType === "string" && (p.paymentType.toLowerCase().includes("bot") || p.paymentType === "admin_transfer" || p.paymentType === "cheque")) ||
+            (typeof p.tariffName === "string" && (p.tariffName.toLowerCase().includes("bot") || p.tariffName.toLowerCase().includes("chek") || p.tariffName.toLowerCase().includes("balans")));
+          
+          if (isBotPayer) {
+            paymentHistoryDeposits += amt;
+            paymentHistoryCount++;
+          }
+        }
+      }
+    });
+  } catch (e) {
+    console.error("Error reading payment_history for bot stats:", e);
+  }
+
+  // 4. Read users collection:
+  // - Compute total current remaining balance across bot users
+  // - Scan billingHistory for both kirim and chiqim to cross-verify
+  let usersKirims = 0;
+  let usersKirimCount = 0;
+  try {
+    const uSnap = await getDocs(collection(db, "users"));
+    uSnap.forEach((uDoc) => {
+      const u = uDoc.data();
+      const isBotUser = u.telegramId !== undefined || u.isBotUser || u.role === "bot_user";
+      if (isBotUser && u.role !== "admin" && !u.isAdmin) {
+        botUsersCount++;
+        const bal = Number(u.balance !== undefined ? u.balance : (u.ball || 0));
+        if (bal > 0) {
+          totalCurrentBalance += bal;
+        }
+      }
+
+      // Check billingHistory
+      if (Array.isArray(u.billingHistory)) {
+        for (const item of u.billingHistory) {
+          const amt = Number(item.amount) || 0;
+          if (item.type === "kirim" && amt > 0 && isBotUser) {
+            usersKirims += amt;
+            usersKirimCount++;
+          } else if (item.type === "chiqim" && amt > 0) {
+            const desc = (item.description || "").toLowerCase();
+            let matchedKey = "";
+            if (desc.includes("pro") && (desc.includes("kurs") || desc.includes("ish"))) matchedKey = "💎 Pro kurs ishi";
+            else if (desc.includes("kurs") || desc.includes("ish")) matchedKey = "📄 Kurs ishi yaratish";
+            else if (desc.includes("obektivka")) matchedKey = "📄 Obektivka yaratish";
+            else if (desc.includes("pro") && (desc.includes("slayd") || desc.includes("taqdimot"))) matchedKey = "💎 Pro slayd";
+            else if (desc.includes("slayd") || desc.includes("taqdimot")) matchedKey = "📊 Slayd yaratish";
+            else if (desc.includes("test")) matchedKey = "📋 Test yaratish";
+            else if (desc.includes("fayl") && desc.includes("tarjima")) matchedKey = "📄 Fayl tarjima qilish";
+            else if (desc.includes("tarjima")) matchedKey = "🌐 Tarjimon";
+            else if (desc.includes("antiplagiat")) matchedKey = "📄 AI Antiplagiat";
+            else if (desc.includes("cv")) matchedKey = "📄 CV yaratish";
+            else if (desc.includes("tezis")) matchedKey = "🎓 Tezis yaratish";
+            else if (desc.includes("maqola")) matchedKey = "📑 Maqola yaratish";
+            else if (desc.includes("dars")) matchedKey = "📝 Dars ishlanma yaratish";
+            else if (desc.includes("savol") || desc.includes("chat")) matchedKey = "💬 Savol-javob";
+
+            if (matchedKey && servicesMap[matchedKey]) {
+              servicesMap[matchedKey].totalSpent += amt;
+              servicesMap[matchedKey].count += 1;
+            }
+          }
+        }
+      }
+    });
+  } catch (e) {
+    console.error("Error reading users for bot stats:", e);
+  }
+
+  // 5. Read payments collection for approved cheque payments
+  let paymentsCollectionDeposits = 0;
+  let paymentsCollectionCount = 0;
+  try {
+    const paySnap = await getDocs(collection(db, "payments"));
+    paySnap.forEach((pDoc) => {
+      const p = pDoc.data();
+      if (p.status === "approved") {
+        const amt = Number(p.amount) || 0;
+        if (amt > 0) {
+          paymentsCollectionDeposits += amt;
+          paymentsCollectionCount++;
+        }
+      }
+    });
+  } catch (e) {}
+
+  totalBotIncome = Math.max(paymentHistoryDeposits, usersKirims, paymentsCollectionDeposits);
+  totalDepositTransactions = Math.max(paymentHistoryCount, usersKirimCount, paymentsCollectionCount);
+
+  // Auto calculate totalSpent if count > 0 but totalSpent is 0
+  for (const s of Object.values(servicesMap)) {
+    if (s.count > 0 && s.totalSpent === 0 && s.price > 0) {
+      s.totalSpent = s.count * s.price;
+    }
+  }
+
+  let totalUsedServicesCount = 0;
+  let totalUsedServicesSum = 0;
+  for (const s of Object.values(servicesMap)) {
+    totalUsedServicesCount += s.count;
+    totalUsedServicesSum += s.totalSpent;
+  }
+
+  return {
+    totalBotIncome,
+    totalDepositTransactions,
+    totalCurrentBalance,
+    botUsersCount,
+    services: Object.values(servicesMap),
+    totalUsedServicesCount,
+    totalUsedServicesSum
+  };
+}
+
+export async function checkAndDeductBalance(userId: number, cost: number, serviceName?: string): Promise<boolean> {
+  if (!db || cost <= 0) {
+    if (serviceName && userId) {
+      await recordServiceUsage(serviceName, 0, userId);
+    }
+    return true;
+  }
   try {
     const user = await getAuthedUser(userId);
     if (!user) return false;
     if (user.role === "admin" || user.id?.startsWith("admin_") || getAdminIds().includes(userId)) {
+      if (serviceName) {
+        await recordServiceUsage(serviceName, 0, userId);
+      }
       return true;
     }
     const currentBalance = Number(user.balance !== undefined ? user.balance : (user.ball || 0));
@@ -1174,8 +1453,19 @@ export async function checkAndDeductBalance(userId: number, cost: number): Promi
     await updateDoc(userRef, {
       balance: newBalance,
       ball: newBalance,
+      totalSpentAmount: increment(cost),
+      billingHistory: arrayUnion({
+        type: "chiqim",
+        amount: cost,
+        date: new Date().toISOString(),
+        description: serviceName || "Xizmat uchun to'lov"
+      }),
       updatedAt: serverTimestamp()
     });
+
+    if (serviceName) {
+      await recordServiceUsage(serviceName, cost, userId);
+    }
     return true;
   } catch (e) {
     console.error("Error deducting balance:", e);
@@ -1183,7 +1473,7 @@ export async function checkAndDeductBalance(userId: number, cost: number): Promi
   }
 }
 
-export async function refundBalance(userId: number, amount: number): Promise<void> {
+export async function refundBalance(userId: number, amount: number, serviceName?: string): Promise<void> {
   if (!db || amount <= 0) return;
   try {
     const user = await getAuthedUser(userId);
@@ -1194,8 +1484,18 @@ export async function refundBalance(userId: number, amount: number): Promise<voi
     await updateDoc(userRef, {
       balance: newBalance,
       ball: newBalance,
+      totalSpentAmount: increment(-amount),
+      billingHistory: arrayUnion({
+        type: "kirim",
+        amount: amount,
+        date: new Date().toISOString(),
+        description: serviceName ? `Qaytarilgan mablag' (${serviceName})` : "Qaytarilgan mablag' (Xatolik yuz bergani sababli)"
+      }),
       updatedAt: serverTimestamp()
     });
+    if (serviceName) {
+      await unrecordServiceUsage(serviceName, amount);
+    }
   } catch (e) {
     console.error("Error refunding balance:", e);
   }
@@ -1611,6 +1911,34 @@ bot.command("addbalance", async (ctx) => {
           balance: currentBalance + amount,
           updatedAt: serverTimestamp()
         });
+
+        // Log to payment_history so it appears in Admin Payment History
+        try {
+          await addDoc(collection(db, "payment_history"), {
+            userId: userDoc.id,
+            telegramId: Number(targetTgId),
+            payerName: userData.displayName || userData.name || `Telegram ID: ${targetTgId}`,
+            payerType: userData.role || "bot_user",
+            amount: amount,
+            tariffName: "Balans to'ldirish (/addbalance buyrug'i)",
+            paymentType: "Admin (Telegram Bot)",
+            status: "approved",
+            timestamp: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            adminUserId: ctx.from?.id || "admin"
+          });
+
+          await updateDoc(doc(db, "users", userDoc.id), {
+            billingHistory: arrayUnion({
+              type: "kirim",
+              amount: amount,
+              date: new Date().toISOString(),
+              description: `Admin (/addbalance) orqali balans to'ldirildi (+${amount.toLocaleString()} UZS)`
+            })
+          });
+        } catch (logErr) {
+          console.warn("Could not log /addbalance to payment_history:", logErr);
+        }
 
         await ctx.reply(`✅ Foydalanuvchi (ID: ${targetTgId}) balansiga ${amount} so'm qo'shildi.`);
         await bot.telegram.sendMessage(targetTgId, `💰 <b>Sizning balansingizga ${amount} so'm qo'shildi!</b>`, { parse_mode: "HTML" }).catch(() => {});
@@ -2035,6 +2363,9 @@ Quyidagi bo'limlardan birini tanlang va to'liq audit tahlilini ko'ring:`;
   const keyboard = {
     inline_keyboard: [
       [
+        { text: "📊 Bot Tushumlari & Xizmatlar Statistikasi", callback_data: "audit_bot_services_stats" }
+      ],
+      [
         { text: "📈 Joriy Xarajatlar & Balans (Tracker)", callback_data: "audit_tracker" }
       ],
       [
@@ -2068,6 +2399,74 @@ Quyidagi bo'limlardan birini tanlang va to'liq audit tahlilini ko'ring:`;
 bot.action("audit_main_menu", async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
   await sendAuditMainMenu(ctx, true);
+});
+
+bot.action("audit_bot_services_stats", async (ctx) => {
+  try {
+    await ctx.answerCbQuery().catch(() => {});
+    await ctx.editMessageText("⏳ <i>Bot tushumlari va xizmatlar statistikasi hisoblanmoqda...</i>", { parse_mode: "HTML" }).catch(() => {});
+
+    const stats = await getBotIncomeAndServiceStats();
+
+    // Active services (used at least once)
+    const activeServices = stats.services
+      .filter((s: any) => s.count > 0)
+      .sort((a: any, b: any) => b.count - a.count || b.totalSpent - a.totalSpent);
+
+    const inactiveServices = stats.services
+      .filter((s: any) => s.count === 0);
+
+    let servicesBlock = "";
+    if (activeServices.length > 0) {
+      servicesBlock = activeServices.map((s: any) => {
+        return `• <b>${s.name}:</b> <b>${s.count} ta</b> (${s.totalSpent.toLocaleString()} so'm)`;
+      }).join("\n");
+    } else {
+      servicesBlock = "<i>Hozircha foydalanuvchilar tomonidan ishlatilgan xizmatlar yo'q.</i>";
+    }
+
+    if (inactiveServices.length > 0) {
+      servicesBlock += "\n\n<i>Boshqa xizmatlar (0 ta):</i>\n" +
+        inactiveServices.map((s: any) => `• ${s.name}: <b>0 ta</b> (0 so'm)`).join("\n");
+    }
+
+    const text = 
+`📊 <b>BOT FOYDALANUVCHILARI TUSHUMI VA XIZMATLAR STATISTIKASI</b>
+
+💰 <b>Bot foydalanuvchilar balansiga tushum:</b>
+• <b>Jami tushum (Kirim):</b> <b>${stats.totalBotIncome.toLocaleString()} so'm</b>
+• <b>To'lov operatsiyalari soni:</b> <b>${stats.totalDepositTransactions} ta</b>
+• <b>Foydalanuvchilar joriy qoldiq balansi:</b> <b>${stats.totalCurrentBalance.toLocaleString()} so'm</b>
+• <b>Bot foydalanuvchilari soni:</b> <b>${stats.botUsersCount} nafar</b>
+
+🛍 <b>Foydalanuvchilar ishlatgan xizmatlar (Har bir xizmat bo'yicha):</b>
+${servicesBlock}
+
+━━━━━━━━━━━━━━━━━━━━
+📌 <b>JAMI XIZMATLAR XULOSASI:</b>
+• <b>Jami foydalanilgan xizmatlar:</b> <b>${stats.totalUsedServicesCount} ta</b>
+• <b>Xizmatlar uchun sarflangan summa:</b> <b>${stats.totalUsedServicesSum.toLocaleString()} so'm</b>
+• <b>Kassa hisobi (Tushum - Sarf):</b> <b>${(stats.totalBotIncome - stats.totalUsedServicesSum).toLocaleString()} so'm</b>
+
+<i>💡 Ma'lumotlar real vaqt rejimida Firestore bazasidan olindi.</i>`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🔄 Qayta hisoblash", callback_data: "audit_bot_services_stats" },
+          { text: "📈 Joriy Xarajatlar (Tracker)", callback_data: "audit_tracker" }
+        ],
+        [
+          { text: "🔙 Audit bosh menyusiga qaytish", callback_data: "audit_main_menu" }
+        ]
+      ]
+    };
+
+    await ctx.editMessageText(text, { parse_mode: "HTML", reply_markup: keyboard });
+  } catch (e: any) {
+    console.error("Audit bot services error:", e);
+    await ctx.reply("❌ Statistika yuklashda xatolik yuz berdi: " + (e.message || "Noma'lum"));
+  }
 });
 
 
@@ -2169,6 +2568,9 @@ bot.action("audit_tracker", async (ctx) => {
 
     const keyboard = {
       inline_keyboard: [
+        [
+          { text: "📊 Bot Tushumlari & Xizmatlar", callback_data: "audit_bot_services_stats" }
+        ],
         [
           { text: "🟢 Gemini Balans To'ldirish", callback_data: "audit_add_gemini" },
           { text: "🔵 Claude Balans To'ldirish", callback_data: "audit_add_claude" }
@@ -2870,17 +3272,27 @@ bot.action(/admin_approve_req_(.+)/, async (ctx) => {
         if (uData.displayName) payerName = uData.displayName;
         if (uData.role === "staff") payerType = "xodim";
         else if (uData.role === "mustaqil_o_qituvchi") payerType = "mustaqil_o_qituvchi";
+        else if (uData.role === "student" || uData.role === "talaba") payerType = "talaba";
+        else if (uData.role === "bot_user" || uData.telegramId) payerType = "bot_user";
       }
     } catch (e) {}
 
+    const resolvedAmount = Number(req.tariffPrice || req.totalPrice || req.amount || 0);
+    const resolvedTariffName = req.isBalanceTopUp
+      ? `Balans to'ldirish (${resolvedAmount.toLocaleString()} UZS)`
+      : (req.tariffName || "Tarif to'lovi");
+
     await addDoc(collection(db, "payment_history"), {
       userId: targetUserId,
+      telegramId: req.telegramId || null,
       payerName: payerName,
       payerType: payerType,
-      amount: Number(req.tariffPrice || req.totalPrice || 0),
-      tariffName: req.tariffName || "Noma'lum",
+      amount: resolvedAmount,
+      tariffName: resolvedTariffName,
       paymentType: req.paymentType || "Chek",
-      timestamp: serverTimestamp()
+      status: "approved",
+      timestamp: serverTimestamp(),
+      createdAt: serverTimestamp()
     });
 
     if (req.isNewOrgRequest) {
@@ -3090,7 +3502,7 @@ return;
   let hasBalance = true;
   let chargeCost = cost;
   if (normText !== "🌐 Tarjimon") {
-    hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost));
+    hasBalance = isAdmin || (await checkAndDeductBalance(userId, cost, normText));
   } else {
     chargeCost = 0;
   }
@@ -3819,6 +4231,9 @@ slide.addText(bulletTxt, { x: 0.8, y: currY, w: 4.1, h: 1.8, fontSize: 12, color
         errMsg = errText.substring(0, 100);
       }
       console.error("Presentation API Error:", res.status, errMsg);
+      if (data?.__chargedCost) {
+        await refundBalance(userId, data.__chargedCost, "📊 Slayd yaratish");
+      }
       userWizardStates.delete(userId);
       return ctx.reply(`❌ Taqdimot ma'lumotlarini yuklashda xato yuz berdi:
 
@@ -3828,6 +4243,9 @@ Iltimos, keyinroq qayta urinib ko'ring yoki Slaydlar sonini biroz kamaytirib tek
     }
   } catch (err: any) {
     console.error("Presentation generation err:", err);
+    if (data?.__chargedCost) {
+      await refundBalance(userId, data.__chargedCost, "📊 Slayd yaratish");
+    }
     userWizardStates.delete(userId);
     return ctx.reply("❌ Taqdimot PPTX faylini yaratishda xato yuz berdi: " + err.message);
   }
@@ -3907,6 +4325,9 @@ async function runCourseWorkDocxGeneration(ctx: any, data: any) {
   } catch (err: any) {
     console.error("[CourseWork Generation Error]:", err);
     await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+    if (data?.__chargedCost) {
+      await refundBalance(userId, data.__chargedCost, "📄 Kurs ishi yaratish");
+    }
     return ctx.reply(`❌ <b>Kurs ishi yaratishda xatolik yuz berdi:</b> ${err.message || "Noma'lum xato"}`, { parse_mode: "HTML" });
   }
 }
@@ -4548,6 +4969,9 @@ Microsoft Word formatidagi fayl muvaffaqiyatli shakllantirildi.` }
   } catch (err: any) {
     console.error("Obektivka generation error:", err);
     await ctx.telegram.deleteMessage(chatId!, loadingMsg.message_id).catch(() => {});
+    if (data?.__chargedCost) {
+      await refundBalance(userId, data.__chargedCost, "📄 Obektivka yaratish");
+    }
     return ctx.reply(`❌ Obektivka hujjatini yaratishda xato yuz berdi: ${err.message || 'Noma\x27lum xatolik'}`);
   }
 }
@@ -4687,14 +5111,14 @@ Iltimos kuting.`, { parse_mode: "HTML" });
         errMsg = errJson.error || errJson.message || "";
       } catch (e) {}
       if (data.__chargedCost) {
-        await refundBalance(userId, data.__chargedCost);
+        await refundBalance(userId, data.__chargedCost, "📋 Test yaratish");
       }
       return ctx.reply(`❌ Test savollarini shakllantirishda xato yuz berdi.${errMsg ? ` Sabab: ${errMsg}` : ""}`);
     }
   } catch (err: any) {
     console.error("Test word generation err:", err);
     if (data.__chargedCost) {
-      await refundBalance(userId, data.__chargedCost);
+      await refundBalance(userId, data.__chargedCost, "📋 Test yaratish");
     }
     return ctx.reply("❌ Test Word faylini yaratishda xato yuz berdi: " + (err.message || "Noma'lum xatolik"));
   }
@@ -4858,7 +5282,7 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
   // these run on Claude via src/pro, not Gemini.
   const proHooks = {
     keyboard: () => getAiAssistantKeyboard(userId),
-    refund: () => refundBalance(userId, data.__chargedCost || 0),
+    refund: () => refundBalance(userId, data.__chargedCost || 0, service),
     onSuccess: async () => {
        if (service === "💎 Pro slayd") await trackAiUsage('proSlayd');
        else if (service === "💎 Pro kurs ishi") await trackAiUsage('proKursIshi');
@@ -5328,7 +5752,7 @@ parse_mode: "HTML",
         }
         
         const fileCost = data.__fileCost || 10000;
-        const hasBalance = isAdmin || (await checkAndDeductBalance(userId, fileCost));
+        const hasBalance = isAdmin || (await checkAndDeductBalance(userId, fileCost, "📄 Fayl tarjima qilish"));
         if (!hasBalance) {
           userWizardStates.delete(userId);
           return ctx.reply("❌ <b>Balansingiz yetarli emas!</b> Fayl tarjimasi narxi: " + fileCost.toLocaleString() + " so'm.", { parse_mode: "HTML" });
@@ -5340,7 +5764,7 @@ parse_mode: "HTML",
         await runTranslationGeneration(ctx, data, true);
       } else {
         const textCost = data.__textCost || 3000;
-        const hasBalance = isAdmin || (await checkAndDeductBalance(userId, textCost));
+        const hasBalance = isAdmin || (await checkAndDeductBalance(userId, textCost, "🌐 Tarjimon"));
         if (!hasBalance) {
           userWizardStates.delete(userId);
           return ctx.reply("❌ <b>Balansingiz yetarli emas!</b> Matn tarjimasi narxi: " + textCost.toLocaleString() + " so'm.", { parse_mode: "HTML" });
@@ -6365,7 +6789,7 @@ bot.on("message", async (ctx) => {
   if (wizard && !pending) {
     if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu" || normText === "⬅️ Asosiy menyu" || AI_COSTS[normText]) {
       if (wizard.data?.__chargedCost) {
-        await refundBalance(userId, wizard.data.__chargedCost);
+        await refundBalance(userId, wizard.data.__chargedCost, wizard.service);
       }
       userWizardStates.delete(userId);
     } else {
@@ -8314,6 +8738,22 @@ for (const [service, price] of Object.entries(costs)) {
         });
 
         try {
+          const payerRole = foundUser.role || (foundUser.telegramId ? "bot_user" : "tashkilot");
+          await addDoc(collection(db, "payment_history"), {
+            userId: foundUser.docId,
+            telegramId: foundUser.telegramId ? Number(foundUser.telegramId) : null,
+            systemId: foundUser.systemId || foundUser.docId,
+            payerName: foundUser.displayName || "Foydalanuvchi",
+            payerType: payerRole,
+            amount: amount,
+            tariffName: "Balans to'ldirish (Admin orqali)",
+            paymentType: "Admin (Telegram Bot)",
+            status: "approved",
+            timestamp: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            adminUserId: userId
+          });
+
           await addDoc(collection(db, "payment_transactions"), {
             userId: foundUser.docId,
             userName: foundUser.displayName,
@@ -8323,6 +8763,15 @@ for (const [service, price] of Object.entries(costs)) {
             adminUserId: userId,
             status: "success",
             createdAt: serverTimestamp(),
+          });
+
+          await updateDoc(userRef, {
+            billingHistory: arrayUnion({
+              type: "kirim",
+              amount: amount,
+              date: new Date().toISOString(),
+              description: `Admin (Telegram bot) orqali balans to'ldirildi (+${amount.toLocaleString()} UZS)`
+            })
           });
         } catch (e) {
           console.warn("Could not save payment transaction log:", e);
@@ -8547,6 +8996,35 @@ Sababi: ${reason}`,
                 processedAt: serverTimestamp(),
                 processedBy: userId
               });
+
+              // Log into payment_history so it appears in Admin Billing -> To'lovlar tarixi
+              try {
+                await addDoc(collection(db, "payment_history"), {
+                  paymentDocId: pDoc.id,
+                  userId: userDoc.id,
+                  telegramId: Number(targetId),
+                  payerName: uName,
+                  payerType: userData.role || "bot_user",
+                  amount: amount,
+                  tariffName: `Chek orqali to'lov (${amount.toLocaleString()} UZS)`,
+                  paymentType: "Chek (Karta orqali)",
+                  status: "approved",
+                  timestamp: serverTimestamp(),
+                  createdAt: serverTimestamp(),
+                  processedBy: userId
+                });
+
+                await updateDoc(doc(db, "users", userDoc.id), {
+                  billingHistory: arrayUnion({
+                    type: "kirim",
+                    amount: amount,
+                    date: new Date().toISOString(),
+                    description: `Chek tasdiqlanib balans to'ldirildi (+${amount.toLocaleString()} UZS)`
+                  })
+                });
+              } catch (histErr) {
+                console.error("Failed to add cheque payment to payment_history:", histErr);
+              }
             }
           } catch (e) {
             console.error("Firestore payment status update fail:", e);

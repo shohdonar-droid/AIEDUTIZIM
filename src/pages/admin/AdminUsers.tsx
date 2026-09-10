@@ -8,6 +8,7 @@ import {
   updateDoc,
   setDoc,
   addDoc,
+  arrayUnion,
   query,
   where,
   deleteDoc,
@@ -2863,24 +2864,58 @@ export default function AdminUsers() {
                                         return;
                                       }
                                       try {
+                                        const targetDocId = matchedUser ? matchedUser.id : `tg_${tgId}`;
+                                        const uName = matchedUser?.displayName || `${tu.firstName || ""} ${tu.lastName || ""}`.trim() || "Telegram Foydalanuvchi";
+                                        const addedAmount = newBall - currentBall;
+
                                         if (matchedUser) {
                                           await setDoc(doc(db, "users", matchedUser.id), {
                                             ball: newBall,
-                                            balance: newBall
+                                            balance: newBall,
+                                            updatedAt: serverTimestamp()
                                           }, { merge: true });
                                         } else {
                                           await setDoc(doc(db, "users", `tg_${tgId}`), {
                                             telegramId: Number(tgId),
                                             uid: `tg_${tgId}`,
-                                            displayName: `${tu.firstName || ""} ${tu.lastName || ""}`.trim() || "Telegram Foydalanuvchi",
+                                            displayName: uName,
                                             role: "bot_user",
                                             ball: newBall,
                                             balance: newBall,
                                             spentBalls: 0,
                                             isBotUser: true,
                                             isTelegramUser: true,
-                                            createdAt: serverTimestamp()
+                                            createdAt: serverTimestamp(),
+                                            updatedAt: serverTimestamp()
                                           });
+                                        }
+
+                                        if (addedAmount > 0) {
+                                          try {
+                                            await addDoc(collection(db, "payment_history"), {
+                                              userId: targetDocId,
+                                              telegramId: Number(tgId),
+                                              payerName: uName,
+                                              payerType: "bot_user",
+                                              amount: addedAmount,
+                                              tariffName: "Balans to'ldirish (Admin panel)",
+                                              paymentType: "Admin (Sayt)",
+                                              status: "approved",
+                                              timestamp: serverTimestamp(),
+                                              createdAt: serverTimestamp()
+                                            });
+
+                                            await updateDoc(doc(db, "users", targetDocId), {
+                                              billingHistory: arrayUnion({
+                                                type: "kirim",
+                                                amount: addedAmount,
+                                                date: new Date().toISOString(),
+                                                description: `Admin (Sayt) orqali balans to'ldirildi (+${addedAmount.toLocaleString()} UZS)`
+                                              })
+                                            });
+                                          } catch (histErr) {
+                                            console.warn("Could not save to payment_history:", histErr);
+                                          }
                                         }
                                         alert("Balans muvaffaqiyatli o'zgartirildi!");
                                       } catch (e) {

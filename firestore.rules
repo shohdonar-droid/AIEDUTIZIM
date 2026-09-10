@@ -69,6 +69,9 @@ service cloud.firestore {
     match /payment_history/{id} {
       allow read, write: if true;
     }
+    match /payment_transactions/{id} {
+      allow read, write: if true;
+    }
 
     match /active_subscriptions/{id} {
       allow read, write: if true;

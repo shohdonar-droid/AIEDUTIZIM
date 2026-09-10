@@ -8,6 +8,7 @@ import {
   where,
   doc,
   setDoc,
+  addDoc,
   serverTimestamp,
   arrayUnion,
   getDoc,
@@ -948,26 +949,58 @@ export default function AdminBilling() {
       let totalInc = editingUser.totalIncome || 0;
       let totalSpent = editingUser.totalSpentAmount || 0;
       let transactions = editingUser.billingHistory || [];
+      let currentBal = Number(editingUser.balance !== undefined ? editingUser.balance : (editingUser.ball || 0));
 
-      if (Number(editIncome) > 0) {
-        totalInc += Number(editIncome);
+      const incomeNum = Number(editIncome) || 0;
+      const expense = Number(editExpense) || 0;
+
+      if (incomeNum > 0) {
+        totalInc += incomeNum;
+        currentBal += incomeNum;
         const newRecord = {
           type: "kirim",
-          amount: Number(editIncome),
+          amount: incomeNum,
           date: new Date().toISOString(),
+          description: "Admin panel orqali kiritilgan to'lov"
         };
         transactions = [...transactions, newRecord];
+
+        // Also record in payment_history collection for the Billing -> To'lovlar tarixi table
+        try {
+          const payerType = activeTab === "org"
+            ? "tashkilot"
+            : activeTab === "student"
+            ? "talaba"
+            : "xodim";
+
+          await addDoc(collection(db, "payment_history"), {
+            userId: editingUser.uid || (editingUser as any).id,
+            systemId: (editingUser as any).systemId || "",
+            telegramId: (editingUser as any).telegramId || null,
+            payerName: editingUser.displayName || (editingUser as any).name || "Foydalanuvchi",
+            payerType: payerType,
+            amount: incomeNum,
+            tariffName: "Balans to'ldirish (Admin panel)",
+            paymentType: "Admin (Sayt)",
+            status: "approved",
+            timestamp: serverTimestamp(),
+            createdAt: serverTimestamp(),
+          });
+        } catch (phErr) {
+          console.error("Could not write to payment_history:", phErr);
+        }
       }
 
-      const expense = Number(editExpense);
       if (Math.abs(expense) > 0) {
         const spentVal = Math.abs(expense);
         totalSpent += spentVal;
+        currentBal = Math.max(0, currentBal - spentVal);
 
         const newRecord = {
           type: "chiqim",
           amount: expense < 0 ? expense : -expense,
           date: new Date().toISOString(),
+          description: "Admin panel orqali yechilgan mablag'"
         };
         transactions = [...transactions, newRecord];
       }
@@ -975,11 +1008,13 @@ export default function AdminBilling() {
       const updateData: any = {
         totalIncome: totalInc,
         totalSpentAmount: totalSpent,
+        balance: currentBal,
+        ball: currentBal,
         billingHistory: transactions,
         updatedAt: serverTimestamp(),
       };
 
-      if (Number(editIncome) > 0) {
+      if (incomeNum > 0) {
         updateData.lastIncomeDate = serverTimestamp();
       }
 

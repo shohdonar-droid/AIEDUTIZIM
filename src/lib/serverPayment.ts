@@ -12,6 +12,7 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
+  arrayUnion,
   Firestore,
 } from "firebase/firestore";
 import crypto from "crypto";
@@ -214,15 +215,39 @@ export async function addBalanceToUser(
     approvedAt: serverTimestamp(),
   });
 
-  // 3. Log payment in payment_history collection
+  // 3. Log payment in payment_history collection and billingHistory
+  const payerRole = data.role || (data.telegramId ? "bot_user" : "tashkilot");
+  const pName = data.displayName || data.name || data.login || "Foydalanuvchi";
+  const desc = `${provider} to'lovi (ID: ${transactionId})`;
+
   await addDoc(collection(db, "payment_history"), {
     userId: docId,
+    systemId: data.systemId || "",
+    telegramId: data.telegramId || null,
+    payerName: pName,
+    payerType: payerRole,
     amount: amount,
-    type: "in",
-    description: `${provider} to'lovi (ID: ${transactionId})`,
+    tariffName: desc,
+    description: desc,
     paymentType: provider,
+    status: "approved",
+    timestamp: serverTimestamp(),
     createdAt: serverTimestamp(),
+    transactionId: transactionId,
   });
+
+  try {
+    await updateDoc(userRef, {
+      billingHistory: arrayUnion({
+        type: "kirim",
+        amount: amount,
+        date: new Date().toISOString(),
+        description: `${provider} orqali to'lov (ID: ${transactionId})`
+      })
+    });
+  } catch (bhErr) {
+    console.warn("Could not append to billingHistory:", bhErr);
+  }
 
   // 4. Notify Telegram admins
   try {
