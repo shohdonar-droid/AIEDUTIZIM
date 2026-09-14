@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { config, type Effort } from "./config";
+import { robustParseJSON } from "../lib/jsonHelper";
 
 let client: Anthropic | null = null;
 
@@ -84,7 +85,7 @@ export async function completeJson<T>(args: {
     .map((block) => block.text)
     .join("");
 
-  return JSON.parse(text) as T;
+  return robustParseJSON<T>(text, {} as T);
 }
 
 /** Run async jobs with a bounded number in flight, preserving input order. */

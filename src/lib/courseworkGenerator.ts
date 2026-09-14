@@ -15,6 +15,7 @@ import {
   TableLayoutType
 } from "docx";
 import { generateContentWithRotation } from "./gemini.js";
+import { robustParseJSON } from "./jsonHelper.js";
 
 export interface CourseWorkInput {
   topic: string;             // Mavzu
@@ -1105,14 +1106,7 @@ Return valid JSON with exactly this structure:
     }
   });
 
-  let outlineJson: any;
-  try {
-    outlineJson = JSON.parse(outlineRes.text || "{}");
-  } catch (e) {
-    console.warn("[CourseWork Gemini] Parsing outline JSON failed, extracting block:", e);
-    const m = (outlineRes.text || "").match(/\{[\s\S]*\}/);
-    outlineJson = m ? JSON.parse(m[0]) : {};
-  }
+  const outlineJson: any = robustParseJSON<any>(outlineRes.text, {});
 
   const topic = outlineJson.title || input.topic;
   const subject = outlineJson.subject || input.subject || "Ijtimoiy-iqtisodiy fanlar";
@@ -1280,19 +1274,16 @@ Also provide practical recommendations in JSON format:
       contents: `${writerSystem}\n\n${prompt}`,
       config: { responseMimeType: "application/json" }
     });
-    try {
-      return JSON.parse(res.text || "{}");
-    } catch {
-      return {
-        conclusion: splitBodyParagraphs(res.text || ""),
-        recommendations: {
-          forTeachers: ["Mavzu bo'yicha zamonaviy o'quv-metodik majmualarni takomillashtirish."],
-          forInstitution: ["Tizimda axborot-kommunikatsiya texnologiyalarini keng joriy qilish."],
-          forStudents: ["Mustaqil ta'lim va ilmiy-tadqiqot ko'nikmalarini rivojlantirish."],
-          forEvaluation: ["Baholash tizimida amaliy keyslar ulushini oshirish."]
-        }
-      };
-    }
+    const fallbackConclusion = {
+      conclusion: splitBodyParagraphs(res.text || ""),
+      recommendations: {
+        forTeachers: ["Mavzu bo'yicha zamonaviy o'quv-metodik majmualarni takomillashtirish."],
+        forInstitution: ["Tizimda axborot-kommunikatsiya texnologiyalarini keng joriy qilish."],
+        forStudents: ["Mustaqil ta'lim va ilmiy-tadqiqot ko'nikmalarini rivojlantirish."],
+        forEvaluation: ["Baholash tizimida amaliy keyslar ulushini oshirish."]
+      }
+    };
+    return robustParseJSON(res.text, fallbackConclusion);
   };
 
   // 7. FOYDALANILGAN ADABIYOTLAR (BIBLIOGRAPHY)
@@ -1317,33 +1308,31 @@ Give 25-30 bibliography entries formatted as JSON with categories:
       contents: `${bibSystem}\n\n${prompt}`,
       config: { responseMimeType: "application/json" }
     });
-    try {
-      return JSON.parse(res.text || "{}");
-    } catch {
-      return {
-        normative: [
-          "O'zbekiston Respublikasi Konstitutsiyasi. – Toshkent: O'zbekiston, 2023.",
-          "O'zbekiston Respublikasining 'Ta'lim to'g'risida'gi Qonuni. O'RQ-637-son, 2020-yil 23-sentyabr.",
-          "O'zbekiston Respublikasi Prezidentining 'O'zbekiston – 2030' strategiyasi to'g'risidagi Farmoni. PF-158-son, 2023-yil 11-sentyabr."
-        ],
-        books: [
-          "Qosimov A., Karimov S. Mutaxassislikka kirish va sohaviy asoslar. – Toshkent: Fan, 2022. – 280 b.",
-          "Yo'ldoshev J.G'. Zamonaviy pedagogik texnologiyalar. – Toshkent: O'qituvchi, 2021. – 216 b.",
-          "Abdullayev A.A. Sohaviy tahlil va modellashtirish. – Toshkent: Iqtisodiyot, 2020. – 312 b."
-        ],
-        articles: [
-          "Axmedov B.R. Sohadagi innovatsion o'zgarishlar tahlili // O'zbekiston iqtisodiy axborotnomasi. – 2023. – №4. – B. 45-52.",
-          "Toshmatov Sh.A. Zamonaviy rivojlanish tendensiyalari // Fan va jamiyat. – 2022. – №2. – B. 18-25."
-        ],
-        foreign: [
-          "Kotler P., Armstrong G. Principles of Management & Innovation. – Pearson, 2021. – 736 p."
-        ],
-        web: [
-          "O'zbekiston Respublikasi Prezidenti huzuridagi Statistika agentligi: https://stat.uz",
-          "O'zbekiston Respublikasi Qonun hujjatlari ma'lumotlari milliy bazasi: https://lex.uz"
-        ]
-      };
-    }
+
+    const fallbackBib = {
+      normative: [
+        "O'zbekiston Respublikasi Konstitutsiyasi. – Toshkent: O'zbekiston, 2023.",
+        "O'zbekiston Respublikasining 'Ta'lim to'g'risida'gi Qonuni. O'RQ-637-son, 2020-yil 23-sentyabr.",
+        "O'zbekiston Respublikasi Prezidentining 'O'zbekiston – 2030' strategiyasi to'g'risidagi Farmoni. PF-158-son, 2023-yil 11-sentyabr."
+      ],
+      books: [
+        "Qosimov A., Karimov S. Mutaxassislikka kirish va sohaviy asoslar. – Toshkent: Fan, 2022. – 280 b.",
+        "Yo'ldoshev J.G'. Zamonaviy pedagogik texnologiyalar. – Toshkent: O'qituvchi, 2021. – 216 b.",
+        "Abdullayev A.A. Sohaviy tahlil va modellashtirish. – Toshkent: Iqtisodiyot, 2020. – 312 b."
+      ],
+      articles: [
+        "Axmedov B.R. Sohadagi innovatsion o'zgarishlar tahlili // O'zbekiston iqtisodiy axborotnomasi. – 2023. – №4. – B. 45-52.",
+        "Toshmatov Sh.A. Zamonaviy rivojlanish tendensiyalari // Fan va jamiyat. – 2022. – №2. – B. 18-25."
+      ],
+      foreign: [
+        "Kotler P., Armstrong G. Principles of Management & Innovation. – Pearson, 2021. – 736 p."
+      ],
+      web: [
+        "O'zbekiston Respublikasi Prezidenti huzuridagi Statistika agentligi: https://stat.uz",
+        "O'zbekiston Respublikasi Qonun hujjatlari ma'lumotlari milliy bazasi: https://lex.uz"
+      ]
+    };
+    return robustParseJSON(res.text, fallbackBib);
   };
 
   console.log("[CourseWork Gemini] Step 2: Concurrently generating sections, intro, conclusions and bibliography with gemini-1.5-pro...");
@@ -1412,8 +1401,8 @@ Give 25-30 bibliography entries formatted as JSON with categories:
     chapters: assembledChapters,
     conclusion: Array.isArray(conclusionOutput.conclusion) && conclusionOutput.conclusion.length > 0
       ? conclusionOutput.conclusion
-      : (splitBodyParagraphs(conclusionOutput.conclusion || introTextClean).length > 0
-          ? splitBodyParagraphs(conclusionOutput.conclusion || introTextClean)
+      : (splitBodyParagraphs(typeof conclusionOutput.conclusion === "string" ? conclusionOutput.conclusion : introTextClean).length > 0
+          ? splitBodyParagraphs(typeof conclusionOutput.conclusion === "string" ? conclusionOutput.conclusion : introTextClean)
           : ["Kurs ishida qo'yilgan maqsad va vazifalar to'liq bajarildi hamda ilmiy-amaliy xulosalar shakllantirildi."]),
     recommendations: conclusionOutput.recommendations || {
       forTeachers: ["Mavzuni o'qitishda yangi pedagogik va amaliy texnologiyalardan foydalanish."],

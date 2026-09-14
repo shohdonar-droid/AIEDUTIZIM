@@ -36,6 +36,7 @@ const Type = SDKType || {
 };
 import { generateContentWithRotation } from "./src/lib/gemini";
 import { generateCourseWorkDataWithGemini, buildCourseWorkDocxBuffer } from "./src/lib/courseworkGenerator.js";
+import { robustParseJSON } from "./src/lib/jsonHelper.js";
 import { runProCourseWorkGeneration, runProPresentationGeneration } from "./src/pro/runners.js";
 import { proIsConfigured } from "./src/pro/config.js";
 import { proQueue } from "./src/pro/limiter.js";
@@ -3872,29 +3873,7 @@ async function ensureUserStateSynced(userId: number) {
 }
 
 function safeParseJSON(text: string | null | undefined, defaultValue: any): any {
-  if (!text) return defaultValue;
-  try {
-    let cleaned = text.trim();
-    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```\s*$/g, "").trim();
-    const start = Math.max(cleaned.indexOf('['), cleaned.indexOf('{'));
-    const end = Math.max(cleaned.lastIndexOf(']'), cleaned.lastIndexOf('}'));
-    if (start !== -1 && end !== -1 && end > start) {
-      cleaned = cleaned.substring(start, end + 1);
-    }
-    return JSON.parse(cleaned);
-  } catch (e) {
-    if (text && text.trim().startsWith('[')) {
-      try {
-        let partial = text.trim();
-        const lastCompleteObject = partial.lastIndexOf('}');
-        if (lastCompleteObject !== -1) {
-           const fixed = partial.substring(0, lastCompleteObject + 1) + ']';
-           return JSON.parse(fixed.replace(/^```json\s*/i, "").replace(/```\s*$/g, "").trim());
-        }
-      } catch (innerE) {}
-    }
-    return defaultValue;
-  }
+  return robustParseJSON(text, defaultValue);
 }
 
 async function runPresentationGeneration(ctx: any, data: any) {
@@ -4953,9 +4932,10 @@ Iltimos kuting, hozir faylingiz shakllantiriladi.`, { parse_mode: "HTML" });
     const cleanFileName = `Obektivka_${(data.name || "hujjat").substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.docx`;
     await ctx.replyWithDocument(
       { source: docxBuffer as any, filename: cleanFileName },
-      { caption: `✅ <b>Sizning obektivkangiz tayyor bo'ldi!</b>
-
-Microsoft Word formatidagi fayl muvaffaqiyatli shakllantirildi.` }
+      { 
+        caption: `✅ <b>Sizning obektivkangiz tayyor bo'ldi!</b>\n\nMicrosoft Word formatidagi fayl muvaffaqiyatli shakllantirildi.`,
+        parse_mode: "HTML"
+      }
     );
 
     return ctx.reply("🤖 <b>Kerakli xizmatni menyudan tanlang:</b>", {
@@ -5404,7 +5384,7 @@ async function handleWizardStep(ctx: any, wizard: any, input: string) {
         ], resize_keyboard: true }
       });
     } else if (step === 10) {
-      data.pageCount = input.replace(/D/g, '') || "30";
+      data.pageCount = input.replace(/\D/g, '') || "30";
       userWizardStates.delete(userId);
       await runProCourseWorkGeneration(ctx, data, proHooks);
     }

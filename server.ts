@@ -9,6 +9,7 @@ import { GoogleGenAI, Type as SDKType } from "@google/genai";
 const Type = SDKType;
 import { generateContentWithRotation, getGeminiKeysPool, syncGeminiKeysWithFirestore, clearKeysCache } from "./src/lib/gemini.js";
 import { generateCourseWorkDataWithGemini, buildCourseWorkDocxBuffer } from "./src/lib/courseworkGenerator.js";
+import { robustParseJSON } from "./src/lib/jsonHelper.js";
 
 const ACADEMIC_PERSONA = `Sen O'zbekiston oliy ta'lim tizimi standartlariga mos "kurs ishi" (course paper) yozuvchi ilmiy-akademik yordamchisan. Foydalanuvchi kiritgan mavzu, universitet nomi, fakultet, kafedra, yo'nalish, talaba F.I.Sh, ilmiy rahbar F.I.Sh kabi ma'lumotlar asosida to'liq, original, ilmiy jihatdan puxta kurs ishi generatsiya qilishing kerak.
 
@@ -47,54 +48,7 @@ import { query as dbQuery } from "./src/lib/db.js";
 import { findUserBySystemId, handleClickRequest, handlePaymeRequest } from "./src/lib/serverPayment.js";
 
 function parseJSONResponse(text: string | null | undefined, defaultOutput: any): any {
-  if (!text) return defaultOutput;
-  try {
-    let cleaned = text.trim();
-    // Remove markdown code blocks
-    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```\s*$/g, "").trim();
-    
-    // Find first and last brackets/braces to extract core JSON
-    const firstBracket = cleaned.indexOf('[');
-    const firstBrace = cleaned.indexOf('{');
-    let start = -1;
-    if (firstBracket !== -1 && firstBrace !== -1) {
-      start = Math.min(firstBracket, firstBrace);
-    } else if (firstBracket !== -1) {
-      start = firstBracket;
-    } else if (firstBrace !== -1) {
-      start = firstBrace;
-    }
-
-    const lastBracket = cleaned.lastIndexOf(']');
-    const lastBrace = cleaned.lastIndexOf('}');
-    const end = Math.max(lastBracket, lastBrace);
-    
-    if (start !== -1 && end !== -1 && end > start) {
-      cleaned = cleaned.substring(start, end + 1);
-    }
-
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("JSON parse error detail:", e);
-    console.error("Offending text snippet:", text?.substring(0, 200) + (text && text.length > 200 ? "..." : ""));
-    
-    // Attempt to fix truncated array of objects
-    if (text && text.trim().startsWith('[')) {
-      try {
-        let partial = text.trim();
-        // Find last complete object }
-        const lastCompleteObject = partial.lastIndexOf('}');
-        if (lastCompleteObject !== -1) {
-           const fixed = partial.substring(0, lastCompleteObject + 1) + ']';
-           return JSON.parse(fixed.replace(/^```json\s*/i, "").replace(/```\s*$/g, "").trim());
-        }
-      } catch (innerE) {
-        // Fallback
-      }
-    }
-    
-    return defaultOutput;
-  }
+  return robustParseJSON(text, defaultOutput);
 }
 
 function validateKursIshi(
