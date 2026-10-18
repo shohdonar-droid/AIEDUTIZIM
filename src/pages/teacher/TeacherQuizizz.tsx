@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, setDoc, runTransaction } from 'firebase/firestore';
 import safeOnSnapshot from '../../lib/safeSnapshot';
+import { QRCodeCanvas } from 'qrcode.react';
 import { Brain, FileUp, Sparkles, Loader2, Save, Trash2, Edit, PlayCircle, Users, CheckCircle, XCircle, Search, Download, BarChart2, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { generateDynamicTest } from '../../services/geminiService';
@@ -455,7 +456,10 @@ export default function TeacherQuizizz() {
       {activeSession && (
         <div className="fixed inset-0 z-[100] bg-gray-100 p-4 md:p-8 overflow-y-auto">
            <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col min-h-[80vh]">
-              <div className="bg-blue-600 p-8 text-white flex flex-col items-center justify-center text-center">
+              <div className="bg-blue-600 p-8 text-white flex flex-col items-center justify-center text-center relative">
+                 <div className="absolute top-4 left-4 bg-white p-2 rounded-lg">
+                    <QRCodeCanvas value="https://www.aide.uz/quizizz" size={80} />
+                 </div>
                  <h2 className="text-3xl font-black mb-4">{activeSession.title}</h2>
                  <p className="text-blue-100 text-xl font-medium mb-6 whitespace-nowrap">
                    O'quvchilarga ayting: <strong>Quizizz</strong> menyusiga kirib PIN kodni yozishsin.
