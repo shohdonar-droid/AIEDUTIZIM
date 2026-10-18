@@ -457,8 +457,8 @@ export default function TeacherQuizizz() {
         <div className="fixed inset-0 z-[100] bg-gray-100 p-4 md:p-8 overflow-y-auto">
            <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col min-h-[80vh]">
               <div className="bg-blue-600 p-8 text-white flex flex-col items-center justify-center text-center relative">
-                 <div className="absolute top-4 left-4 bg-white p-2 rounded-lg">
-                    <QRCodeCanvas value="https://www.aide.uz/quizizz" size={80} />
+                 <div className="absolute top-4 left-4 bg-white p-2 rounded-lg z-20">
+                    <img src="/image.png" alt="QR Code" className="w-[80px] h-[80px]" />
                  </div>
                  <h2 className="text-3xl font-black mb-4">{activeSession.title}</h2>
                  <p className="text-blue-100 text-xl font-medium mb-6 whitespace-nowrap">
