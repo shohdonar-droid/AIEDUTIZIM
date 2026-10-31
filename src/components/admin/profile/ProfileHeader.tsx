@@ -53,7 +53,7 @@ export function ProfileHeader({ user }: { user: any }) {
              </div>
              <div className="flex items-center gap-2 text-gray-500 font-bold bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
                <Mail size={14} className="text-blue-600" /> 
-               <span>{user?.email || 'admin@aiedutizim.uz'}</span>
+               <span>{user?.email || 'admin@aide.uz'}</span>
              </div>
              {user?.address && (
                <div className="flex items-center gap-2 text-gray-500 font-bold bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">

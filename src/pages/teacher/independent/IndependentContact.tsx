@@ -77,7 +77,7 @@ export default function IndependentContact() {
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Elektron pochta</p>
-                <p className="text-sm font-semibold text-gray-800 mt-0.5">support@aiedutizim.uz</p>
+                <p className="text-sm font-semibold text-gray-800 mt-0.5">support@aide.uz</p>
               </div>
             </div>
 

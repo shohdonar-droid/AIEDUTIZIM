@@ -50,7 +50,7 @@ import path from "path";
 dotenv.config();
 setLogLevel("error");
 
-let rawAppUrl = process.env.APP_URL || "https://aiedutizim.vercel.app";
+let rawAppUrl = process.env.APP_URL || "https://www.aide.uz";
 if (!rawAppUrl.startsWith("http://") && !rawAppUrl.startsWith("https://")) {
   rawAppUrl = "https://" + rawAppUrl;
 }
@@ -9766,7 +9766,7 @@ Endi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tish
             parse_mode: "HTML",
             reply_markup: {
               inline_keyboard: [
-                [{ text: "📱 Tizimga kirish", web_app: { url: "${APP_URL}/login" } }],
+                [{ text: "📱 Tizimga kirish", web_app: { url: autoLoginUrl } }],
               ],
             },
           });
@@ -9813,7 +9813,7 @@ Endi "Tizimga kirish" tugmasi orqali o'z profilingizga to'g'ridan to'g'ri o'tish
                   [
                     {
                       text: "📱 Tizimga kirish",
-                      web_app: { url: "${APP_URL}/login" },
+                      web_app: { url: autoLoginUrl },
                     },
                   ],
                 ],

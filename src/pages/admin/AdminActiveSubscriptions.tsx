@@ -763,7 +763,7 @@ IJROCHI:
 "AIEDUTIZIM" MChJ
 INN: 309124859
 Manzil: Toshkent sh., Chilonzor tumani, 9-kvartal.
-E-mail: support@aiedutizim.uz
+E-mail: support@aide.uz
 
 BUYURTMACHI:
 Sarlavha: ${sub.userName}
