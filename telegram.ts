@@ -1676,7 +1676,7 @@ bot.start(async (ctx) => {
 `📄 Obektivka yarating\n\n` +
 `⚡ Barchasi — bitta botda, tez va qulay!\n\n` +
 `🌐 www.aide.uz\n` +
-`🤖 @AIEDUTIZIM_bot\n` +
+`🤖 @aideuz_bot\n` +
 `💬 Savollar va yordam: @aiedutizimchat\n\n` +
 `🚀 AIEDUTIZIM — ta’limni sun’iy intellekt bilan osonlashtiring!`;
 

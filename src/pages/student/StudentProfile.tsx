@@ -40,7 +40,7 @@ export default function StudentProfile() {
       await setDoc(doc(db, 'users', user.uid), {
         telegramToken: token,
       }, { merge: true });
-      window.open(`https://t.me/aideuz_bot?start=link_${token}`, '_blank');
+      window.open(`https://t.me/AIEDUTIZIM_bot?start=link_${token}`, '_blank');
     } catch (e) {
       console.error(e);
       alert("Xatolik yuz berdi");
