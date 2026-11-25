@@ -15,6 +15,103 @@ service cloud.firestore {
       );
     }
 
+    // Helper for DTM module RBAC (admins & subadmins verified via token or user profile role)
+    function isDtmAdmin() {
+      return isAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'subadmin', 'superadmin']
+      );
+    }
+
+    function isValidDtmId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidDtmSubject(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 160 &&
+        data.code is string && data.code.size() >= 1 && data.code.size() <= 40 &&
+        data.blockType is string && data.blockType.size() >= 1 && data.blockType.size() <= 40 &&
+        data.status in ['ACTIVE', 'INACTIVE'] &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 1500));
+    }
+
+    function isValidDtmQuestion(data) {
+      return data.subjectId is string && data.subjectId.size() >= 1 && data.subjectId.size() <= 128 &&
+        data.block is string && data.block.size() >= 1 && data.block.size() <= 40 &&
+        data.questionText is string && data.questionText.size() >= 1 && data.questionText.size() <= 4000 &&
+        data.optionA is string && data.optionA.size() >= 1 && data.optionA.size() <= 1500 &&
+        data.optionB is string && data.optionB.size() >= 1 && data.optionB.size() <= 1500 &&
+        data.optionC is string && data.optionC.size() >= 1 && data.optionC.size() <= 1500 &&
+        data.optionD is string && data.optionD.size() >= 1 && data.optionD.size() <= 1500 &&
+        data.correctAnswer in ['A', 'B', 'C', 'D'] &&
+        data.difficulty in ['EASY', 'MEDIUM', 'HARD'] &&
+        data.status in ['ACTIVE', 'INACTIVE'] &&
+        (!('topic' in data) || (data.topic is string && data.topic.size() <= 200));
+    }
+
+    function isValidDtmOrganization(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 240 &&
+        data.status in ['ACTIVE', 'INACTIVE'] &&
+        (!('orgType' in data) || (data.orgType is string && data.orgType.size() <= 120)) &&
+        (!('region' in data) || (data.region is string && data.region.size() <= 120)) &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+        (!('responsiblePerson' in data) || (data.responsiblePerson is string && data.responsiblePerson.size() <= 160)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 1500));
+    }
+
+    function isValidDtmStudent(data) {
+      return data.numericId is string && data.numericId.matches('^[0-9]{7}$') &&
+        data.organizationId is string && data.organizationId.size() >= 1 && data.organizationId.size() <= 128 &&
+        data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 200 &&
+        data.block1SubjectId is string && data.block1SubjectId.size() >= 1 && data.block1SubjectId.size() <= 128 &&
+        data.block2SubjectId is string && data.block2SubjectId.size() >= 1 && data.block2SubjectId.size() <= 128 &&
+        (!('groupOrClass' in data) || (data.groupOrClass is string && data.groupOrClass.size() <= 100)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidDtmAssignment(data) {
+      return data.assignmentCode is string && data.assignmentCode.size() >= 3 && data.assignmentCode.size() <= 64 &&
+        data.organizationId is string && data.organizationId.size() >= 1 && data.organizationId.size() <= 128 &&
+        data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128 &&
+        data.studentNumericId is string && data.studentNumericId.matches('^[0-9]{7}$') &&
+        data.block1SubjectId is string && data.block1SubjectId.size() >= 1 && data.block1SubjectId.size() <= 128 &&
+        data.block2SubjectId is string && data.block2SubjectId.size() >= 1 && data.block2SubjectId.size() <= 128 &&
+        data.block1Questions is list && data.block1Questions.size() == 30 &&
+        data.block2Questions is list && data.block2Questions.size() == 30 &&
+        data.totalQuestions == 60 &&
+        data.status in ['GENERATED', 'PDF_READY', 'DOWNLOADED', 'CHECKED', 'CANCELLED', 'SUPERSEDED'];
+    }
+
+    function isValidDtmAnswerSheet(data) {
+      return data.studentNumericId is string && data.studentNumericId.matches('^[0-9]{7}$') &&
+        data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128 &&
+        data.assignmentId is string && data.assignmentId.size() >= 1 && data.assignmentId.size() <= 128 &&
+        data.sourceType in ['MANUAL', 'OMR_CAMERA', 'OMR_IMAGE', 'OMR_PDF', 'SCANNER'] &&
+        data.answers is map &&
+        data.status in ['SUBMITTED', 'CHECKED', 'ERROR'];
+    }
+
+    function isValidDtmResult(data) {
+      return data.organizationId is string && data.organizationId.size() >= 1 && data.organizationId.size() <= 128 &&
+        data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128 &&
+        data.studentNumericId is string && data.studentNumericId.matches('^[0-9]{7}$') &&
+        data.assignmentId is string && data.assignmentId.size() >= 1 && data.assignmentId.size() <= 128 &&
+        data.totalQuestions is number && data.totalQuestions == 60 &&
+        data.correctCount is number && data.wrongCount is number && data.unansweredCount is number &&
+        data.percentage is number && data.score is number;
+    }
+
     // Global admin rule
     match /{document=**} {
       allow read, write: if isAdmin();
@@ -83,6 +180,77 @@ service cloud.firestore {
     // Activity logs
     match /activityLogs/{document=**} {
       allow read, write: if true;
+    }
+
+    // =====================================================
+    // DTM TIZIM MODULE COLLECTIONS (Strictly Admin RBAC)
+    // =====================================================
+    match /dtmCounters/{counterId} {
+      allow get: if isDtmAdmin() && isValidDtmId(counterId);
+      allow list: if isDtmAdmin();
+      allow create, update: if isDtmAdmin() && isValidDtmId(counterId) &&
+        incoming().nextValue is int && incoming().nextValue >= 1;
+      allow delete: if false;
+    }
+
+    match /dtmSubjects/{subjectId} {
+      allow get: if isDtmAdmin() && isValidDtmId(subjectId);
+      allow list: if isDtmAdmin();
+      allow create: if isDtmAdmin() && isValidDtmId(subjectId) && isValidDtmSubject(incoming());
+      allow update: if isDtmAdmin() && isValidDtmId(subjectId) && isValidDtmSubject(incoming());
+      allow delete: if isDtmAdmin() && isValidDtmId(subjectId);
+    }
+
+    match /dtmQuestions/{questionId} {
+      allow get: if isDtmAdmin() && isValidDtmId(questionId);
+      allow list: if isDtmAdmin();
+      allow create: if isDtmAdmin() && isValidDtmId(questionId) && isValidDtmQuestion(incoming());
+      allow update: if isDtmAdmin() && isValidDtmId(questionId) && isValidDtmQuestion(incoming());
+      allow delete: if isDtmAdmin() && isValidDtmId(questionId);
+    }
+
+    match /dtmOrganizations/{orgId} {
+      allow get: if isDtmAdmin() && isValidDtmId(orgId);
+      allow list: if isDtmAdmin();
+      allow create: if isDtmAdmin() && isValidDtmId(orgId) && isValidDtmOrganization(incoming());
+      allow update: if isDtmAdmin() && isValidDtmId(orgId) && isValidDtmOrganization(incoming());
+      allow delete: if isDtmAdmin() && isValidDtmId(orgId);
+    }
+
+    match /dtmStudents/{studentId} {
+      allow get: if isDtmAdmin() && isValidDtmId(studentId);
+      allow list: if isDtmAdmin();
+      allow create: if isDtmAdmin() && isValidDtmId(studentId) && isValidDtmStudent(incoming());
+      allow update: if isDtmAdmin() && isValidDtmId(studentId) && isValidDtmStudent(incoming()) &&
+        incoming().numericId == existing().numericId;
+      allow delete: if isDtmAdmin() && isValidDtmId(studentId);
+    }
+
+    match /dtmAssignments/{assignmentId} {
+      allow get: if isDtmAdmin() && isValidDtmId(assignmentId);
+      allow list: if isDtmAdmin();
+      allow create: if isDtmAdmin() && isValidDtmId(assignmentId) && isValidDtmAssignment(incoming());
+      allow update: if isDtmAdmin() && isValidDtmId(assignmentId) && isValidDtmAssignment(incoming()) &&
+        incoming().assignmentCode == existing().assignmentCode &&
+        incoming().studentId == existing().studentId &&
+        incoming().studentNumericId == existing().studentNumericId &&
+        incoming().block1Questions == existing().block1Questions &&
+        incoming().block2Questions == existing().block2Questions;
+      allow delete: if false; // Preserve historical snapshots
+    }
+
+    match /dtmAnswerSheets/{sheetId} {
+      allow get: if isDtmAdmin() && isValidDtmId(sheetId);
+      allow list: if isDtmAdmin();
+      allow create, update: if isDtmAdmin() && isValidDtmId(sheetId) && isValidDtmAnswerSheet(incoming());
+      allow delete: if false;
+    }
+
+    match /dtmResults/{resultId} {
+      allow get: if isDtmAdmin() && isValidDtmId(resultId);
+      allow list: if isDtmAdmin();
+      allow create, update: if isDtmAdmin() && isValidDtmId(resultId) && isValidDtmResult(incoming());
+      allow delete: if false;
     }
 
     // Global admin rule

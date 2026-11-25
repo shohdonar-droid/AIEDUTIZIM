@@ -36,6 +36,7 @@ import AdminSystemLogs from './AdminSystemLogs';
 import AdminBackup from './AdminBackup';
 import AdminAutoTests from './AdminAutoTests';
 import { AdminLayout } from '../../components/admin/AdminLayout';
+import { DtmSubRoutes } from './dtm/DtmRoutes';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -107,6 +108,9 @@ export default function AdminDashboard() {
         <Route path="/banner" element={<AdminBanner />} />
         <Route path="/info" element={<AdminInfo />} />
         <Route path="/footer" element={<AdminFooter />} />
+
+        {/* DTM System */}
+        <Route path="/dtm/*" element={<DtmSubRoutes />} />
         
         {/* Billing */}
         <Route path="/billing" element={<AdminBilling />} />

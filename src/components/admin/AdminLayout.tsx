@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutGrid,
   User as UserIcon,
@@ -24,7 +24,8 @@ import {
   Menu,
   X,
   HardDrive,
-  Building2
+  Building2,
+  ClipboardCheck
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -32,9 +33,18 @@ import { useAuth } from '../../hooks/useAuth';
 export function AdminLayout({ children, unreadCount, user }: { children: React.ReactNode, unreadCount: number, user: any }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+  const location = useLocation();
+  const [expandedMenu, setExpandedMenu] = useState<string | null>(() =>
+    location.pathname.startsWith('/dtm') || location.pathname.startsWith('/admin/dtm') ? 'dtm' : null
+  );
   const { logout } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/dtm') || location.pathname.startsWith('/admin/dtm')) {
+      setExpandedMenu('dtm');
+    }
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     if (window.confirm("Tizimdan chiqishni xohlaysizmi?")) {
@@ -74,6 +84,15 @@ export function AdminLayout({ children, unreadCount, user }: { children: React.R
         { name: 'Banner', path: '/admin/banner' },
         { name: 'Info', path: '/admin/info' },
         { name: 'Footer', path: '/admin/footer' }
+    ]},
+    { id: 'dtm', name: 'DTM tizim', icon: ClipboardCheck, subItems: [
+        { name: 'Dashboard', path: '/dtm/dashboard' },
+        { name: 'Testlar bazasi', path: '/dtm/questions' },
+        { name: 'Fanlar', path: '/dtm/subjects' },
+        { name: 'Tashkilotlar', path: '/dtm/organizations' },
+        { name: 'Test variantlari', path: '/dtm/assignments' },
+        { name: 'Natijalar', path: '/dtm/results' },
+        { name: 'Javoblarni tekshirish', path: '/dtm/answer-check' }
     ]},
     { id: 'billing', name: 'Billing', icon: Wallet, subItems: [
         { name: 'Tariflar', path: '/admin/billing' },

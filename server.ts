@@ -571,6 +571,126 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
     }
   });
 
+  // ==========================================
+  // DTM TIZIM: SERVER-SIDE PDF & ZIP ENDPOINTS
+  // ==========================================
+  const verifyDtmAdminToken = async (req: express.Request): Promise<{ ok: boolean; status: number; error?: string }> => {
+    const authHeader = req.headers.authorization || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return { ok: false, status: 401, error: "Avtorizatsiya talab qilinadi (Bearer token yo'q)." };
+    }
+    const idToken = authHeader.slice(7).trim();
+    if (!idToken) {
+      return { ok: false, status: 401, error: "Yaroqsiz token." };
+    }
+
+    try {
+      const fbCfgPath = path.join(process.cwd(), "firebase-applet-config.json");
+      const fbCfg = JSON.parse(fs.readFileSync(fbCfgPath, "utf8"));
+      const apiKey = process.env.FIREBASE_API_KEY || fbCfg.apiKey;
+      const projectId = process.env.FIREBASE_PROJECT_ID || fbCfg.projectId;
+      const databaseId = process.env.FIREBASE_DATABASE_ID || fbCfg.firestoreDatabaseId || "(default)";
+
+      const lookupRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      if (!lookupRes.ok) {
+        return { ok: false, status: 401, error: "Firebase tokeni yaroqsiz yoki muddati tugagan." };
+      }
+      const lookupData: any = await lookupRes.json();
+      const userRecord = lookupData?.users?.[0];
+      if (!userRecord || !userRecord.localId) {
+        return { ok: false, status: 401, error: "Foydalanuvchi aniqlanmadi." };
+      }
+
+      const adminEmails = ["shohdonar@gmail.com", "elyorbek@admin.uz", "elyorbek@gmail.com"];
+      if (userRecord.email && adminEmails.includes(String(userRecord.email).toLowerCase())) {
+        return { ok: true, status: 200 };
+      }
+
+      const userDocRes = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(databaseId)}/documents/users/${encodeURIComponent(userRecord.localId)}`,
+        { headers: { Authorization: `Bearer ${idToken}` } }
+      );
+      if (userDocRes.ok) {
+        const userDoc: any = await userDocRes.json();
+        const role = userDoc?.fields?.role?.stringValue || "";
+        if (role === "admin" || role === "subadmin" || role === "superadmin") {
+          return { ok: true, status: 200 };
+        }
+      }
+
+      return { ok: false, status: 403, error: "DTM bo'limi uchun faqat administrator ruxsatiga ega foydalanuvchilar kirishi mumkin." };
+    } catch (err: any) {
+      console.error("[DTM Auth Verify Error]:", err);
+      return { ok: false, status: 500, error: "Token tekshirishda server xatoligi." };
+    }
+  };
+
+  app.post("/api/dtm/pdf/test", async (req, res) => {
+    try {
+      const authCheck = await verifyDtmAdminToken(req);
+      if (!authCheck.ok) {
+        return res.status(authCheck.status).json({ error: authCheck.error });
+      }
+      const { assignment } = req.body || {};
+      if (!assignment || !/^\d{7}$/.test(String(assignment.studentNumericId || ""))) {
+        return res.status(400).json({ error: "Noto'g'ri assignment yoki 7 xonali O'quvchi ID." });
+      }
+      const { generateTestBookletPdfBuffer } = await import("./server/dtmPdfService.js");
+      const pdfBuffer = await generateTestBookletPdfBuffer(assignment);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Test_${assignment.studentNumericId}.pdf"`);
+      return res.send(pdfBuffer);
+    } catch (err: any) {
+      console.error("[DTM Test PDF Error]:", err);
+      return res.status(500).json({ error: err?.message || "Test PDF yaratishda xatolik." });
+    }
+  });
+
+  app.post("/api/dtm/pdf/answer-sheet", async (req, res) => {
+    try {
+      const authCheck = await verifyDtmAdminToken(req);
+      if (!authCheck.ok) {
+        return res.status(authCheck.status).json({ error: authCheck.error });
+      }
+      const { assignment } = req.body || {};
+      if (!assignment || !/^\d{7}$/.test(String(assignment.studentNumericId || ""))) {
+        return res.status(400).json({ error: "Noto'g'ri assignment yoki 7 xonali O'quvchi ID." });
+      }
+      const { generateAnswerSheetPdfBuffer } = await import("./server/dtmPdfService.js");
+      const pdfBuffer = await generateAnswerSheetPdfBuffer(assignment);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Javoblar_${assignment.studentNumericId}.pdf"`);
+      return res.send(pdfBuffer);
+    } catch (err: any) {
+      console.error("[DTM Answer Sheet PDF Error]:", err);
+      return res.status(500).json({ error: err?.message || "Javoblar varaqasi PDF yaratishda xatolik." });
+    }
+  });
+
+  app.post("/api/dtm/zip", async (req, res) => {
+    try {
+      const authCheck = await verifyDtmAdminToken(req);
+      if (!authCheck.ok) {
+        return res.status(authCheck.status).json({ error: authCheck.error });
+      }
+      const { organizationName, assignments } = req.body || {};
+      if (!Array.isArray(assignments) || assignments.length === 0) {
+        return res.status(400).json({ error: "ZIP yaratish uchun tayyor variantlar ro'yxati bo'sh." });
+      }
+      const { streamOrganizationZip } = await import("./server/dtmPdfService.js");
+      await streamOrganizationZip(res, String(organizationName || "Tashkilot"), assignments);
+    } catch (err: any) {
+      console.error("[DTM ZIP Error]:", err);
+      if (!res.headersSent) {
+        return res.status(500).json({ error: err?.message || "ZIP arxiv yaratishda xatolik." });
+      }
+    }
+  });
+
   app.post("/api/gemini", async (req, res) => {
     try {
       const { action, topic, count, context, docType, options } = req.body;

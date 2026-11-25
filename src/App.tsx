@@ -18,6 +18,7 @@ import StudentDashboard from './pages/student/StudentDashboard';
 import TestExecute from './pages/student/TestExecute';
 import AutoTestExecute from './pages/student/AutoTestExecute';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import DtmModuleShell from './pages/admin/dtm/DtmRoutes';
 import CourseView from './pages/CourseView';
 import InfoDetail from './pages/InfoDetail';
 import VerifyCertificate from './pages/VerifyCertificate';
@@ -115,6 +116,13 @@ export default function App() {
               <Route path="/admin/*" element={
                 <ProtectedRoute role="admin">
                   <AdminDashboard />
+                </ProtectedRoute>
+              } />
+
+              {/* DTM System Standalone Module Routes */}
+              <Route path="/dtm/*" element={
+                <ProtectedRoute role="admin">
+                  <DtmModuleShell />
                 </ProtectedRoute>
               } />
             </Routes>

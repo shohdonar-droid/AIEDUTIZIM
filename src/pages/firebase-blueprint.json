@@ -96,6 +96,89 @@
         "attempts": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "DtmSubject": {
+      "title": "DtmSubject",
+      "description": "DTM subject definition with block type and status",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "blockType": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+      }
+    },
+    "DtmQuestion": {
+      "title": "DtmQuestion",
+      "description": "DTM test bank question",
+      "type": "object",
+      "properties": {
+        "subjectId": { "type": "string" },
+        "block": { "type": "string" },
+        "questionText": { "type": "string" },
+        "correctAnswer": { "type": "string", "enum": ["A", "B", "C", "D"] },
+        "difficulty": { "type": "string", "enum": ["EASY", "MEDIUM", "HARD"] },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+      }
+    },
+    "DtmOrganization": {
+      "title": "DtmOrganization",
+      "description": "DTM participating organization / school",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "orgType": { "type": "string" },
+        "region": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+      }
+    },
+    "DtmStudent": {
+      "title": "DtmStudent",
+      "description": "Internal DTM examinee with unique 7-digit ID",
+      "type": "object",
+      "properties": {
+        "numericId": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "block1SubjectId": { "type": "string" },
+        "block2SubjectId": { "type": "string" }
+      }
+    },
+    "DtmAssignment": {
+      "title": "DtmAssignment",
+      "description": "Immutable individual 60-question DTM test assignment snapshot",
+      "type": "object",
+      "properties": {
+        "assignmentCode": { "type": "string" },
+        "organizationId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentNumericId": { "type": "string" },
+        "totalQuestions": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
+    "DtmAnswerSheet": {
+      "title": "DtmAnswerSheet",
+      "description": "DTM answer sheet",
+      "type": "object",
+      "properties": {
+        "studentNumericId": { "type": "string" },
+        "assignmentId": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "DtmResult": {
+      "title": "DtmResult",
+      "description": "Graded DTM result",
+      "type": "object",
+      "properties": {
+        "studentNumericId": { "type": "string" },
+        "assignmentId": { "type": "string" },
+        "score": { "type": "number" },
+        "percentage": { "type": "number" }
+      }
     }
   },
   "firestore": {
@@ -109,6 +192,14 @@
     "/messages/{messageId}": { "schema": "object", "description": "Messages" },
     "/activityLogs/{logId}": { "schema": "object", "description": "Logs" },
     "/siteContent/{contentId}": { "schema": "object", "description": "Content" },
-    "/counters/{counterId}": { "schema": "object", "description": "Counters" }
+    "/counters/{counterId}": { "schema": "object", "description": "Counters" },
+    "/dtmSubjects/{subjectId}": { "schema": "DtmSubject", "description": "DTM subjects" },
+    "/dtmQuestions/{questionId}": { "schema": "DtmQuestion", "description": "DTM test bank questions" },
+    "/dtmOrganizations/{orgId}": { "schema": "DtmOrganization", "description": "DTM organizations" },
+    "/dtmStudents/{studentId}": { "schema": "DtmStudent", "description": "DTM examinees" },
+    "/dtmAssignments/{assignmentId}": { "schema": "DtmAssignment", "description": "DTM test variant snapshots" },
+    "/dtmAnswerSheets/{sheetId}": { "schema": "DtmAnswerSheet", "description": "DTM answer sheets" },
+    "/dtmResults/{resultId}": { "schema": "DtmResult", "description": "DTM results" },
+    "/dtmCounters/{counterId}": { "schema": "object", "description": "DTM atomic counters" }
   }
 }
