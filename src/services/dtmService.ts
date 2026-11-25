@@ -1470,9 +1470,18 @@ export async function submitAndCheckAnswerSheet(params: {
   sourceType?: DtmAnswerSourceType;
   fileUrl?: string | null;
   fileName?: string | null;
+  ocrConfidence?: number | null;
 }): Promise<DtmResult> {
   assertSignedInAdmin();
-  const { student, assignment, answers, sourceType = 'MANUAL', fileUrl = null, fileName = null } = params;
+  const {
+    student,
+    assignment,
+    answers,
+    sourceType = 'MANUAL',
+    fileUrl = null,
+    fileName = null,
+    ocrConfidence,
+  } = params;
 
   const allQuestions = [
     ...(assignment.block1Questions || []),
@@ -1529,7 +1538,12 @@ export async function submitAndCheckAnswerSheet(params: {
       fileUrl,
       fileName,
       answers,
-      ocrConfidence: sourceType === 'MANUAL' ? 100 : null,
+      ocrConfidence:
+        typeof ocrConfidence === 'number'
+          ? ocrConfidence
+          : sourceType === 'MANUAL'
+          ? 100
+          : null,
       status: 'CHECKED',
       checkedBy: checker,
       createdAt: serverTimestamp(),
