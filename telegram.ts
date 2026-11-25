@@ -1538,10 +1538,9 @@ export async function getKeyboard(
 
   const userHeader = [
     [{ text: "💻 CHIRCHIQ KOMPYUTER XIZMATLARI" }],
-    [{ text: "🎯 DTM tizim" }, { text: "🎓 Mening topshiriqlarim" }],
-    [{ text: "👤 Profil" }, { text: "💬 Adminga murojaat" }],
-    [{ text: "🤖 Xizmatlar" }, { text: "💰 Bonus olish" }],
-    [{ text: "💰 Balans" }, { text: "🌐 Rasmiy sayt" }]
+    [{ text: "🎓 Topshiriqlarim" }, { text: "🤖 Xizmatlar" }],
+    [{ text: "🎯 DTM tizim" }, { text: "🌐 Sayt" }],
+    [{ text: "💰 Balans" }, { text: "🎁 Bonus" }, { text: "💬 Murojaat" }, { text: "👤 Profil" }]
   ];
 
   const adminIds = getAdminIds();
@@ -7119,9 +7118,11 @@ bot.on("message", async (ctx) => {
   // AI and Menu section exit check
   const menuButtons = [
     "ℹ️ Tizim haqida", "💰 Balans", "💳 Balansni to'ldirish",
-    "💬 Adminga murojaat", "🌐 Rasmiy sayt",
+    "💬 Adminga murojaat", "💬 Murojaat", "🌐 Rasmiy sayt", "🌐 Sayt",
+    "🎁 Bonus", "💰 Bonus olish",
     "🔙 Asosiy Menyu", "⬅️ Asosiy menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish",
-    "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob", "🎓 Mening topshiriqlarim",
+    "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob",
+    "🎓 Mening topshiriqlarim", "🎓 Topshiriqlarim",
     "💻 CHIRCHIQ KOMPYUTER XIZMATLARI", "📊 Tizim xarajatlari",
     "🎯 DTM tizim", "📝 DTM Test Kitobchasi", "📊 DTM natijani bilish", "✅ DTM Javob tekshirish"
   ];
@@ -8678,7 +8679,7 @@ for (const [service, price] of Object.entries(costs)) {
     );
   }
 
-  if (normText === "💰 Bonus olish" || normText === "bonus olish") {
+  if (normText === "💰 Bonus olish" || normText === "bonus olish" || normText === "🎁 Bonus" || normText === "💰 Bonus" || normText.toLowerCase() === "bonus") {
     aiModeDeactivate();
     let invitedCount = 0;
     if (db) {
@@ -8799,7 +8800,7 @@ for (const [service, price] of Object.entries(costs)) {
     });
   }
 
-  if (normText === "🌐 Rasmiy sayt") {
+  if (normText === "🌐 Rasmiy sayt" || normText === "🌐 Sayt" || normText.toLowerCase() === "sayt") {
     aiAssistantActiveUsers.delete(userId);
     return ctx.reply(
       `🌐 <b>AIEDUTIZIM - Raqamli ta'lim platformasi</b>
@@ -8808,7 +8809,7 @@ for (const [service, price] of Object.entries(costs)) {
     );
   }
 
-  if (normText === "💬 Adminga murojaat") {
+  if (normText === "💬 Adminga murojaat" || normText === "💬 Murojaat" || normText.toLowerCase() === "murojaat") {
     aiAssistantActiveUsers.delete(userId);
     const customText = customMenuTexts.get("💬 Adminga murojaat");
     pendingLogins.set(userId, { step: "admin_message" });
@@ -8827,7 +8828,13 @@ for (const [service, price] of Object.entries(costs)) {
   }
 
 
-  if (normText === "🎓 Mening topshiriqlarim" || normText === "🎓 mening topshiriqlarim" || normText === "mening topshiriqlarim") {
+  if (
+    normText === "🎓 Mening topshiriqlarim" ||
+    normText === "🎓 mening topshiriqlarim" ||
+    normText === "mening topshiriqlarim" ||
+    normText === "🎓 Topshiriqlarim" ||
+    normText.toLowerCase() === "topshiriqlarim"
+  ) {
     aiModeDeactivate();
     pendingLogins.delete(userId);
     
