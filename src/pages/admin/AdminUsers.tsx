@@ -1627,14 +1627,21 @@ export default function AdminUsers() {
                         {t.systemId || "-"}
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => impersonateTeacher(t.uid)}
-                          className="font-black text-blue-600 hover:underline inline-flex items-center gap-1"
-                          title="Teacher profiliga kirish"
-                        >
-                          <LayoutDashboard className="w-4 h-4" />{" "}
-                          {t.displayName}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => impersonateTeacher(t.uid)}
+                            className="font-black text-blue-600 hover:underline inline-flex items-center gap-1"
+                            title="Tashkilot profiliga kirish"
+                          >
+                            <LayoutDashboard className="w-4 h-4" />{" "}
+                            {t.displayName}
+                          </button>
+                          {(t as any).isDtmOrganization && (
+                            <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                              DTM
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-500">
                         {t.phone || "-"}

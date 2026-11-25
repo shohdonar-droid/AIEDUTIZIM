@@ -51,6 +51,7 @@ export interface DtmQuestion {
   topic: string;
   difficulty: DtmDifficulty;
   status: DtmStatus;
+  orderIndex?: number;
   createdAt: any;
   updatedAt: any;
 }
@@ -67,6 +68,10 @@ export interface DtmOrganization {
   status: DtmStatus;
   studentCount?: number;
   assignmentCount?: number;
+  ownerUid?: string;
+  login?: string;
+  password?: string;
+  email?: string;
   createdAt: any;
   updatedAt: any;
 }

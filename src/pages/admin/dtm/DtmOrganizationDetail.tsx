@@ -55,8 +55,9 @@ interface ExcelPreviewRow {
   error?: string;
 }
 
-export default function DtmOrganizationDetail() {
+export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: string }) {
   const { id } = useParams<{ id: string }>();
+  const orgId = scopedOrgId || id;
   const [org, setOrg] = useState<DtmOrganization | null>(null);
   const [students, setStudents] = useState<DtmStudent[]>([]);
   const [subjects, setSubjects] = useState<DtmSubject[]>([]);
@@ -93,15 +94,15 @@ export default function DtmOrganizationDetail() {
   const [importing, setImporting] = useState(false);
 
   const loadData = async () => {
-    if (!id) return;
+    if (!orgId) return;
     setLoading(true);
     setError('');
     try {
       const [orgData, studentList, subjectList, orgAssignments] = await Promise.all([
-        getDtmOrganizationById(id),
-        listDtmStudentsByOrg(id),
+        getDtmOrganizationById(orgId),
+        listDtmStudentsByOrg(orgId),
         listDtmSubjects(),
-        listDtmAssignments(id),
+        listDtmAssignments(orgId),
       ]);
       setOrg(orgData);
       setStudents(studentList);
@@ -120,16 +121,10 @@ export default function DtmOrganizationDetail() {
 
   useEffect(() => {
     loadData();
-  }, [id]);
+  }, [orgId]);
 
-  const block1Subjects = useMemo(
-    () => subjects.filter((s) => s.blockType === '1-blok' || s.blockType === 'both' || s.blockType !== '2-blok'),
-    [subjects]
-  );
-  const block2Subjects = useMemo(
-    () => subjects.filter((s) => s.blockType === '2-blok' || s.blockType === 'both' || s.blockType !== '1-blok'),
-    [subjects]
-  );
+  const block1Subjects = subjects;
+  const block2Subjects = subjects;
 
   const filteredStudents = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -515,23 +510,47 @@ export default function DtmOrganizationDetail() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <DtmModuleNav
-        title={org ? org.name : 'Tashkilot tafsilotlari'}
-        subtitle={
-          org
-            ? `${org.orgType || 'Tashkilot'} · ${org.region || 'Hudud ko‘rsatilmagan'} · Jami ${students.length} o‘quvchi · ${readyAssignments.length} tayyor variant`
-            : "O‘quvchilar va test variantlarini boshqarish"
-        }
-        actions={
+      {scopedOrgId ? (
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-blue-600">
+              DTM Tashkilot · O‘quvchilar
+            </div>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">
+              {org ? org.name : 'Tashkilot o‘quvchilari'}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {org
+                ? `${org.orgType || 'Tashkilot'} · ${org.region || 'Hudud ko‘rsatilmagan'} · Jami ${students.length} o‘quvchi · ${readyAssignments.length} tayyor variant`
+                : "O‘quvchilar va test variantlarini boshqarish"}
+            </p>
+          </div>
           <Link
-            to="/dtm/organizations"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            to="/teacher/dtm/answer-check"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Tashkilotlar ro‘yxati
+            Javoblarni tekshirish
           </Link>
-        }
-      />
+        </div>
+      ) : (
+        <DtmModuleNav
+          title={org ? org.name : 'Tashkilot tafsilotlari'}
+          subtitle={
+            org
+              ? `${org.orgType || 'Tashkilot'} · ${org.region || 'Hudud ko‘rsatilmagan'} · Jami ${students.length} o‘quvchi · ${readyAssignments.length} tayyor variant`
+              : "O‘quvchilar va test variantlarini boshqarish"
+          }
+          actions={
+            <Link
+              to="/dtm/organizations"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Tashkilotlar ro‘yxati
+            </Link>
+          }
+        />
+      )}
 
       {error && (
         <div className="mb-4 whitespace-pre-line rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">

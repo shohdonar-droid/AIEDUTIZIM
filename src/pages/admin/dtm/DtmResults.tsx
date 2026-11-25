@@ -19,7 +19,7 @@ import {
 import { DtmOrganization, DtmResult } from '../../../types/dtm';
 import { DtmModuleNav } from './DtmModuleNav';
 
-export default function DtmResults() {
+export default function DtmResults({ scopedOrgId }: { scopedOrgId?: string }) {
   const [results, setResults] = useState<DtmResult[]>([]);
   const [organizations, setOrganizations] = useState<DtmOrganization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,8 +34,8 @@ export default function DtmResults() {
     setError('');
     try {
       const [resList, orgs] = await Promise.all([
-        listDtmResults(),
-        listDtmOrganizations(),
+        listDtmResults(scopedOrgId),
+        scopedOrgId ? Promise.resolve([]) : listDtmOrganizations(),
       ]);
       setResults(resList);
       setOrganizations(orgs);
@@ -48,7 +48,7 @@ export default function DtmResults() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [scopedOrgId]);
 
   const filteredResults = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -88,10 +88,24 @@ export default function DtmResults() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <DtmModuleNav
-        title="DTM Natijalar"
-        subtitle="Tekshirilgan javoblar varaqalari, bloklar kesimidagi to‘g‘ri javoblar va umumiy ballar"
-      />
+      {scopedOrgId ? (
+        <div className="mb-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-blue-600">
+            DTM Tashkilot
+          </div>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">
+            DTM Natijalar
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Tashkilot o‘quvchilarining tekshirilgan javoblari va umumiy ballari
+          </p>
+        </div>
+      ) : (
+        <DtmModuleNav
+          title="DTM Natijalar"
+          subtitle="Tekshirilgan javoblar varaqalari, bloklar kesimidagi to‘g‘ri javoblar va umumiy ballar"
+        />
+      )}
 
       {error && (
         <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -123,8 +137,12 @@ export default function DtmResults() {
       </div>
 
       {/* Filters */}
-      <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:grid-cols-3">
-        <div className="relative sm:col-span-2">
+      <div
+        className={`mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs ${
+          scopedOrgId ? '' : 'sm:grid-cols-3'
+        }`}
+      >
+        <div className={`relative ${scopedOrgId ? '' : 'sm:col-span-2'}`}>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -134,18 +152,20 @@ export default function DtmResults() {
             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
           />
         </div>
-        <select
-          value={orgFilter}
-          onChange={(e) => setOrgFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
-        >
-          <option value="ALL">Barcha tashkilotlar</option>
-          {organizations.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </select>
+        {!scopedOrgId && (
+          <select
+            value={orgFilter}
+            onChange={(e) => setOrgFilter(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+          >
+            <option value="ALL">Barcha tashkilotlar</option>
+            {organizations.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Results Table */}

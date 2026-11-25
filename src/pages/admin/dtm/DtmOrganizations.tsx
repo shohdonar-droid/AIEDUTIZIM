@@ -12,6 +12,9 @@ import {
   CheckCircle2,
   Loader2,
   Users,
+  KeyRound,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   createDtmOrganization,
@@ -19,6 +22,7 @@ import {
   formatDtmError,
   formatTimestamp,
   listDtmOrganizations,
+  provisionDtmOrgProfile,
   updateDtmOrganization,
 } from '../../../services/dtmService';
 import { DtmOrganization, DtmStatus } from '../../../types/dtm';
@@ -54,6 +58,15 @@ export default function DtmOrganizations() {
   const [responsiblePerson, setResponsiblePerson] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<DtmStatus>('ACTIVE');
+  const [orgLogin, setOrgLogin] = useState('');
+  const [orgPassword, setOrgPassword] = useState('');
+  const [provisioningOrgId, setProvisioningOrgId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string;
+    login: string;
+    password: string;
+  } | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -101,6 +114,8 @@ export default function DtmOrganizations() {
     setResponsiblePerson('');
     setNotes('');
     setStatus('ACTIVE');
+    setOrgLogin('');
+    setOrgPassword('');
     setError('');
     setIsModalOpen(true);
   };
@@ -115,14 +130,47 @@ export default function DtmOrganizations() {
     setResponsiblePerson(org.responsiblePerson || '');
     setNotes(org.notes || '');
     setStatus(org.status || 'ACTIVE');
+    setOrgLogin(org.login || '');
+    setOrgPassword(org.password || '');
     setError('');
     setIsModalOpen(true);
+  };
+
+  const handleCopyCredentials = (text: string, key: string) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopiedId(key);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {});
+  };
+
+  const handleProvisionLegacyOrg = async (org: DtmOrganization) => {
+    setProvisioningOrgId(org.id);
+    setError('');
+    setSuccess('');
+    try {
+      const creds = await provisionDtmOrgProfile(org);
+      setCreatedCredentials({
+        name: org.name,
+        login: creds.login,
+        password: creds.password,
+      });
+      setSuccess(`“${org.name}” uchun DTM profil yaratildi va Foydalanuvchilar -> Tashkilotlar ro‘yxatiga qo‘shildi.`);
+      await loadData();
+    } catch (err) {
+      setError(formatDtmError(err));
+    } finally {
+      setProvisioningOrgId(null);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Tashkilot nomini kiriting.");
+      return;
+    }
+    if (!editingOrg && orgPassword.trim() && orgPassword.trim().length < 6) {
+      setError("Parol kamida 6 ta belgidan iborat bo‘lishi kerak.");
       return;
     }
 
@@ -143,7 +191,7 @@ export default function DtmOrganizations() {
         });
         setSuccess(`“${name.trim()}” tashkiloti yangilandi.`);
       } else {
-        await createDtmOrganization({
+        const created = await createDtmOrganization({
           name: name.trim(),
           orgType: orgType.trim(),
           region: region.trim(),
@@ -152,8 +200,15 @@ export default function DtmOrganizations() {
           responsiblePerson: responsiblePerson.trim(),
           notes: notes.trim(),
           status,
+          login: orgLogin.trim() || undefined,
+          password: orgPassword.trim() || undefined,
         });
-        setSuccess(`“${name.trim()}” tashkiloti yaratildi.`);
+        setCreatedCredentials({
+          name: name.trim(),
+          login: created.login,
+          password: created.password,
+        });
+        setSuccess(`“${name.trim()}” tashkiloti va DTM profili yaratildi (Login: ${created.login}).`);
       }
       setIsModalOpen(false);
       await loadData();
@@ -209,6 +264,50 @@ export default function DtmOrganizations() {
         </div>
       )}
 
+      {createdCredentials && (
+        <div className="mb-5 flex flex-col justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50/90 p-4 sm:flex-row sm:items-center">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-800">
+              <KeyRound className="h-4 w-4" />
+              DTM Tashkilot kirish ma’lumotlari ({createdCredentials.name})
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-900">
+              <span>
+                Login: <strong className="font-mono text-blue-700">{createdCredentials.login}</strong>
+              </span>
+              <span>
+                Parol: <strong className="font-mono text-blue-700">{createdCredentials.password}</strong>
+              </span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Foydalanuvchilar → Tashkilotlar bo‘limida ham saqlandi. Tashkilot “Tashkilot” bo‘limidan tizimga kirishi mumkin.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                handleCopyCredentials(
+                  `Tashkilot: ${createdCredentials.name}\nLogin: ${createdCredentials.login}\nParol: ${createdCredentials.password}`,
+                  'banner'
+                )
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              {copiedId === 'banner' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copiedId === 'banner' ? 'Nusxalandi' : 'Nusxalash'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreatedCredentials(null)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-white/70"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Search & Filter */}
       <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:grid-cols-3">
         <div className="relative sm:col-span-2">
@@ -240,6 +339,7 @@ export default function DtmOrganizations() {
               <tr>
                 <th className="px-4 py-3.5">Tashkilot nomi</th>
                 <th className="px-4 py-3.5">Turi / Hudud</th>
+                <th className="px-4 py-3.5">Login / Parol</th>
                 <th className="px-4 py-3.5">O‘quvchilar soni</th>
                 <th className="px-4 py-3.5">Test variantlari</th>
                 <th className="px-4 py-3.5">Yaratilgan sana</th>
@@ -250,13 +350,13 @@ export default function DtmOrganizations() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
                     Tashkilotlar yuklanmoqda...
                   </td>
                 </tr>
               ) : filteredOrgs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
                     <Building2 className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                     Tashkilotlar topilmadi.
                   </td>
@@ -281,6 +381,28 @@ export default function DtmOrganizations() {
                     <td className="px-4 py-3.5 text-xs text-slate-600">
                       <div className="font-medium text-slate-800">{org.orgType || '—'}</div>
                       <div className="text-slate-500">{org.region || '—'}</div>
+                    </td>
+                    <td className="px-4 py-3.5 text-xs">
+                      {org.ownerUid && org.login ? (
+                        <div className="space-y-0.5">
+                          <div className="font-mono font-bold text-slate-800">{org.login}</div>
+                          <div className="font-mono text-slate-500">{org.password || '—'}</div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleProvisionLegacyOrg(org)}
+                          disabled={provisioningOrgId === org.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          {provisioningOrgId === org.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <KeyRound className="h-3 w-3" />
+                          )}
+                          Profil ochish
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 tabular-nums">
                       <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900">
@@ -446,6 +568,41 @@ export default function DtmOrganizations() {
                   placeholder="Qo‘shimcha ma’lumotlar..."
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
                 />
+              </div>
+
+              <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3.5">
+                <div className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-blue-900">
+                  <KeyRound className="h-3.5 w-3.5" />
+                  Tashkilot kirish profili (DTM tizimi uchun)
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">
+                      Login {editingOrg ? '' : '(bo‘sh qolsa avtomatik)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={orgLogin}
+                      disabled={Boolean(editingOrg?.ownerUid)}
+                      onChange={(e) => setOrgLogin(e.target.value)}
+                      placeholder="Avtomatik 7 xonali ID"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 font-mono text-sm outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-700">
+                      Parol {editingOrg?.ownerUid ? '' : '(bo‘sh qolsa avtomatik)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={orgPassword}
+                      disabled={Boolean(editingOrg?.ownerUid)}
+                      onChange={(e) => setOrgPassword(e.target.value)}
+                      placeholder="Kamida 6 ta belgi"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 font-mono text-sm outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2.5 pt-2">

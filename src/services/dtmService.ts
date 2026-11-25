@@ -16,6 +16,9 @@ import {
   serverTimestamp,
   increment,
 } from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
+import { getNextSequentialId } from '../lib/idUtils';
+import { generatePassword } from '../lib/helpers';
 import {
   DtmAnswerOption,
   DtmAnswerSheet,
@@ -188,10 +191,15 @@ export async function listDtmQuestions(): Promise<DtmQuestion[]> {
   try {
     const snap = await getDocs(collection(db, 'dtmQuestions'));
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DtmQuestion));
+    // Chronological ascending order: oldest first, newly added questions appear at the bottom
     return list.sort((a, b) => {
-      const ta = a.createdAt?.toMillis?.() || 0;
-      const tb = b.createdAt?.toMillis?.() || 0;
-      return tb - ta;
+      const ta = a.createdAt?.toMillis?.() ?? a.orderIndex ?? 0;
+      const tb = b.createdAt?.toMillis?.() ?? b.orderIndex ?? 0;
+      if (ta !== tb) return ta - tb;
+      const oa = a.orderIndex ?? 0;
+      const ob = b.orderIndex ?? 0;
+      if (oa !== ob) return oa - ob;
+      return a.id.localeCompare(b.id);
     });
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, 'dtmQuestions');
@@ -205,7 +213,7 @@ export async function createDtmQuestion(input: Omit<DtmQuestion, 'id' | 'created
     const ref = await addDoc(collection(db, 'dtmQuestions'), {
       subjectId: input.subjectId,
       subjectName: input.subjectName || '',
-      block: input.block,
+      block: input.block || 'both',
       questionText: input.questionText.trim(),
       optionA: input.optionA.trim(),
       optionB: input.optionB.trim(),
@@ -215,6 +223,7 @@ export async function createDtmQuestion(input: Omit<DtmQuestion, 'id' | 'created
       topic: (input.topic || '').trim(),
       difficulty: input.difficulty || 'MEDIUM',
       status: input.status || 'ACTIVE',
+      orderIndex: input.orderIndex ?? Date.now(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -232,16 +241,17 @@ export async function bulkCreateDtmQuestions(
   if (items.length === 0) return 0;
   try {
     const chunkSize = 400;
+    const baseOrder = Date.now();
     let saved = 0;
     for (let i = 0; i < items.length; i += chunkSize) {
       const chunk = items.slice(i, i + chunkSize);
       const batch = writeBatch(db);
-      for (const item of chunk) {
+      chunk.forEach((item, idx) => {
         const ref = doc(collection(db, 'dtmQuestions'));
         batch.set(ref, {
           subjectId: item.subjectId,
           subjectName: item.subjectName || '',
-          block: item.block,
+          block: item.block || 'both',
           questionText: item.questionText.trim(),
           optionA: item.optionA.trim(),
           optionB: item.optionB.trim(),
@@ -251,10 +261,11 @@ export async function bulkCreateDtmQuestions(
           topic: (item.topic || '').trim(),
           difficulty: item.difficulty || 'MEDIUM',
           status: item.status || 'ACTIVE',
+          orderIndex: item.orderIndex ?? (baseOrder + i + idx),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-      }
+      });
       await batch.commit();
       saved += chunk.length;
     }
@@ -324,6 +335,102 @@ export async function getDtmOrganizationById(id: string): Promise<DtmOrganizatio
   }
 }
 
+function clearAdminTeachersCache() {
+  try {
+    localStorage.removeItem('admin_users_last_load_time');
+    localStorage.removeItem('admin_users_teachers_cache');
+  } catch {
+    // ignore storage errors
+  }
+}
+
+async function createFirebaseAuthOrgAccount(params: {
+  name: string;
+  phone: string;
+  organizationId: string;
+  status?: DtmStatus;
+  login?: string;
+  password?: string;
+}): Promise<{ ownerUid: string; login: string; password: string; email: string }> {
+  const cleanLogin = (params.login || '').trim() || (await getNextSequentialId('teacher'));
+  const pass = (params.password || '').trim() || generatePassword();
+
+  if (pass.length < 6) {
+    throw new DtmServiceError(
+      "Parol kamida 6 ta belgidan iborat bo'lishi kerak.",
+      'INVALID_PASSWORD'
+    );
+  }
+
+  const existingLoginSnap = await getDocs(
+    query(collection(db, 'users'), where('login', '==', cleanLogin))
+  );
+  if (!existingLoginSnap.empty) {
+    throw new DtmServiceError(
+      `“${cleanLogin}” logini allaqachon band. Boshqa login kiriting.`,
+      'LOGIN_TAKEN'
+    );
+  }
+
+  const email = `${cleanLogin.toLowerCase()}@teacher.uz`;
+  const apiKey = process.env.FIREBASE_API_KEY || firebaseConfig.apiKey;
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password: pass,
+        returnSecureToken: false,
+      }),
+    }
+  );
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.localId) {
+    const errCode = String(data?.error?.message || '');
+    if (errCode.includes('EMAIL_EXISTS')) {
+      throw new DtmServiceError(
+        `“${cleanLogin}” logini tizimda band. Boshqa login kiriting.`,
+        'LOGIN_TAKEN'
+      );
+    }
+    throw new DtmServiceError(
+      `Tashkilot uchun login profil yaratishda xatolik: ${errCode || response.status}`,
+      'AUTH_CREATE_FAILED'
+    );
+  }
+
+  const uid = String(data.localId);
+  await setDoc(doc(db, 'users', uid), {
+    uid,
+    displayName: params.name.trim(),
+    phone: (params.phone || '').trim(),
+    login: cleanLogin,
+    systemId: cleanLogin,
+    password: pass,
+    ball: 0,
+    role: 'teacher',
+    email,
+    isDtmOrganization: true,
+    dtmOrganizationId: params.organizationId,
+    dtmOrganizationName: params.name.trim(),
+    assignedTariff: 'DTM',
+    tariffPrice: 0,
+    status: params.status === 'INACTIVE' ? 'blocked' : 'active',
+    createdAt: serverTimestamp(),
+  });
+
+  clearAdminTeachersCache();
+
+  return {
+    ownerUid: uid,
+    login: cleanLogin,
+    password: pass,
+    email,
+  };
+}
+
 export async function createDtmOrganization(input: {
   name: string;
   orgType: string;
@@ -333,10 +440,22 @@ export async function createDtmOrganization(input: {
   responsiblePerson: string;
   notes?: string;
   status?: DtmStatus;
-}): Promise<string> {
+  login?: string;
+  password?: string;
+}): Promise<{ id: string; ownerUid: string; login: string; password: string; email: string }> {
   assertSignedInAdmin();
   try {
-    const ref = await addDoc(collection(db, 'dtmOrganizations'), {
+    const orgRef = doc(collection(db, 'dtmOrganizations'));
+    const creds = await createFirebaseAuthOrgAccount({
+      name: input.name,
+      phone: input.phone,
+      organizationId: orgRef.id,
+      status: input.status,
+      login: input.login,
+      password: input.password,
+    });
+
+    await setDoc(orgRef, {
       name: input.name.trim(),
       orgType: input.orgType.trim(),
       region: input.region.trim(),
@@ -347,13 +466,54 @@ export async function createDtmOrganization(input: {
       status: input.status || 'ACTIVE',
       studentCount: 0,
       assignmentCount: 0,
+      ownerUid: creds.ownerUid,
+      login: creds.login,
+      password: creds.password,
+      email: creds.email,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    return ref.id;
+
+    return {
+      id: orgRef.id,
+      ...creds,
+    };
   } catch (err) {
+    if (err instanceof DtmServiceError) throw err;
     handleFirestoreError(err, OperationType.CREATE, 'dtmOrganizations');
     throw new DtmServiceError(formatDtmError(err, "Tashkilot yaratishda xatolik"), 'FIRESTORE_ERROR');
+  }
+}
+
+export async function provisionDtmOrgProfile(
+  org: DtmOrganization,
+  customLogin?: string,
+  customPassword?: string
+): Promise<{ ownerUid: string; login: string; password: string; email: string }> {
+  assertSignedInAdmin();
+  try {
+    const creds = await createFirebaseAuthOrgAccount({
+      name: org.name,
+      phone: org.phone || '',
+      organizationId: org.id,
+      status: org.status,
+      login: customLogin,
+      password: customPassword,
+    });
+
+    await updateDoc(doc(db, 'dtmOrganizations', org.id), {
+      ownerUid: creds.ownerUid,
+      login: creds.login,
+      password: creds.password,
+      email: creds.email,
+      updatedAt: serverTimestamp(),
+    });
+
+    return creds;
+  } catch (err) {
+    if (err instanceof DtmServiceError) throw err;
+    handleFirestoreError(err, OperationType.UPDATE, `dtmOrganizations/${org.id}`);
+    throw new DtmServiceError(formatDtmError(err, "Tashkilot profilini yaratishda xatolik"), 'FIRESTORE_ERROR');
   }
 }
 
@@ -363,10 +523,34 @@ export async function updateDtmOrganization(
 ): Promise<void> {
   assertSignedInAdmin();
   try {
+    const orgSnap = await getDoc(doc(db, 'dtmOrganizations', id));
+    const currentOrg = orgSnap.exists() ? (orgSnap.data() as DtmOrganization) : null;
+
     await updateDoc(doc(db, 'dtmOrganizations', id), {
       ...input,
       updatedAt: serverTimestamp(),
     });
+
+    const ownerUid = input.ownerUid || currentOrg?.ownerUid;
+    if (ownerUid) {
+      const userUpdates: Record<string, any> = {
+        isDtmOrganization: true,
+        dtmOrganizationId: id,
+      };
+      if (input.name !== undefined) {
+        userUpdates.displayName = input.name.trim();
+        userUpdates.dtmOrganizationName = input.name.trim();
+      }
+      if (input.phone !== undefined) userUpdates.phone = input.phone.trim();
+      if (input.password !== undefined && input.password.trim().length >= 6) {
+        userUpdates.password = input.password.trim();
+      }
+      if (input.status !== undefined) {
+        userUpdates.status = input.status === 'INACTIVE' ? 'blocked' : 'active';
+      }
+      await setDoc(doc(db, 'users', ownerUid), userUpdates, { merge: true }).catch(() => {});
+      clearAdminTeachersCache();
+    }
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `dtmOrganizations/${id}`);
     throw new DtmServiceError(formatDtmError(err, "Tashkilotni yangilashda xatolik"), 'FIRESTORE_ERROR');
@@ -377,6 +561,7 @@ export async function deleteDtmOrganization(id: string): Promise<void> {
   assertSignedInAdmin();
   try {
     await deleteDoc(doc(db, 'dtmOrganizations', id));
+    clearAdminTeachersCache();
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `dtmOrganizations/${id}`);
     throw new DtmServiceError(formatDtmError(err, "Tashkilotni o'chirishda xatolik"), 'FIRESTORE_ERROR');
@@ -409,11 +594,20 @@ export async function listAllDtmStudents(): Promise<DtmStudent[]> {
   }
 }
 
-export async function findDtmStudentByNumericId(numericId: string): Promise<DtmStudent | null> {
+export async function findDtmStudentByNumericId(
+  numericId: string,
+  organizationId?: string
+): Promise<DtmStudent | null> {
   const cleanId = numericId.trim();
   if (!/^\d{7}$/.test(cleanId)) return null;
   try {
-    const q = query(collection(db, 'dtmStudents'), where('numericId', '==', cleanId));
+    const q = organizationId
+      ? query(
+          collection(db, 'dtmStudents'),
+          where('numericId', '==', cleanId),
+          where('organizationId', '==', organizationId)
+        )
+      : query(collection(db, 'dtmStudents'), where('numericId', '==', cleanId));
     const snap = await getDocs(q);
     if (snap.empty) return null;
     const d = snap.docs[0];
@@ -458,18 +652,19 @@ async function prepareQuestionSnapshotsForBlocks(params: {
     ? snap2.docs.map((d) => ({ id: d.id, ...d.data() } as DtmQuestion))
     : raw1;
 
-  const pool1 = raw1.filter((q) => q.block === '1-blok' || q.block === 'both');
-  const pool2 = raw2.filter((q) => q.block === '2-blok' || q.block === 'both');
+  // Subjects and questions are independent of blocks; blocks are chosen per student.
+  const pool1 = raw1;
+  const pool2 = raw2;
 
   const errors: string[] = [];
   if (pool1.length < 30) {
     errors.push(
-      `“${params.block1SubjectName}” fanida (1-blok) 30 ta aktiv test mavjud emas. Hozir mavjud testlar soni: ${pool1.length} ta. Test variantini yaratish uchun kamida 30 ta aktiv test kerak.`
+      `“${params.block1SubjectName}” fanida 30 ta aktiv test mavjud emas. Hozir mavjud testlar soni: ${pool1.length} ta. Test variantini yaratish uchun kamida 30 ta aktiv test kerak.`
     );
   }
-  if (pool2.length < 30) {
+  if (pool2.length < 30 && params.block1SubjectId !== params.block2SubjectId) {
     errors.push(
-      `“${params.block2SubjectName}” fanida (2-blok) 30 ta aktiv test mavjud emas. Hozir mavjud testlar soni: ${pool2.length} ta. Test variantini yaratish uchun kamida 30 ta aktiv test kerak.`
+      `“${params.block2SubjectName}” fanida 30 ta aktiv test mavjud emas. Hozir mavjud testlar soni: ${pool2.length} ta. Test variantini yaratish uchun kamida 30 ta aktiv test kerak.`
     );
   }
 
@@ -486,44 +681,55 @@ async function prepareQuestionSnapshotsForBlocks(params: {
 
   if (chosen1.length < 30 || chosen2.length < 30) {
     throw new DtmServiceError(
-      "Takrorlanmas 60 ta savol tanlash uchun aktiv testlar yetarli emas (1-blok va 2-blok savollari kesishib qoldi).",
+      "Takrorlanmas 60 ta savol tanlash uchun aktiv testlar yetarli emas (1-blok va 2-blok bir xil fandan tanlangan bo'lsa kamida 60 ta aktiv test kerak).",
       'INSUFFICIENT_UNIQUE_QUESTIONS'
     );
   }
 
-  const block1Questions: DtmQuestionSnapshot[] = chosen1.map((q, idx) => ({
-    order: idx + 1,
-    questionId: q.id,
-    originalQuestionId: q.id,
-    questionText: q.questionText,
-    optionA: q.optionA,
-    optionB: q.optionB,
-    optionC: q.optionC,
-    optionD: q.optionD,
-    correctAnswer: q.correctAnswer,
-    subjectId: params.block1SubjectId,
-    subjectName: params.block1SubjectName,
-    block: '1-blok',
-    difficulty: q.difficulty,
-    topic: q.topic || '',
-  }));
+  const buildShuffledSnapshot = (
+    q: DtmQuestion,
+    order: number,
+    subjectId: string,
+    subjectName: string,
+    blockLabel: '1-blok' | '2-blok'
+  ): DtmQuestionSnapshot => {
+    const optionEntries: Array<{ text: string; isCorrect: boolean }> = [
+      { text: q.optionA, isCorrect: q.correctAnswer === 'A' },
+      { text: q.optionB, isCorrect: q.correctAnswer === 'B' },
+      { text: q.optionC, isCorrect: q.correctAnswer === 'C' },
+      { text: q.optionD, isCorrect: q.correctAnswer === 'D' },
+    ];
+    const shuffledOptions = shuffleFisherYates(optionEntries);
+    const letters: DtmAnswerOption[] = ['A', 'B', 'C', 'D'];
+    const correctIdx = shuffledOptions.findIndex((opt) => opt.isCorrect);
+    const remappedCorrect: DtmAnswerOption =
+      correctIdx >= 0 ? letters[correctIdx] : q.correctAnswer;
 
-  const block2Questions: DtmQuestionSnapshot[] = chosen2.map((q, idx) => ({
-    order: 31 + idx,
-    questionId: q.id,
-    originalQuestionId: q.id,
-    questionText: q.questionText,
-    optionA: q.optionA,
-    optionB: q.optionB,
-    optionC: q.optionC,
-    optionD: q.optionD,
-    correctAnswer: q.correctAnswer,
-    subjectId: params.block2SubjectId,
-    subjectName: params.block2SubjectName,
-    block: '2-blok',
-    difficulty: q.difficulty,
-    topic: q.topic || '',
-  }));
+    return {
+      order,
+      questionId: q.id,
+      originalQuestionId: q.id,
+      questionText: q.questionText,
+      optionA: shuffledOptions[0].text,
+      optionB: shuffledOptions[1].text,
+      optionC: shuffledOptions[2].text,
+      optionD: shuffledOptions[3].text,
+      correctAnswer: remappedCorrect,
+      subjectId,
+      subjectName,
+      block: blockLabel,
+      difficulty: q.difficulty,
+      topic: q.topic || '',
+    };
+  };
+
+  const block1Questions: DtmQuestionSnapshot[] = chosen1.map((q, idx) =>
+    buildShuffledSnapshot(q, idx + 1, params.block1SubjectId, params.block1SubjectName, '1-blok')
+  );
+
+  const block2Questions: DtmQuestionSnapshot[] = chosen2.map((q, idx) =>
+    buildShuffledSnapshot(q, 31 + idx, params.block2SubjectId, params.block2SubjectName, '2-blok')
+  );
 
   return { block1Questions, block2Questions };
 }
@@ -892,7 +1098,8 @@ export async function generateStudentAssignment(params: {
   // Check existing non-cancelled/non-superseded assignments
   const existingQ = query(
     collection(db, 'dtmAssignments'),
-    where('studentId', '==', student.id)
+    where('studentId', '==', student.id),
+    where('organizationId', '==', student.organizationId)
   );
   const existingSnap = await getDocs(existingQ);
   const activeExisting = existingSnap.docs
@@ -1077,11 +1284,17 @@ export async function getDtmAssignmentById(id: string): Promise<DtmAssignment | 
 }
 
 export async function getLatestAssignmentByStudentNumericId(
-  numericId: string
+  numericId: string,
+  organizationId?: string
 ): Promise<{ student: DtmStudent; assignment: DtmAssignment | null }> {
-  const student = await findDtmStudentByNumericId(numericId);
+  const student = await findDtmStudentByNumericId(numericId, organizationId);
   if (!student) {
-    throw new DtmServiceError(`ID: ${numericId} bo'yicha o'quvchi topilmadi.`, 'STUDENT_NOT_FOUND');
+    throw new DtmServiceError(
+      organizationId
+        ? `ID: ${numericId} bo'yicha sizning tashkilotingizda o'quvchi topilmadi.`
+        : `ID: ${numericId} bo'yicha o'quvchi topilmadi.`,
+      'STUDENT_NOT_FOUND'
+    );
   }
 
   let assignment: DtmAssignment | null = null;
@@ -1089,9 +1302,14 @@ export async function getLatestAssignmentByStudentNumericId(
     assignment = await getDtmAssignmentById(student.latestAssignmentId);
   }
   if (!assignment) {
-    const snap = await getDocs(
-      query(collection(db, 'dtmAssignments'), where('studentNumericId', '==', student.numericId))
-    );
+    const assignQ = organizationId
+      ? query(
+          collection(db, 'dtmAssignments'),
+          where('studentNumericId', '==', student.numericId),
+          where('organizationId', '==', organizationId)
+        )
+      : query(collection(db, 'dtmAssignments'), where('studentNumericId', '==', student.numericId));
+    const snap = await getDocs(assignQ);
     const list = snap.docs
       .map((d) => ({ id: d.id, ...d.data() } as DtmAssignment))
       .filter((a) => a.status !== 'CANCELLED' && a.status !== 'SUPERSEDED')
@@ -1366,9 +1584,12 @@ export async function submitAndCheckAnswerSheet(params: {
   }
 }
 
-export async function listDtmResults(): Promise<DtmResult[]> {
+export async function listDtmResults(organizationId?: string): Promise<DtmResult[]> {
   try {
-    const snap = await getDocs(collection(db, 'dtmResults'));
+    const q = organizationId
+      ? query(collection(db, 'dtmResults'), where('organizationId', '==', organizationId))
+      : collection(db, 'dtmResults');
+    const snap = await getDocs(q);
     const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DtmResult));
     return list.sort((a, b) => {
       const ta = a.checkedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
@@ -1425,5 +1646,43 @@ export async function getDtmDashboardData(): Promise<{
   } catch (err) {
     if (err instanceof DtmServiceError) throw err;
     throw new DtmServiceError(formatDtmError(err, "Dashboard ma'lumotlarini yuklashda xatolik"), 'FIRESTORE_ERROR');
+  }
+}
+
+export async function getDtmOrgDashboardData(organizationId: string): Promise<{
+  organization: DtmOrganization | null;
+  studentCount: number;
+  assignmentCount: number;
+  checkedResultsCount: number;
+  averagePercentage: number;
+  averageScore: number;
+  recentAssignments: DtmAssignment[];
+  recentResults: DtmResult[];
+}> {
+  try {
+    const [organization, students, assignments, results] = await Promise.all([
+      getDtmOrganizationById(organizationId),
+      listDtmStudentsByOrg(organizationId),
+      listDtmAssignments(organizationId),
+      listDtmResults(organizationId),
+    ]);
+
+    const validAssignments = assignments.filter((a) => a.status !== 'CANCELLED' && a.status !== 'SUPERSEDED');
+    const totalPercentage = results.reduce((acc, r) => acc + (Number(r.percentage) || 0), 0);
+    const totalScore = results.reduce((acc, r) => acc + (Number(r.score) || 0), 0);
+
+    return {
+      organization,
+      studentCount: students.length,
+      assignmentCount: validAssignments.length,
+      checkedResultsCount: results.length,
+      averagePercentage: results.length > 0 ? Math.round((totalPercentage / results.length) * 10) / 10 : 0,
+      averageScore: results.length > 0 ? Math.round((totalScore / results.length) * 10) / 10 : 0,
+      recentAssignments: assignments.slice(0, 6),
+      recentResults: results.slice(0, 6),
+    };
+  } catch (err) {
+    if (err instanceof DtmServiceError) throw err;
+    throw new DtmServiceError(formatDtmError(err, "Tashkilot dashboard ma'lumotlarini yuklashda xatolik"), 'FIRESTORE_ERROR');
   }
 }

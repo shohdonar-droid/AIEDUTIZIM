@@ -84,6 +84,9 @@ export interface UserProfile {
   customLimitPrices?: Record<string, any>;
   assignedTariff?: string;
   tariffPrice?: number;
+  isDtmOrganization?: boolean;
+  dtmOrganizationId?: string;
+  dtmOrganizationName?: string;
   status?: 'active' | 'deleted' | 'blocked';
   createdAt: any;
 }

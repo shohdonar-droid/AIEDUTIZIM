@@ -130,7 +130,10 @@
         "name": { "type": "string" },
         "orgType": { "type": "string" },
         "region": { "type": "string" },
-        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+        "ownerUid": { "type": "string" },
+        "login": { "type": "string" },
+        "email": { "type": "string" }
       }
     },
     "DtmStudent": {

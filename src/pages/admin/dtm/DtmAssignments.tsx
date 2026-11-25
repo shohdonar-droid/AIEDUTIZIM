@@ -27,7 +27,7 @@ import {
 } from '../../../types/dtm';
 import { AssignmentStatusBadge, DtmModuleNav } from './DtmModuleNav';
 
-export default function DtmAssignments() {
+export default function DtmAssignments({ scopedOrgId }: { scopedOrgId?: string }) {
   const [assignments, setAssignments] = useState<DtmAssignment[]>([]);
   const [organizations, setOrganizations] = useState<DtmOrganization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,8 +49,8 @@ export default function DtmAssignments() {
     setError('');
     try {
       const [assigns, orgs] = await Promise.all([
-        listDtmAssignments(),
-        listDtmOrganizations(),
+        listDtmAssignments(scopedOrgId),
+        scopedOrgId ? Promise.resolve([]) : listDtmOrganizations(),
       ]);
       setAssignments(assigns);
       setOrganizations(orgs);
@@ -63,7 +63,7 @@ export default function DtmAssignments() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [scopedOrgId]);
 
   const distinctSubjects = useMemo(() => {
     const set = new Set<string>();
@@ -141,10 +141,24 @@ export default function DtmAssignments() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <DtmModuleNav
-        title="Test variantlari"
-        subtitle="Har bir o‘quvchi uchun biriktirilgan o‘zgarmas 60 talik snapshot variantlar va PDF yuklab olish"
-      />
+      {scopedOrgId ? (
+        <div className="mb-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-blue-600">
+            DTM Tashkilot
+          </div>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">
+            Test variantlari
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Tashkilot o‘quvchilari uchun yaratilgan 60 talik snapshot variantlar va PDF yuklab olish
+          </p>
+        </div>
+      ) : (
+        <DtmModuleNav
+          title="Test variantlari"
+          subtitle="Har bir o‘quvchi uchun biriktirilgan o‘zgarmas 60 talik snapshot variantlar va PDF yuklab olish"
+        />
+      )}
 
       {error && (
         <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -154,7 +168,11 @@ export default function DtmAssignments() {
       )}
 
       {/* Filters */}
-      <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-5">
+      <div
+        className={`mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:grid-cols-2 ${
+          scopedOrgId ? 'lg:grid-cols-4' : 'lg:grid-cols-5'
+        }`}
+      >
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -165,18 +183,20 @@ export default function DtmAssignments() {
             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
           />
         </div>
-        <select
-          value={orgFilter}
-          onChange={(e) => setOrgFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
-        >
-          <option value="ALL">Barcha tashkilotlar</option>
-          {organizations.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </select>
+        {!scopedOrgId && (
+          <select
+            value={orgFilter}
+            onChange={(e) => setOrgFilter(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+          >
+            <option value="ALL">Barcha tashkilotlar</option>
+            {organizations.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        )}
         <select
           value={subjectFilter}
           onChange={(e) => setSubjectFilter(e.target.value)}

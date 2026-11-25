@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Plus,
   Pencil,
@@ -9,6 +10,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  ArrowRight,
 } from 'lucide-react';
 import {
   createDtmSubject,
@@ -19,19 +21,8 @@ import {
   listDtmSubjects,
   updateDtmSubject,
 } from '../../../services/dtmService';
-import {
-  DtmQuestion,
-  DtmStatus,
-  DtmSubject,
-} from '../../../types/dtm';
+import { DtmQuestion, DtmStatus, DtmSubject } from '../../../types/dtm';
 import { DtmModuleNav, StatusBadge } from './DtmModuleNav';
-
-const BLOCK_OPTIONS = [
-  { value: '1-blok', label: '1-blok' },
-  { value: '2-blok', label: '2-blok' },
-  { value: 'both', label: '1-blok va 2-blok (Ikkalasi uchun)' },
-  { value: 'custom', label: 'Boshqa / Maxsus blok...' },
-];
 
 export default function DtmSubjects() {
   const [subjects, setSubjects] = useState<DtmSubject[]>([]);
@@ -42,7 +33,6 @@ export default function DtmSubjects() {
   const [success, setSuccess] = useState('');
 
   const [search, setSearch] = useState('');
-  const [blockFilter, setBlockFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -50,8 +40,6 @@ export default function DtmSubjects() {
 
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [blockChoice, setBlockChoice] = useState('both');
-  const [customBlock, setCustomBlock] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<DtmStatus>('ACTIVE');
 
@@ -73,30 +61,27 @@ export default function DtmSubjects() {
     loadData();
   }, []);
 
-  const activeCountBySubject = useMemo(() => {
-    const map: Record<string, { total: number; b1: number; b2: number }> = {};
+  const statsBySubject = useMemo(() => {
+    const map: Record<
+      string,
+      { total: number; active: number; easy: number; medium: number; hard: number }
+    > = {};
     for (const q of questions) {
-      if (q.status !== 'ACTIVE') continue;
-      if (!map[q.subjectId]) map[q.subjectId] = { total: 0, b1: 0, b2: 0 };
+      if (!map[q.subjectId]) {
+        map[q.subjectId] = { total: 0, active: 0, easy: 0, medium: 0, hard: 0 };
+      }
       map[q.subjectId].total++;
-      if (q.block === '1-blok' || q.block === 'both') map[q.subjectId].b1++;
-      if (q.block === '2-blok' || q.block === 'both') map[q.subjectId].b2++;
+      if (q.status === 'ACTIVE') map[q.subjectId].active++;
+      if (q.difficulty === 'EASY') map[q.subjectId].easy++;
+      else if (q.difficulty === 'HARD') map[q.subjectId].hard++;
+      else map[q.subjectId].medium++;
     }
     return map;
   }, [questions]);
 
-  const distinctBlocks = useMemo(() => {
-    const set = new Set<string>(['1-blok', '2-blok', 'both']);
-    subjects.forEach((s) => {
-      if (s.blockType) set.add(s.blockType);
-    });
-    return Array.from(set);
-  }, [subjects]);
-
   const filteredSubjects = useMemo(() => {
     const term = search.trim().toLowerCase();
     return subjects.filter((s) => {
-      if (blockFilter !== 'ALL' && s.blockType !== blockFilter) return false;
       if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
       if (
         term &&
@@ -110,14 +95,12 @@ export default function DtmSubjects() {
       }
       return true;
     });
-  }, [subjects, search, blockFilter, statusFilter]);
+  }, [subjects, search, statusFilter]);
 
   const openCreateModal = () => {
     setEditingSubject(null);
     setName('');
     setCode('');
-    setBlockChoice('both');
-    setCustomBlock('');
     setDescription('');
     setStatus('ACTIVE');
     setError('');
@@ -128,13 +111,6 @@ export default function DtmSubjects() {
     setEditingSubject(sub);
     setName(sub.name);
     setCode(sub.code);
-    if (sub.blockType === '1-blok' || sub.blockType === '2-blok' || sub.blockType === 'both') {
-      setBlockChoice(sub.blockType);
-      setCustomBlock('');
-    } else {
-      setBlockChoice('custom');
-      setCustomBlock(sub.blockType);
-    }
     setDescription(sub.description || '');
     setStatus(sub.status);
     setError('');
@@ -143,17 +119,12 @@ export default function DtmSubjects() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const resolvedBlock = blockChoice === 'custom' ? customBlock.trim() : blockChoice;
     if (!name.trim()) {
       setError("Fan nomini kiriting.");
       return;
     }
     if (!code.trim()) {
       setError("Fan kodini kiriting (masalan: MATH).");
-      return;
-    }
-    if (!resolvedBlock) {
-      setError("Blok turini kiriting.");
       return;
     }
 
@@ -165,7 +136,7 @@ export default function DtmSubjects() {
         await updateDtmSubject(editingSubject.id, {
           name: name.trim(),
           code: code.trim().toUpperCase(),
-          blockType: resolvedBlock,
+          blockType: 'both',
           description: description.trim(),
           status,
         });
@@ -174,7 +145,7 @@ export default function DtmSubjects() {
         await createDtmSubject({
           name: name.trim(),
           code: code.trim().toUpperCase(),
-          blockType: resolvedBlock,
+          blockType: 'both',
           description: description.trim(),
           status,
         });
@@ -202,10 +173,10 @@ export default function DtmSubjects() {
   };
 
   const handleDelete = async (sub: DtmSubject) => {
-    const count = activeCountBySubject[sub.id]?.total || 0;
+    const count = statsBySubject[sub.id]?.total || 0;
     const warning =
       count > 0
-        ? `Ushbu fanga bog‘langan ${count} ta aktiv savol mavjud. Shunga qaramay “${sub.name}” fanini o‘chirmoqchimisiz?`
+        ? `Ushbu fanga bog‘langan ${count} ta test savoli mavjud. Shunga qaramay “${sub.name}” fanini o‘chirmoqchimisiz?`
         : `“${sub.name}” fanini o‘chirishni tasdiqlaysizmi?`;
     if (!window.confirm(warning)) return;
 
@@ -221,8 +192,8 @@ export default function DtmSubjects() {
   return (
     <div className="mx-auto max-w-7xl">
       <DtmModuleNav
-        title="Fanlar va bloklar boshqaruvi"
-        subtitle="1-blok, 2-blok va kelajakdagi qo‘shimcha bloklar uchun fanlar katalogi"
+        title="Fanlar katalogi"
+        subtitle="DTM fanlari ro‘yxati — har bir fan o‘quvchiga biriktirishda 1-blok yoki 2-blok sifatida tanlanishi mumkin"
         actions={
           <button
             onClick={openCreateModal}
@@ -249,7 +220,7 @@ export default function DtmSubjects() {
 
       {/* Filters */}
       <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:grid-cols-3">
-        <div className="relative">
+        <div className="relative sm:col-span-2">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -259,18 +230,6 @@ export default function DtmSubjects() {
             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
           />
         </div>
-        <select
-          value={blockFilter}
-          onChange={(e) => setBlockFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
-        >
-          <option value="ALL">Barcha blok turlari</option>
-          {distinctBlocks.map((b) => (
-            <option key={b} value={b}>
-              {b === 'both' ? '1-blok va 2-blok' : b}
-            </option>
-          ))}
-        </select>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -290,8 +249,8 @@ export default function DtmSubjects() {
               <tr>
                 <th className="px-4 py-3.5">Kod</th>
                 <th className="px-4 py-3.5">Fan nomi</th>
-                <th className="px-4 py-3.5">Blok turi</th>
-                <th className="px-4 py-3.5">Aktiv testlar (1-blok / 2-blok)</th>
+                <th className="px-4 py-3.5">Jami / Aktiv testlar</th>
+                <th className="px-4 py-3.5">Qiyinlik bo‘yicha</th>
                 <th className="px-4 py-3.5">Status</th>
                 <th className="px-4 py-3.5">Yangilangan</th>
                 <th className="px-4 py-3.5 text-right">Amallar</th>
@@ -313,33 +272,46 @@ export default function DtmSubjects() {
                 </tr>
               ) : (
                 filteredSubjects.map((sub) => {
-                  const counts = activeCountBySubject[sub.id] || { total: 0, b1: 0, b2: 0 };
+                  const counts = statsBySubject[sub.id] || {
+                    total: 0,
+                    active: 0,
+                    easy: 0,
+                    medium: 0,
+                    hard: 0,
+                  };
                   return (
                     <tr key={sub.id} className="hover:bg-slate-50/70">
                       <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">
                         {sub.code}
                       </td>
                       <td className="px-4 py-3.5">
-                        <p className="font-semibold text-slate-900">{sub.name}</p>
+                        <Link
+                          to={`/dtm/questions?subjectId=${sub.id}`}
+                          className="font-semibold text-slate-900 hover:text-blue-600"
+                        >
+                          {sub.name}
+                        </Link>
                         {sub.description && (
                           <p className="mt-0.5 max-w-xs truncate text-xs text-slate-500">
                             {sub.description}
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-xs font-medium text-slate-700">
-                        {sub.blockType === 'both' ? '1-blok va 2-blok' : sub.blockType}
-                      </td>
                       <td className="px-4 py-3.5 tabular-nums">
-                        <div className="flex flex-col text-xs">
-                          <span className="font-semibold text-slate-800">
-                            Jami aktiv: {counts.total} ta
+                        <div className="text-xs">
+                          <span className="font-semibold text-slate-900">
+                            {counts.total} ta
                           </span>
-                          <span className="text-slate-500">
-                            1-blok: {counts.b1} · 2-blok: {counts.b2}
-                            {(counts.b1 < 30 && counts.b2 < 30) && ' (30 ta kerak)'}
+                          <span className="ml-1.5 text-slate-500">
+                            ({counts.active} aktiv
+                            {counts.active < 30 ? ' · 30 ta kerak' : ''})
                           </span>
                         </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-slate-600 tabular-nums">
+                        Oson: <strong className="text-sky-700">{counts.easy}</strong> · O‘rta:{' '}
+                        <strong className="text-amber-700">{counts.medium}</strong> · Qiyin:{' '}
+                        <strong className="text-rose-700">{counts.hard}</strong>
                       </td>
                       <td className="px-4 py-3.5">
                         <button
@@ -355,10 +327,18 @@ export default function DtmSubjects() {
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="inline-flex items-center gap-1">
+                          <Link
+                            to={`/dtm/questions?subjectId=${sub.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                            title="Fan testlarini ochish"
+                          >
+                            Testlar
+                            <ArrowRight className="h-3 w-3" />
+                          </Link>
                           <button
                             onClick={() => openEditModal(sub)}
                             className="rounded-lg p-1.5 text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
-                            title="Tahrirlash"
+                            title="Fanni tahrirlash"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
@@ -426,53 +406,19 @@ export default function DtmSubjects() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-700">
-                    Blok turi *
-                  </label>
-                  <select
-                    value={blockChoice}
-                    onChange={(e) => setBlockChoice(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
-                  >
-                    {BLOCK_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-700">
-                    Status
-                  </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as DtmStatus)}
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
-                  >
-                    <option value="ACTIVE">ACTIVE (Aktiv)</option>
-                    <option value="INACTIVE">INACTIVE (Nofaol)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">
+                  Status
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as DtmStatus)}
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
+                >
+                  <option value="ACTIVE">ACTIVE (Aktiv)</option>
+                  <option value="INACTIVE">INACTIVE (Nofaol)</option>
+                </select>
               </div>
-
-              {blockChoice === 'custom' && (
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-700">
-                    Maxsus blok nomi *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={customBlock}
-                    onChange={(e) => setCustomBlock(e.target.value)}
-                    placeholder="Masalan: 3-blok"
-                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-              )}
 
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-700">

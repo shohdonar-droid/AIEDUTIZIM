@@ -26,7 +26,7 @@ import { AssignmentStatusBadge, DtmModuleNav } from './DtmModuleNav';
 
 const OPTIONS: DtmAnswerOption[] = ['A', 'B', 'C', 'D'];
 
-export default function DtmAnswerCheck() {
+export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }) {
   const [numericIdInput, setNumericIdInput] = useState('');
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +55,7 @@ export default function DtmAnswerCheck() {
     setSavedResult(null);
     try {
       const { student: foundStudent, assignment: foundAssignment } =
-        await getLatestAssignmentByStudentNumericId(cleaned);
+        await getLatestAssignmentByStudentNumericId(cleaned, scopedOrgId);
       setStudent(foundStudent);
       setAssignment(foundAssignment);
 
@@ -133,10 +133,24 @@ export default function DtmAnswerCheck() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <DtmModuleNav
-        title="Javoblarni tekshirish"
-        subtitle="Javoblar varaqasidagi 7 xonali ID orqali o‘quvchining individual variantini topish va avtomatik baholash"
-      />
+      {scopedOrgId ? (
+        <div className="mb-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-blue-600">
+            DTM Tashkilot
+          </div>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-slate-900">
+            Javoblarni tekshirish
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Tashkilot o‘quvchisining 7 xonali ID raqami orqali javoblar varaqasini tekshirish
+          </p>
+        </div>
+      ) : (
+        <DtmModuleNav
+          title="Javoblarni tekshirish"
+          subtitle="Javoblar varaqasidagi 7 xonali ID orqali o‘quvchining individual variantini topish va avtomatik baholash"
+        />
+      )}
 
       {error && (
         <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -232,7 +246,7 @@ export default function DtmAnswerCheck() {
                   </p>
                 </div>
                 <Link
-                  to="/dtm/results"
+                  to={scopedOrgId ? '/teacher/dtm/results' : '/dtm/results'}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-800"
                 >
                   Natijalar jadvaliga o‘tish

@@ -574,7 +574,9 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
   // ==========================================
   // DTM TIZIM: SERVER-SIDE PDF & ZIP ENDPOINTS
   // ==========================================
-  const verifyDtmAdminToken = async (req: express.Request): Promise<{ ok: boolean; status: number; error?: string }> => {
+  const verifyDtmAccess = async (
+    req: express.Request
+  ): Promise<{ ok: boolean; status: number; error?: string; isAdmin?: boolean; dtmOrganizationId?: string }> => {
     const authHeader = req.headers.authorization || "";
     if (!authHeader.startsWith("Bearer ")) {
       return { ok: false, status: 401, error: "Avtorizatsiya talab qilinadi (Bearer token yo'q)." };
@@ -607,7 +609,7 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
 
       const adminEmails = ["shohdonar@gmail.com", "elyorbek@admin.uz", "elyorbek@gmail.com"];
       if (userRecord.email && adminEmails.includes(String(userRecord.email).toLowerCase())) {
-        return { ok: true, status: 200 };
+        return { ok: true, status: 200, isAdmin: true };
       }
 
       const userDocRes = await fetch(
@@ -617,12 +619,18 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
       if (userDocRes.ok) {
         const userDoc: any = await userDocRes.json();
         const role = userDoc?.fields?.role?.stringValue || "";
+        const status = userDoc?.fields?.status?.stringValue || "active";
         if (role === "admin" || role === "subadmin" || role === "superadmin") {
-          return { ok: true, status: 200 };
+          return { ok: true, status: 200, isAdmin: true };
+        }
+        const isDtmOrg = Boolean(userDoc?.fields?.isDtmOrganization?.booleanValue);
+        const dtmOrgId = userDoc?.fields?.dtmOrganizationId?.stringValue || "";
+        if (role === "teacher" && isDtmOrg && dtmOrgId && status !== "deleted" && status !== "blocked") {
+          return { ok: true, status: 200, isAdmin: false, dtmOrganizationId: dtmOrgId };
         }
       }
 
-      return { ok: false, status: 403, error: "DTM bo'limi uchun faqat administrator ruxsatiga ega foydalanuvchilar kirishi mumkin." };
+      return { ok: false, status: 403, error: "DTM bo'limi uchun faqat administrator yoki DTM tashkiloti foydalanuvchilari kirishi mumkin." };
     } catch (err: any) {
       console.error("[DTM Auth Verify Error]:", err);
       return { ok: false, status: 500, error: "Token tekshirishda server xatoligi." };
@@ -631,13 +639,16 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
 
   app.post("/api/dtm/pdf/test", async (req, res) => {
     try {
-      const authCheck = await verifyDtmAdminToken(req);
+      const authCheck = await verifyDtmAccess(req);
       if (!authCheck.ok) {
         return res.status(authCheck.status).json({ error: authCheck.error });
       }
       const { assignment } = req.body || {};
       if (!assignment || !/^\d{7}$/.test(String(assignment.studentNumericId || ""))) {
         return res.status(400).json({ error: "Noto'g'ri assignment yoki 7 xonali O'quvchi ID." });
+      }
+      if (!authCheck.isAdmin && assignment.organizationId !== authCheck.dtmOrganizationId) {
+        return res.status(403).json({ error: "Boshqa tashkilot variantini yuklab olish taqiqlangan." });
       }
       const { generateTestBookletPdfBuffer } = await import("./server/dtmPdfService.js");
       const pdfBuffer = await generateTestBookletPdfBuffer(assignment);
@@ -652,13 +663,16 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
 
   app.post("/api/dtm/pdf/answer-sheet", async (req, res) => {
     try {
-      const authCheck = await verifyDtmAdminToken(req);
+      const authCheck = await verifyDtmAccess(req);
       if (!authCheck.ok) {
         return res.status(authCheck.status).json({ error: authCheck.error });
       }
       const { assignment } = req.body || {};
       if (!assignment || !/^\d{7}$/.test(String(assignment.studentNumericId || ""))) {
         return res.status(400).json({ error: "Noto'g'ri assignment yoki 7 xonali O'quvchi ID." });
+      }
+      if (!authCheck.isAdmin && assignment.organizationId !== authCheck.dtmOrganizationId) {
+        return res.status(403).json({ error: "Boshqa tashkilot javoblar varaqasini yuklab olish taqiqlangan." });
       }
       const { generateAnswerSheetPdfBuffer } = await import("./server/dtmPdfService.js");
       const pdfBuffer = await generateAnswerSheetPdfBuffer(assignment);
@@ -673,13 +687,19 @@ Sitemap: https://www.aide.uz/sitemap.xml`);
 
   app.post("/api/dtm/zip", async (req, res) => {
     try {
-      const authCheck = await verifyDtmAdminToken(req);
+      const authCheck = await verifyDtmAccess(req);
       if (!authCheck.ok) {
         return res.status(authCheck.status).json({ error: authCheck.error });
       }
       const { organizationName, assignments } = req.body || {};
       if (!Array.isArray(assignments) || assignments.length === 0) {
         return res.status(400).json({ error: "ZIP yaratish uchun tayyor variantlar ro'yxati bo'sh." });
+      }
+      if (
+        !authCheck.isAdmin &&
+        assignments.some((a: any) => !a || a.organizationId !== authCheck.dtmOrganizationId)
+      ) {
+        return res.status(403).json({ error: "ZIP tarkibida boshqa tashkilotga tegishli variantlar mavjud." });
       }
       const { streamOrganizationZip } = await import("./server/dtmPdfService.js");
       await streamOrganizationZip(res, String(organizationName || "Tashkilot"), assignments);

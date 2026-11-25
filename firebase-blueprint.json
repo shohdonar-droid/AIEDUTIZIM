@@ -26,6 +26,9 @@
         "idx": { "type": "number" },
         "ball": { "type": "number" },
         "spentBalls": { "type": "number" },
+        "isDtmOrganization": { "type": "boolean" },
+        "dtmOrganizationId": { "type": "string" },
+        "dtmOrganizationName": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "role", "login"]
@@ -85,6 +88,9 @@
         "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
         "studentCount": { "type": "number" },
         "assignmentCount": { "type": "number" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "login": { "type": "string", "maxLength": 80 },
+        "email": { "type": "string", "maxLength": 160 },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },

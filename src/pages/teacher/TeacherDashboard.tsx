@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, User, FileText, Library, CheckCircle2, MessageSquare, LogOut, ChevronRight, GraduationCap, Home, BrainCircuit, BookOpen, Building2, Phone, Award } from 'lucide-react';
+import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, User, FileText, Library, CheckCircle2, MessageSquare, LogOut, ChevronRight, GraduationCap, Home, BrainCircuit, BookOpen, Building2, Phone, Award, FileSpreadsheet } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../../hooks/useAuth';
 import TeacherProfile from './TeacherProfile';
@@ -39,6 +39,13 @@ import { handleFirestoreError, OperationType } from '../../lib/firebase';
 import AdminAcademic from '../admin/AdminAcademic';
 import AdminUsers from '../admin/AdminUsers';
 
+// DTM Organization Portal components
+import DtmOrgDashboard from '../admin/dtm/DtmOrgDashboard';
+import DtmOrganizationDetail from '../admin/dtm/DtmOrganizationDetail';
+import DtmAssignments from '../admin/dtm/DtmAssignments';
+import DtmResults from '../admin/dtm/DtmResults';
+import DtmAnswerCheck from '../admin/dtm/DtmAnswerCheck';
+
 export default function TeacherDashboard() {
   const { user, logout, stopImpersonation } = useAuth();
   const location = useLocation();
@@ -59,8 +66,19 @@ export default function TeacherDashboard() {
   }, [user]);
 
   const isIndependent = (user?.role as string) === 'mustaqil_o_qituvchi';
+  const isDtmOrg =
+    user?.role === 'teacher' &&
+    Boolean(user?.isDtmOrganization && user?.dtmOrganizationId);
+  const dtmOrgId = user?.dtmOrganizationId || '';
 
-  const menuStructure = isIndependent ? [
+  const menuStructure = isDtmOrg ? [
+    { id: 'general', name: 'Dashboard', path: '/teacher', icon: LayoutDashboard, exact: true },
+    { id: 'dtm-org', name: 'Tashkilot (O‘quvchilar)', path: '/teacher/dtm/organization', icon: Building2 },
+    { id: 'dtm-assignments', name: 'Test variantlari', path: '/teacher/dtm/assignments', icon: FileSpreadsheet },
+    { id: 'dtm-results', name: 'Natijalar', path: '/teacher/dtm/results', icon: Award },
+    { id: 'dtm-answer-check', name: 'Javoblarni tekshirish', path: '/teacher/dtm/answer-check', icon: CheckCircle2 },
+    { id: 'profile', name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
+  ] : isIndependent ? [
     { id: 'general', name: 'Asosiy', path: '/teacher', icon: LayoutDashboard, exact: true },
     { id: 'profile', name: 'Profil', path: '/teacher/profile', icon: User, exact: true },
     { id: 'departments', name: 'Yo\'nalishlar', path: '/teacher/departments', icon: Building2, exact: true },
@@ -215,14 +233,24 @@ export default function TeacherDashboard() {
                 {user?.displayName}
               </h2>
               <p className="text-[8px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-0.5">
-                {user?.role === 'staff' ? 'Xodim' : (user?.role === 'admin' ? 'Administrator' : ((user?.role as string) === 'mustaqil_o_qituvchi' ? "Mustaqil O'qituvchi" : 'Tashkilot'))}
+                {isDtmOrg
+                  ? 'DTM Tashkilot'
+                  : user?.role === 'staff'
+                  ? 'Xodim'
+                  : user?.role === 'admin'
+                  ? 'Administrator'
+                  : (user?.role as string) === 'mustaqil_o_qituvchi'
+                  ? "Mustaqil O'qituvchi"
+                  : 'Tashkilot'}
               </p>
               <p className="text-xs font-black text-amber-600 font-mono tracking-wider mt-1 truncate">
                 ID: {user?.systemId || user?.uid}
               </p>
-              <p className="text-[10px] font-black text-emerald-600 font-mono tracking-wide mt-0.5 truncate">
-                Balans: {((user as any)?.balance || 0).toLocaleString()} UZS
-              </p>
+              {!isDtmOrg && (
+                <p className="text-[10px] font-black text-emerald-600 font-mono tracking-wide mt-0.5 truncate">
+                  Balans: {((user as any)?.balance || 0).toLocaleString()} UZS
+                </p>
+              )}
             </motion.div>
           )}
           {user?.isImpersonated && !isCollapsed && (
@@ -292,7 +320,17 @@ export default function TeacherDashboard() {
       <main className="flex-1 p-4 md:p-8 md:pl-10 w-full overflow-hidden flex flex-col items-center">
         <div className="w-full max-w-[1200px]">
           <Routes>
-            {isIndependent ? (
+            {isDtmOrg ? (
+              <>
+                <Route path="/" element={<DtmOrgDashboard organizationId={dtmOrgId} />} />
+                <Route path="/dtm/organization" element={<DtmOrganizationDetail scopedOrgId={dtmOrgId} />} />
+                <Route path="/dtm/assignments" element={<DtmAssignments scopedOrgId={dtmOrgId} />} />
+                <Route path="/dtm/results" element={<DtmResults scopedOrgId={dtmOrgId} />} />
+                <Route path="/dtm/answer-check" element={<DtmAnswerCheck scopedOrgId={dtmOrgId} />} />
+                <Route path="/profile" element={<TeacherProfile />} />
+                <Route path="*" element={<Navigate to="/teacher" replace />} />
+              </>
+            ) : isIndependent ? (
               <>
                 <Route path="/" element={<IndependentOverview />} />
                 <Route path="/profile" element={<TeacherProfile />} />
