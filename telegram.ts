@@ -42,6 +42,17 @@ import { proIsConfigured } from "./src/pro/config.js";
 import { proQueue } from "./src/pro/limiter.js";
 import { findUserBySystemId } from "./src/lib/serverPayment.js";
 import { getNextSequentialId } from "./src/lib/idUtils";
+import {
+  createTelegramDtmAssignmentAndPdfs,
+  formatTelegramResultMessage,
+  getDtmAssignmentByCode,
+  getEligibleDtmSubjects,
+  getResultByAssignmentId,
+  gradeTelegramDtmAssignment,
+  listUserTelegramDtmAssignments,
+  lookupDtmResultByNumericId,
+  parseQuickAnswerString,
+} from "./server/dtmTelegramService.js";
 import dotenv from "dotenv";
 import sharp from "sharp";
 import fs from "fs";
@@ -888,7 +899,8 @@ const AI_COSTS: Record<string, number> = {
   "📋 Test yaratish": 3000,
   "📝 Test yaratish": 3000,
   "💬 Savol-javob": 1000,
-  "📄 Obektivka yaratish": 15000
+  "📄 Obektivka yaratish": 15000,
+  "📝 DTM Test Kitobchasi": 5000
 };
 
 export async function getBotConfigCosts() {
@@ -1526,7 +1538,7 @@ export async function getKeyboard(
 
   const userHeader = [
     [{ text: "💻 CHIRCHIQ KOMPYUTER XIZMATLARI" }],
-    [{ text: "🎓 Mening topshiriqlarim" }],
+    [{ text: "🎯 DTM tizim" }, { text: "🎓 Mening topshiriqlarim" }],
     [{ text: "👤 Profil" }, { text: "💬 Adminga murojaat" }],
     [{ text: "🤖 Xizmatlar" }, { text: "💰 Bonus olish" }],
     [{ text: "💰 Balans" }, { text: "🌐 Rasmiy sayt" }]
@@ -1540,19 +1552,26 @@ export async function getKeyboard(
 
     return [
       [{ text: "💻 CHIRCHIQ KOMPYUTER XIZMATLARI" }],
-      [{ text: "🎓 Mening topshiriqlarim" }, { text: "👤 Profil" }],
-      [{ text: "🤖 Xizmatlar" }, { text: "💬 Savol-javob" }],
-      [{ text: "💵 Balans to'ldirish (Admin)" }],
+      [{ text: "🎯 DTM tizim" }, { text: "🎓 Mening topshiriqlarim" }],
+      [{ text: "👤 Profil" }, { text: "🤖 Xizmatlar" }],
+      [{ text: "💬 Savol-javob" }, { text: "💵 Balans to'ldirish (Admin)" }],
       [{ text: "📢 E'lon yuborish" }, { text: `📊 Statistika (${telegramUsersCount})` }],
       isPrimary 
         ? [{ text: "📥 Javob berilmaganlar" }, { text: "💰 Narxlar sozlamalari" }]
         : [{ text: "📥 Javob berilmaganlar" }],
-      [{ text: "📊 Tizim xarajatlari" }],
-      [{ text: "🌐 Rasmiy sayt" }]
+      [{ text: "📊 Tizim xarajatlari" }, { text: "🌐 Rasmiy sayt" }]
     ];
   }
 
   return userHeader;
+}
+
+export function getDtmMenuKeyboard() {
+  return [
+    [{ text: "📝 DTM Test Kitobchasi" }, { text: "📊 DTM natijani bilish" }],
+    [{ text: "✅ DTM Javob tekshirish" }],
+    [{ text: "⬅️ Asosiy menyu" }],
+  ];
 }
 
 export async function getAiAssistantKeyboard(userId?: number) {
@@ -6709,7 +6728,357 @@ async function sendNextQuestion(ctx: any) {
    }
 }
 
-// --- END CHIRCHIQ KOMPYUTER XIZMATLARI ACTIONS ---
+// --- START DTM TIZIM BOT HANDLERS ---
+interface DtmBuyDraft {
+  block1SubjectId?: string;
+  block1SubjectName?: string;
+  block2SubjectId?: string;
+  block2SubjectName?: string;
+  cost?: number;
+  subjects?: Array<{ id: string; name: string; code: string; activeCount: number }>;
+}
+
+const dtmBuyDrafts = new Map<number, DtmBuyDraft>();
+const dtmBusyUsers = new Set<number>();
+
+function buildDtmSubjectInlineRows(
+  subjects: Array<{ id: string; name: string; activeCount: number }>,
+  prefix: "dtm_b1_" | "dtm_b2_",
+  excludeId?: string
+) {
+  const filtered = excludeId ? subjects.filter((s) => s.id !== excludeId) : subjects;
+  const rows: Array<Array<{ text: string; callback_data: string }>> = [];
+  for (let i = 0; i < filtered.length; i += 2) {
+    const pair = filtered.slice(i, i + 2).map((sub) => ({
+      text: `${sub.name} (${sub.activeCount})`,
+      callback_data: `${prefix}${sub.id}`,
+    }));
+    rows.push(pair);
+  }
+  return rows;
+}
+
+async function promptDtmVariantGrading(ctx: any, userId: number, assignmentCode: string) {
+  const assignment = await getDtmAssignmentByCode(db, assignmentCode);
+  if (!assignment) {
+    return ctx.reply(
+      `❌ <code>${assignmentCode}</code> raqamli variant topilmadi. Iltimos Variant ID ni tekshirib qayta kiriting:`,
+      { parse_mode: "HTML" }
+    );
+  }
+
+  const isAdmin = getAdminIds().includes(userId);
+  if (!isAdmin && assignment.telegramUserId !== userId) {
+    return ctx.reply(
+      "❌ Ushbu Variant ID boshqa foydalanuvchiga tegishli. Agar tashkilot imtihoni natijasini bilmoqchi bo'lsangiz, <b>📊 DTM natijani bilish</b> bo'limiga 7 xonali ID kiriting.",
+      { parse_mode: "HTML" }
+    );
+  }
+
+  if (assignment.status === "CHECKED") {
+    const existingResult = await getResultByAssignmentId(db, assignment.id);
+    pendingLogins.delete(userId);
+    if (existingResult) {
+      return ctx.reply(
+        formatTelegramResultMessage(existingResult, "✅ <b>USHBU VARIANT ALLAQACHON TEKSHIRILGAN</b>"),
+        { parse_mode: "HTML" }
+      );
+    }
+  }
+
+  pendingLogins.set(userId, {
+    step: "dtm_await_60_answers",
+    targetButton: assignment.assignmentCode,
+  });
+
+  return ctx.reply(
+    `✅ <b>Variant topildi:</b> <code>${assignment.assignmentCode}</code>\n` +
+      `📘 1-blok: <b>${assignment.block1SubjectName}</b> (1–30)\n` +
+      `📗 2-blok: <b>${assignment.block2SubjectName}</b> (31–60)\n\n` +
+      `<b>Tezkor kiritish (60 harf):</b>\n` +
+      `1–60 javoblarni ketma-ket kiriting (bo‘sh qoldirish uchun <code>-</code> yozing).\n\n` +
+      `Masalan: <code>ABCDABCD...</code>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        keyboard: [[{ text: "⬅️ Asosiy menyu" }]],
+        resize_keyboard: true,
+      },
+    }
+  );
+}
+
+bot.action("dtm_restart_buy", async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
+  try { await ctx.answerCbQuery(); } catch (e) {}
+
+  try {
+    const subjects = await getEligibleDtmSubjects(db);
+    if (subjects.length < 2) {
+      return ctx.editMessageText(
+        "⚠️ Hozircha DTM bazasida kamida 30 ta faol savoli bor 2 ta fan mavjud emas."
+      );
+    }
+    dtmBuyDrafts.set(userId, { subjects });
+    const rows = buildDtmSubjectInlineRows(subjects, "dtm_b1_");
+    return ctx.editMessageText(
+      "📝 <b>DTM Test Kitobchasi</b>\n\n📘 <b>1-blok fanini tanlang (1–30 savollar):</b>",
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: rows },
+      }
+    );
+  } catch (err: any) {
+    console.error("[DTM Bot Restart Error]:", err);
+    return ctx.reply("❌ Fanlar ro'yxatini yuklashda xatolik yuz berdi.");
+  }
+});
+
+bot.action(/^dtm_b1_(.+)$/, async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
+  const subjectId = ctx.match[1];
+  try { await ctx.answerCbQuery(); } catch (e) {}
+
+  try {
+    let draft = dtmBuyDrafts.get(userId);
+    let subjects = draft?.subjects;
+    if (!subjects || subjects.length === 0) {
+      subjects = await getEligibleDtmSubjects(db);
+    }
+    const b1 = subjects.find((s) => s.id === subjectId);
+    if (!b1) {
+      return ctx.reply("❌ Tanlangan fan topilmadi. Qaytadan <b>📝 DTM Test Kitobchasi</b> tugmasini bosing.", { parse_mode: "HTML" });
+    }
+
+    draft = {
+      subjects,
+      block1SubjectId: b1.id,
+      block1SubjectName: b1.name,
+    };
+    dtmBuyDrafts.set(userId, draft);
+
+    const rows = buildDtmSubjectInlineRows(subjects, "dtm_b2_", b1.id);
+    rows.push([{ text: "🔙 1-blokni qayta tanlash", callback_data: "dtm_restart_buy" }]);
+
+    return ctx.editMessageText(
+      `📘 1-blok (1–30): <b>${b1.name}</b>\n\n📗 Endi <b>2-blok fanini tanlang (31–60 savollar):</b>`,
+      {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: rows },
+      }
+    );
+  } catch (err) {
+    console.error("[DTM B1 Error]:", err);
+    return ctx.reply("❌ 1-blokni saqlashda xatolik yuz berdi.");
+  }
+});
+
+bot.action(/^dtm_b2_(.+)$/, async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
+  const subjectId = ctx.match[1];
+  try { await ctx.answerCbQuery(); } catch (e) {}
+
+  try {
+    const draft = dtmBuyDrafts.get(userId);
+    if (!draft || !draft.block1SubjectId) {
+      return ctx.reply("⚠️ Sessiya eskirgan. Iltimos <b>📝 DTM Test Kitobchasi</b> tugmasini qaytadan bosing.", { parse_mode: "HTML" });
+    }
+
+    const subjects = draft.subjects?.length ? draft.subjects : await getEligibleDtmSubjects(db);
+    const b2 = subjects.find((s) => s.id === subjectId);
+    if (!b2) {
+      return ctx.reply("❌ Tanlangan 2-blok fani topilmadi.");
+    }
+
+    const dynamicCosts = await getBotConfigCosts();
+    const cost = Number(dynamicCosts["📝 DTM Test Kitobchasi"] ?? AI_COSTS["📝 DTM Test Kitobchasi"] ?? 5000);
+    const authed = await getAuthedUser(userId);
+    const isAdmin = getAdminIds().includes(userId) || authed?.role === "admin" || authed?.role === "superadmin";
+    const balance = authed ? Number(authed.balance !== undefined ? authed.balance : (authed.ball || 0)) : 0;
+
+    draft.block2SubjectId = b2.id;
+    draft.block2SubjectName = b2.name;
+    draft.cost = isAdmin ? 0 : cost;
+    dtmBuyDrafts.set(userId, draft);
+
+    if (!isAdmin && (!authed || balance < cost)) {
+      return ctx.editMessageText(
+        `📝 <b>DTM TEST KITOBCHASI BUYURTMASI</b>\n\n` +
+          `📘 1-blok (1–30): <b>${draft.block1SubjectName}</b>\n` +
+          `📗 2-blok (31–60): <b>${b2.name}</b>\n` +
+          `💰 Narxi: <b>${cost.toLocaleString()} so'm</b>\n` +
+          `💳 Balansingiz: <b>${balance.toLocaleString()} so'm</b>\n\n` +
+          `❌ <b>Balansingizda mablag' yetarli emas!</b>`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "💳 Balansni to'ldirish", callback_data: "add_balance" }],
+              [{ text: "🔙 Fanlarni qayta tanlash", callback_data: "dtm_restart_buy" }],
+            ],
+          },
+        }
+      );
+    }
+
+    return ctx.editMessageText(
+      `📝 <b>DTM TEST KITOBCHASI BUYURTMASI</b>\n\n` +
+        `📘 1-blok (1–30): <b>${draft.block1SubjectName}</b>\n` +
+        `📗 2-blok (31–60): <b>${b2.name}</b>\n` +
+        `💰 Narxi: <b>${(isAdmin ? 0 : cost).toLocaleString()} so'm</b>\n` +
+        `💳 Balansingiz: <b>${balance.toLocaleString()} so'm</b>\n\n` +
+        `Tasdiqlaysizmi?`,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "✅ Tasdiqlash", callback_data: "dtm_confirm_buy" },
+              { text: "❌ Bekor qilish", callback_data: "dtm_cancel_buy" },
+            ],
+            [{ text: "🔙 Fanlarni o'zgartirish", callback_data: "dtm_restart_buy" }],
+          ],
+        },
+      }
+    );
+  } catch (err) {
+    console.error("[DTM B2 Error]:", err);
+    return ctx.reply("❌ Narxni hisoblashda xatolik yuz berdi.");
+  }
+});
+
+bot.action("dtm_cancel_buy", async (ctx) => {
+  const userId = ctx.from?.id;
+  if (userId) dtmBuyDrafts.delete(userId);
+  try { await ctx.answerCbQuery("Bekor qilindi"); } catch (e) {}
+  try {
+    await ctx.editMessageText("❌ DTM test kitobchasi buyurtmasi bekor qilindi.");
+  } catch (e) {}
+});
+
+bot.action("dtm_confirm_buy", async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
+
+  if (dtmBusyUsers.has(userId)) {
+    try { await ctx.answerCbQuery("Tayyorlanmoqda, kuting..."); } catch (e) {}
+    return;
+  }
+
+  const draft = dtmBuyDrafts.get(userId);
+  if (!draft || !draft.block1SubjectId || !draft.block2SubjectId) {
+    try { await ctx.answerCbQuery(); } catch (e) {}
+    return ctx.reply("⚠️ Buyurtma ma'lumoti topilmadi. Qaytadan <b>📝 DTM Test Kitobchasi</b> tugmasini bosing.", { parse_mode: "HTML" });
+  }
+
+  dtmBusyUsers.add(userId);
+  try { await ctx.answerCbQuery(); } catch (e) {}
+
+  const dynamicCosts = await getBotConfigCosts();
+  const baseCost = Number(dynamicCosts["📝 DTM Test Kitobchasi"] ?? AI_COSTS["📝 DTM Test Kitobchasi"] ?? 5000);
+  const authed = await getAuthedUser(userId);
+  const isAdmin = getAdminIds().includes(userId) || authed?.role === "admin" || authed?.role === "superadmin";
+  const chargeCost = isAdmin ? 0 : baseCost;
+
+  let deducted = false;
+  try {
+    if (chargeCost > 0) {
+      deducted = await checkAndDeductBalance(userId, chargeCost, "📝 DTM Test Kitobchasi");
+      if (!deducted) {
+        await ctx.editMessageText(
+          `❌ <b>Balansingiz yetarli emas!</b>\n\nKerakli summa: <b>${chargeCost.toLocaleString()} so'm</b>`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [[{ text: "💳 Balansni to'ldirish", callback_data: "add_balance" }]],
+            },
+          }
+        );
+        return;
+      }
+    }
+
+    await ctx.editMessageText(
+      `⏳ <b>Test kitobchasi va javoblar varaqasi tayyorlanmoqda...</b>\n\n` +
+        `📘 1-blok: ${draft.block1SubjectName}\n` +
+        `📗 2-blok: ${draft.block2SubjectName}\n` +
+        `Iltimos, 5–10 soniya kuting.`,
+      { parse_mode: "HTML" }
+    );
+
+    const fullName =
+      authed?.displayName ||
+      `${ctx.from.first_name || ""} ${ctx.from.last_name || ""}`.trim() ||
+      `Telegram_${userId}`;
+
+    const generated = await createTelegramDtmAssignmentAndPdfs(db, {
+      telegramUserId: userId,
+      fullName,
+      block1SubjectId: draft.block1SubjectId,
+      block2SubjectId: draft.block2SubjectId,
+    });
+
+    dtmBuyDrafts.delete(userId);
+
+    await ctx.replyWithDocument(
+      { source: generated.testPdfBuffer, filename: `Test_${generated.numericId}.pdf` },
+      {
+        caption:
+          `📘 <b>DTM TEST KITOBCHASI (60 ta savol)</b>\n\n` +
+          `📄 <b>Variant ID:</b> <code>${generated.assignmentCode}</code>\n` +
+          `🆔 <b>O'quvchi ID:</b> <code>${generated.numericId}</code>\n` +
+          `1-blok (1–30): <b>${generated.block1SubjectName}</b>\n` +
+          `2-blok (31–60): <b>${generated.block2SubjectName}</b>`,
+        parse_mode: "HTML",
+      }
+    );
+
+    await ctx.replyWithDocument(
+      { source: generated.answerPdfBuffer, filename: `Javoblar_${generated.numericId}.pdf` },
+      {
+        caption:
+          `📝 <b>JAVOBLAR VARAQASI</b>\n\n` +
+          `📄 <b>Variant ID:</b> <code>${generated.assignmentCode}</code>\n` +
+          `Testni ishlab bo'lgach, javoblaringizni tekshirish uchun pastdagi <b>«📝 Javobni kiritish»</b> tugmasini bosing.`,
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📝 Javobni kiritish", callback_data: `dtm_grade_${generated.assignmentCode}` }],
+          ],
+        },
+      }
+    );
+  } catch (err: any) {
+    console.error("[DTM Confirm Buy Error]:", err);
+    if (deducted && chargeCost > 0) {
+      await refundBalance(userId, chargeCost, "📝 DTM Test Kitobchasi");
+    }
+    await ctx.reply(
+      `❌ Test kitobchasini yaratishda xatolik yuz berdi: ${err?.message || "Noma'lum xato"}.` +
+        (deducted && chargeCost > 0 ? "\n💰 Hisobingizdan yechilgan mablag' qaytarildi." : ""),
+      { parse_mode: "HTML" }
+    );
+  } finally {
+    dtmBusyUsers.delete(userId);
+  }
+});
+
+bot.action(/^dtm_grade_(.+)$/, async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
+  const assignmentCode = ctx.match[1].trim();
+  try { await ctx.answerCbQuery(); } catch (e) {}
+  try {
+    await promptDtmVariantGrading(ctx, userId, assignmentCode);
+  } catch (err) {
+    console.error("[DTM Grade Prompt Error]:", err);
+    await ctx.reply("❌ Variantni yuklashda xatolik yuz berdi.");
+  }
+});
+// --- END DTM TIZIM BOT HANDLERS ---
 
 bot.on("message", async (ctx) => {
   const userId = ctx.from.id;
@@ -6753,7 +7122,8 @@ bot.on("message", async (ctx) => {
     "💬 Adminga murojaat", "🌐 Rasmiy sayt",
     "🔙 Asosiy Menyu", "⬅️ Asosiy menyu", "🚪 Chiqish", "👤 Profil", "🔑 Kirish",
     "🤖 AI Yordamchi", "🤖 Xizmatlar", "Xizmatlar", "🤖 XIZMATLAR", "XIZMATLAR", "💬 Savol-javob", "🎓 Mening topshiriqlarim",
-    "💻 CHIRCHIQ KOMPYUTER XIZMATLARI", "📊 Tizim xarajatlari"
+    "💻 CHIRCHIQ KOMPYUTER XIZMATLARI", "📊 Tizim xarajatlari",
+    "🎯 DTM tizim", "📝 DTM Test Kitobchasi", "📊 DTM natijani bilish", "✅ DTM Javob tekshirish"
   ];
   
   if (menuButtons.includes(normText) || normText === "🔙 Asosiy Menyu" || normText === "⬅️ Asosiy menyu") {
@@ -6827,6 +7197,222 @@ if (shops.length === 0) {
     } catch (e) {
       console.error("Error fetching computer services:", e);
       return ctx.reply("❌ Xatolik: " + (e as any).message);
+    }
+  }
+
+  if (normText === "🎯 DTM tizim") {
+    aiModeDeactivate();
+    pendingLogins.delete(userId);
+    return ctx.reply(
+      "🎯 <b>DTM TIZIM BO'LIMI</b>\n\n" +
+        "• <b>📝 DTM Test Kitobchasi</b> — 1-blok va 2-blok fanlarini tanlab, individual 60 talik PDF test kitobchasi va javoblar varaqasini olish\n" +
+        "• <b>✅ DTM Javob tekshirish</b> — Botdan olingan test varianti (Variant ID) javoblarini tekshirish\n" +
+        "• <b>📊 DTM natijani bilish</b> — Tashkilot yoki admin olgan imtihon natijasini 7 xonali ID orqali ko'rish",
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: getDtmMenuKeyboard(),
+          resize_keyboard: true,
+        },
+      }
+    );
+  }
+
+  if (normText === "📝 DTM Test Kitobchasi") {
+    aiModeDeactivate();
+    pendingLogins.delete(userId);
+
+    if (!authed) {
+      return ctx.reply(
+        "🔑 Davom etish uchun avval tizimga kiring yoki telefon raqamingizni yuboring:",
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: "📱 Telefon raqamni yuborish", request_contact: true }],
+              [{ text: "🔑 Kirish" }, { text: "⬅️ Asosiy menyu" }],
+            ],
+            resize_keyboard: true,
+          },
+        }
+      );
+    }
+
+    try {
+      const subjects = await getEligibleDtmSubjects(db);
+      if (subjects.length < 2) {
+        return ctx.reply(
+          "⚠️ Hozircha DTM testlar bazasida kamida 30 ta faol savoli bor 2 ta fan mavjud emas. Keyinroq qayta urinib ko'ring."
+        );
+      }
+
+      dtmBuyDrafts.set(userId, { subjects });
+      const rows = buildDtmSubjectInlineRows(subjects, "dtm_b1_");
+      return ctx.reply(
+        "📝 <b>DTM Test Kitobchasi</b>\n\n📘 <b>1-blok fanini tanlang (1–30 savollar):</b>",
+        {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: rows },
+        }
+      );
+    } catch (err: any) {
+      console.error("[DTM Subjects Load Error]:", err);
+      return ctx.reply("❌ Fanlar ro'yxatini yuklashda xatolik yuz berdi.");
+    }
+  }
+
+  if (normText === "✅ DTM Javob tekshirish") {
+    aiModeDeactivate();
+    pendingLogins.set(userId, { step: "dtm_await_variant_id" });
+
+    try {
+      const myAssignments = await listUserTelegramDtmAssignments(db, userId);
+      const pendingItems = myAssignments.filter((a) => a.status !== "CHECKED").slice(0, 6);
+      const buttons = pendingItems.map((a) => [
+        {
+          text: `📝 ${a.assignmentCode} (${a.block1SubjectName} / ${a.block2SubjectName})`,
+          callback_data: `dtm_grade_${a.assignmentCode}`,
+        },
+      ]);
+
+      return ctx.reply(
+        "✅ <b>DTM JAVOBLARINI TEKSHIRISH</b>\n\n" +
+          (pendingItems.length > 0
+            ? "Pastdagi o'zingiz sotib olgan variantlardan birini tanlang yoki <b>Variant ID</b> ni yuboring (masalan: <code>DTM-2026-000001</code>):"
+            : "Tekshirmoqchi bo'lgan <b>Variant ID</b> ni kiriting (masalan: <code>DTM-2026-000001</code>):"),
+        {
+          parse_mode: "HTML",
+          reply_markup: buttons.length > 0 ? { inline_keyboard: buttons } : undefined,
+        }
+      );
+    } catch (err) {
+      console.error("[DTM List User Assignments Error]:", err);
+      return ctx.reply(
+        "Tekshirmoqchi bo'lgan <b>Variant ID</b> ni kiriting (masalan: <code>DTM-2026-000001</code>):",
+        { parse_mode: "HTML" }
+      );
+    }
+  }
+
+  if (normText === "📊 DTM natijani bilish") {
+    aiModeDeactivate();
+    pendingLogins.set(userId, { step: "dtm_await_result_numeric_id" });
+    return ctx.reply(
+      "📊 <b>DTM NATIJANI BILISH</b>\n\n" +
+        "Tashkilot yoki admin imtihonida berilgan <b>7 xonali ID</b> raqamini kiriting (masalan: <code>1000001</code>):",
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: [[{ text: "⬅️ Asosiy menyu" }]],
+          resize_keyboard: true,
+        },
+      }
+    );
+  }
+
+  // Handle active DTM text input states before AI Services
+  if (!menuButtons.includes(normText) && pending && pending.step === "dtm_await_variant_id") {
+    try {
+      await promptDtmVariantGrading(ctx, userId, normText);
+    } catch (err) {
+      console.error("[DTM Await Variant Error]:", err);
+      await ctx.reply("❌ Variantni tekshirishda xatolik yuz berdi.");
+    }
+    return;
+  }
+
+  if (!menuButtons.includes(normText) && pending && pending.step === "dtm_await_60_answers") {
+    const parsed = parseQuickAnswerString(normText);
+    if ("error" in parsed) {
+      return ctx.reply(`❌ ${parsed.error}`);
+    }
+    const assignmentCode = pending.targetButton || "";
+    try {
+      const assignment = await getDtmAssignmentByCode(db, assignmentCode);
+      if (!assignment) {
+        pendingLogins.delete(userId);
+        return ctx.reply("❌ Variant topilmadi.");
+      }
+
+      const graded = await gradeTelegramDtmAssignment(db, {
+        assignment,
+        telegramUserId: userId,
+        answers: parsed.answers,
+      });
+      pendingLogins.delete(userId);
+
+      const header = graded.alreadyChecked
+        ? "✅ <b>USHBU VARIANT ALLAQACHON TEKSHIRILGAN</b>"
+        : "🏆 <b>DTM JAVOBLARINGIZ TEKSHIRILDI!</b>";
+
+      return ctx.reply(formatTelegramResultMessage(graded.result, header), {
+        parse_mode: "HTML",
+        reply_markup: {
+          keyboard: getDtmMenuKeyboard(),
+          resize_keyboard: true,
+        },
+      });
+    } catch (err) {
+      console.error("[DTM Grade Answers Error]:", err);
+      return ctx.reply("❌ Javoblarni tekshirishda xatolik yuz berdi.");
+    }
+  }
+
+  if (!menuButtons.includes(normText) && pending && pending.step === "dtm_await_result_numeric_id") {
+    const cleaned = normText.replace(/\D/g, "");
+    if (!/^\d{7}$/.test(cleaned)) {
+      return ctx.reply(
+        "❌ Iltimos, aniq <b>7 xonali</b> raqamli ID kiriting (masalan: <code>1000001</code>):",
+        { parse_mode: "HTML" }
+      );
+    }
+
+    try {
+      const lookup = await lookupDtmResultByNumericId(db, cleaned);
+      if (lookup.state === "NOT_FOUND") {
+        return ctx.reply(
+          `❌ <code>${cleaned}</code> raqamli ID bo'yicha DTM ma'lumoti topilmadi. ID raqamni tekshirib qayta kiriting.`,
+          { parse_mode: "HTML" }
+        );
+      }
+
+      pendingLogins.delete(userId);
+
+      if (lookup.state === "CHECKED") {
+        return ctx.reply(formatTelegramResultMessage(lookup.result), {
+          parse_mode: "HTML",
+          reply_markup: {
+            keyboard: getDtmMenuKeyboard(),
+            resize_keyboard: true,
+          },
+        });
+      }
+
+      const fullName = lookup.student?.fullName || lookup.assignment?.studentFullName || "—";
+      const orgName = lookup.student?.organizationName || lookup.assignment?.organizationName || "—";
+      const b1 = lookup.student?.block1SubjectName || lookup.assignment?.block1SubjectName || "—";
+      const b2 = lookup.student?.block2SubjectName || lookup.assignment?.block2SubjectName || "—";
+      const assignCode = lookup.assignment?.assignmentCode || "Hali yaratilmagan";
+
+      return ctx.reply(
+        `⏳ <b>NATIJA HALI TEKSHIRILMAGAN</b>\n\n` +
+          `👤 <b>F.I.Sh.:</b> ${fullName}\n` +
+          `🏢 <b>Tashkilot:</b> ${orgName}\n` +
+          `🆔 <b>7 xonali ID:</b> <code>${cleaned}</code>\n` +
+          `📄 <b>Variant ID:</b> <code>${assignCode}</code>\n` +
+          `📘 1-blok: <b>${b1}</b>\n` +
+          `📗 2-blok: <b>${b2}</b>\n\n` +
+          `Javoblar varaqangiz tashkilot/admin tomonidan tekshirilgandan so'ng natijangiz shu 7 xonali ID orqali ko'rinadi.`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            keyboard: getDtmMenuKeyboard(),
+            resize_keyboard: true,
+          },
+        }
+      );
+    } catch (err) {
+      console.error("[DTM Lookup Numeric ID Error]:", err);
+      return ctx.reply("❌ Natijani qidirishda xatolik yuz berdi.");
     }
   }
 

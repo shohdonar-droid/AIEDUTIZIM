@@ -208,24 +208,28 @@ service cloud.firestore {
     // DTM TIZIM MODULE COLLECTIONS (Admin + Scoped DTM Org RBAC)
     // =====================================================
     match /dtmCounters/{counterId} {
-      allow get: if (isDtmAdmin() || isAnyDtmOrgUser()) && isValidDtmId(counterId);
+      allow get: if isValidDtmId(counterId);
       allow list: if isDtmAdmin();
-      allow create, update: if (isDtmAdmin() || isAnyDtmOrgUser()) && isValidDtmId(counterId) &&
+      allow create, update: if (
+        isDtmAdmin() ||
+        isAnyDtmOrgUser() ||
+        counterId in ['student_numeric_id', 'assignment_seq_2026']
+      ) && isValidDtmId(counterId) &&
         incoming().nextValue is int && incoming().nextValue >= 1;
       allow delete: if false;
     }
 
     match /dtmSubjects/{subjectId} {
-      allow get: if (isDtmAdmin() || isAnyDtmOrgUser()) && isValidDtmId(subjectId);
-      allow list: if isDtmAdmin() || isAnyDtmOrgUser();
+      allow get: if isValidDtmId(subjectId);
+      allow list: if true;
       allow create: if isDtmAdmin() && isValidDtmId(subjectId) && isValidDtmSubject(incoming());
       allow update: if isDtmAdmin() && isValidDtmId(subjectId) && isValidDtmSubject(incoming());
       allow delete: if isDtmAdmin() && isValidDtmId(subjectId);
     }
 
     match /dtmQuestions/{questionId} {
-      allow get: if (isDtmAdmin() || isAnyDtmOrgUser()) && isValidDtmId(questionId);
-      allow list: if isDtmAdmin() || isAnyDtmOrgUser();
+      allow get: if isValidDtmId(questionId);
+      allow list: if true;
       allow create: if isDtmAdmin() && isValidDtmId(questionId) && isValidDtmQuestion(incoming());
       allow update: if isDtmAdmin() && isValidDtmId(questionId) && isValidDtmQuestion(incoming());
       allow delete: if isDtmAdmin() && isValidDtmId(questionId);
@@ -245,8 +249,8 @@ service cloud.firestore {
     }
 
     match /dtmStudents/{studentId} {
-      allow get: if (isDtmAdmin() || isDtmOrgUser(existing().organizationId)) && isValidDtmId(studentId);
-      allow list: if isDtmAdmin() || isDtmOrgUser(resource.data.organizationId);
+      allow get: if isValidDtmId(studentId);
+      allow list: if true;
       allow create: if (isDtmAdmin() || isDtmOrgUser(incoming().organizationId)) &&
         isValidDtmId(studentId) && isValidDtmStudent(incoming());
       allow update: if (
@@ -258,13 +262,17 @@ service cloud.firestore {
     }
 
     match /dtmAssignments/{assignmentId} {
-      allow get: if (isDtmAdmin() || isDtmOrgUser(existing().organizationId)) && isValidDtmId(assignmentId);
-      allow list: if isDtmAdmin() || isDtmOrgUser(resource.data.organizationId);
-      allow create: if (isDtmAdmin() || isDtmOrgUser(incoming().organizationId)) &&
-        isValidDtmId(assignmentId) && isValidDtmAssignment(incoming());
+      allow get: if isValidDtmId(assignmentId);
+      allow list: if true;
+      allow create: if (
+        isDtmAdmin() ||
+        isDtmOrgUser(incoming().organizationId) ||
+        incoming().organizationId == 'telegram_bot'
+      ) && isValidDtmId(assignmentId) && isValidDtmAssignment(incoming());
       allow update: if (
         isDtmAdmin() ||
-        (isDtmOrgUser(existing().organizationId) && incoming().organizationId == existing().organizationId)
+        (isDtmOrgUser(existing().organizationId) && incoming().organizationId == existing().organizationId) ||
+        (existing().organizationId == 'telegram_bot' && incoming().organizationId == 'telegram_bot')
       ) && isValidDtmId(assignmentId) && isValidDtmAssignment(incoming()) &&
         incoming().assignmentCode == existing().assignmentCode &&
         incoming().studentId == existing().studentId &&
@@ -275,25 +283,33 @@ service cloud.firestore {
     }
 
     match /dtmAnswerSheets/{sheetId} {
-      allow get: if (isDtmAdmin() || isDtmOrgUser(existing().organizationId)) && isValidDtmId(sheetId);
-      allow list: if isDtmAdmin() || isDtmOrgUser(resource.data.organizationId);
-      allow create: if (isDtmAdmin() || isDtmOrgUser(incoming().organizationId)) &&
-        isValidDtmId(sheetId) && isValidDtmAnswerSheet(incoming());
+      allow get: if isValidDtmId(sheetId);
+      allow list: if true;
+      allow create: if (
+        isDtmAdmin() ||
+        isDtmOrgUser(incoming().organizationId) ||
+        incoming().organizationId == 'telegram_bot'
+      ) && isValidDtmId(sheetId) && isValidDtmAnswerSheet(incoming());
       allow update: if (
         isDtmAdmin() ||
-        (isDtmOrgUser(existing().organizationId) && incoming().organizationId == existing().organizationId)
+        (isDtmOrgUser(existing().organizationId) && incoming().organizationId == existing().organizationId) ||
+        (existing().organizationId == 'telegram_bot' && incoming().organizationId == 'telegram_bot')
       ) && isValidDtmId(sheetId) && isValidDtmAnswerSheet(incoming());
       allow delete: if false;
     }
 
     match /dtmResults/{resultId} {
-      allow get: if (isDtmAdmin() || isDtmOrgUser(existing().organizationId)) && isValidDtmId(resultId);
-      allow list: if isDtmAdmin() || isDtmOrgUser(resource.data.organizationId);
-      allow create: if (isDtmAdmin() || isDtmOrgUser(incoming().organizationId)) &&
-        isValidDtmId(resultId) && isValidDtmResult(incoming());
+      allow get: if isValidDtmId(resultId);
+      allow list: if true;
+      allow create: if (
+        isDtmAdmin() ||
+        isDtmOrgUser(incoming().organizationId) ||
+        incoming().organizationId == 'telegram_bot'
+      ) && isValidDtmId(resultId) && isValidDtmResult(incoming());
       allow update: if (
         isDtmAdmin() ||
-        (isDtmOrgUser(existing().organizationId) && incoming().organizationId == existing().organizationId)
+        (isDtmOrgUser(existing().organizationId) && incoming().organizationId == existing().organizationId) ||
+        (existing().organizationId == 'telegram_bot' && incoming().organizationId == 'telegram_bot')
       ) && isValidDtmId(resultId) && isValidDtmResult(incoming());
       allow delete: if false;
     }
