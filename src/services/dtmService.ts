@@ -27,6 +27,7 @@ import {
   DtmAssignmentStatus,
   DtmDashboardStats,
   DtmDifficulty,
+  DtmMandatoryGroup,
   DtmOrganization,
   DtmQuestion,
   DtmQuestionSnapshot,
@@ -35,6 +36,7 @@ import {
   DtmStatus,
   DtmStudent,
   DtmSubject,
+  MANDATORY_SUBJECT_SPECS,
 } from '../types/dtm';
 
 export class DtmServiceError extends Error {
@@ -130,19 +132,45 @@ export async function listDtmSubjects(): Promise<DtmSubject[]> {
   }
 }
 
+export function inferMandatoryGroupFromName(name: string): DtmMandatoryGroup | '' {
+  const norm = (name || '').toLowerCase().trim();
+  if (!norm) return '';
+  if (
+    norm.includes('ona tili') ||
+    norm.includes('onatili') ||
+    norm.includes('onatil') ||
+    norm.includes("o'zbek tili") ||
+    norm.includes('o‘zbek tili') ||
+    norm.includes('uzbek tili')
+  ) {
+    return 'ONA_TILI';
+  }
+  if (norm.includes('matematika') || norm.includes('math')) return 'MATEMATIKA';
+  if (norm.includes('tarix')) return 'TARIX';
+  return '';
+}
+
 export async function createDtmSubject(input: {
   name: string;
   code: string;
   blockType: string;
+  isMandatory?: boolean;
+  mandatoryGroup?: DtmMandatoryGroup | '';
   description?: string;
   status: DtmStatus;
 }): Promise<string> {
   assertSignedInAdmin();
   try {
+    const isMandatory = Boolean(input.isMandatory || input.blockType === 'majburiy');
+    const resolvedGroup = isMandatory
+      ? input.mandatoryGroup || inferMandatoryGroupFromName(input.name)
+      : '';
     const ref = await addDoc(collection(db, 'dtmSubjects'), {
       name: input.name.trim(),
       code: input.code.trim().toUpperCase(),
-      blockType: input.blockType.trim(),
+      blockType: isMandatory ? 'majburiy' : input.blockType.trim(),
+      isMandatory,
+      mandatoryGroup: resolvedGroup,
       description: (input.description || '').trim(),
       status: input.status,
       createdAt: serverTimestamp(),
@@ -155,16 +183,52 @@ export async function createDtmSubject(input: {
   }
 }
 
+export async function ensureDefaultMandatorySubjects(): Promise<{ createdCount: number; subjects: DtmSubject[] }> {
+  assertSignedInAdmin();
+  const existing = await listDtmSubjects();
+  const hasGroup = new Set<string>();
+  existing.forEach((s) => {
+    if (s.isMandatory || s.blockType === 'majburiy') {
+      const grp = s.mandatoryGroup || inferMandatoryGroupFromName(s.name);
+      if (grp) hasGroup.add(grp);
+    }
+  });
+
+  let createdCount = 0;
+  for (const spec of MANDATORY_SUBJECT_SPECS) {
+    if (!hasGroup.has(spec.group)) {
+      await createDtmSubject({
+        name: spec.defaultName,
+        code: spec.defaultCode,
+        blockType: 'majburiy',
+        isMandatory: true,
+        mandatoryGroup: spec.group,
+        description: `Majburiy fan (har bir to‘g‘ri javobga ${spec.weightPerQuestion} ball, test variantiga avtomatik ${spec.questionCount} ta qo‘shiladi)`,
+        status: 'ACTIVE',
+      });
+      createdCount++;
+    }
+  }
+  const updated = await listDtmSubjects();
+  return { createdCount, subjects: updated };
+}
+
 export async function updateDtmSubject(
   id: string,
-  input: Partial<Pick<DtmSubject, 'name' | 'code' | 'blockType' | 'description' | 'status'>>
+  input: Partial<Pick<DtmSubject, 'name' | 'code' | 'blockType' | 'isMandatory' | 'mandatoryGroup' | 'description' | 'status'>>
 ): Promise<void> {
   assertSignedInAdmin();
   try {
     const payload: any = { updatedAt: serverTimestamp() };
     if (input.name !== undefined) payload.name = input.name.trim();
     if (input.code !== undefined) payload.code = input.code.trim().toUpperCase();
-    if (input.blockType !== undefined) payload.blockType = input.blockType.trim();
+    if (input.isMandatory !== undefined) {
+      payload.isMandatory = Boolean(input.isMandatory);
+      payload.blockType = input.isMandatory ? 'majburiy' : input.blockType || 'both';
+    } else if (input.blockType !== undefined) {
+      payload.blockType = input.blockType.trim();
+    }
+    if (input.mandatoryGroup !== undefined) payload.mandatoryGroup = input.mandatoryGroup;
     if (input.description !== undefined) payload.description = input.description.trim();
     if (input.status !== undefined) payload.status = input.status;
     await updateDoc(doc(db, 'dtmSubjects', id), payload);
@@ -210,10 +274,16 @@ export async function listDtmQuestions(): Promise<DtmQuestion[]> {
 export async function createDtmQuestion(input: Omit<DtmQuestion, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   assertSignedInAdmin();
   try {
+    const isMandatory = Boolean(input.isMandatory || input.block === 'majburiy');
+    const mandatoryGroup = isMandatory
+      ? input.mandatoryGroup || inferMandatoryGroupFromName(input.subjectName || '')
+      : '';
     const ref = await addDoc(collection(db, 'dtmQuestions'), {
       subjectId: input.subjectId,
       subjectName: input.subjectName || '',
-      block: input.block || 'both',
+      block: isMandatory ? 'majburiy' : input.block || 'both',
+      isMandatory,
+      mandatoryGroup,
       questionText: input.questionText.trim(),
       optionA: input.optionA.trim(),
       optionB: input.optionB.trim(),
@@ -248,10 +318,16 @@ export async function bulkCreateDtmQuestions(
       const batch = writeBatch(db);
       chunk.forEach((item, idx) => {
         const ref = doc(collection(db, 'dtmQuestions'));
+        const isMandatory = Boolean(item.isMandatory || item.block === 'majburiy');
+        const mandatoryGroup = isMandatory
+          ? item.mandatoryGroup || inferMandatoryGroupFromName(item.subjectName || '')
+          : '';
         batch.set(ref, {
           subjectId: item.subjectId,
           subjectName: item.subjectName || '',
-          block: item.block || 'both',
+          block: isMandatory ? 'majburiy' : item.block || 'both',
+          isMandatory,
+          mandatoryGroup,
           questionText: item.questionText.trim(),
           optionA: item.optionA.trim(),
           optionB: item.optionB.trim(),
@@ -619,61 +695,112 @@ export async function findDtmStudentByNumericId(
 }
 
 /**
- * Queries active questions for both block1 and block2, validates >= 30 each,
- * and returns balanced randomized 30 + 30 snapshots without side effects.
+ * Queries active questions for mandatory subjects (Ona tili 10, Matematika 10, O'zbekiston tarixi 10)
+ * plus block1 (30) and block2 (30), validates counts, and returns 90 randomized snapshots:
+ * 1..30 = Majburiy fanlar, 31..60 = 1-blok, 61..90 = 2-blok.
  */
 async function prepareQuestionSnapshotsForBlocks(params: {
   block1SubjectId: string;
   block1SubjectName: string;
   block2SubjectId: string;
   block2SubjectName: string;
-}): Promise<{ block1Questions: DtmQuestionSnapshot[]; block2Questions: DtmQuestionSnapshot[] }> {
-  const [snap1, snap2] = await Promise.all([
-    getDocs(
-      query(
-        collection(db, 'dtmQuestions'),
-        where('subjectId', '==', params.block1SubjectId),
-        where('status', '==', 'ACTIVE')
-      )
-    ),
-    params.block1SubjectId === params.block2SubjectId
-      ? Promise.resolve(null)
-      : getDocs(
-          query(
-            collection(db, 'dtmQuestions'),
-            where('subjectId', '==', params.block2SubjectId),
-            where('status', '==', 'ACTIVE')
-          )
-        ),
+}): Promise<{
+  mandatoryQuestions: DtmQuestionSnapshot[];
+  block1Questions: DtmQuestionSnapshot[];
+  block2Questions: DtmQuestionSnapshot[];
+}> {
+  const [subSnap, activeQSnap] = await Promise.all([
+    getDocs(collection(db, 'dtmSubjects')),
+    getDocs(query(collection(db, 'dtmQuestions'), where('status', '==', 'ACTIVE'))),
   ]);
 
-  const raw1 = snap1.docs.map((d) => ({ id: d.id, ...d.data() } as DtmQuestion));
-  const raw2 = snap2
-    ? snap2.docs.map((d) => ({ id: d.id, ...d.data() } as DtmQuestion))
-    : raw1;
+  const subjectById = new Map<string, DtmSubject>();
+  subSnap.docs.forEach((d) => {
+    subjectById.set(d.id, { id: d.id, ...d.data() } as DtmSubject);
+  });
 
-  // Subjects and questions are independent of blocks; blocks are chosen per student.
-  const pool1 = raw1;
-  const pool2 = raw2;
+  const allActiveQuestions = activeQSnap.docs.map(
+    (d) => ({ id: d.id, ...d.data() } as DtmQuestion)
+  );
+
+  const isQuestionMandatory = (q: DtmQuestion): boolean => {
+    const sub = subjectById.get(q.subjectId);
+    return Boolean(
+      q.isMandatory ||
+        q.block === 'majburiy' ||
+        sub?.isMandatory ||
+        sub?.blockType === 'majburiy'
+    );
+  };
+
+  const resolveMandatoryGroup = (q: DtmQuestion): DtmMandatoryGroup | '' => {
+    const sub = subjectById.get(q.subjectId);
+    return (
+      q.mandatoryGroup ||
+      sub?.mandatoryGroup ||
+      inferMandatoryGroupFromName(sub?.name || q.subjectName || '')
+    );
+  };
+
+  // Partition mandatory pools (strictly ONLY questions designated as mandatory)
+  const mandatoryPools: Record<DtmMandatoryGroup, DtmQuestion[]> = {
+    ONA_TILI: [],
+    MATEMATIKA: [],
+    TARIX: [],
+  };
+
+  for (const q of allActiveQuestions) {
+    if (!isQuestionMandatory(q)) continue;
+    const grp = resolveMandatoryGroup(q);
+    if (grp && mandatoryPools[grp]) {
+      mandatoryPools[grp].push(q);
+    }
+  }
+
+  // Elective pools strictly exclude mandatory-marked questions
+  const pool1 = allActiveQuestions.filter(
+    (q) => q.subjectId === params.block1SubjectId && !isQuestionMandatory(q)
+  );
+  const pool2 = allActiveQuestions.filter(
+    (q) => q.subjectId === params.block2SubjectId && !isQuestionMandatory(q)
+  );
 
   const errors: string[] = [];
+  for (const spec of MANDATORY_SUBJECT_SPECS) {
+    const avail = mandatoryPools[spec.group].length;
+    if (avail < spec.questionCount) {
+      errors.push(
+        `Majburiy “${spec.label}” fani bo‘yicha kamida ${spec.questionCount} ta aktiv majburiy test savoli kerak (hozir: ${avail} ta).`
+      );
+    }
+  }
+
   if (pool1.length < 30) {
     errors.push(
-      `“${params.block1SubjectName}” fanida 30 ta aktiv test mavjud emas. Hozir mavjud testlar soni: ${pool1.length} ta. Test variantini yaratish uchun kamida 30 ta aktiv test kerak.`
+      `“${params.block1SubjectName}” fanida 30 ta aktiv asosiy test mavjud emas. Hozir mavjud testlar soni: ${pool1.length} ta.`
     );
   }
   if (pool2.length < 30 && params.block1SubjectId !== params.block2SubjectId) {
     errors.push(
-      `“${params.block2SubjectName}” fanida 30 ta aktiv test mavjud emas. Hozir mavjud testlar soni: ${pool2.length} ta. Test variantini yaratish uchun kamida 30 ta aktiv test kerak.`
+      `“${params.block2SubjectName}” fanida 30 ta aktiv asosiy test mavjud emas. Hozir mavjud testlar soni: ${pool2.length} ta.`
     );
   }
 
   if (errors.length > 0) {
     throw new DtmServiceError(errors.join('\n'), 'INSUFFICIENT_QUESTIONS', {
+      mandatoryCounts: {
+        ONA_TILI: mandatoryPools.ONA_TILI.length,
+        MATEMATIKA: mandatoryPools.MATEMATIKA.length,
+        TARIX: mandatoryPools.TARIX.length,
+      },
       block1Available: pool1.length,
       block2Available: pool2.length,
     });
   }
+
+  const chosenOnaTili = selectBalancedRandomQuestions(mandatoryPools.ONA_TILI, 10, new Set());
+  const chosenMath = selectBalancedRandomQuestions(mandatoryPools.MATEMATIKA, 10, new Set());
+  const chosenTarix = selectBalancedRandomQuestions(mandatoryPools.TARIX, 10, new Set());
 
   const chosen1 = selectBalancedRandomQuestions(pool1, 30, new Set());
   const usedIds = new Set(chosen1.map((q) => q.id));
@@ -681,7 +808,7 @@ async function prepareQuestionSnapshotsForBlocks(params: {
 
   if (chosen1.length < 30 || chosen2.length < 30) {
     throw new DtmServiceError(
-      "Takrorlanmas 60 ta savol tanlash uchun aktiv testlar yetarli emas (1-blok va 2-blok bir xil fandan tanlangan bo'lsa kamida 60 ta aktiv test kerak).",
+      "Takrorlanmas 60 ta asosiy fan savolini tanlash uchun aktiv testlar yetarli emas (1-blok va 2-blok bir xil fandan tanlangan bo'lsa kamida 60 ta aktiv test kerak).",
       'INSUFFICIENT_UNIQUE_QUESTIONS'
     );
   }
@@ -691,7 +818,8 @@ async function prepareQuestionSnapshotsForBlocks(params: {
     order: number,
     subjectId: string,
     subjectName: string,
-    blockLabel: '1-blok' | '2-blok'
+    blockLabel: 'majburiy' | '1-blok' | '2-blok',
+    mandatoryGroup: DtmMandatoryGroup | '' = ''
   ): DtmQuestionSnapshot => {
     const optionEntries: Array<{ text: string; isCorrect: boolean }> = [
       { text: q.optionA, isCorrect: q.correctAnswer === 'A' },
@@ -718,20 +846,54 @@ async function prepareQuestionSnapshotsForBlocks(params: {
       subjectId,
       subjectName,
       block: blockLabel,
+      mandatoryGroup,
       difficulty: q.difficulty,
       topic: q.topic || '',
     };
   };
 
+  const mandatoryQuestions: DtmQuestionSnapshot[] = [
+    ...chosenOnaTili.map((q, idx) =>
+      buildShuffledSnapshot(
+        q,
+        1 + idx,
+        q.subjectId,
+        'Ona tili (Majburiy)',
+        'majburiy',
+        'ONA_TILI'
+      )
+    ),
+    ...chosenMath.map((q, idx) =>
+      buildShuffledSnapshot(
+        q,
+        11 + idx,
+        q.subjectId,
+        'Matematika (Majburiy)',
+        'majburiy',
+        'MATEMATIKA'
+      )
+    ),
+    ...chosenTarix.map((q, idx) =>
+      buildShuffledSnapshot(
+        q,
+        21 + idx,
+        q.subjectId,
+        "O'zbekiston tarixi (Majburiy)",
+        'majburiy',
+        'TARIX'
+      )
+    ),
+  ];
+
   const block1Questions: DtmQuestionSnapshot[] = chosen1.map((q, idx) =>
-    buildShuffledSnapshot(q, idx + 1, params.block1SubjectId, params.block1SubjectName, '1-blok')
+    buildShuffledSnapshot(q, 31 + idx, params.block1SubjectId, params.block1SubjectName, '1-blok')
   );
 
   const block2Questions: DtmQuestionSnapshot[] = chosen2.map((q, idx) =>
-    buildShuffledSnapshot(q, 31 + idx, params.block2SubjectId, params.block2SubjectName, '2-blok')
+    buildShuffledSnapshot(q, 61 + idx, params.block2SubjectId, params.block2SubjectName, '2-blok')
   );
 
-  return { block1Questions, block2Questions };
+  return { mandatoryQuestions, block1Questions, block2Questions };
 }
 
 function shuffleFisherYates<T>(arr: T[]): T[] {
@@ -814,6 +976,7 @@ export async function createDtmStudent(
   assertSignedInAdmin();
 
   let preparedSnapshots: {
+    mandatoryQuestions: DtmQuestionSnapshot[];
     block1Questions: DtmQuestionSnapshot[];
     block2Questions: DtmQuestionSnapshot[];
   } | null = null;
@@ -877,9 +1040,11 @@ export async function createDtmStudent(
           block1SubjectName: input.block1SubjectName,
           block2SubjectId: input.block2SubjectId,
           block2SubjectName: input.block2SubjectName,
+          mandatorySubjectsLabel: "Ona tili, Matematika, O'zbekiston tarixi",
+          mandatoryQuestions: preparedSnapshots.mandatoryQuestions,
           block1Questions: preparedSnapshots.block1Questions,
           block2Questions: preparedSnapshots.block2Questions,
-          totalQuestions: 60,
+          totalQuestions: 90,
           status: 'GENERATED',
           generatedBy: auth.currentUser?.email || auth.currentUser?.uid || 'admin',
           createdAt: serverTimestamp(),
@@ -1133,7 +1298,7 @@ export async function generateStudentAssignment(params: {
     throw new DtmServiceError("2-blok fani bazada topilmadi.", 'SUBJECT_NOT_FOUND');
   }
 
-  const { block1Questions, block2Questions } = await prepareQuestionSnapshotsForBlocks({
+  const { mandatoryQuestions, block1Questions, block2Questions } = await prepareQuestionSnapshotsForBlocks({
     block1SubjectId: student.block1SubjectId,
     block1SubjectName,
     block2SubjectId: student.block2SubjectId,
@@ -1182,9 +1347,11 @@ export async function generateStudentAssignment(params: {
         block1SubjectName,
         block2SubjectId: student.block2SubjectId,
         block2SubjectName,
+        mandatorySubjectsLabel: "Ona tili, Matematika, O'zbekiston tarixi",
+        mandatoryQuestions,
         block1Questions,
         block2Questions,
-        totalQuestions: 60,
+        totalQuestions: 90,
         status: 'GENERATED',
         generatedBy: auth.currentUser?.email || auth.currentUser?.uid || 'admin',
         createdAt: serverTimestamp(),
@@ -1483,7 +1650,11 @@ export async function submitAndCheckAnswerSheet(params: {
     ocrConfidence,
   } = params;
 
+  const hasMandatory =
+    Array.isArray(assignment.mandatoryQuestions) && assignment.mandatoryQuestions.length > 0;
+
   const allQuestions = [
+    ...(assignment.mandatoryQuestions || []),
     ...(assignment.block1Questions || []),
     ...(assignment.block2Questions || []),
   ].sort((a, b) => a.order - b.order);
@@ -1491,36 +1662,59 @@ export async function submitAndCheckAnswerSheet(params: {
   let correctCount = 0;
   let wrongCount = 0;
   let unansweredCount = 0;
+  let mandatoryCorrect = 0;
+  const mandatoryBreakdown = { onaTili: 0, matematika: 0, tarix: 0 };
   let block1Correct = 0;
   let block2Correct = 0;
 
   const questionBreakdown: DtmResultQuestionItem[] = allQuestions.map((q) => {
     const selected = (answers[String(q.order)] || '') as DtmAnswerOption | '';
     const isCorrect = selected !== '' && selected === q.correctAnswer;
+    const isMandatoryItem = hasMandatory && (q.order <= 30 || q.block === 'majburiy');
+    const isBlock1Item = hasMandatory ? q.order >= 31 && q.order <= 60 : q.order <= 30;
+
     if (selected === '') {
       unansweredCount++;
     } else if (isCorrect) {
       correctCount++;
-      if (q.order <= 30) block1Correct++;
-      else block2Correct++;
+      if (isMandatoryItem) {
+        mandatoryCorrect++;
+        if (q.mandatoryGroup === 'ONA_TILI' || q.order <= 10) mandatoryBreakdown.onaTili++;
+        else if (q.mandatoryGroup === 'MATEMATIKA' || q.order <= 20) mandatoryBreakdown.matematika++;
+        else mandatoryBreakdown.tarix++;
+      } else if (isBlock1Item) {
+        block1Correct++;
+      } else {
+        block2Correct++;
+      }
     } else {
       wrongCount++;
     }
 
     return {
       order: q.order,
-      subjectName: q.subjectName || (q.order <= 30 ? assignment.block1SubjectName : assignment.block2SubjectName),
-      block: q.block || (q.order <= 30 ? '1-blok' : '2-blok'),
+      subjectName:
+        q.subjectName ||
+        (isMandatoryItem
+          ? 'Majburiy fan'
+          : isBlock1Item
+          ? assignment.block1SubjectName
+          : assignment.block2SubjectName),
+      block: q.block || (isMandatoryItem ? 'majburiy' : isBlock1Item ? '1-blok' : '2-blok'),
+      mandatoryGroup: q.mandatoryGroup || '',
       selectedAnswer: selected,
       correctAnswer: q.correctAnswer,
       isCorrect,
     };
   });
 
-  const totalQuestions = allQuestions.length || 60;
+  const totalQuestions = allQuestions.length || (hasMandatory ? 90 : 60);
   const percentage = Math.round((correctCount / totalQuestions) * 1000) / 10;
-  // Standard DTM block score: 1-blok * 3.1 + 2-blok * 2.1 (max 156.0 ball)
-  const score = Math.round((block1Correct * 3.1 + block2Correct * 2.1) * 10) / 10;
+  const maxScore = hasMandatory ? 189.0 : 156.0;
+  // Standard DTM score: Majburiy * 1.1 + 1-blok * 3.1 + 2-blok * 2.1 (max 189.0) or legacy 60 (max 156.0)
+  const score = hasMandatory
+    ? Math.round((mandatoryCorrect * 1.1 + block1Correct * 3.1 + block2Correct * 2.1) * 10) / 10
+    : Math.round((block1Correct * 3.1 + block2Correct * 2.1) * 10) / 10;
 
   try {
     const batch = writeBatch(db);
@@ -1565,8 +1759,10 @@ export async function submitAndCheckAnswerSheet(params: {
       correctCount,
       wrongCount,
       unansweredCount,
+      ...(hasMandatory ? { mandatoryCorrect, mandatoryBreakdown } : {}),
       block1Correct,
       block2Correct,
+      maxScore,
       percentage,
       score,
       questionBreakdown,

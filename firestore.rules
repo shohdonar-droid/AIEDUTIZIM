@@ -62,6 +62,8 @@ service cloud.firestore {
         data.code is string && data.code.size() >= 1 && data.code.size() <= 40 &&
         data.blockType is string && data.blockType.size() >= 1 && data.blockType.size() <= 40 &&
         data.status in ['ACTIVE', 'INACTIVE'] &&
+        (!('isMandatory' in data) || data.isMandatory is bool) &&
+        (!('mandatoryGroup' in data) || (data.mandatoryGroup is string && data.mandatoryGroup in ['', 'ONA_TILI', 'MATEMATIKA', 'TARIX'])) &&
         (!('description' in data) || (data.description is string && data.description.size() <= 1500));
     }
 
@@ -76,6 +78,8 @@ service cloud.firestore {
         data.correctAnswer in ['A', 'B', 'C', 'D'] &&
         data.difficulty in ['EASY', 'MEDIUM', 'HARD'] &&
         data.status in ['ACTIVE', 'INACTIVE'] &&
+        (!('isMandatory' in data) || data.isMandatory is bool) &&
+        (!('mandatoryGroup' in data) || (data.mandatoryGroup is string && data.mandatoryGroup in ['', 'ONA_TILI', 'MATEMATIKA', 'TARIX'])) &&
         (!('topic' in data) || (data.topic is string && data.topic.size() <= 200));
     }
 
@@ -110,7 +114,10 @@ service cloud.firestore {
         data.block2SubjectId is string && data.block2SubjectId.size() >= 1 && data.block2SubjectId.size() <= 128 &&
         data.block1Questions is list && data.block1Questions.size() == 30 &&
         data.block2Questions is list && data.block2Questions.size() == 30 &&
-        data.totalQuestions == 60 &&
+        (
+          (data.totalQuestions == 60 && (!('mandatoryQuestions' in data) || data.mandatoryQuestions.size() == 0)) ||
+          (data.totalQuestions == 90 && 'mandatoryQuestions' in data && data.mandatoryQuestions is list && data.mandatoryQuestions.size() == 30)
+        ) &&
         data.status in ['GENERATED', 'PDF_READY', 'DOWNLOADED', 'CHECKED', 'CANCELLED', 'SUPERSEDED'];
     }
 
@@ -129,7 +136,9 @@ service cloud.firestore {
         data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128 &&
         data.studentNumericId is string && data.studentNumericId.matches('^[0-9]{7}$') &&
         data.assignmentId is string && data.assignmentId.size() >= 1 && data.assignmentId.size() <= 128 &&
-        data.totalQuestions is number && data.totalQuestions == 60 &&
+        data.totalQuestions is number && data.totalQuestions in [60, 90] &&
+        (!('mandatoryCorrect' in data) || data.mandatoryCorrect is number) &&
+        (!('maxScore' in data) || data.maxScore is number) &&
         data.correctCount is number && data.wrongCount is number && data.unansweredCount is number &&
         data.percentage is number && data.score is number;
     }
@@ -277,6 +286,7 @@ service cloud.firestore {
         incoming().assignmentCode == existing().assignmentCode &&
         incoming().studentId == existing().studentId &&
         incoming().studentNumericId == existing().studentNumericId &&
+        (!('mandatoryQuestions' in existing()) || incoming().mandatoryQuestions == existing().mandatoryQuestions) &&
         incoming().block1Questions == existing().block1Questions &&
         incoming().block2Questions == existing().block2Questions;
       allow delete: if false; // Preserve historical snapshots

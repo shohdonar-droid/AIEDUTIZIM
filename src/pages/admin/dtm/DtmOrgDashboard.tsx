@@ -78,7 +78,7 @@ export default function DtmOrgDashboard({ organizationId }: DtmOrgDashboardProps
     {
       label: 'Test variantlari',
       value: assignmentCount,
-      meta: '60 talik individual to‘plam',
+      meta: '90 talik individual to‘plam',
       icon: FileSpreadsheet,
       iconBg: 'bg-amber-50 text-amber-600',
       to: '/teacher/dtm/assignments',
@@ -94,7 +94,7 @@ export default function DtmOrgDashboard({ organizationId }: DtmOrgDashboardProps
     {
       label: 'O‘rtacha natija',
       value: `${averagePercentage}%`,
-      meta: `${averageScore} / 156.0 ball`,
+      meta: `${averageScore} / 189.0 ball`,
       icon: TrendingUp,
       iconBg: 'bg-indigo-50 text-indigo-600',
       to: '/teacher/dtm/results',

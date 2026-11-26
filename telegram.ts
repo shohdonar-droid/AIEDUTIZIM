@@ -6785,17 +6785,28 @@ async function promptDtmVariantGrading(ctx: any, userId: number, assignmentCode:
     }
   }
 
+  const hasMandatory =
+    (Array.isArray(assignment.mandatoryQuestions) && assignment.mandatoryQuestions.length > 0) ||
+    assignment.totalQuestions === 90;
+  const totalQ = Number(assignment.totalQuestions || (hasMandatory ? 90 : 60));
+
   pendingLogins.set(userId, {
     step: "dtm_await_60_answers",
     targetButton: assignment.assignmentCode,
   });
 
+  const blocksSummary = hasMandatory
+    ? `📙 Majburiy fanlar (1–30 · 1.1 ball): <b>${assignment.mandatorySubjectsLabel || "Ona tili, Matematika, O'zbekiston tarixi"}</b>\n` +
+      `📘 1-blok (31–60 · 3.1 ball): <b>${assignment.block1SubjectName}</b>\n` +
+      `📗 2-blok (61–90 · 2.1 ball): <b>${assignment.block2SubjectName}</b>`
+    : `📘 1-blok: <b>${assignment.block1SubjectName}</b> (1–30)\n` +
+      `📗 2-blok: <b>${assignment.block2SubjectName}</b> (31–60)`;
+
   return ctx.reply(
     `✅ <b>Variant topildi:</b> <code>${assignment.assignmentCode}</code>\n` +
-      `📘 1-blok: <b>${assignment.block1SubjectName}</b> (1–30)\n` +
-      `📗 2-blok: <b>${assignment.block2SubjectName}</b> (31–60)\n\n` +
-      `<b>Tezkor kiritish (60 harf):</b>\n` +
-      `1–60 javoblarni ketma-ket kiriting (bo‘sh qoldirish uchun <code>-</code> yozing).\n\n` +
+      `${blocksSummary}\n\n` +
+      `<b>Tezkor kiritish (${totalQ} harf):</b>\n` +
+      `1–${totalQ} javoblarni ketma-ket kiriting (bo‘sh qoldirish uchun <code>-</code> yozing).\n\n` +
       `Masalan: <code>ABCDABCD...</code>`,
     {
       parse_mode: "HTML",
@@ -6822,7 +6833,9 @@ bot.action("dtm_restart_buy", async (ctx) => {
     dtmBuyDrafts.set(userId, { subjects });
     const rows = buildDtmSubjectInlineRows(subjects, "dtm_b1_");
     return ctx.editMessageText(
-      "📝 <b>DTM Test Kitobchasi</b>\n\n📘 <b>1-blok fanini tanlang (1–30 savollar):</b>",
+      "📝 <b>DTM Test Kitobchasi (90 ta savol)</b>\n" +
+        "<i>Majburiy fanlar (1–30): Ona tili, Matematika, O'zbekiston tarixi avtomatik qo'shiladi.</i>\n\n" +
+        "📘 <b>1-blok fanini tanlang (31–60 savollar):</b>",
       {
         parse_mode: "HTML",
         reply_markup: { inline_keyboard: rows },
@@ -6862,7 +6875,9 @@ bot.action(/^dtm_b1_(.+)$/, async (ctx) => {
     rows.push([{ text: "🔙 1-blokni qayta tanlash", callback_data: "dtm_restart_buy" }]);
 
     return ctx.editMessageText(
-      `📘 1-blok (1–30): <b>${b1.name}</b>\n\n📗 Endi <b>2-blok fanini tanlang (31–60 savollar):</b>`,
+      `📙 Majburiy fanlar (1–30): <b>Ona tili, Matematika, O'zbekiston tarixi</b>\n` +
+        `📘 1-blok (31–60): <b>${b1.name}</b>\n\n` +
+        `📗 Endi <b>2-blok fanini tanlang (61–90 savollar):</b>`,
       {
         parse_mode: "HTML",
         reply_markup: { inline_keyboard: rows },
@@ -6905,9 +6920,10 @@ bot.action(/^dtm_b2_(.+)$/, async (ctx) => {
 
     if (!isAdmin && (!authed || balance < cost)) {
       return ctx.editMessageText(
-        `📝 <b>DTM TEST KITOBCHASI BUYURTMASI</b>\n\n` +
-          `📘 1-blok (1–30): <b>${draft.block1SubjectName}</b>\n` +
-          `📗 2-blok (31–60): <b>${b2.name}</b>\n` +
+        `📝 <b>DTM TEST KITOBCHASI BUYURTMASI (90 ta savol)</b>\n\n` +
+          `📙 Majburiy fanlar (1–30): <b>Ona tili, Matematika, O'zbekiston tarixi</b>\n` +
+          `📘 1-blok (31–60): <b>${draft.block1SubjectName}</b>\n` +
+          `📗 2-blok (61–90): <b>${b2.name}</b>\n` +
           `💰 Narxi: <b>${cost.toLocaleString()} so'm</b>\n` +
           `💳 Balansingiz: <b>${balance.toLocaleString()} so'm</b>\n\n` +
           `❌ <b>Balansingizda mablag' yetarli emas!</b>`,
@@ -6924,9 +6940,10 @@ bot.action(/^dtm_b2_(.+)$/, async (ctx) => {
     }
 
     return ctx.editMessageText(
-      `📝 <b>DTM TEST KITOBCHASI BUYURTMASI</b>\n\n` +
-        `📘 1-blok (1–30): <b>${draft.block1SubjectName}</b>\n` +
-        `📗 2-blok (31–60): <b>${b2.name}</b>\n` +
+      `📝 <b>DTM TEST KITOBCHASI BUYURTMASI (90 ta savol)</b>\n\n` +
+        `📙 Majburiy fanlar (1–30): <b>Ona tili, Matematika, O'zbekiston tarixi</b>\n` +
+        `📘 1-blok (31–60): <b>${draft.block1SubjectName}</b>\n` +
+        `📗 2-blok (61–90): <b>${b2.name}</b>\n` +
         `💰 Narxi: <b>${(isAdmin ? 0 : cost).toLocaleString()} so'm</b>\n` +
         `💳 Balansingiz: <b>${balance.toLocaleString()} so'm</b>\n\n` +
         `Tasdiqlaysizmi?`,
@@ -7002,8 +7019,9 @@ bot.action("dtm_confirm_buy", async (ctx) => {
 
     await ctx.editMessageText(
       `⏳ <b>Test kitobchasi va javoblar varaqasi tayyorlanmoqda...</b>\n\n` +
-        `📘 1-blok: ${draft.block1SubjectName}\n` +
-        `📗 2-blok: ${draft.block2SubjectName}\n` +
+        `📙 Majburiy (1–30): Ona tili, Matematika, O'zbekiston tarixi\n` +
+        `📘 1-blok (31–60): ${draft.block1SubjectName}\n` +
+        `📗 2-blok (61–90): ${draft.block2SubjectName}\n` +
         `Iltimos, 5–10 soniya kuting.`,
       { parse_mode: "HTML" }
     );
@@ -7026,11 +7044,12 @@ bot.action("dtm_confirm_buy", async (ctx) => {
       { source: generated.testPdfBuffer, filename: `Test_${generated.numericId}.pdf` },
       {
         caption:
-          `📘 <b>DTM TEST KITOBCHASI (60 ta savol)</b>\n\n` +
+          `📘 <b>DTM TEST KITOBCHASI (${generated.totalQuestions} ta savol)</b>\n\n` +
           `📄 <b>Variant ID:</b> <code>${generated.assignmentCode}</code>\n` +
           `🆔 <b>O'quvchi ID:</b> <code>${generated.numericId}</code>\n` +
-          `1-blok (1–30): <b>${generated.block1SubjectName}</b>\n` +
-          `2-blok (31–60): <b>${generated.block2SubjectName}</b>`,
+          `📙 Majburiy (1–30): <b>${generated.mandatorySubjectsLabel}</b>\n` +
+          `📘 1-blok (31–60): <b>${generated.block1SubjectName}</b>\n` +
+          `📗 2-blok (61–90): <b>${generated.block2SubjectName}</b>`,
         parse_mode: "HTML",
       }
     );
@@ -7039,7 +7058,7 @@ bot.action("dtm_confirm_buy", async (ctx) => {
       { source: generated.answerPdfBuffer, filename: `Javoblar_${generated.numericId}.pdf` },
       {
         caption:
-          `📝 <b>JAVOBLAR VARAQASI</b>\n\n` +
+          `📝 <b>JAVOBLAR VARAQASI (${generated.totalQuestions} ta savol · 1 bet)</b>\n\n` +
           `📄 <b>Variant ID:</b> <code>${generated.assignmentCode}</code>\n` +
           `Testni ishlab bo'lgach, javoblaringizni tekshirish uchun pastdagi <b>«📝 Javobni kiritish»</b> tugmasini bosing.`,
         parse_mode: "HTML",
@@ -7206,7 +7225,7 @@ if (shops.length === 0) {
     pendingLogins.delete(userId);
     return ctx.reply(
       "🎯 <b>DTM TIZIM BO'LIMI</b>\n\n" +
-        "• <b>📝 DTM Test Kitobchasi</b> — 1-blok va 2-blok fanlarini tanlab, individual 60 talik PDF test kitobchasi va javoblar varaqasini olish\n" +
+        "• <b>📝 DTM Test Kitobchasi</b> — Majburiy fanlar (1–30) avtomatik qo'shilgan holda 1-blok va 2-blokni tanlab, 90 talik individual PDF test kitobchasi va 1 betlik DTM javoblar varaqasini olish\n" +
         "• <b>✅ DTM Javob tekshirish</b> — Botdan olingan test varianti (Variant ID) javoblarini tekshirish\n" +
         "• <b>📊 DTM natijani bilish</b> — Tashkilot yoki admin olgan imtihon natijasini 7 xonali ID orqali ko'rish",
       {
@@ -7242,14 +7261,16 @@ if (shops.length === 0) {
       const subjects = await getEligibleDtmSubjects(db);
       if (subjects.length < 2) {
         return ctx.reply(
-          "⚠️ Hozircha DTM testlar bazasida kamida 30 ta faol savoli bor 2 ta fan mavjud emas. Keyinroq qayta urinib ko'ring."
+          "⚠️ Hozircha DTM testlar bazasida kamida 30 ta faol savoli bor 2 ta asosiy blok fani mavjud emas. Keyinroq qayta urinib ko'ring."
         );
       }
 
       dtmBuyDrafts.set(userId, { subjects });
       const rows = buildDtmSubjectInlineRows(subjects, "dtm_b1_");
       return ctx.reply(
-        "📝 <b>DTM Test Kitobchasi</b>\n\n📘 <b>1-blok fanini tanlang (1–30 savollar):</b>",
+        "📝 <b>DTM Test Kitobchasi (90 ta savol)</b>\n" +
+          "<i>Majburiy fanlar (1–30): Ona tili, Matematika, O'zbekiston tarixi avtomatik qo'shiladi.</i>\n\n" +
+          "📘 <b>1-blok fanini tanlang (31–60 savollar):</b>",
         {
           parse_mode: "HTML",
           reply_markup: { inline_keyboard: rows },
@@ -7322,16 +7343,23 @@ if (shops.length === 0) {
   }
 
   if (!menuButtons.includes(normText) && pending && pending.step === "dtm_await_60_answers") {
-    const parsed = parseQuickAnswerString(normText);
-    if ("error" in parsed) {
-      return ctx.reply(`❌ ${parsed.error}`);
-    }
     const assignmentCode = pending.targetButton || "";
     try {
       const assignment = await getDtmAssignmentByCode(db, assignmentCode);
       if (!assignment) {
         pendingLogins.delete(userId);
         return ctx.reply("❌ Variant topilmadi.");
+      }
+
+      const expectedCount = Number(
+        assignment.totalQuestions ||
+          (Array.isArray(assignment.mandatoryQuestions) && assignment.mandatoryQuestions.length > 0
+            ? 90
+            : 60)
+      );
+      const parsed = parseQuickAnswerString(normText, expectedCount);
+      if ("error" in parsed) {
+        return ctx.reply(`❌ ${parsed.error}`);
       }
 
       const graded = await gradeTelegramDtmAssignment(db, {
@@ -7393,6 +7421,10 @@ if (shops.length === 0) {
       const b1 = lookup.student?.block1SubjectName || lookup.assignment?.block1SubjectName || "—";
       const b2 = lookup.student?.block2SubjectName || lookup.assignment?.block2SubjectName || "—";
       const assignCode = lookup.assignment?.assignmentCode || "Hali yaratilmagan";
+      const is90Q =
+        lookup.assignment?.totalQuestions === 90 ||
+        (Array.isArray(lookup.assignment?.mandatoryQuestions) &&
+          lookup.assignment.mandatoryQuestions.length > 0);
 
       return ctx.reply(
         `⏳ <b>NATIJA HALI TEKSHIRILMAGAN</b>\n\n` +
@@ -7400,6 +7432,9 @@ if (shops.length === 0) {
           `🏢 <b>Tashkilot:</b> ${orgName}\n` +
           `🆔 <b>7 xonali ID:</b> <code>${cleaned}</code>\n` +
           `📄 <b>Variant ID:</b> <code>${assignCode}</code>\n` +
+          (is90Q
+            ? `📙 Majburiy fanlar: <b>${lookup.assignment?.mandatorySubjectsLabel || "Ona tili, Matematika, O'zbekiston tarixi"}</b>\n`
+            : "") +
           `📘 1-blok: <b>${b1}</b>\n` +
           `📗 2-blok: <b>${b2}</b>\n\n` +
           `Javoblar varaqangiz tashkilot/admin tomonidan tekshirilgandan so'ng natijangiz shu 7 xonali ID orqali ko'rinadi.`,

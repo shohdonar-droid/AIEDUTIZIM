@@ -88,7 +88,7 @@ export default function DtmDashboard() {
     {
       label: 'Jami fanlar',
       value: stats.totalSubjects,
-      meta: '1-blok va 2-blok fanlari',
+      meta: 'Majburiy + 1-blok va 2-blok',
       icon: BookOpen,
       iconBg: 'bg-sky-50 text-sky-600',
       to: '/dtm/subjects',
@@ -96,7 +96,7 @@ export default function DtmDashboard() {
     {
       label: 'Yaratilgan test variantlari',
       value: stats.totalAssignments,
-      meta: '60 talik individual snapshot',
+      meta: '90 talik individual snapshot',
       icon: FileSpreadsheet,
       iconBg: 'bg-amber-50 text-amber-600',
       to: '/dtm/assignments',
@@ -112,7 +112,7 @@ export default function DtmDashboard() {
     {
       label: 'O‘rtacha natija',
       value: `${stats.averagePercentage}%`,
-      meta: `${stats.averageScore} / 156.0 ball`,
+      meta: `${stats.averageScore} / 189.0 ball`,
       icon: TrendingUp,
       iconBg: 'bg-teal-50 text-teal-600',
       to: '/dtm/results',
@@ -259,7 +259,7 @@ export default function DtmDashboard() {
               <h2 className="text-base font-semibold text-slate-900">
                 Oxirgi yaratilgan test variantlari
               </h2>
-              <p className="text-xs text-slate-500">Har bir o‘quvchi uchun 60 talik individual to‘plam</p>
+              <p className="text-xs text-slate-500">Har bir o‘quvchi uchun 90 talik individual to‘plam</p>
             </div>
             <Link
               to="/dtm/assignments"

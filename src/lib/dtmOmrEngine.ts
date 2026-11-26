@@ -83,14 +83,24 @@ const IDEAL_FIDUCIAL_ASPECT =
 // Grid Constants (PDF points)
 const GRID_LEFT = 40;
 const CONTENT_WIDTH = PDF_WIDTH - 80; // 515.28
-const GRID_Y = 190;
 const COL_GAP = 14;
 const COL_WIDTH = (CONTENT_WIDTH - COL_GAP * 2) / 3; // 162.4267
-const HEADER_HEIGHT = 20;
-const ROW_HEIGHT = 27.5;
-const BOX_SIZE_PT = 14;
-const BOX_STEP_PT = 32;
 const OPTIONS: DtmAnswerOption[] = ['A', 'B', 'C', 'D'];
+
+// Legacy 60-question square geometry
+const GRID60_Y = 190;
+const HEADER60_HEIGHT = 20;
+const ROW60_HEIGHT = 27.5;
+const BOX60_SIZE_PT = 14;
+const BOX60_STEP_PT = 32;
+
+// 90-question 1-page circular geometry
+const GRID90_Y = 168;
+const HEADER90_HEIGHT = 18;
+const ROW90_HEIGHT = 19.2;
+const BUBBLE90_CENTER_OFFSET_X = 38;
+const BUBBLE90_STEP_PT = 33;
+const BUBBLE90_RADIUS_PT = 6.2;
 
 export interface CheckboxGeometry {
   order: number;
@@ -100,28 +110,62 @@ export interface CheckboxGeometry {
   size: number; // warped px
 }
 
-function getRowAndCol(qNum: number): { col: number; row: number } {
-  const col = Math.floor((qNum - 1) / 20);
-  const row = (qNum - 1) % 20;
-  return { col, row };
+interface BoxGeometryWarp {
+  x: number;
+  y: number;
+  size: number;
+  cx: number;
+  cy: number;
+  r: number;
+  isCircle: boolean;
+  colX: number;
+  ry: number;
 }
 
 function getBoxCoordinatesWarp(
   qNum: number,
   optIdx: number,
   dx = 0,
-  dy = 0
-): { x: number; y: number; size: number; colX: number; ry: number } {
-  const { col, row } = getRowAndCol(qNum);
+  dy = 0,
+  is90 = true
+): BoxGeometryWarp {
+  if (is90) {
+    const col = Math.floor((qNum - 1) / 30);
+    const row = (qNum - 1) % 30;
+    const colXPt = GRID_LEFT + col * (COL_WIDTH + COL_GAP);
+    const ryPt = GRID90_Y + HEADER90_HEIGHT + row * ROW90_HEIGHT;
+    const cxPt = colXPt + BUBBLE90_CENTER_OFFSET_X + optIdx * BUBBLE90_STEP_PT;
+    const cyPt = ryPt + ROW90_HEIGHT / 2;
+    const rPt = BUBBLE90_RADIUS_PT;
+
+    return {
+      x: (cxPt - rPt) * WARP_SCALE + dx,
+      y: (cyPt - rPt) * WARP_SCALE + dy,
+      size: rPt * 2 * WARP_SCALE,
+      cx: cxPt * WARP_SCALE + dx,
+      cy: cyPt * WARP_SCALE + dy,
+      r: rPt * WARP_SCALE,
+      isCircle: true,
+      colX: colXPt * WARP_SCALE + dx,
+      ry: ryPt * WARP_SCALE + dy,
+    };
+  }
+
+  const col = Math.floor((qNum - 1) / 20);
+  const row = (qNum - 1) % 20;
   const colXPt = GRID_LEFT + col * (COL_WIDTH + COL_GAP);
-  const ryPt = GRID_Y + HEADER_HEIGHT + row * ROW_HEIGHT;
-  const bxPt = colXPt + 30 + optIdx * BOX_STEP_PT;
+  const ryPt = GRID60_Y + HEADER60_HEIGHT + row * ROW60_HEIGHT;
+  const bxPt = colXPt + 30 + optIdx * BOX60_STEP_PT;
   const byPt = ryPt + 6.5;
 
   return {
     x: bxPt * WARP_SCALE + dx,
     y: byPt * WARP_SCALE + dy,
-    size: BOX_SIZE_PT * WARP_SCALE,
+    size: BOX60_SIZE_PT * WARP_SCALE,
+    cx: (bxPt + BOX60_SIZE_PT / 2) * WARP_SCALE + dx,
+    cy: (byPt + BOX60_SIZE_PT / 2) * WARP_SCALE + dy,
+    r: (BOX60_SIZE_PT / 2) * WARP_SCALE,
+    isCircle: false,
     colX: colXPt * WARP_SCALE + dx,
     ry: ryPt * WARP_SCALE + dy,
   };
@@ -806,12 +850,17 @@ function warpToCanonicalCanvas(
 function findSubGridOffset(
   inkGrid: Float32Array,
   w: number,
-  h: number
+  h: number,
+  is90: boolean
 ): { dx: number; dy: number } {
-  const sampleQs = [1, 5, 10, 15, 20, 21, 25, 30, 35, 40, 41, 45, 50, 55, 60];
+  const sampleQs = is90
+    ? [1, 6, 12, 18, 24, 30, 31, 36, 42, 48, 54, 60, 61, 66, 72, 78, 84, 90]
+    : [1, 5, 10, 15, 20, 21, 25, 30, 35, 40, 41, 45, 50, 55, 60];
   let bestDx = 0;
   let bestDy = 0;
   let bestEnergy = -Infinity;
+
+  const angles = [0, Math.PI / 4, Math.PI / 2, (3 * Math.PI) / 4, Math.PI, (5 * Math.PI) / 4, (3 * Math.PI) / 2, (7 * Math.PI) / 4];
 
   for (let dy = -4; dy <= 4; dy += 2) {
     for (let dx = -4; dx <= 4; dx += 2) {
@@ -822,40 +871,55 @@ function findSubGridOffset(
 
       for (const qNum of sampleQs) {
         for (let oi = 0; oi < 4; oi++) {
-          const box = getBoxCoordinatesWarp(qNum, oi, dx, dy);
-          const bx = Math.round(box.x);
-          const by = Math.round(box.y);
-          const sz = Math.round(box.size);
-
-          // Sample 1px border perimeter of printed checkbox (dark ink expected)
-          for (let t = 2; t <= sz - 2; t += 4) {
-            const pts = [
-              [bx + t, by],
-              [bx + t, by + sz],
-              [bx, by + t],
-              [bx + sz, by + t],
-            ];
-            for (const [px, py] of pts) {
-              if (px >= 0 && px < w && py >= 0 && py < h) {
-                borderDarkness += 255 - inkGrid[py * w + px];
+          const box = getBoxCoordinatesWarp(qNum, oi, dx, dy, is90);
+          if (box.isCircle) {
+            for (const ang of angles) {
+              const bx = Math.round(box.cx + Math.cos(ang) * box.r);
+              const by = Math.round(box.cy + Math.sin(ang) * box.r);
+              if (bx >= 0 && bx < w && by >= 0 && by < h) {
+                borderDarkness += 255 - inkGrid[by * w + bx];
                 bSamples++;
               }
+              const hx = Math.round(box.cx + Math.cos(ang) * (box.r + 4));
+              const hy = Math.round(box.cy + Math.sin(ang) * (box.r + 4));
+              if (hx >= 0 && hx < w && hy >= 0 && hy < h) {
+                outerHaloBrightness += inkGrid[hy * w + hx];
+                hSamples++;
+              }
             }
-          }
+          } else {
+            const bx = Math.round(box.x);
+            const by = Math.round(box.y);
+            const sz = Math.round(box.size);
 
-          // Sample 4px outside left/right/top/bottom (white paper expected)
-          const haloPts = [
-            [bx - 4, by + sz / 2],
-            [bx + sz + 4, by + sz / 2],
-            [bx + sz / 2, by - 4],
-            [bx + sz / 2, by + sz + 4],
-          ];
-          for (const [px, py] of haloPts) {
-            const ix = Math.round(px);
-            const iy = Math.round(py);
-            if (ix >= 0 && ix < w && iy >= 0 && iy < h) {
-              outerHaloBrightness += inkGrid[iy * w + ix];
-              hSamples++;
+            for (let t = 2; t <= sz - 2; t += 4) {
+              const pts = [
+                [bx + t, by],
+                [bx + t, by + sz],
+                [bx, by + t],
+                [bx + sz, by + t],
+              ];
+              for (const [px, py] of pts) {
+                if (px >= 0 && px < w && py >= 0 && py < h) {
+                  borderDarkness += 255 - inkGrid[py * w + px];
+                  bSamples++;
+                }
+              }
+            }
+
+            const haloPts = [
+              [bx - 4, by + sz / 2],
+              [bx + sz + 4, by + sz / 2],
+              [bx + sz / 2, by - 4],
+              [bx + sz / 2, by + sz + 4],
+            ];
+            for (const [px, py] of haloPts) {
+              const ix = Math.round(px);
+              const iy = Math.round(py);
+              if (ix >= 0 && ix < w && iy >= 0 && iy < h) {
+                outerHaloBrightness += inkGrid[iy * w + ix];
+                hSamples++;
+              }
             }
           }
         }
@@ -882,14 +946,15 @@ function estimateRowPaperWhite(
   h: number,
   qNum: number,
   dx: number,
-  dy: number
+  dy: number,
+  is90: boolean
 ): number {
   const samples: number[] = [];
   for (let oi = 0; oi < 3; oi++) {
-    const b1 = getBoxCoordinatesWarp(qNum, oi, dx, dy);
-    const b2 = getBoxCoordinatesWarp(qNum, oi + 1, dx, dy);
-    const gapStartX = Math.round(b1.x + b1.size + 6);
-    const gapEndX = Math.round(b2.x - 6);
+    const b1 = getBoxCoordinatesWarp(qNum, oi, dx, dy, is90);
+    const b2 = getBoxCoordinatesWarp(qNum, oi + 1, dx, dy, is90);
+    const gapStartX = Math.round(b1.x + b1.size + 5);
+    const gapEndX = Math.round(b2.x - 5);
     const yStart = Math.round(b1.y + 3);
     const yEnd = Math.round(b1.y + b1.size - 3);
 
@@ -912,15 +977,9 @@ function scoreSingleBox(
   inkGrid: Float32Array,
   w: number,
   h: number,
-  box: { x: number; y: number; size: number },
+  box: BoxGeometryWarp,
   rowPaperWhite: number
 ): number {
-  const inset = 3.5; // Exclude printed 2px outer border
-  const x0 = clamp(Math.round(box.x + inset), 0, w - 1);
-  const y0 = clamp(Math.round(box.y + inset), 0, h - 1);
-  const x1 = clamp(Math.round(box.x + box.size - inset), 0, w - 1);
-  const y1 = clamp(Math.round(box.y + box.size - inset), 0, h - 1);
-
   const inkThreshold = rowPaperWhite - Math.max(36, rowPaperWhite * 0.24);
   const normScale = Math.max(75, rowPaperWhite * 0.72);
 
@@ -928,15 +987,47 @@ function scoreSingleBox(
   let darkCount = 0;
   let normSum = 0;
 
-  for (let y = y0; y <= y1; y++) {
-    const rowOff = y * w;
-    for (let x = x0; x <= x1; x++) {
-      const v = inkGrid[rowOff + x];
-      total++;
-      if (v < inkThreshold) darkCount++;
-      const diff = rowPaperWhite - v;
-      if (diff > 14) {
-        normSum += Math.min(1, diff / normScale);
+  if (box.isCircle) {
+    const rIn = Math.max(4, box.r - 2.4);
+    const rInSq = rIn * rIn;
+    const x0 = clamp(Math.floor(box.cx - rIn), 0, w - 1);
+    const x1 = clamp(Math.ceil(box.cx + rIn), 0, w - 1);
+    const y0 = clamp(Math.floor(box.cy - rIn), 0, h - 1);
+    const y1 = clamp(Math.ceil(box.cy + rIn), 0, h - 1);
+
+    for (let y = y0; y <= y1; y++) {
+      const dy = y - box.cy;
+      const dySq = dy * dy;
+      const rowOff = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const dx = x - box.cx;
+        if (dx * dx + dySq > rInSq) continue;
+        const v = inkGrid[rowOff + x];
+        total++;
+        if (v < inkThreshold) darkCount++;
+        const diff = rowPaperWhite - v;
+        if (diff > 14) {
+          normSum += Math.min(1, diff / normScale);
+        }
+      }
+    }
+  } else {
+    const inset = 3.5; // Exclude printed 2px outer border
+    const x0 = clamp(Math.round(box.x + inset), 0, w - 1);
+    const y0 = clamp(Math.round(box.y + inset), 0, h - 1);
+    const x1 = clamp(Math.round(box.x + box.size - inset), 0, w - 1);
+    const y1 = clamp(Math.round(box.y + box.size - inset), 0, h - 1);
+
+    for (let y = y0; y <= y1; y++) {
+      const rowOff = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const v = inkGrid[rowOff + x];
+        total++;
+        if (v < inkThreshold) darkCount++;
+        const diff = rowPaperWhite - v;
+        if (diff > 14) {
+          normSum += Math.min(1, diff / normScale);
+        }
       }
     }
   }
@@ -952,8 +1043,12 @@ function scoreSingleBox(
 // ==========================================
 export function scanAnswerSheetFromCanvas(
   sourceCanvas: HTMLCanvasElement,
-  customCorners?: OmrCorners
+  customCorners?: OmrCorners,
+  options?: { questionCount?: 60 | 90 }
 ): OmrScanResult {
+  const questionCount = options?.questionCount === 60 ? 60 : 90;
+  const is90 = questionCount === 90;
+
   const detected = customCorners
     ? { corners: customCorners, autoDetected: true }
     : detectFiducialCorners(sourceCanvas);
@@ -971,7 +1066,7 @@ export function scanAnswerSheetFromCanvas(
     inkGrid[i] = computeInkLuminance(wPixels[p], wPixels[p + 1], wPixels[p + 2]);
   }
 
-  const alignmentOffset = findSubGridOffset(inkGrid, WARP_WIDTH, WARP_HEIGHT);
+  const alignmentOffset = findSubGridOffset(inkGrid, WARP_WIDTH, WARP_HEIGHT, is90);
 
   const questions: OmrQuestionDetection[] = [];
   const answers: Record<string, DtmAnswerOption | ''> = {};
@@ -980,21 +1075,22 @@ export function scanAnswerSheetFromCanvas(
   let confidenceSum = 0;
   let confidenceCount = 0;
 
-  for (let qNum = 1; qNum <= 60; qNum++) {
+  for (let qNum = 1; qNum <= questionCount; qNum++) {
     const rowWhite = estimateRowPaperWhite(
       inkGrid,
       WARP_WIDTH,
       WARP_HEIGHT,
       qNum,
       alignmentOffset.dx,
-      alignmentOffset.dy
+      alignmentOffset.dy,
+      is90
     );
 
     const scoresRecord: Record<DtmAnswerOption, number> = { A: 0, B: 0, C: 0, D: 0 };
     const entries: Array<{ opt: DtmAnswerOption; score: number }> = [];
 
     OPTIONS.forEach((opt, oi) => {
-      const box = getBoxCoordinatesWarp(qNum, oi, alignmentOffset.dx, alignmentOffset.dy);
+      const box = getBoxCoordinatesWarp(qNum, oi, alignmentOffset.dx, alignmentOffset.dy, is90);
       const s = scoreSingleBox(inkGrid, WARP_WIDTH, WARP_HEIGHT, box, rowWhite);
       scoresRecord[opt] = Math.round(s * 1000) / 1000;
       entries.push({ opt, score: s });
@@ -1052,7 +1148,6 @@ export function scanAnswerSheetFromCanvas(
 
   // Draw visual verification overlay onto warpedCanvas
   wCtx.save();
-  // Highlight 4 fiducial targets
   [
     CANONICAL_FIDUCIALS_WARP.tl,
     CANONICAL_FIDUCIALS_WARP.tr,
@@ -1064,28 +1159,31 @@ export function scanAnswerSheetFromCanvas(
     wCtx.strokeRect(pt.x - 18, pt.y - 18, 36, 36);
   });
 
+  const highlightBubble = (box: BoxGeometryWarp, stroke: string, fill: string) => {
+    wCtx.strokeStyle = stroke;
+    wCtx.fillStyle = fill;
+    wCtx.lineWidth = 3;
+    if (box.isCircle) {
+      wCtx.beginPath();
+      wCtx.arc(box.cx, box.cy, box.r + 2.5, 0, Math.PI * 2);
+      wCtx.fill();
+      wCtx.stroke();
+    } else {
+      wCtx.fillRect(box.x - 2, box.y - 2, box.size + 4, box.size + 4);
+      wCtx.strokeRect(box.x - 2, box.y - 2, box.size + 4, box.size + 4);
+    }
+  };
+
   for (const q of questions) {
     if (q.status === 'BLANK') continue;
     OPTIONS.forEach((opt, oi) => {
-      const box = getBoxCoordinatesWarp(q.order, oi, alignmentOffset.dx, alignmentOffset.dy);
+      const box = getBoxCoordinatesWarp(q.order, oi, alignmentOffset.dx, alignmentOffset.dy, is90);
       if (q.status === 'OK' && q.selected === opt) {
-        wCtx.strokeStyle = '#10b981';
-        wCtx.fillStyle = 'rgba(16, 185, 129, 0.22)';
-        wCtx.lineWidth = 3;
-        wCtx.fillRect(box.x - 2, box.y - 2, box.size + 4, box.size + 4);
-        wCtx.strokeRect(box.x - 2, box.y - 2, box.size + 4, box.size + 4);
+        highlightBubble(box, '#10b981', 'rgba(16, 185, 129, 0.22)');
       } else if (q.status === 'LOW_CONFIDENCE' && q.selected === opt) {
-        wCtx.strokeStyle = '#f59e0b';
-        wCtx.fillStyle = 'rgba(245, 158, 11, 0.25)';
-        wCtx.lineWidth = 3;
-        wCtx.fillRect(box.x - 2, box.y - 2, box.size + 4, box.size + 4);
-        wCtx.strokeRect(box.x - 2, box.y - 2, box.size + 4, box.size + 4);
+        highlightBubble(box, '#f59e0b', 'rgba(245, 158, 11, 0.25)');
       } else if (q.status === 'MULTIPLE' && q.scores[opt] >= 0.24) {
-        wCtx.strokeStyle = '#e11d48';
-        wCtx.fillStyle = 'rgba(225, 29, 72, 0.24)';
-        wCtx.lineWidth = 3;
-        wCtx.fillRect(box.x - 2, box.y - 2, box.size + 4, box.size + 4);
-        wCtx.strokeRect(box.x - 2, box.y - 2, box.size + 4, box.size + 4);
+        highlightBubble(box, '#e11d48', 'rgba(225, 29, 72, 0.24)');
       }
     });
   }

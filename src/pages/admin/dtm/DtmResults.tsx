@@ -73,16 +73,20 @@ export default function DtmResults({ scopedOrgId }: { scopedOrgId?: string }) {
 
   const summary = useMemo(() => {
     if (filteredResults.length === 0) {
-      return { count: 0, avgScore: 0, avgPct: 0, maxScore: 0 };
+      return { count: 0, avgScore: 0, avgPct: 0, maxScore: 0, maxPossible: 189 };
     }
     const totalScore = filteredResults.reduce((acc, r) => acc + (r.score || 0), 0);
     const totalPct = filteredResults.reduce((acc, r) => acc + (r.percentage || 0), 0);
     const maxScore = Math.max(...filteredResults.map((r) => r.score || 0));
+    const allLegacy = filteredResults.every(
+      (r) => (r.totalQuestions || 60) === 60 && r.mandatoryCorrect === undefined
+    );
     return {
       count: filteredResults.length,
       avgScore: Math.round((totalScore / filteredResults.length) * 10) / 10,
       avgPct: Math.round((totalPct / filteredResults.length) * 10) / 10,
       maxScore,
+      maxPossible: allLegacy ? 156 : 189,
     };
   }, [filteredResults]);
 
@@ -123,7 +127,10 @@ export default function DtmResults({ scopedOrgId }: { scopedOrgId?: string }) {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
           <p className="text-xs font-medium text-slate-500">O‘rtacha ball</p>
           <p className="mt-1 text-xl font-bold text-blue-700 tabular-nums">
-            {summary.avgScore} <span className="text-xs font-normal text-slate-400">/ 156.0</span>
+            {summary.avgScore}{' '}
+            <span className="text-xs font-normal text-slate-400">
+              / {summary.maxPossible.toFixed(1)}
+            </span>
           </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -177,7 +184,7 @@ export default function DtmResults({ scopedOrgId }: { scopedOrgId?: string }) {
                 <th className="px-4 py-3.5">O‘quvchi ID</th>
                 <th className="px-4 py-3.5">F.I.Sh. / Tashkilot</th>
                 <th className="px-4 py-3.5">Variant</th>
-                <th className="px-4 py-3.5">1-blok / 2-blok</th>
+                <th className="px-4 py-3.5">Bloklar kesimi</th>
                 <th className="px-4 py-3.5">To‘g‘ri javob</th>
                 <th className="px-4 py-3.5">Foiz</th>
                 <th className="px-4 py-3.5">Ball</th>
@@ -217,6 +224,11 @@ export default function DtmResults({ scopedOrgId }: { scopedOrgId?: string }) {
                       {r.assignmentCode}
                     </td>
                     <td className="px-4 py-3.5 text-xs tabular-nums text-slate-700">
+                      {r.mandatoryCorrect !== undefined && (
+                        <div className="text-amber-700">
+                          Majburiy: <strong>{r.mandatoryCorrect}/30</strong>
+                        </div>
+                      )}
                       <div>
                         {r.block1SubjectName}: <strong>{r.block1Correct}/30</strong>
                       </div>
@@ -285,11 +297,19 @@ export default function DtmResults({ scopedOrgId }: { scopedOrgId?: string }) {
               </button>
             </div>
 
-            <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div
+              className={`mb-5 grid grid-cols-2 gap-3 ${
+                selectedResult.mandatoryCorrect !== undefined ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
+              }`}
+            >
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs text-slate-500">Jami ball</div>
                 <div className="text-lg font-bold text-emerald-700 tabular-nums">
-                  {selectedResult.score} / 156.0
+                  {selectedResult.score} /{' '}
+                  {(
+                    selectedResult.maxScore ||
+                    (selectedResult.totalQuestions === 90 ? 189 : 156)
+                  ).toFixed(1)}
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -299,6 +319,21 @@ export default function DtmResults({ scopedOrgId }: { scopedOrgId?: string }) {
                   {selectedResult.unansweredCount}
                 </div>
               </div>
+              {selectedResult.mandatoryCorrect !== undefined && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+                  <div className="text-xs text-amber-800">Majburiy fanlar (1–30)</div>
+                  <div className="text-sm font-bold text-amber-950 tabular-nums">
+                    {selectedResult.mandatoryCorrect} / 30 (× 1.1)
+                  </div>
+                  {selectedResult.mandatoryBreakdown && (
+                    <div className="mt-0.5 text-[10px] text-amber-700">
+                      Ona tili: {selectedResult.mandatoryBreakdown.onaTili} · Mat:{' '}
+                      {selectedResult.mandatoryBreakdown.matematika} · Tarix:{' '}
+                      {selectedResult.mandatoryBreakdown.tarix}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs text-slate-500">1-blok ({selectedResult.block1SubjectName})</div>
                 <div className="text-sm font-bold text-slate-900 tabular-nums">

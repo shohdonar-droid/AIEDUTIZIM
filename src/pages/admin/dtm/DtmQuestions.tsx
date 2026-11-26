@@ -20,6 +20,7 @@ import {
   deleteDtmQuestion,
   formatDtmError,
   formatTimestamp,
+  inferMandatoryGroupFromName,
   listDtmQuestions,
   listDtmSubjects,
   updateDtmQuestion,
@@ -27,6 +28,7 @@ import {
 import {
   DtmAnswerOption,
   DtmDifficulty,
+  DtmMandatoryGroup,
   DtmQuestion,
   DtmStatus,
   DtmSubject,
@@ -57,12 +59,15 @@ export default function DtmQuestions() {
   const [search, setSearch] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [kindFilter, setKindFilter] = useState<'ALL' | 'ELECTIVE' | 'MANDATORY'>('ALL');
   const [page, setPage] = useState(1);
 
-  // Add/Edit Question Modal (No Block field — attached purely to Subject!)
+  // Add/Edit Question Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<DtmQuestion | null>(null);
   const [subjectId, setSubjectId] = useState('');
+  const [isMandatory, setIsMandatory] = useState(false);
+  const [mandatoryGroup, setMandatoryGroup] = useState<DtmMandatoryGroup | ''>('ONA_TILI');
   const [questionText, setQuestionText] = useState('');
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
@@ -73,9 +78,11 @@ export default function DtmQuestions() {
   const [difficulty, setDifficulty] = useState<DtmDifficulty>('MEDIUM');
   const [status, setStatus] = useState<DtmStatus>('ACTIVE');
 
-  // Bulk Paste Modal (No Block field)
+  // Bulk Paste Modal
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [bulkSubjectId, setBulkSubjectId] = useState('');
+  const [bulkIsMandatory, setBulkIsMandatory] = useState(false);
+  const [bulkMandatoryGroup, setBulkMandatoryGroup] = useState<DtmMandatoryGroup | ''>('ONA_TILI');
   const [bulkDifficulty, setBulkDifficulty] = useState<DtmDifficulty>('MEDIUM');
   const [bulkText, setBulkText] = useState('');
 
@@ -122,14 +129,19 @@ export default function DtmQuestions() {
   const subjectStatsMap = useMemo(() => {
     const map: Record<
       string,
-      { total: number; active: number; easy: number; medium: number; hard: number }
+      { total: number; active: number; mandatoryActive: number; electiveActive: number; easy: number; medium: number; hard: number }
     > = {};
     for (const q of questions) {
       if (!map[q.subjectId]) {
-        map[q.subjectId] = { total: 0, active: 0, easy: 0, medium: 0, hard: 0 };
+        map[q.subjectId] = { total: 0, active: 0, mandatoryActive: 0, electiveActive: 0, easy: 0, medium: 0, hard: 0 };
       }
       map[q.subjectId].total++;
-      if (q.status === 'ACTIVE') map[q.subjectId].active++;
+      if (q.status === 'ACTIVE') {
+        map[q.subjectId].active++;
+        const isQMand = Boolean(q.isMandatory || q.block === 'majburiy');
+        if (isQMand) map[q.subjectId].mandatoryActive++;
+        else map[q.subjectId].electiveActive++;
+      }
       if (q.difficulty === 'EASY') map[q.subjectId].easy++;
       else if (q.difficulty === 'HARD') map[q.subjectId].hard++;
       else map[q.subjectId].medium++;
@@ -165,8 +177,11 @@ export default function DtmQuestions() {
   const filteredSubjectQuestions = useMemo(() => {
     const term = search.trim().toLowerCase();
     return subjectQuestionsWithSeq.filter((q) => {
+      const isQMand = Boolean(q.isMandatory || q.block === 'majburiy');
       if (difficultyFilter !== 'ALL' && q.difficulty !== difficultyFilter) return false;
       if (statusFilter !== 'ALL' && q.status !== statusFilter) return false;
+      if (kindFilter === 'MANDATORY' && !isQMand) return false;
+      if (kindFilter === 'ELECTIVE' && isQMand) return false;
       if (
         term &&
         !(
@@ -180,7 +195,7 @@ export default function DtmQuestions() {
       }
       return true;
     });
-  }, [subjectQuestionsWithSeq, search, difficultyFilter, statusFilter]);
+  }, [subjectQuestionsWithSeq, search, difficultyFilter, statusFilter, kindFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredSubjectQuestions.length / PAGE_SIZE));
   const paginatedQuestions = useMemo(() => {
@@ -191,7 +206,29 @@ export default function DtmQuestions() {
 
   useEffect(() => {
     setPage(1);
-  }, [selectedSubjectId, search, difficultyFilter, statusFilter]);
+  }, [selectedSubjectId, search, difficultyFilter, statusFilter, kindFilter]);
+
+  const applySubjectDefaultsForSingle = (targetSubId: string) => {
+    const sub = subjectMap[targetSubId];
+    const subMandatory = Boolean(sub?.isMandatory || sub?.blockType === 'majburiy');
+    setIsMandatory(subMandatory);
+    setMandatoryGroup(
+      sub?.mandatoryGroup ||
+        inferMandatoryGroupFromName(sub?.name || '') ||
+        'ONA_TILI'
+    );
+  };
+
+  const applySubjectDefaultsForBulk = (targetSubId: string) => {
+    const sub = subjectMap[targetSubId];
+    const subMandatory = Boolean(sub?.isMandatory || sub?.blockType === 'majburiy');
+    setBulkIsMandatory(subMandatory);
+    setBulkMandatoryGroup(
+      sub?.mandatoryGroup ||
+        inferMandatoryGroupFromName(sub?.name || '') ||
+        'ONA_TILI'
+    );
+  };
 
   const handleOpenSubjectQuestions = (subId: string) => {
     setSelectedSubjectId(subId);
@@ -199,6 +236,7 @@ export default function DtmQuestions() {
     setSearch('');
     setDifficultyFilter('ALL');
     setStatusFilter('ALL');
+    setKindFilter('ALL');
     setError('');
   };
 
@@ -209,8 +247,10 @@ export default function DtmQuestions() {
   };
 
   const openCreateModal = (preselectedSubId?: string) => {
+    const targetSubId = preselectedSubId || selectedSubjectId || subjects[0]?.id || '';
     setEditingQuestion(null);
-    setSubjectId(preselectedSubId || selectedSubjectId || subjects[0]?.id || '');
+    setSubjectId(targetSubId);
+    applySubjectDefaultsForSingle(targetSubId);
     setQuestionText('');
     setOptionA('');
     setOptionB('');
@@ -225,8 +265,17 @@ export default function DtmQuestions() {
   };
 
   const openEditModal = (q: DtmQuestion) => {
+    const sub = subjectMap[q.subjectId];
+    const qMandatory = Boolean(q.isMandatory || q.block === 'majburiy' || sub?.isMandatory);
     setEditingQuestion(q);
     setSubjectId(q.subjectId);
+    setIsMandatory(qMandatory);
+    setMandatoryGroup(
+      q.mandatoryGroup ||
+        sub?.mandatoryGroup ||
+        inferMandatoryGroupFromName(sub?.name || q.subjectName || '') ||
+        'ONA_TILI'
+    );
     setQuestionText(q.questionText);
     setOptionA(q.optionA);
     setOptionB(q.optionB);
@@ -250,8 +299,15 @@ export default function DtmQuestions() {
       setError("Savol matni va A, B, C, D variantlarning barchasini to‘ldiring.");
       return;
     }
+    if (isMandatory && !mandatoryGroup) {
+      setError("Majburiy fan yo‘nalishini (Ona tili, Matematika yoki O‘zbekiston tarixi) tanlang.");
+      return;
+    }
 
     const subjName = subjectMap[subjectId]?.name || '';
+    const payloadBlock = isMandatory ? 'majburiy' : 'both';
+    const payloadGroup = isMandatory ? mandatoryGroup : '';
+
     setSaving(true);
     setError('');
     setSuccess('');
@@ -260,7 +316,9 @@ export default function DtmQuestions() {
         await updateDtmQuestion(editingQuestion.id, {
           subjectId,
           subjectName: subjName,
-          block: 'both',
+          block: payloadBlock,
+          isMandatory,
+          mandatoryGroup: payloadGroup,
           questionText,
           optionA,
           optionB,
@@ -276,7 +334,9 @@ export default function DtmQuestions() {
         await createDtmQuestion({
           subjectId,
           subjectName: subjName,
-          block: 'both',
+          block: payloadBlock,
+          isMandatory,
+          mandatoryGroup: payloadGroup,
           questionText,
           optionA,
           optionB,
@@ -358,7 +418,9 @@ export default function DtmQuestions() {
       parsed.push({
         subjectId: bulkSubjectId,
         subjectName: subjName,
-        block: 'both',
+        block: bulkIsMandatory ? 'majburiy' : 'both',
+        isMandatory: bulkIsMandatory,
+        mandatoryGroup: bulkIsMandatory ? bulkMandatoryGroup : '',
         questionText: qText,
         optionA: cleanOpts[0] || '',
         optionB: cleanOpts[1] || '',
@@ -406,7 +468,15 @@ export default function DtmQuestions() {
   };
 
   const activeSubjectStats = selectedSubjectId
-    ? subjectStatsMap[selectedSubjectId] || { total: 0, active: 0, easy: 0, medium: 0, hard: 0 }
+    ? subjectStatsMap[selectedSubjectId] || {
+        total: 0,
+        active: 0,
+        mandatoryActive: 0,
+        electiveActive: 0,
+        easy: 0,
+        medium: 0,
+        hard: 0,
+      }
     : null;
 
   return (
@@ -419,8 +489,8 @@ export default function DtmQuestions() {
         }
         subtitle={
           activeSubject
-            ? `${activeSubject.code} · Fanga biriktirilgan barcha test savollari ketma-ket tartibda (yangi testlar pastdan qo‘shiladi)`
-            : 'Fanlar bo‘yicha testlar soni, qiyinlik darajalari va testlarni tahrirlash'
+            ? `${activeSubject.code} · Fanga biriktirilgan asosiy va majburiy (1.1 ball) test savollari`
+            : 'Fanlar bo‘yicha asosiy blok va majburiy fan testlari soni, qiyinlik darajalari'
         }
         actions={
           <>
@@ -435,7 +505,9 @@ export default function DtmQuestions() {
             )}
             <button
               onClick={() => {
-                setBulkSubjectId(selectedSubjectId || subjects[0]?.id || '');
+                const targetSubId = selectedSubjectId || subjects[0]?.id || '';
+                setBulkSubjectId(targetSubId);
+                applySubjectDefaultsForBulk(targetSubId);
                 setIsBulkOpen(true);
               }}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
@@ -521,9 +593,12 @@ export default function DtmQuestions() {
                     </tr>
                   ) : (
                     filteredSubjects.map((sub) => {
+                      const isSubMandatory = Boolean(sub.isMandatory || sub.blockType === 'majburiy');
                       const st = subjectStatsMap[sub.id] || {
                         total: 0,
                         active: 0,
+                        mandatoryActive: 0,
+                        electiveActive: 0,
                         easy: 0,
                         medium: 0,
                         hard: 0,
@@ -534,12 +609,19 @@ export default function DtmQuestions() {
                             {sub.code}
                           </td>
                           <td className="px-4 py-3.5">
-                            <button
-                              onClick={() => handleOpenSubjectQuestions(sub.id)}
-                              className="text-left font-semibold text-slate-900 hover:text-blue-600"
-                            >
-                              {sub.name}
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => handleOpenSubjectQuestions(sub.id)}
+                                className="text-left font-semibold text-slate-900 hover:text-blue-600"
+                              >
+                                {sub.name}
+                              </button>
+                              {isSubMandatory && (
+                                <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                                  Majburiy (1.1)
+                                </span>
+                              )}
+                            </div>
                             {sub.description && (
                               <p className="mt-0.5 max-w-xs truncate text-xs text-slate-500">
                                 {sub.description}
@@ -552,6 +634,7 @@ export default function DtmQuestions() {
                             </div>
                             <div className="text-xs text-slate-500">
                               Aktiv: {st.active} ta
+                              {st.mandatoryActive > 0 && ` · Majburiy: ${st.mandatoryActive}`}
                             </div>
                           </td>
                           <td className="px-4 py-3.5 tabular-nums">
@@ -639,7 +722,7 @@ export default function DtmQuestions() {
           )}
 
           {/* Filters inside Subject */}
-          <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:grid-cols-4">
+          <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:grid-cols-5">
             <div className="relative sm:col-span-2">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -650,6 +733,15 @@ export default function DtmQuestions() {
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
               />
             </div>
+            <select
+              value={kindFilter}
+              onChange={(e) => setKindFilter(e.target.value as 'ALL' | 'ELECTIVE' | 'MANDATORY')}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+            >
+              <option value="ALL">Barcha test toifasi</option>
+              <option value="ELECTIVE">Asosiy blok testi</option>
+              <option value="MANDATORY">Majburiy fan testi (1.1)</option>
+            </select>
             <select
               value={difficultyFilter}
               onChange={(e) => setDifficultyFilter(e.target.value)}
@@ -719,6 +811,13 @@ export default function DtmQuestions() {
                           {q.id.slice(0, 8)}
                         </td>
                         <td className="max-w-lg px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(q.isMandatory || q.block === 'majburiy') && (
+                              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                                Majburiy (1.1 ball)
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm font-medium text-slate-900">{q.questionText}</p>
                           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
                             <span>A) {q.optionA}</span>
@@ -817,22 +916,71 @@ export default function DtmQuestions() {
             </div>
 
             <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-700">Fan *</label>
-                <select
-                  required
-                  value={subjectId}
-                  onChange={(e) => setSubjectId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
-                >
-                  <option value="">Fan tanlang...</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Fan *</label>
+                  <select
+                    required
+                    value={subjectId}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setSubjectId(nextId);
+                      if (!editingQuestion) applySubjectDefaultsForSingle(nextId);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
+                  >
+                    <option value="">Fan tanlang...</option>
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Test toifasi *
+                  </label>
+                  <select
+                    value={isMandatory ? 'MANDATORY' : 'ELECTIVE'}
+                    onChange={(e) => {
+                      const nextMand = e.target.value === 'MANDATORY';
+                      setIsMandatory(nextMand);
+                      if (nextMand) {
+                        const sub = subjectMap[subjectId];
+                        setMandatoryGroup(
+                          sub?.mandatoryGroup ||
+                            inferMandatoryGroupFromName(sub?.name || '') ||
+                            'ONA_TILI'
+                        );
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:border-blue-500"
+                  >
+                    <option value="ELECTIVE">Asosiy blok testi (1-blok / 2-blok)</option>
+                    <option value="MANDATORY">Majburiy fan testi (1.1 ball · 1–30)</option>
+                  </select>
+                </div>
               </div>
+
+              {isMandatory && (
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Qaysi majburiy fan uchun? *
+                  </label>
+                  <select
+                    required
+                    value={mandatoryGroup}
+                    onChange={(e) => setMandatoryGroup(e.target.value as DtmMandatoryGroup)}
+                    className="w-full rounded-xl border border-indigo-200 bg-indigo-50/40 px-3.5 py-2 text-sm font-medium text-indigo-950 outline-none focus:border-indigo-500"
+                  >
+                    <option value="ONA_TILI">Ona tili (1–10 savollar)</option>
+                    <option value="MATEMATIKA">Matematika (11–20 savollar)</option>
+                    <option value="TARIX">O‘zbekiston tarixi (21–30 savollar)</option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-700">
@@ -983,13 +1131,17 @@ export default function DtmQuestions() {
             </div>
 
             <form onSubmit={handleBulkSave} className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-700">Fan *</label>
                   <select
                     required
                     value={bulkSubjectId}
-                    onChange={(e) => setBulkSubjectId(e.target.value)}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setBulkSubjectId(nextId);
+                      applySubjectDefaultsForBulk(nextId);
+                    }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
                   >
                     {subjects.map((s) => (
@@ -997,6 +1149,28 @@ export default function DtmQuestions() {
                         {s.name} ({s.code})
                       </option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Test toifasi</label>
+                  <select
+                    value={bulkIsMandatory ? 'MANDATORY' : 'ELECTIVE'}
+                    onChange={(e) => {
+                      const nextMand = e.target.value === 'MANDATORY';
+                      setBulkIsMandatory(nextMand);
+                      if (nextMand) {
+                        const sub = subjectMap[bulkSubjectId];
+                        setBulkMandatoryGroup(
+                          sub?.mandatoryGroup ||
+                            inferMandatoryGroupFromName(sub?.name || '') ||
+                            'ONA_TILI'
+                        );
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  >
+                    <option value="ELECTIVE">Asosiy blok testi</option>
+                    <option value="MANDATORY">Majburiy fan testi (1.1 ball)</option>
                   </select>
                 </div>
                 <div>
@@ -1012,6 +1186,24 @@ export default function DtmQuestions() {
                   </select>
                 </div>
               </div>
+
+              {bulkIsMandatory && (
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    Qaysi majburiy fan uchun? *
+                  </label>
+                  <select
+                    required
+                    value={bulkMandatoryGroup}
+                    onChange={(e) => setBulkMandatoryGroup(e.target.value as DtmMandatoryGroup)}
+                    className="w-full rounded-xl border border-indigo-200 bg-indigo-50/40 px-3 py-2 text-sm font-medium text-indigo-950 outline-none focus:border-indigo-500"
+                  >
+                    <option value="ONA_TILI">Ona tili (1–10 savollar)</option>
+                    <option value="MATEMATIKA">Matematika (11–20 savollar)</option>
+                    <option value="TARIX">O‘zbekiston tarixi (21–30 savollar)</option>
+                  </select>
+                </div>
+              )}
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                 <p className="font-semibold text-slate-800">Matn formati namunasi:</p>

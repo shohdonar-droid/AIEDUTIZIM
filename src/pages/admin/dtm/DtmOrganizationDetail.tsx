@@ -123,8 +123,12 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
     loadData();
   }, [orgId]);
 
-  const block1Subjects = subjects;
-  const block2Subjects = subjects;
+  const electiveSubjects = useMemo(
+    () => subjects.filter((s) => !s.isMandatory && s.blockType !== 'majburiy'),
+    [subjects]
+  );
+  const block1Subjects = electiveSubjects;
+  const block2Subjects = electiveSubjects;
 
   const filteredStudents = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -162,8 +166,8 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
     setGroupOrClass('');
     setPhone('');
     setNotes('');
-    setBlock1SubjectId(block1Subjects[0]?.id || subjects[0]?.id || '');
-    setBlock2SubjectId(block2Subjects[1]?.id || block2Subjects[0]?.id || subjects[0]?.id || '');
+    setBlock1SubjectId(block1Subjects[0]?.id || '');
+    setBlock2SubjectId(block2Subjects[1]?.id || block2Subjects[0]?.id || '');
     setGenerateImmediately(false);
     setError('');
     setIsStudentModalOpen(true);
@@ -231,7 +235,7 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
         );
         setSuccess(
           res.assignment
-            ? `O‘quvchi yaratildi (ID: ${res.student.numericId}) va 60 talik test varianti (${res.assignment.assignmentCode}) biriktirildi.`
+            ? `O‘quvchi yaratildi (ID: ${res.student.numericId}) va 90 talik test varianti (${res.assignment.assignmentCode}) biriktirildi.`
             : `O‘quvchi yaratildi! Unikal 7 xonali ID: ${res.student.numericId}`
         );
       }
@@ -257,7 +261,7 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
       if (!ok) return;
     } else {
       const ok = window.confirm(
-        "O‘quvchi uchun tanlangan fanlardan 60 ta tasodifiy test biriktiriladi. Davom etasizmi?"
+        "O‘quvchi uchun majburiy fanlardan 30 ta (Ona tili 10, Matematika 10, O‘zbekiston tarixi 10) hamda 1-blok va 2-blokdan 30 tadan jami 90 ta tasodifiy test biriktiriladi. Davom etasizmi?"
       );
       if (!ok) return;
     }
@@ -271,7 +275,7 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
         allowRegenerate: hasExisting,
       });
       setSuccess(
-        `${st.fullName} (ID: ${st.numericId}) uchun ${created.assignmentCode} varianti (60 ta savol) yaratildi.`
+        `${st.fullName} (ID: ${st.numericId}) uchun ${created.assignmentCode} varianti (90 ta savol) yaratildi.`
       );
       await loadData();
     } catch (err) {
@@ -291,7 +295,7 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
     }
     if (
       !window.confirm(
-        `Test varianti yaratilmagan ${pendingCount} ta o‘quvchi uchun 60 tadan tasodifiy test varianti generatsiya qilinsinmi?`
+        `Test varianti yaratilmagan ${pendingCount} ta o‘quvchi uchun 90 tadan (30 majburiy + 30 + 30) tasodifiy test varianti generatsiya qilinsinmi?`
       )
     ) {
       return;
@@ -407,8 +411,8 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
         'F.I.Sh.': 'Aliyev Anvar Baxtiyorovich',
         'Sinf/Guruh': '11-A',
         Telefon: '+998901234567',
-        '1-blok': subjects[0]?.name || 'Matematika',
-        '2-blok': subjects[1]?.name || subjects[0]?.name || 'Fizika',
+        '1-blok': electiveSubjects[0]?.name || 'Matematika',
+        '2-blok': electiveSubjects[1]?.name || electiveSubjects[0]?.name || 'Fizika',
       },
     ];
     const ws = XLSX.utils.json_to_sheet(sampleData);
@@ -420,7 +424,7 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
   const resolveSubjectByNameOrCode = (val: string): DtmSubject | undefined => {
     const norm = (val || '').trim().toLowerCase();
     if (!norm) return undefined;
-    return subjects.find(
+    return electiveSubjects.find(
       (s) => s.name.toLowerCase() === norm || s.code.toLowerCase() === norm
     );
   };
@@ -738,6 +742,9 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
                           {st.latestAssignmentCode && (
                             <span className="font-mono text-[10px] text-slate-400">
                               {st.latestAssignmentCode}
+                              {assignmentsById[st.latestAssignmentId || '']
+                                ? ` · ${assignmentsById[st.latestAssignmentId || ''].totalQuestions || 60} savol`
+                                : ''}
                             </span>
                           )}
                         </div>
@@ -797,7 +804,7 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
                             title={
                               hasAssignment
                                 ? 'Test variantini qayta yaratish'
-                                : '60 talik test yaratish'
+                                : '90 talik test yaratish'
                             }
                           >
                             {isBusy ? (
@@ -900,10 +907,14 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
                 </div>
               </div>
 
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3.5 py-2.5 text-xs text-indigo-900">
+                <strong>Majburiy fanlar avtomatik qo‘shiladi:</strong> Ona tili (10 ta), Matematika (10 ta), O‘zbekiston tarixi (10 ta) — har bir to‘g‘ri javob 1.1 ball. Jami <strong>90 ta savol</strong> (maks. 189.0 ball).
+              </div>
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-700">
-                    1-blok fani (30 ta savol) *
+                    1-blok fani (30 ta savol · 3.1 ball) *
                   </label>
                   <select
                     required
@@ -921,7 +932,7 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-700">
-                    2-blok fani (30 ta savol) *
+                    2-blok fani (30 ta savol · 2.1 ball) *
                   </label>
                   <select
                     required
@@ -959,7 +970,7 @@ export default function DtmOrganizationDetail({ scopedOrgId }: { scopedOrgId?: s
                     className="h-4 w-4 rounded border-blue-300 text-blue-600"
                   />
                   <span>
-                    Saqlash bilan darhol 60 talik tasodifiy test variantini yaratish (30 + 30)
+                    Saqlash bilan darhol 90 talik tasodifiy test variantini yaratish (30 majburiy + 30 + 30)
                   </span>
                 </label>
               )}

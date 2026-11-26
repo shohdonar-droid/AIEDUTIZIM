@@ -50,10 +50,13 @@ const CORNER_LABELS: Record<CornerKey, string> = {
   br: "Pastki-O'ng",
 };
 
-function answersToQuickString(answersMap: Record<string, DtmAnswerOption | ''>): string {
+function answersToQuickString(
+  answersMap: Record<string, DtmAnswerOption | ''>,
+  totalQuestions = 90
+): string {
   let out = '';
   let lastFilled = 0;
-  for (let i = 1; i <= 60; i++) {
+  for (let i = 1; i <= totalQuestions; i++) {
     if (answersMap[String(i)]) lastFilled = i;
   }
   for (let i = 1; i <= lastFilled; i++) {
@@ -171,12 +174,23 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
     return map;
   }, [omrResult]);
 
-  const applyOmrResult = (res: OmrScanResult, nextSourceType: DtmAnswerSourceType, fileName: string) => {
+  const hasMandatory =
+    Boolean(assignment?.mandatoryQuestions && assignment.mandatoryQuestions.length > 0) ||
+    assignment?.totalQuestions === 90;
+  const totalQuestionsCount = assignment?.totalQuestions || (hasMandatory ? 90 : 60);
+  const omrQuestionCount: 60 | 90 = totalQuestionsCount === 60 ? 60 : 90;
+
+  const applyOmrResult = (
+    res: OmrScanResult,
+    nextSourceType: DtmAnswerSourceType,
+    fileName: string,
+    qTotal = totalQuestionsCount
+  ) => {
     setOmrResult(res);
     setDraftCorners(res.corners);
     setResolvedOrders({});
     setAnswers(res.answers);
-    setQuickString(answersToQuickString(res.answers));
+    setQuickString(answersToQuickString(res.answers, qTotal));
     setSourceType(nextSourceType);
     setUploadedFileName(fileName);
     if (!res.autoDetected) {
@@ -210,8 +224,11 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
       setStudent(foundStudent);
       setAssignment(foundAssignment);
 
+      const qCount =
+        foundAssignment?.totalQuestions ||
+        (foundAssignment?.mandatoryQuestions?.length ? 90 : 60);
       const initial: Record<string, DtmAnswerOption | ''> = {};
-      for (let i = 1; i <= 60; i++) initial[String(i)] = '';
+      for (let i = 1; i <= qCount; i++) initial[String(i)] = '';
       setAnswers(initial);
       setQuickString('');
     } catch (err) {
@@ -230,7 +247,7 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
         ...prev,
         [String(order)]: nextValue,
       };
-      setQuickString(answersToQuickString(next));
+      setQuickString(answersToQuickString(next, totalQuestionsCount));
       return next;
     });
     setResolvedOrders((prev) => ({ ...prev, [order]: true }));
@@ -241,7 +258,7 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
     setQuickString(cleaned);
     const tokens = cleaned.replace(/\s+/g, '').split('');
     const next: Record<string, DtmAnswerOption | ''> = {};
-    for (let i = 1; i <= 60; i++) {
+    for (let i = 1; i <= totalQuestionsCount; i++) {
       const ch = tokens[i - 1];
       next[String(i)] = ch === 'A' || ch === 'B' || ch === 'C' || ch === 'D' ? ch : '';
     }
@@ -261,12 +278,12 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
     try {
       const canvas = await loadSourceCanvasFromFile(file);
       sourceCanvasRef.current = canvas;
-      const result = scanAnswerSheetFromCanvas(canvas);
+      const result = scanAnswerSheetFromCanvas(canvas, undefined, { questionCount: omrQuestionCount });
       const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       const resolvedSource: DtmAnswerSourceType =
         preferredSource || (isPdf ? 'OMR_PDF' : 'OMR_IMAGE');
 
-      applyOmrResult(result, resolvedSource, file.name);
+      applyOmrResult(result, resolvedSource, file.name, omrQuestionCount);
       if (!result.autoDetected) {
         setInspectOpen(true);
       }
@@ -284,9 +301,9 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
     try {
       const canvas = canvasFromVideoFrame(videoRef.current);
       sourceCanvasRef.current = canvas;
-      const result = scanAnswerSheetFromCanvas(canvas);
+      const result = scanAnswerSheetFromCanvas(canvas, undefined, { questionCount: omrQuestionCount });
       const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, '-');
-      applyOmrResult(result, 'OMR_CAMERA', `camera_${stamp}.jpg`);
+      applyOmrResult(result, 'OMR_CAMERA', `camera_${stamp}.jpg`, omrQuestionCount);
       setCameraOpen(false);
       if (!result.autoDetected) {
         setInspectOpen(true);
@@ -303,11 +320,14 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
     setOmrScanning(true);
     setError('');
     try {
-      const result = scanAnswerSheetFromCanvas(sourceCanvasRef.current, draftCorners);
+      const result = scanAnswerSheetFromCanvas(sourceCanvasRef.current, draftCorners, {
+        questionCount: omrQuestionCount,
+      });
       applyOmrResult(
         result,
         sourceType === 'MANUAL' ? 'OMR_IMAGE' : sourceType,
-        uploadedFileName || 'omr_scan.jpg'
+        uploadedFileName || 'omr_scan.jpg',
+        omrQuestionCount
       );
       setInspectTab('overlay');
     } catch (err) {
@@ -335,7 +355,7 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
 
   const handleClearAnswers = () => {
     const empty: Record<string, DtmAnswerOption | ''> = {};
-    for (let i = 1; i <= 60; i++) empty[String(i)] = '';
+    for (let i = 1; i <= totalQuestionsCount; i++) empty[String(i)] = '';
     setAnswers(empty);
     setQuickString('');
     setOmrResult(null);
@@ -462,7 +482,7 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
                     {assignment.assignmentCode}
                   </div>
                   <div className="text-xs text-slate-500 tabular-nums">
-                    Belgilangan javoblar: {filledCount} / 60
+                    Belgilangan javoblar: {filledCount} / {totalQuestionsCount}
                   </div>
                 </div>
               )}
@@ -488,8 +508,15 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
                   </div>
                   <p className="mt-1 text-sm text-emerald-900 tabular-nums">
                     To‘g‘ri: <strong>{savedResult.correctCount}</strong> / {savedResult.totalQuestions}{' '}
-                    ({savedResult.percentage}%) · Ball: <strong>{savedResult.score} / 156.0</strong>{' '}
-                    (1-blok: {savedResult.block1Correct}/30, 2-blok: {savedResult.block2Correct}/30)
+                    ({savedResult.percentage}%) · Ball:{' '}
+                    <strong>
+                      {savedResult.score} / {savedResult.maxScore || (savedResult.totalQuestions === 90 ? 189 : 156)}.0
+                    </strong>{' '}
+                    (
+                    {savedResult.mandatoryCorrect !== undefined
+                      ? `Majburiy: ${savedResult.mandatoryCorrect}/30, `
+                      : ''}
+                    1-blok: {savedResult.block1Correct}/30, 2-blok: {savedResult.block2Correct}/30)
                   </p>
                 </div>
                 <Link
@@ -527,7 +554,7 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
                     )}
                   </div>
                   <p className="mt-1 text-xs text-slate-500">
-                    Javoblar varaqasini kamera orqali suratga oling yoki JPG/PNG/PDF faylni yuklang — tizim 60 ta javobni avtomatik o‘qiydi.
+                    Javoblar varaqasini kamera orqali suratga oling yoki JPG/PNG/PDF faylni yuklang — tizim {totalQuestionsCount} ta javobni avtomatik o‘qiydi.
                   </p>
 
                   <div className="mt-3 grid grid-cols-1 gap-2">
@@ -585,7 +612,7 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-medium text-slate-600">O‘qilgan javoblar:</span>
                         <span className="font-bold text-slate-900 tabular-nums">
-                          {omrResult.filledCount} / 60
+                          {omrResult.filledCount} / {totalQuestionsCount}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-xs">
@@ -667,10 +694,10 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
                 {/* Quick Paste Card */}
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
                   <h3 className="text-sm font-bold text-slate-900">
-                    Tezkor kiritish (60 harf)
+                    Tezkor kiritish ({totalQuestionsCount} harf)
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    1–60 javoblarni ketma-ket kiriting (bo‘sh qoldirish uchun <code className="font-mono">-</code> yozing).
+                    1–{totalQuestionsCount} javoblarni ketma-ket kiriting (bo‘sh qoldirish uchun <code className="font-mono">-</code> yozing).
                   </p>
                   <textarea
                     rows={3}
@@ -704,23 +731,57 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
                 </button>
               </div>
 
-              {/* Right: 60-Question Bubble Grid */}
+              {/* Right: 90-Question (3 cols) or Legacy 60-Question (2 cols) Bubble Grid */}
               <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  {[
-                    {
-                      title: `1-blok: ${assignment.block1SubjectName} (1–30)`,
-                      start: 1,
-                      end: 30,
-                    },
-                    {
-                      title: `2-blok: ${assignment.block2SubjectName} (31–60)`,
-                      start: 31,
-                      end: 60,
-                    },
-                  ].map((block) => (
+                <div
+                  className={`grid grid-cols-1 gap-5 ${
+                    hasMandatory ? 'md:grid-cols-2 xl:grid-cols-3' : 'md:grid-cols-2'
+                  }`}
+                >
+                  {(hasMandatory
+                    ? [
+                        {
+                          title: 'Majburiy fanlar (1–30 · 1.1)',
+                          start: 1,
+                          end: 30,
+                          isMandatoryCol: true,
+                        },
+                        {
+                          title: `1-blok: ${assignment.block1SubjectName} (31–60)`,
+                          start: 31,
+                          end: 60,
+                          isMandatoryCol: false,
+                        },
+                        {
+                          title: `2-blok: ${assignment.block2SubjectName} (61–90)`,
+                          start: 61,
+                          end: 90,
+                          isMandatoryCol: false,
+                        },
+                      ]
+                    : [
+                        {
+                          title: `1-blok: ${assignment.block1SubjectName} (1–30)`,
+                          start: 1,
+                          end: 30,
+                          isMandatoryCol: false,
+                        },
+                        {
+                          title: `2-blok: ${assignment.block2SubjectName} (31–60)`,
+                          start: 31,
+                          end: 60,
+                          isMandatoryCol: false,
+                        },
+                      ]
+                  ).map((block) => (
                     <div key={block.title}>
-                      <h4 className="mb-3 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-800">
+                      <h4
+                        className={`mb-3 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider ${
+                          block.isMandatoryCol
+                            ? 'bg-indigo-50 text-indigo-900'
+                            : 'bg-slate-100 text-slate-800'
+                        }`}
+                      >
                         {block.title}
                       </h4>
                       <div className="space-y-1.5">
@@ -733,54 +794,68 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
                           const isUnresolved = !resolvedOrders[qNum];
                           const isMultiple = isUnresolved && omrDet?.status === 'MULTIPLE';
                           const isLowConf = isUnresolved && omrDet?.status === 'LOW_CONFIDENCE';
+                          const subLabel =
+                            block.isMandatoryCol && qNum === 1
+                              ? 'Ona tili (1–10)'
+                              : block.isMandatoryCol && qNum === 11
+                              ? 'Matematika (11–20)'
+                              : block.isMandatoryCol && qNum === 21
+                              ? "O'zbekiston tarixi (21–30)"
+                              : null;
 
                           return (
-                            <div
-                              id={`dtm-q-row-${qNum}`}
-                              key={qNum}
-                              className={`flex items-center justify-between rounded-lg border px-2.5 py-1 transition ${
-                                isMultiple
-                                  ? 'border-rose-300 bg-rose-50/70'
-                                  : isLowConf
-                                  ? 'border-amber-300 bg-amber-50/70'
-                                  : 'border-slate-100 hover:bg-slate-50'
-                              }`}
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-7 font-mono text-xs font-bold text-slate-600 tabular-nums">
-                                  {qNum}.
-                                </span>
-                                {isMultiple && (
-                                  <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
-                                    2 ta
+                            <React.Fragment key={qNum}>
+                              {subLabel && (
+                                <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                                  {subLabel}
+                                </div>
+                              )}
+                              <div
+                                id={`dtm-q-row-${qNum}`}
+                                className={`flex items-center justify-between rounded-lg border px-2 py-1 transition ${
+                                  isMultiple
+                                    ? 'border-rose-300 bg-rose-50/70'
+                                    : isLowConf
+                                    ? 'border-amber-300 bg-amber-50/70'
+                                    : 'border-slate-100 hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span className="w-6 font-mono text-xs font-bold text-slate-600 tabular-nums">
+                                    {qNum}.
                                   </span>
-                                )}
-                                {isLowConf && (
-                                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                                    Shubha
-                                  </span>
-                                )}
+                                  {isMultiple && (
+                                    <span className="rounded bg-rose-100 px-1 py-0.5 text-[10px] font-bold text-rose-700">
+                                      2+
+                                    </span>
+                                  )}
+                                  {isLowConf && (
+                                    <span className="rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold text-amber-800">
+                                      ?
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {OPTIONS.map((opt) => {
+                                    const active = current === opt;
+                                    return (
+                                      <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => handleSelectOption(qNum, opt)}
+                                        className={`h-7 w-7 rounded-md font-mono text-xs font-bold transition ${
+                                          active
+                                            ? 'bg-blue-600 text-white shadow-xs'
+                                            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                                        }`}
+                                      >
+                                        {opt}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                {OPTIONS.map((opt) => {
-                                  const active = current === opt;
-                                  return (
-                                    <button
-                                      key={opt}
-                                      type="button"
-                                      onClick={() => handleSelectOption(qNum, opt)}
-                                      className={`h-7 w-8 rounded-md font-mono text-xs font-bold transition ${
-                                        active
-                                          ? 'bg-blue-600 text-white shadow-xs'
-                                          : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
-                                      }`}
-                                    >
-                                      {opt}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                            </React.Fragment>
                           );
                         })}
                       </div>
@@ -1010,7 +1085,7 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3.5">
               <div className="text-xs text-slate-600 tabular-nums">
                 Aniqlik: <strong>{omrResult.ocrConfidence}%</strong> · O‘qilgan javoblar:{' '}
-                <strong>{omrResult.filledCount}/60</strong>
+                <strong>{omrResult.filledCount}/{totalQuestionsCount}</strong>
               </div>
               <div className="flex items-center gap-2">
                 {inspectTab === 'corners' && (

@@ -150,13 +150,13 @@ export default function DtmAssignments({ scopedOrgId }: { scopedOrgId?: string }
             Test variantlari
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Tashkilot o‘quvchilari uchun yaratilgan 60 talik snapshot variantlar va PDF yuklab olish
+            Tashkilot o‘quvchilari uchun yaratilgan 90 talik (30 majburiy + 30 + 30) snapshot variantlar va PDF yuklab olish
           </p>
         </div>
       ) : (
         <DtmModuleNav
           title="Test variantlari"
-          subtitle="Har bir o‘quvchi uchun biriktirilgan o‘zgarmas 60 talik snapshot variantlar va PDF yuklab olish"
+          subtitle="Har bir o‘quvchi uchun biriktirilgan o‘zgarmas 90 talik (30 majburiy + 30 + 30) snapshot variantlar va PDF yuklab olish"
         />
       )}
 
@@ -239,7 +239,7 @@ export default function DtmAssignments({ scopedOrgId }: { scopedOrgId?: string }
                 <th className="px-4 py-3.5">Assignment ID</th>
                 <th className="px-4 py-3.5">O‘quvchi ID</th>
                 <th className="px-4 py-3.5">F.I.Sh. / Tashkilot</th>
-                <th className="px-4 py-3.5">1-blok / 2-blok</th>
+                <th className="px-4 py-3.5">Bloklar</th>
                 <th className="px-4 py-3.5">Testlar</th>
                 <th className="px-4 py-3.5">Holati</th>
                 <th className="px-4 py-3.5">Sana</th>
@@ -283,6 +283,12 @@ export default function DtmAssignments({ scopedOrgId }: { scopedOrgId?: string }
                       </p>
                     </td>
                     <td className="px-4 py-3.5 text-xs text-slate-700">
+                      {((a.mandatoryQuestions && a.mandatoryQuestions.length > 0) ||
+                        a.totalQuestions === 90) && (
+                        <div className="font-medium text-amber-700">
+                          Majburiy: Ona tili, Mat, Tarix
+                        </div>
+                      )}
                       <div>1: {a.block1SubjectName}</div>
                       <div>2: {a.block2SubjectName}</div>
                     </td>
@@ -373,7 +379,7 @@ export default function DtmAssignments({ scopedOrgId }: { scopedOrgId?: string }
               <div className="flex items-center gap-2 text-xs text-slate-600">
                 <Lock className="h-4 w-4 text-slate-500" />
                 <span>
-                  Ushbu variantdagi 60 ta savol o‘zgarmas snapshot sifatida muzlatilgan (bazadagi keyingi tahrirlar ta’sir qilmaydi).
+                  Ushbu variantdagi {selectedAssignment.totalQuestions || 60} ta savol o‘zgarmas snapshot sifatida muzlatilgan (bazadagi keyingi tahrirlar ta’sir qilmaydi).
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -407,18 +413,32 @@ export default function DtmAssignments({ scopedOrgId }: { scopedOrgId?: string }
               </div>
             </div>
 
-            {/* 1-blok & 2-blok questions */}
+            {/* Majburiy, 1-blok & 2-blok questions */}
             <div className="space-y-6">
-              {[
-                {
-                  title: `1-blok: ${selectedAssignment.block1SubjectName} (1–30)`,
-                  questions: selectedAssignment.block1Questions || [],
-                },
-                {
-                  title: `2-blok: ${selectedAssignment.block2SubjectName} (31–60)`,
-                  questions: selectedAssignment.block2Questions || [],
-                },
-              ].map((section) => (
+              {(() => {
+                const hasMandatory =
+                  (selectedAssignment.mandatoryQuestions?.length || 0) > 0 ||
+                  selectedAssignment.totalQuestions === 90;
+                const sections = [
+                  ...(hasMandatory
+                    ? [
+                        {
+                          title: `Majburiy fanlar: ${selectedAssignment.mandatorySubjectsLabel || "Ona tili, Matematika, O'zbekiston tarixi"} (1–30 · 1.1 ball)`,
+                          questions: selectedAssignment.mandatoryQuestions || [],
+                        },
+                      ]
+                    : []),
+                  {
+                    title: `1-blok: ${selectedAssignment.block1SubjectName} (${hasMandatory ? '31–60' : '1–30'} · 3.1 ball)`,
+                    questions: selectedAssignment.block1Questions || [],
+                  },
+                  {
+                    title: `2-blok: ${selectedAssignment.block2SubjectName} (${hasMandatory ? '61–90' : '31–60'} · 2.1 ball)`,
+                    questions: selectedAssignment.block2Questions || [],
+                  },
+                ];
+                return sections;
+              })().map((section) => (
                 <div key={section.title}>
                   <h4 className="mb-3 rounded-lg bg-slate-100 px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-slate-800">
                     {section.title}

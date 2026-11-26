@@ -1,6 +1,44 @@
 export type DtmStatus = 'ACTIVE' | 'INACTIVE';
 
-export type DtmBlockType = '1-blok' | '2-blok' | 'both' | string;
+export type DtmBlockType = 'majburiy' | '1-blok' | '2-blok' | 'both' | string;
+
+export type DtmMandatoryGroup = 'ONA_TILI' | 'MATEMATIKA' | 'TARIX';
+
+export interface DtmMandatorySubjectSpec {
+  group: DtmMandatoryGroup;
+  label: string;
+  defaultName: string;
+  defaultCode: string;
+  questionCount: number;
+  weightPerQuestion: number;
+}
+
+export const MANDATORY_SUBJECT_SPECS: DtmMandatorySubjectSpec[] = [
+  {
+    group: 'ONA_TILI',
+    label: 'Ona tili',
+    defaultName: 'Ona tili (Majburiy)',
+    defaultCode: 'MAJ_ONATILI',
+    questionCount: 10,
+    weightPerQuestion: 1.1,
+  },
+  {
+    group: 'MATEMATIKA',
+    label: 'Matematika',
+    defaultName: 'Matematika (Majburiy)',
+    defaultCode: 'MAJ_MATH',
+    questionCount: 10,
+    weightPerQuestion: 1.1,
+  },
+  {
+    group: 'TARIX',
+    label: "O'zbekiston tarixi",
+    defaultName: "O'zbekiston tarixi (Majburiy)",
+    defaultCode: 'MAJ_TARIX',
+    questionCount: 10,
+    weightPerQuestion: 1.1,
+  },
+];
 
 export type DtmDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
@@ -22,6 +60,7 @@ export interface DtmBlockDefinition {
 }
 
 export const DEFAULT_DTM_BLOCKS: DtmBlockDefinition[] = [
+  { id: 'majburiy', label: 'Majburiy fanlar (Ona tili, Matematika, O‘zbekiston tarixi)', questionCount: 30, weightPerQuestion: 1.1 },
   { id: '1-blok', label: '1-blok (Asosiy fan)', questionCount: 30, weightPerQuestion: 3.1 },
   { id: '2-blok', label: '2-blok (Ikkinchi fan)', questionCount: 30, weightPerQuestion: 2.1 },
 ];
@@ -31,6 +70,8 @@ export interface DtmSubject {
   name: string;
   code: string;
   blockType: DtmBlockType;
+  isMandatory?: boolean;
+  mandatoryGroup?: DtmMandatoryGroup | '';
   description: string;
   status: DtmStatus;
   createdAt: any;
@@ -42,6 +83,8 @@ export interface DtmQuestion {
   subjectId: string;
   subjectName?: string;
   block: DtmBlockType;
+  isMandatory?: boolean;
+  mandatoryGroup?: DtmMandatoryGroup | '';
   questionText: string;
   optionA: string;
   optionB: string;
@@ -100,7 +143,7 @@ export interface DtmStudent {
 }
 
 export interface DtmQuestionSnapshot {
-  order: number; // 1..60
+  order: number; // 1..90 (or 1..60 legacy)
   questionId: string;
   originalQuestionId: string;
   questionText: string;
@@ -112,6 +155,7 @@ export interface DtmQuestionSnapshot {
   subjectId: string;
   subjectName?: string;
   block: DtmBlockType;
+  mandatoryGroup?: DtmMandatoryGroup | '';
   difficulty?: DtmDifficulty;
   topic?: string;
 }
@@ -131,9 +175,11 @@ export interface DtmAssignment {
   block1SubjectName: string;
   block2SubjectId: string;
   block2SubjectName: string;
-  block1Questions: DtmQuestionSnapshot[]; // 30 items (1..30)
-  block2Questions: DtmQuestionSnapshot[]; // 30 items (31..60)
-  totalQuestions: number; // 60
+  mandatorySubjectsLabel?: string; // e.g. "Ona tili, Matematika, O'zbekiston tarixi"
+  mandatoryQuestions?: DtmQuestionSnapshot[]; // 30 items (1..30): 10 Ona tili + 10 Matematika + 10 Tarix
+  block1Questions: DtmQuestionSnapshot[]; // 30 items (31..60, or 1..30 legacy)
+  block2Questions: DtmQuestionSnapshot[]; // 30 items (61..90, or 31..60 legacy)
+  totalQuestions: number; // 90 (or 60 legacy)
   status: DtmAssignmentStatus;
   generatedBy?: string;
   createdAt: any;
@@ -152,7 +198,7 @@ export interface DtmAnswerSheet {
   sourceType: DtmAnswerSourceType;
   fileUrl?: string | null;
   fileName?: string | null;
-  answers: Record<string, DtmAnswerOption | ''>; // "1".."60"
+  answers: Record<string, DtmAnswerOption | ''>; // "1".."90" (or "1".."60" legacy)
   ocrConfidence?: number | null;
   status: 'SUBMITTED' | 'CHECKED' | 'ERROR';
   checkedBy?: string;
@@ -164,6 +210,7 @@ export interface DtmResultQuestionItem {
   order: number;
   subjectName: string;
   block: DtmBlockType;
+  mandatoryGroup?: DtmMandatoryGroup | '';
   selectedAnswer: DtmAnswerOption | '';
   correctAnswer: DtmAnswerOption;
   isCorrect: boolean;
@@ -181,14 +228,21 @@ export interface DtmResult {
   answerSheetId: string;
   block1SubjectName: string;
   block2SubjectName: string;
-  totalQuestions: number;
+  totalQuestions: number; // 90 (or 60 legacy)
   correctCount: number;
   wrongCount: number;
   unansweredCount: number;
+  mandatoryCorrect?: number; // out of 30 (1.1 ball each)
+  mandatoryBreakdown?: {
+    onaTili: number;
+    matematika: number;
+    tarix: number;
+  };
   block1Correct: number;
   block2Correct: number;
+  maxScore?: number; // 189.0 (or 156.0 legacy)
   percentage: number;
-  score: number; // Weighted DTM score (block1 * 3.1 + block2 * 2.1, max 156.0)
+  score: number; // Weighted DTM score (mandatory*1.1 + block1*3.1 + block2*2.1, max 189.0)
   questionBreakdown: DtmResultQuestionItem[];
   checkedBy?: string;
   checkedAt: any;
