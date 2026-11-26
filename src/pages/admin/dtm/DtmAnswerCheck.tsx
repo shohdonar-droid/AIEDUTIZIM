@@ -176,7 +176,9 @@ export default function DtmAnswerCheck({ scopedOrgId }: { scopedOrgId?: string }
 
   const hasMandatory =
     Boolean(assignment?.mandatoryQuestions && assignment.mandatoryQuestions.length > 0) ||
-    assignment?.totalQuestions === 90;
+    assignment?.totalQuestions === 90 ||
+    Boolean(assignment?.mandatorySubjectsLabel) ||
+    Boolean(assignment?.block1Questions?.some((q) => Number(q?.order) > 30));
   const totalQuestionsCount = assignment?.totalQuestions || (hasMandatory ? 90 : 60);
   const omrQuestionCount: 60 | 90 = totalQuestionsCount === 60 ? 60 : 90;
 

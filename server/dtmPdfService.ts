@@ -345,9 +345,12 @@ export function generateAnswerSheetPdfBuffer(assignment: DtmPdfAssignmentPayload
   return new Promise((resolve, reject) => {
     try {
       const fonts = resolveFonts();
+      const mandatoryQs = [...(assignment.mandatoryQuestions || [])].sort((a, b) => a.order - b.order);
       const hasMandatory =
-        Boolean(assignment.mandatoryQuestions && assignment.mandatoryQuestions.length > 0) ||
-        assignment.totalQuestions === 90;
+        mandatoryQs.length > 0 ||
+        assignment.totalQuestions === 90 ||
+        Boolean(assignment.mandatorySubjectsLabel) ||
+        Boolean(assignment.block1Questions?.some((q) => Number(q?.order) > 30));
 
       const doc = new PDFDocument({
         size: "A4",
@@ -389,56 +392,71 @@ export function generateAnswerSheetPdfBuffer(assignment: DtmPdfAssignmentPayload
         // ============================================================
         // 1-PAGE A4 DTM 90-QUESTION CIRCULAR BUBBLE SHEET (3 x 30)
         // ============================================================
-        doc.fillColor("#0f172a").font("Bld").fontSize(12.5).text("AIEDUTIZIM  ·  DTM TIZIM", left, 22);
+        doc.fillColor("#0f172a").font("Bld").fontSize(12.5).text("AIEDUTIZIM  ·  DTM TIZIM", left, 22, {
+          lineBreak: false,
+        });
         doc.fillColor("#0f172a").font("Bld").fontSize(11).text("JAVOBLAR VARAQASI (90 SAVOL)", left, 23, {
           width: contentWidth,
           align: "right",
+          lineBreak: false,
         });
         doc.moveTo(left, 39).lineTo(pageWidth - left, 39).lineWidth(1.1).strokeColor("#0f172a").stroke();
 
         const metaY = 47;
         const metaH = 86;
-        const leftInfoW = 285;
+        const leftInfoW = 290;
         const idBoxX = left + leftInfoW + 10;
         const idBoxW = contentWidth - leftInfoW - 10;
+        const labelX = left + 9;
+        const valueX = left + 90;
+        const valueW = leftInfoW - 98;
+
+        const mSub1 = mandatoryQs.find((q) => q.order >= 1 && q.order <= 10)?.subjectName || "Ona tili";
+        const mSub2 = mandatoryQs.find((q) => q.order >= 11 && q.order <= 20)?.subjectName || "Matematika";
+        const mSub3 = mandatoryQs.find((q) => q.order >= 21 && q.order <= 30)?.subjectName || "O'zbekiston tarixi";
+        const mandatorySummary =
+          assignment.mandatorySubjectsLabel || `${mSub1} (1–10), ${mSub2} (11–20), ${mSub3} (21–30)`;
 
         doc.roundedRect(left, metaY, leftInfoW, metaH, 4).lineWidth(1).strokeColor("#334155").stroke();
-        doc.fillColor("#475569").font("Reg").fontSize(8);
-        doc.text("Tashkilot:", left + 9, metaY + 7);
-        doc.fillColor("#0f172a").font("Bld").fontSize(8.5).text(assignment.organizationName || "—", left + 68, metaY + 7, {
-          width: leftInfoW - 76,
+
+        doc.fillColor("#475569").font("Reg").fontSize(7.8).text("Tashkilot:", labelX, metaY + 7, { lineBreak: false });
+        doc.fillColor("#0f172a").font("Bld").fontSize(8.2).text(assignment.organizationName || "—", valueX, metaY + 7, {
+          width: valueW,
           ellipsis: true,
           lineBreak: false,
         });
 
-        doc.fillColor("#475569").font("Reg").fontSize(8).text("F.I.Sh.:", left + 9, metaY + 21);
-        doc.fillColor("#0f172a").font("Bld").fontSize(9).text(assignment.studentFullName || "—", left + 68, metaY + 20, {
-          width: leftInfoW - 76,
+        doc.fillColor("#475569").font("Reg").fontSize(7.8).text("F.I.Sh.:", labelX, metaY + 20.5, { lineBreak: false });
+        doc.fillColor("#0f172a").font("Bld").fontSize(8.6).text(assignment.studentFullName || "—", valueX, metaY + 20, {
+          width: valueW,
           ellipsis: true,
           lineBreak: false,
         });
 
-        doc.fillColor("#475569").font("Reg").fontSize(8).text("Variant ID:", left + 9, metaY + 35);
-        doc.fillColor("#0f172a").font("MonoBld").fontSize(8.5).text(assignment.assignmentCode || assignment.id, left + 68, metaY + 35);
-
-        doc.fillColor("#1e3a8a").font("Bld").fontSize(7.8).text("Majburiy (1–30):", left + 9, metaY + 49);
-        doc.fillColor("#1e3a8a").font("Bld").fontSize(7.8).text(
-          assignment.mandatorySubjectsLabel || "Ona tili, Matematika, Tarix",
-          left + 74,
-          metaY + 49,
-          { width: leftInfoW - 82, ellipsis: true, lineBreak: false }
-        );
-
-        doc.fillColor("#475569").font("Reg").fontSize(7.8).text("1-blok (31–60):", left + 9, metaY + 61);
-        doc.fillColor("#0f172a").font("Bld").fontSize(7.8).text(assignment.block1SubjectName || "—", left + 74, metaY + 61, {
-          width: leftInfoW - 82,
+        doc.fillColor("#475569").font("Reg").fontSize(7.8).text("Variant ID:", labelX, metaY + 34, { lineBreak: false });
+        doc.fillColor("#0f172a").font("MonoBld").fontSize(8.2).text(assignment.assignmentCode || assignment.id, valueX, metaY + 34, {
+          width: valueW,
           ellipsis: true,
           lineBreak: false,
         });
 
-        doc.fillColor("#475569").font("Reg").fontSize(7.8).text("2-blok (61–90):", left + 9, metaY + 73);
-        doc.fillColor("#0f172a").font("Bld").fontSize(7.8).text(assignment.block2SubjectName || "—", left + 74, metaY + 73, {
-          width: leftInfoW - 82,
+        doc.fillColor("#1e3a8a").font("Bld").fontSize(7.5).text("Majburiy (1–30):", labelX, metaY + 48, { lineBreak: false });
+        doc.fillColor("#1e3a8a").font("Bld").fontSize(7.4).text(mandatorySummary, valueX, metaY + 48, {
+          width: valueW,
+          ellipsis: true,
+          lineBreak: false,
+        });
+
+        doc.fillColor("#475569").font("Reg").fontSize(7.5).text("1-blok (31–60):", labelX, metaY + 60.5, { lineBreak: false });
+        doc.fillColor("#0f172a").font("Bld").fontSize(7.6).text(assignment.block1SubjectName || "—", valueX, metaY + 60.5, {
+          width: valueW,
+          ellipsis: true,
+          lineBreak: false,
+        });
+
+        doc.fillColor("#475569").font("Reg").fontSize(7.5).text("2-blok (61–90):", labelX, metaY + 73, { lineBreak: false });
+        doc.fillColor("#0f172a").font("Bld").fontSize(7.6).text(assignment.block2SubjectName || "—", valueX, metaY + 73, {
+          width: valueW,
           ellipsis: true,
           lineBreak: false,
         });
@@ -448,11 +466,13 @@ export function generateAnswerSheetPdfBuffer(assignment: DtmPdfAssignmentPayload
         doc.fillColor("#0f172a").font("Bld").fontSize(8.5).text("O'QUVCHI ID (OCR / OMR BLOK)", idBoxX, metaY + 7, {
           width: idBoxW,
           align: "center",
+          lineBreak: false,
         });
 
         doc.fillColor("#000000").font("MonoBld").fontSize(19).text(numericId, idBoxX, metaY + 21, {
           width: idBoxW,
           align: "center",
+          lineBreak: false,
         });
 
         const digits = numericId.split("");
@@ -476,14 +496,16 @@ export function generateAnswerSheetPdfBuffer(assignment: DtmPdfAssignmentPayload
         // Instruction Bar
         const instrY = 140;
         doc.roundedRect(left, instrY, contentWidth, 20, 3).fill("#f1f5f9");
-        doc.fillColor("#334155").font("Reg").fontSize(7.5).text(
-          "YO'RIQNOMA: A, B, C, D doirachalarini qora yoki ko'k ruchka bilan to'liq bo'yang. Har savolda faqat 1 ta javob belgilanadi.",
-          left + 8,
-          instrY + 5.5,
-          { width: contentWidth - 16, align: "center" }
+        doc.fillColor("#334155").font("Reg").fontSize(7.3).text(
+          "YO'RIQNOMA: 1–30 Majburiy, 31–60 1-blok, 61–90 2-blok. A, B, C, D doirachalarini qora/ko'k ruchkada to'liq bo'yang (har savolda 1 ta javob).",
+          left + 6,
+          instrY + 6,
+          { width: contentWidth - 12, align: "center", lineBreak: false }
         );
 
         // 3-Column OMR Grid: 1-30 (Majburiy), 31-60 (1-blok), 61-90 (2-blok)
+        // NOTE: Bubble coordinates (gridY, headerH, colGap, rowH, centerStartX, stepX, radius)
+        // are paired 1:1 with src/lib/dtmOmrEngine.ts — keep exact geometry unchanged.
         const gridY = 168;
         const headerH = 18;
         const colGap = 14;
@@ -497,13 +519,14 @@ export function generateAnswerSheetPdfBuffer(assignment: DtmPdfAssignmentPayload
           doc.rect(colX, gridY, colW, headerH).fill(col === 0 ? "#1e3a8a" : "#0f172a");
           const colLabel =
             col === 0
-              ? `MAJBURIY (1–30)`
+              ? "MAJBURIY (1–30 · 1.1)"
               : col === 1
-              ? `1-BLOK (31–60)`
-              : `2-BLOK (61–90)`;
-          doc.fillColor("#ffffff").font("Bld").fontSize(8).text(colLabel, colX, gridY + 4.5, {
+              ? "1-BLOK (31–60 · 3.1)"
+              : "2-BLOK (61–90 · 2.1)";
+          doc.fillColor("#ffffff").font("Bld").fontSize(7.8).text(colLabel, colX, gridY + 4.8, {
             width: colW,
             align: "center",
+            lineBreak: false,
           });
 
           for (let r = 0; r < 30; r++) {
@@ -513,13 +536,27 @@ export function generateAnswerSheetPdfBuffer(assignment: DtmPdfAssignmentPayload
             const rowBg = r % 2 === 0 ? "#ffffff" : "#f8fafc";
             doc.rect(colX, ry, colW, rowH).lineWidth(0.45).strokeColor("#cbd5e1").fillAndStroke(rowBg, "#cbd5e1");
 
+            // Thin section accent strip along left edge (strictly outside OMR bubble zone)
+            const accentColor =
+              col === 0
+                ? qNum <= 10
+                  ? "#1d4ed8"
+                  : qNum <= 20
+                  ? "#0284c7"
+                  : "#4338ca"
+                : col === 1
+                ? "#0f172a"
+                : "#334155";
+            doc.rect(colX, ry, 2.4, rowH).fill(accentColor);
+
             // Visual sub-block separators in Mandatory column between Ona tili (1-10), Matematika (11-20), Tarix (21-30)
             if (qNum === 11 || qNum === 21) {
               doc.moveTo(colX, ry).lineTo(colX + colW, ry).lineWidth(1.25).strokeColor("#2563eb").stroke();
             }
 
-            doc.fillColor("#0f172a").font("MonoBld").fontSize(8.2).text(`${String(qNum).padStart(2, "0")}.`, colX + 5, ry + 5, {
-              width: 20,
+            doc.fillColor("#0f172a").font("MonoBld").fontSize(8.1).text(`${String(qNum).padStart(2, "0")}.`, colX + 4, ry + 5.5, {
+              width: 21,
+              align: "right",
               lineBreak: false,
             });
 
@@ -532,12 +569,22 @@ export function generateAnswerSheetPdfBuffer(assignment: DtmPdfAssignmentPayload
             options.forEach((opt, oi) => {
               const cx = centerStartX + oi * stepX;
               doc.circle(cx, cy, radius).lineWidth(0.95).strokeColor("#0f172a").fillAndStroke("#ffffff", "#0f172a");
-              doc.fillColor("#0f172a").font("Bld").fontSize(7.5).text(opt, cx - radius, cy - 3.6, {
+              doc.fillColor("#0f172a").font("Bld").fontSize(7.5).text(opt, cx - radius, cy - 4.0, {
                 width: radius * 2,
                 align: "center",
                 lineBreak: false,
               });
             });
+
+            // Micro section marker in far-right margin for mandatory blocks (clear of bubble D halo)
+            if (qNum === 1 || qNum === 11 || qNum === 21) {
+              const tag = qNum === 1 ? "OT" : qNum === 11 ? "MT" : "TX";
+              doc.fillColor("#1e40af").font("Bld").fontSize(5.5).text(tag, colX + 146.5, cy - 3, {
+                width: 14,
+                align: "center",
+                lineBreak: false,
+              });
+            }
           }
         }
 
